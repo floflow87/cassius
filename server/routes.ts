@@ -9,14 +9,92 @@ import {
   insertImplantSchema,
   insertRadioSchema,
   insertVisiteSchema,
+  patients,
 } from "@shared/schema";
 import { z } from "zod";
+import { db, pool } from "./db";
+import { eq } from "drizzle-orm";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   const objectStorageService = new ObjectStorageService();
+
+  // Endpoint de test de connexion à la base de données
+  app.get("/db-test", async (_req, res) => {
+    const testId = `test-${Date.now()}`;
+    const testPatient = {
+      nom: "Doe",
+      prenom: "John",
+      dateNaissance: "1990-01-15",
+      sexe: "HOMME" as const,
+      telephone: "+33600000000",
+      email: "john.doe@test.com",
+      contexteMedical: "Patient de test - à supprimer",
+    };
+
+    try {
+      // Test 1: Vérifier la connexion
+      const connectionTest = await pool.query("SELECT 1 as connected");
+      if (!connectionTest.rows[0]?.connected) {
+        throw new Error("Échec de la connexion à la base de données");
+      }
+
+      // Test 2: INSERT - Créer un patient fictif
+      const [insertedPatient] = await db
+        .insert(patients)
+        .values(testPatient)
+        .returning();
+
+      if (!insertedPatient) {
+        throw new Error("Échec de l'insertion du patient test");
+      }
+
+      // Test 3: SELECT - Récupérer le patient créé
+      const [selectedPatient] = await db
+        .select()
+        .from(patients)
+        .where(eq(patients.id, insertedPatient.id));
+
+      if (!selectedPatient) {
+        throw new Error("Échec de la lecture du patient test");
+      }
+
+      // Test 4: DELETE - Supprimer le patient de test
+      await db.delete(patients).where(eq(patients.id, insertedPatient.id));
+
+      // Succès
+      res.json({
+        success: true,
+        message: "Connexion à la base de données Supabase validée",
+        tests: {
+          connexion: "OK",
+          insert: "OK",
+          select: "OK",
+          delete: "OK (patient test supprimé)",
+        },
+        patientTest: {
+          id: insertedPatient.id,
+          nom: selectedPatient.nom,
+          prenom: selectedPatient.prenom,
+          dateNaissance: selectedPatient.dateNaissance,
+        },
+        database: process.env.NODE_ENV === "production" ? "Supabase" : "Replit PostgreSQL",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Erreur test DB:", error);
+      res.status(500).json({
+        success: false,
+        message: "Erreur de connexion à la base de données",
+        error: error instanceof Error ? error.message : "Erreur inconnue",
+        database: process.env.NODE_ENV === "production" ? "Supabase" : "Replit PostgreSQL",
+        conseil: "Vérifiez que SUPABASE_DATABASE_URL (production) ou DATABASE_URL (développement) est correctement configuré dans les Secrets Replit",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
 
   app.get("/api/patients", requireAuth, async (_req, res) => {
     try {
