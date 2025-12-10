@@ -17,13 +17,22 @@ import {
   type InsertVisite,
   type User,
 } from "@shared/schema";
+import type {
+  PatientDetail,
+  ImplantDetail,
+  ImplantWithPatient,
+  DashboardStats,
+  AdvancedStats,
+  ImplantFilters,
+  CreateUserInput,
+} from "@shared/types";
 import { db } from "./db";
 import { eq, desc, ilike, or, and, sql } from "drizzle-orm";
 
 export interface IStorage {
   getPatients(): Promise<Patient[]>;
   getPatient(id: string): Promise<Patient | undefined>;
-  getPatientWithDetails(id: string): Promise<any>;
+  getPatientWithDetails(id: string): Promise<PatientDetail | undefined>;
   createPatient(patient: InsertPatient): Promise<Patient>;
   searchPatients(query: string): Promise<Patient[]>;
 
@@ -31,7 +40,7 @@ export interface IStorage {
   createOperation(operation: InsertOperation): Promise<Operation>;
 
   getImplant(id: string): Promise<Implant | undefined>;
-  getImplantWithDetails(id: string): Promise<any>;
+  getImplantWithDetails(id: string): Promise<ImplantDetail | undefined>;
   getPatientImplants(patientId: string): Promise<Implant[]>;
   createImplant(implant: InsertImplant): Promise<Implant>;
 
@@ -42,38 +51,16 @@ export interface IStorage {
   getImplantVisites(implantId: string): Promise<Visite[]>;
   createVisite(visite: InsertVisite): Promise<Visite>;
 
-  getStats(): Promise<{
-    totalPatients: number;
-    totalOperations: number;
-    totalImplants: number;
-    totalRadios: number;
-    implantsByStatus: Record<string, number>;
-    recentOperations: Operation[];
-  }>;
+  getStats(): Promise<DashboardStats>;
 
   getAllImplants(): Promise<Implant[]>;
-  filterImplants(filters: {
-    marque?: string;
-    siteFdi?: string;
-    typeOs?: string;
-    statut?: string;
-  }): Promise<(Implant & { patient?: Patient })[]>;
+  filterImplants(filters: ImplantFilters): Promise<ImplantWithPatient[]>;
   getImplantBrands(): Promise<string[]>;
-  getAdvancedStats(): Promise<{
-    successRate: number;
-    complicationRate: number;
-    failureRate: number;
-    avgIsqPose: number;
-    avgIsq3m: number;
-    avgIsq6m: number;
-    implantsByBrand: Record<string, number>;
-    implantsBySite: Record<string, number>;
-    isqTrends: { month: string; avgIsq: number }[];
-  }>;
+  getAdvancedStats(): Promise<AdvancedStats>;
 
   getUserById(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(data: { username: string; password: string; role?: string; nom?: string | null; prenom?: string | null }): Promise<User>;
+  createUser(data: CreateUserInput): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -86,7 +73,7 @@ export class DatabaseStorage implements IStorage {
     return patient || undefined;
   }
 
-  async getPatientWithDetails(id: string): Promise<any> {
+  async getPatientWithDetails(id: string): Promise<PatientDetail | undefined> {
     const patient = await this.getPatient(id);
     if (!patient) return undefined;
 
@@ -172,7 +159,7 @@ export class DatabaseStorage implements IStorage {
     return implant || undefined;
   }
 
-  async getImplantWithDetails(id: string): Promise<any> {
+  async getImplantWithDetails(id: string): Promise<ImplantDetail | undefined> {
     const implant = await this.getImplant(id);
     if (!implant) return undefined;
 
@@ -192,7 +179,7 @@ export class DatabaseStorage implements IStorage {
       ...implant,
       visites: implantVisites,
       radios: implantRadios,
-    };
+    } as ImplantDetail;
   }
 
   async getPatientImplants(patientId: string): Promise<Implant[]> {
@@ -236,14 +223,7 @@ export class DatabaseStorage implements IStorage {
     return newVisite;
   }
 
-  async getStats(): Promise<{
-    totalPatients: number;
-    totalOperations: number;
-    totalImplants: number;
-    totalRadios: number;
-    implantsByStatus: Record<string, number>;
-    recentOperations: Operation[];
-  }> {
+  async getStats(): Promise<DashboardStats> {
     const allPatients = await db.select().from(patients);
     const allOperations = await db.select().from(operations).orderBy(desc(operations.dateOperation));
     const allImplants = await db.select().from(implants);
@@ -269,12 +249,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(implants).orderBy(desc(implants.datePose));
   }
 
-  async filterImplants(filters: {
-    marque?: string;
-    siteFdi?: string;
-    typeOs?: string;
-    statut?: string;
-  }): Promise<(Implant & { patient?: Patient })[]> {
+  async filterImplants(filters: ImplantFilters): Promise<ImplantWithPatient[]> {
     const conditions = [];
 
     if (filters.marque) {
@@ -314,17 +289,7 @@ export class DatabaseStorage implements IStorage {
     return results.map((r) => r.marque);
   }
 
-  async getAdvancedStats(): Promise<{
-    successRate: number;
-    complicationRate: number;
-    failureRate: number;
-    avgIsqPose: number;
-    avgIsq3m: number;
-    avgIsq6m: number;
-    implantsByBrand: Record<string, number>;
-    implantsBySite: Record<string, number>;
-    isqTrends: { month: string; avgIsq: number }[];
-  }> {
+  async getAdvancedStats(): Promise<AdvancedStats> {
     const allImplants = await db.select().from(implants);
     const total = allImplants.length;
 
@@ -398,7 +363,7 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async createUser(data: { username: string; password: string; role?: string; nom?: string | null; prenom?: string | null }): Promise<User> {
+  async createUser(data: CreateUserInput): Promise<User> {
     const [user] = await db.insert(users).values({
       username: data.username,
       password: data.password,

@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
@@ -11,6 +11,22 @@ import {
   insertVisiteSchema,
   patients,
 } from "@shared/schema";
+import type {
+  Patient,
+  PatientDetail,
+  Operation,
+  Implant,
+  Radio,
+  Visite,
+  ImplantDetail,
+  DashboardStats,
+  AdvancedStats,
+  ImplantWithPatient,
+  DbTestResponse,
+  ApiError,
+  UploadUrlRequest,
+  UploadUrlResponse,
+} from "@shared/types";
 import { z } from "zod";
 import { db, pool } from "./db";
 import { eq } from "drizzle-orm";
