@@ -1,0 +1,700 @@
+{
+  "id": "d4b61466-8882-4d92-8679-d902afd939af",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.implants": {
+      "name": "implants",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "patient_id": {
+          "name": "patient_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marque": {
+          "name": "marque",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reference_fabricant": {
+          "name": "reference_fabricant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "diametre": {
+          "name": "diametre",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "longueur": {
+          "name": "longueur",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_fdi": {
+          "name": "site_fdi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position_implant": {
+          "name": "position_implant",
+          "type": "position_implant",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type_os": {
+          "name": "type_os",
+          "type": "type_os",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mise_en_charge_prevue": {
+          "name": "mise_en_charge_prevue",
+          "type": "type_mise_en_charge",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isq_pose": {
+          "name": "isq_pose",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isq_2m": {
+          "name": "isq_2m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isq_3m": {
+          "name": "isq_3m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isq_6m": {
+          "name": "isq_6m",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "statut": {
+          "name": "statut",
+          "type": "statut_implant",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'EN_SUIVI'"
+        },
+        "date_pose": {
+          "name": "date_pose",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "implants_operation_id_operations_id_fk": {
+          "name": "implants_operation_id_operations_id_fk",
+          "tableFrom": "implants",
+          "tableTo": "operations",
+          "columnsFrom": [
+            "operation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "implants_patient_id_patients_id_fk": {
+          "name": "implants_patient_id_patients_id_fk",
+          "tableFrom": "implants",
+          "tableTo": "patients",
+          "columnsFrom": [
+            "patient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.operations": {
+      "name": "operations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "patient_id": {
+          "name": "patient_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date_operation": {
+          "name": "date_operation",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type_intervention": {
+          "name": "type_intervention",
+          "type": "type_intervention",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type_chirurgie_temps": {
+          "name": "type_chirurgie_temps",
+          "type": "type_chirurgie_temps",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type_chirurgie_approche": {
+          "name": "type_chirurgie_approche",
+          "type": "type_chirurgie_approche",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "greffe_osseuse": {
+          "name": "greffe_osseuse",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "type_greffe": {
+          "name": "type_greffe",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "greffe_quantite": {
+          "name": "greffe_quantite",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "greffe_localisation": {
+          "name": "greffe_localisation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type_mise_en_charge": {
+          "name": "type_mise_en_charge",
+          "type": "type_mise_en_charge",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conditions_medicales_preop": {
+          "name": "conditions_medicales_preop",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes_perop": {
+          "name": "notes_perop",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "observations_postop": {
+          "name": "observations_postop",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "operations_patient_id_patients_id_fk": {
+          "name": "operations_patient_id_patients_id_fk",
+          "tableFrom": "operations",
+          "tableTo": "patients",
+          "columnsFrom": [
+            "patient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.patients": {
+      "name": "patients",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prenom": {
+          "name": "prenom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date_naissance": {
+          "name": "date_naissance",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sexe": {
+          "name": "sexe",
+          "type": "sexe",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "telephone": {
+          "name": "telephone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contexte_medical": {
+          "name": "contexte_medical",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.radios": {
+      "name": "radios",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "patient_id": {
+          "name": "patient_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "implant_id": {
+          "name": "implant_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type": {
+          "name": "type",
+          "type": "type_radio",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "radios_patient_id_patients_id_fk": {
+          "name": "radios_patient_id_patients_id_fk",
+          "tableFrom": "radios",
+          "tableTo": "patients",
+          "columnsFrom": [
+            "patient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "radios_operation_id_operations_id_fk": {
+          "name": "radios_operation_id_operations_id_fk",
+          "tableFrom": "radios",
+          "tableTo": "operations",
+          "columnsFrom": [
+            "operation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "radios_implant_id_implants_id_fk": {
+          "name": "radios_implant_id_implants_id_fk",
+          "tableFrom": "radios",
+          "tableTo": "implants",
+          "columnsFrom": [
+            "implant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ASSISTANT'"
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prenom": {
+          "name": "prenom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_username_unique": {
+          "name": "users_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "username"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.visites": {
+      "name": "visites",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "implant_id": {
+          "name": "implant_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "patient_id": {
+          "name": "patient_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isq": {
+          "name": "isq",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "radio_id": {
+          "name": "radio_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "visites_implant_id_implants_id_fk": {
+          "name": "visites_implant_id_implants_id_fk",
+          "tableFrom": "visites",
+          "tableTo": "implants",
+          "columnsFrom": [
+            "implant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "visites_patient_id_patients_id_fk": {
+          "name": "visites_patient_id_patients_id_fk",
+          "tableFrom": "visites",
+          "tableTo": "patients",
+          "columnsFrom": [
+            "patient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "visites_radio_id_radios_id_fk": {
+          "name": "visites_radio_id_radios_id_fk",
+          "tableFrom": "visites",
+          "tableTo": "radios",
+          "columnsFrom": [
+            "radio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.position_implant": {
+      "name": "position_implant",
+      "schema": "public",
+      "values": [
+        "CRESTAL",
+        "SOUS_CRESTAL",
+        "SUPRA_CRESTAL"
+      ]
+    },
+    "public.role": {
+      "name": "role",
+      "schema": "public",
+      "values": [
+        "CHIRURGIEN",
+        "ASSISTANT",
+        "ADMIN"
+      ]
+    },
+    "public.sexe": {
+      "name": "sexe",
+      "schema": "public",
+      "values": [
+        "HOMME",
+        "FEMME"
+      ]
+    },
+    "public.statut_implant": {
+      "name": "statut_implant",
+      "schema": "public",
+      "values": [
+        "EN_SUIVI",
+        "SUCCES",
+        "COMPLICATION",
+        "ECHEC"
+      ]
+    },
+    "public.type_chirurgie_approche": {
+      "name": "type_chirurgie_approche",
+      "schema": "public",
+      "values": [
+        "LAMBEAU",
+        "FLAPLESS"
+      ]
+    },
+    "public.type_chirurgie_temps": {
+      "name": "type_chirurgie_temps",
+      "schema": "public",
+      "values": [
+        "UN_TEMPS",
+        "DEUX_TEMPS"
+      ]
+    },
+    "public.type_intervention": {
+      "name": "type_intervention",
+      "schema": "public",
+      "values": [
+        "POSE_IMPLANT",
+        "GREFFE_OSSEUSE",
+        "SINUS_LIFT",
+        "EXTRACTION_IMPLANT_IMMEDIATE",
+        "REPRISE_IMPLANT",
+        "CHIRURGIE_GUIDEE"
+      ]
+    },
+    "public.type_mise_en_charge": {
+      "name": "type_mise_en_charge",
+      "schema": "public",
+      "values": [
+        "IMMEDIATE",
+        "PRECOCE",
+        "DIFFEREE"
+      ]
+    },
+    "public.type_os": {
+      "name": "type_os",
+      "schema": "public",
+      "values": [
+        "D1",
+        "D2",
+        "D3",
+        "D4"
+      ]
+    },
+    "public.type_radio": {
+      "name": "type_radio",
+      "schema": "public",
+      "values": [
+        "PANORAMIQUE",
+        "CBCT",
+        "RETROALVEOLAIRE"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
