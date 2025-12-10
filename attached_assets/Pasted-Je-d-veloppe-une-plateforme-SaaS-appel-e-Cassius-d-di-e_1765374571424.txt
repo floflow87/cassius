@@ -1,0 +1,257 @@
+Je développe une plateforme SaaS appelée Cassius, dédiée aux chirurgiens-dentistes implantologues.
+L’objectif : structurer la mémoire clinique, documenter les opérations implantologiques, centraliser les radios, générer des timelines cliniques et permettre des recherches et statistiques.
+
+Je souhaite que tu m’assistes dans la création du MVP technique : backend Node/TS, base de données PostgreSQL, API REST, et un frontend React minimal.
+
+🎯 Objectif du MVP
+
+Créer un système capable de :
+
+Gérer des patients (CRUD)
+
+Créer des actes chirurgicaux (= opérations)
+
+Ajouter un ou plusieurs implants à une opération
+
+Uploader et stocker des radios
+
+Gérer des visites de contrôle (ISQ + notes)
+
+Afficher une timeline patient et une timeline implant (version simple)
+
+Effectuer une recherche simple (patients, implants)
+
+Pas besoin d’IA, pas besoin de statistiques pour ce MVP.
+
+🧱 Stack technique imposée
+
+Backend : NodeJS + TypeScript + Express
+
+ORM : Prisma
+
+Database : PostgreSQL (Supabase)
+
+Frontend : React + TypeScript
+
+Storage (radios) : Supabase Storage (ou S3 si besoin)
+
+API : REST, architecture modulaire (routes / services / controllers)
+
+🗄️ Modèle de données à implémenter (MVP)
+
+Merci de créer ces tables Prisma exactement :
+
+Patient
+
+id (UUID, PK)
+
+nom
+
+prenom
+
+date_naissance
+
+sexe (enum)
+
+telephone
+
+email
+
+contexte_medical (text)
+
+created_at (datetime)
+
+Operation
+
+id (UUID, PK)
+
+patient_id (FK → Patient)
+
+date_operation
+
+type_intervention (enum) : POSE_IMPLANT / GREFFE_OSSEUSE / SINUS_LIFT / EXTRACTION_IMPLANT_IMMEDIATE / REPRISE_IMPLANT / CHIRURGIE_GUIDEE
+
+type_chirurgie_temps (enum) : UN_TEMPS / DEUX_TEMPS
+
+type_chirurgie_approche (enum) : LAMBEAU / FLAPLESS
+
+greffe_oseuse (bool)
+
+type_greffe (string, optional)
+
+greffe_quantite (string, optional)
+
+greffe_localisation (string, optional)
+
+type_mise_en_charge (enum) : IMMEDIATE / PRECOCE / DIFFEREE
+
+conditions_medicales_preop (text)
+
+notes_perop (text)
+
+observations_postop (text)
+
+Implant
+
+id (UUID, PK)
+
+operation_id (FK → Operation)
+
+patient_id (FK → Patient)
+
+marque
+
+reference_fabricant
+
+diametre (float)
+
+longueur (float)
+
+site_fdi (string)
+
+position_implant (enum) : CRESTAL / SOUS_CRESTAL / SUPRA_CRESTAL
+
+type_os (enum : D1/D2/D3/D4, optional)
+
+mise_en_charge_prevue (enum) : IMMEDIATE / PRECOCE / DIFFEREE
+
+isq_pose (float optional)
+
+isq_2m (float optional)
+
+isq_3m (float optional)
+
+isq_6m (float optional)
+
+statut (enum) : EN_SUIVI / SUCCES / COMPLICATION / ECHEC
+
+date_pose (héritée de l’opération)
+
+Radio
+
+id (UUID)
+
+patient_id (FK)
+
+operation_id (FK optional)
+
+implant_id (FK optional)
+
+type (enum : PANORAMIQUE / CBCT / RETROALVEOLAIRE)
+
+url
+
+date
+
+VisiteControle
+
+id (UUID)
+
+implant_id (FK)
+
+patient_id (FK)
+
+date
+
+isq
+
+notes
+
+radio_id (optional)
+
+🔌 API REST à créer (MVP)
+Patients
+
+POST /patients
+
+GET /patients
+
+GET /patients/:id
+
+Operations
+
+POST /operations
+
+GET /operations/:id
+
+Implants
+
+POST /implants
+
+GET /implants/:id
+
+GET /patients/:id/implants
+
+Radios
+
+POST /radios
+
+GET /radios/:id
+
+Visites
+
+POST /visites
+
+GET /implants/:id/visites
+
+🧭 Fonctionnalités frontend (MVP)
+Vue Patients
+
+liste patients
+
+recherche
+
+création patient
+
+Fiche Patient
+
+infos patient
+
+liste opérations
+
+liste implants
+
+bouton Nouvelle opération
+
+timeline patient simple (liste d’événements)
+
+Formulaire Opération
+
+→ type métier + pré-op + per-op + greffe + mise en charge
+→ ajout d’implants
+
+Fiche Implant
+
+données implant
+
+liste visites
+
+timeline implant simple (liste datée)
+
+Upload Radio
+
+upload image
+
+liaison (patient / opération / implant)
+
+📌 Priorités de développement (ordre obligatoire)
+
+Setup projet backend Node/TS + Prisma
+
+Définition schéma Prisma + migrations
+
+CRUD Patients
+
+CRUD Operations
+
+CRUD Implants
+
+Upload Radios
+
+CRUD Visites
+
+Timeline implant (v1 : liste d’événements)
+
+Timeline patient (v1 : liste d’événements)
+
+Recherche simple
