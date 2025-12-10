@@ -11,6 +11,7 @@ import {
   Activity,
   FileImage,
   ClipboardList,
+  Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,8 +60,9 @@ export default function PatientDetailsPage() {
     return age;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("fr-FR", {
+  const formatDate = (dateInput: string | Date) => {
+    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    return date.toLocaleDateString("fr-FR", {
       day: "2-digit",
       month: "long",
       year: "numeric",
@@ -121,6 +123,12 @@ export default function PatientDetailsPage() {
             Patient depuis {formatDate(patient.createdAt)}
           </p>
         </div>
+        <Link href={`/patient/${patientId}/report`}>
+          <Button variant="outline" data-testid="button-print-report">
+            <Printer className="h-4 w-4 mr-2" />
+            Rapport
+          </Button>
+        </Link>
       </div>
 
       <Card>

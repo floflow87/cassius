@@ -11,6 +11,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
 import type { Implant, Visite, Radio } from "@shared/schema";
 
 interface ImplantWithDetails extends Implant {
@@ -186,25 +196,83 @@ export default function ImplantDetailsPage() {
                 <p className="text-sm">Aucune mesure ISQ enregistrée</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {isqProgression.map((point, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 rounded-md bg-muted/50"
-                  >
-                    <span className="text-sm text-muted-foreground">
-                      {point.label}
-                    </span>
-                    <span className="font-mono font-medium text-lg">
-                      {point.value}
-                    </span>
-                  </div>
-                ))}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {isqProgression.map((point, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                    >
+                      <span className="text-xs text-muted-foreground">
+                        {point.label}
+                      </span>
+                      <span className="font-mono font-medium">
+                        {point.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {isqProgression.length >= 2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Graphique ISQ
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={isqProgression}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis 
+                  dataKey="label" 
+                  tick={{ fontSize: 11 }}
+                  className="text-muted-foreground"
+                />
+                <YAxis 
+                  domain={[0, 100]} 
+                  tick={{ fontSize: 11 }}
+                  className="text-muted-foreground"
+                  label={{ 
+                    value: 'ISQ', 
+                    angle: -90, 
+                    position: 'insideLeft',
+                    style: { textAnchor: 'middle', fontSize: 12 }
+                  }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "6px",
+                  }}
+                  formatter={(value: number) => [`ISQ: ${value}`, '']}
+                />
+                <ReferenceLine 
+                  y={70} 
+                  stroke="hsl(var(--chart-2))" 
+                  strokeDasharray="5 5" 
+                  label={{ value: 'Seuil critique', position: 'right', fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

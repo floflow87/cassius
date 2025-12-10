@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Users, Activity, Search } from "lucide-react";
+import { Users, Activity, Search, BarChart3 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,9 +21,14 @@ const menuItems = [
     icon: Users,
   },
   {
-    title: "Tableau de bord",
-    url: "/dashboard",
+    title: "Implants",
+    url: "/implants",
     icon: Activity,
+  },
+  {
+    title: "Statistiques",
+    url: "/dashboard",
+    icon: BarChart3,
   },
 ];
 
@@ -76,7 +81,11 @@ export function AppSidebar({ searchQuery, onSearchChange }: AppSidebarProps) {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location === item.url || (item.url === "/" && location.startsWith("/patient"))}
+                    isActive={
+                      location === item.url || 
+                      (item.url === "/" && location.startsWith("/patient")) ||
+                      (item.url === "/implants" && location.includes("/implant/"))
+                    }
                   >
                     <Link href={item.url} data-testid={`link-nav-${item.title.toLowerCase()}`}>
                       <item.icon className="h-4 w-4" />

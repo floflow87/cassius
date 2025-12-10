@@ -21,6 +21,7 @@ export const positionImplantEnum = pgEnum("position_implant", ["CRESTAL", "SOUS_
 export const typeOsEnum = pgEnum("type_os", ["D1", "D2", "D3", "D4"]);
 export const statutImplantEnum = pgEnum("statut_implant", ["EN_SUIVI", "SUCCES", "COMPLICATION", "ECHEC"]);
 export const typeRadioEnum = pgEnum("type_radio", ["PANORAMIQUE", "CBCT", "RETROALVEOLAIRE"]);
+export const roleEnum = pgEnum("role", ["CHIRURGIEN", "ASSISTANT", "ADMIN"]);
 
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -154,6 +155,9 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  role: roleEnum("role").default("ASSISTANT").notNull(),
+  nom: text("nom"),
+  prenom: text("prenom"),
 });
 
 export const insertPatientSchema = createInsertSchema(patients).omit({

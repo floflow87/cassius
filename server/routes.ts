@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { requireAuth } from "./auth";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -17,7 +18,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   const objectStorageService = new ObjectStorageService();
 
-  app.get("/api/patients", async (_req, res) => {
+  app.get("/api/patients", requireAuth, async (_req, res) => {
     try {
       const patients = await storage.getPatients();
       res.json(patients);
@@ -27,7 +28,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:id", async (req, res) => {
+  app.get("/api/patients/:id", requireAuth, async (req, res) => {
     try {
       const patient = await storage.getPatientWithDetails(req.params.id);
       if (!patient) {
@@ -40,7 +41,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/patients", async (req, res) => {
+  app.post("/api/patients", requireAuth, async (req, res) => {
     try {
       const data = insertPatientSchema.parse(req.body);
       const patient = await storage.createPatient(data);
@@ -54,7 +55,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/search", async (req, res) => {
+  app.get("/api/patients/search", requireAuth, async (req, res) => {
     try {
       const query = req.query.q as string || "";
       const patients = await storage.searchPatients(query);
@@ -65,7 +66,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/operations/:id", async (req, res) => {
+  app.get("/api/operations/:id", requireAuth, async (req, res) => {
     try {
       const operation = await storage.getOperation(req.params.id);
       if (!operation) {
@@ -94,7 +95,7 @@ export async function registerRoutes(
     ).default([]),
   });
 
-  app.post("/api/operations", async (req, res) => {
+  app.post("/api/operations", requireAuth, async (req, res) => {
     try {
       const data = operationWithImplantsSchema.parse(req.body);
       const { implants: implantData, ...operationData } = data;
@@ -123,7 +124,17 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants/:id", async (req, res) => {
+  app.get("/api/implants/brands", requireAuth, async (_req, res) => {
+    try {
+      const brands = await storage.getImplantBrands();
+      res.json(brands);
+    } catch (error) {
+      console.error("Error fetching brands:", error);
+      res.status(500).json({ error: "Failed to fetch brands" });
+    }
+  });
+
+  app.get("/api/implants/:id", requireAuth, async (req, res) => {
     try {
       const implant = await storage.getImplantWithDetails(req.params.id);
       if (!implant) {
@@ -136,7 +147,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:id/implants", async (req, res) => {
+  app.get("/api/patients/:id/implants", requireAuth, async (req, res) => {
     try {
       const implants = await storage.getPatientImplants(req.params.id);
       res.json(implants);
@@ -146,7 +157,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/implants", async (req, res) => {
+  app.post("/api/implants", requireAuth, async (req, res) => {
     try {
       const data = insertImplantSchema.parse(req.body);
       const implant = await storage.createImplant(data);
@@ -160,7 +171,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/radios/:id", async (req, res) => {
+  app.get("/api/radios/:id", requireAuth, async (req, res) => {
     try {
       const radio = await storage.getRadio(req.params.id);
       if (!radio) {
@@ -173,7 +184,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/radios", async (req, res) => {
+  app.post("/api/radios", requireAuth, async (req, res) => {
     try {
       const data = insertRadioSchema.parse(req.body);
       const radio = await storage.createRadio(data);
@@ -187,7 +198,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants/:id/visites", async (req, res) => {
+  app.get("/api/implants/:id/visites", requireAuth, async (req, res) => {
     try {
       const visites = await storage.getImplantVisites(req.params.id);
       res.json(visites);
@@ -197,7 +208,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/visites", async (req, res) => {
+  app.post("/api/visites", requireAuth, async (req, res) => {
     try {
       const data = insertVisiteSchema.parse(req.body);
       const visite = await storage.createVisite(data);
@@ -211,7 +222,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/stats", async (_req, res) => {
+  app.get("/api/stats", requireAuth, async (_req, res) => {
     try {
       const stats = await storage.getStats();
       res.json(stats);
@@ -221,7 +232,37 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/objects/upload", async (_req, res) => {
+  app.get("/api/stats/advanced", requireAuth, async (_req, res) => {
+    try {
+      const stats = await storage.getAdvancedStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching advanced stats:", error);
+      res.status(500).json({ error: "Failed to fetch advanced stats" });
+    }
+  });
+
+  app.get("/api/implants", requireAuth, async (req, res) => {
+    try {
+      const { marque, siteFdi, typeOs, statut } = req.query;
+      if (marque || siteFdi || typeOs || statut) {
+        const filtered = await storage.filterImplants({
+          marque: marque as string,
+          siteFdi: siteFdi as string,
+          typeOs: typeOs as string,
+          statut: statut as string,
+        });
+        return res.json(filtered);
+      }
+      const implants = await storage.getAllImplants();
+      res.json(implants);
+    } catch (error) {
+      console.error("Error fetching implants:", error);
+      res.status(500).json({ error: "Failed to fetch implants" });
+    }
+  });
+
+  app.post("/api/objects/upload", requireAuth, async (_req, res) => {
     try {
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
       res.json({ uploadURL });
@@ -231,7 +272,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/radios/upload-complete", async (req, res) => {
+  app.put("/api/radios/upload-complete", requireAuth, async (req, res) => {
     try {
       const { uploadURL } = req.body;
       if (!uploadURL) {
