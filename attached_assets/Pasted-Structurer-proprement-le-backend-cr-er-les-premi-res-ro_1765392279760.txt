@@ -1,0 +1,79 @@
+Structurer proprement le backend + créer les premières routes
+
+Je souhaite organiser mon backend proprement avant d’ajouter de nouvelles fonctionnalités.
+
+Le projet utilise Express + TypeScript + Drizzle ORM (et non Prisma).
+
+Merci de faire les actions suivantes :
+
+1. Créer une structure de dossiers claire :
+src/
+  server.ts
+  db/
+    client.ts       // initialisation de Drizzle + connexion à la DB
+    schema.ts       // définition des tables (patients, operations, implants…)
+  routes/
+    patient.routes.ts
+    operation.routes.ts
+    implant.routes.ts
+  controllers/
+    patient.controller.ts
+    operation.controller.ts
+    implant.controller.ts
+  services/
+    patient.service.ts
+    operation.service.ts
+    implant.service.ts
+  middlewares/
+    errorHandler.ts
+
+2. Configurer Express dans server.ts :
+
+importer et monter toutes les routes (patient.routes.ts, etc.)
+
+activer le parsing JSON (express.json())
+
+ajouter un gestionnaire d’erreurs global (middleware errorHandler)
+
+3. Implémenter les premiers endpoints réels :
+
+Pour les patients :
+
+POST /patients → création d’un patient dans la base via Drizzle
+
+GET /patients/:id → récupération d’un patient avec, si possible, ses opérations et implants associés (même en version simple pour l’instant)
+
+4. Utiliser Drizzle proprement :
+
+créer un client Drizzle réutilisable dans db/client.ts
+
+qui utilise la bonne DATABASE_URL déjà configurée
+
+définir le schéma de la table patients (et éventuellement operations) dans db/schema.ts
+
+utiliser Drizzle uniquement dans la couche service (patient.service.ts),
+pas directement dans les controllers
+
+5. Fournir un code fonctionnel et testé :
+
+un service qui gère toute la logique patient (insert/select avec Drizzle)
+
+un controller qui gère la couche HTTP (req/res)
+
+un fichier de routes qui connecte le controller à Express
+
+6. Après génération du code :
+
+Merci d’expliquer clairement comment tester dans Replit :
+
+POST /patients (avec un exemple de payload JSON)
+
+GET /patients/:id
+
+Je veux être capable de :
+
+Créer un patient via POST /patients
+
+Le récupérer via GET /patients/:id
+
+Une fois cette base propre et fonctionnelle, je poursuivrai avec les opérations, implants, radios, visites de contrôle et timelines.
