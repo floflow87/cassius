@@ -1,0 +1,76 @@
+Correction de la route GET /api/implants/:id/protheses
+
+Je souhaite corriger l’endpoint GET /api/implants/:id/protheses, car il utilise une variable organisationId non définie dans la route.
+
+Objectif :
+– protéger la route avec requireJwt
+– récupérer correctement organisationId depuis req.jwtUser (ou getOrganisationId)
+– l’utiliser pour filtrer les prothèses du cabinet du praticien
+– renvoyer proprement les données au format JSON
+
+Merci d’appliquer les modifications suivantes :
+
+✅ 1. Mettre à jour la route GET /api/implants/:id/protheses
+
+Je veux que la route ressemble à ceci (ou équivalent selon ton helper) :
+
+app.get("/api/implants/:id/protheses", requireJwt, async (req, res) => {
+  try {
+    const organisationId = getOrganisationId(req, res); 
+    if (!organisationId) return;
+
+    const implantId = req.params.id;
+
+    const protheses = await storage.getImplantProtheses(
+      organisationId,
+      implantId
+    );
+
+    return res.json(protheses);
+  } catch (err) {
+    console.error("Erreur récupération prothèses :", err);
+    return res.status(500).json({ error: "Erreur serveur lors de la récupération des prothèses" });
+  }
+});
+
+
+Si getOrganisationId n’existe pas ou ne renvoie pas l’ID, utiliser ceci :
+
+const organisationId = req.jwtUser?.organisationId;
+if (!organisationId) {
+  return res.status(400).json({ error: "Organisation manquante dans le token" });
+}
+
+✅ 2. Vérifier que storage.getImplantProtheses() reste inchangé
+async getImplantProtheses(organisationId: string, implantId: string) {
+  return db.select()
+    .from(protheses)
+    .where(
+      and(
+        eq(protheses.implantId, implantId),
+        eq(protheses.organisationId, organisationId)
+      )
+    )
+    .orderBy(desc(protheses.datePose));
+}
+
+🎯 Résultat attendu
+
+L’endpoint ne crash plus (plus de variable non définie)
+
+Le filtrage par organisationId est correctement appliqué
+
+Les données d’un cabinet ne peuvent pas être consultées par un autre
+
+L’endpoint répond correctement :
+
+[
+  {
+    "id": "...",
+    "implantId": "...",
+    "typeProthese": "VISSEE",
+    "typePilier": "DROIT",
+    "datePose": "2025-12-10",
+    "notes": "..."
+  }
+]
