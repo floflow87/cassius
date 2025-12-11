@@ -1,0 +1,125 @@
+Création d’une organisation à chaque inscription (register-cabinet)
+
+Je souhaite que Cassius fonctionne comme un vrai SaaS multi-cabinets.
+
+Objectif :
+Quand un nouveau cabinet s’inscrit, je veux :
+
+créer automatiquement une organisation (cabinet),
+
+créer un user ADMIN rattaché à cette organisation,
+
+renvoyer un JWT contenant organisationId,
+
+et que ce cabinet ait ensuite ses données totalement isolées des autres.
+
+Merci de faire les actions suivantes :
+
+1. Créer un nouvel endpoint d’inscription “cabinet”
+
+Dans server/auth.ts (ou un fichier auth équivalent), ajouter une nouvelle route :
+
+POST /api/auth/register-cabinet
+
+avec un body de ce type :
+
+{
+  "organisationName": "Cabinet Dr Martin",
+  "username": "dr.martin",
+  "password": "Cassius2025!",
+  "nom": "Martin",
+  "prenom": "Jean"
+}
+
+
+Cette route doit :
+
+Créer une nouvelle entrée dans la table organisations (ou cabinets) définie dans shared/schema.ts :
+
+nom = organisationName
+
+Créer un utilisateur associé avec :
+
+organisationId = id de cette nouvelle organisation
+
+role = "ADMIN" (conformément à mon choix produit)
+
+username, password hashé, nom, prenom
+
+2. Générer et renvoyer un JWT pour ce nouvel admin
+
+Après création de l’utilisateur admin :
+
+Générer un token JWT via generateToken(...) avec le payload suivant :
+
+{
+  userId: user.id,
+  username: user.username,
+  role: user.role,           // ADMIN
+  organisationId: user.organisationId
+}
+
+
+Renvoyer en réponse JSON quelque chose comme :
+
+{
+  "token": "<JWT_ICI>",
+  "user": {
+    "id": "...",
+    "username": "dr.martin",
+    "role": "ADMIN",
+    "organisationId": "<ID_ORG>",
+    "nom": "Martin",
+    "prenom": "Jean"
+  },
+  "organisation": {
+    "id": "<ID_ORG>",
+    "nom": "Cabinet Dr Martin"
+  }
+}
+
+3. Laisser default-org-001 uniquement pour les données existantes
+
+Garder l’organisation "default-org-001" uniquement pour :
+
+les utilisateurs / données de test actuels,
+
+les comptes internes si besoin.
+
+Les nouveaux cabinets créés via POST /api/auth/register-cabinet doivent toujours avoir leur propre organisationId distinct, et ne jamais être rattachés à default-org-001.
+
+4. Adapter si nécessaire le storage pour créer une organisation
+
+Si ce n’est pas déjà fait :
+
+Ajouter dans server/storage.ts une méthode du type :
+
+createOrganisation(data) → qui insère dans organisations et renvoie l’instance créée.
+
+L’utiliser dans la nouvelle route register-cabinet.
+
+5. Me montrer le résultat
+
+Merci de me montrer :
+
+le code de la nouvelle route POST /api/auth/register-cabinet dans auth.ts,
+
+la méthode createOrganisation éventuelle dans storage.ts,
+
+un exemple de body de requête et de réponse pour ce nouvel endpoint.
+
+🎯 Résultat attendu :
+
+Quand j’appelle POST /api/auth/register-cabinet → un nouveau cabinet est créé.
+
+Le user créé est un ADMIN de ce cabinet.
+
+Le JWT contient le organisationId de ce cabinet.
+
+En utilisant ce JWT pour :
+
+POST /api/patients
+
+GET /api/patients
+
+… je ne vois que les données de ce cabinet.

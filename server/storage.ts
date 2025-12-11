@@ -5,6 +5,7 @@ import {
   radios,
   visites,
   users,
+  organisations,
   type Patient,
   type InsertPatient,
   type Operation,
@@ -16,6 +17,8 @@ import {
   type Visite,
   type InsertVisite,
   type User,
+  type Organisation,
+  type InsertOrganisation,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -67,6 +70,9 @@ export interface IStorage {
   getUserById(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(data: CreateUserInput): Promise<User>;
+
+  // Organisation methods
+  createOrganisation(data: InsertOrganisation): Promise<Organisation>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -462,6 +468,14 @@ export class DatabaseStorage implements IStorage {
       organisationId: data.organisationId || null,
     }).returning();
     return user;
+  }
+
+  // ========== ORGANISATIONS ==========
+  async createOrganisation(data: InsertOrganisation): Promise<Organisation> {
+    const [org] = await db.insert(organisations).values({
+      nom: data.nom,
+    }).returning();
+    return org;
   }
 }
 
