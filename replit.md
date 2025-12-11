@@ -48,13 +48,20 @@ Preferred communication style: Simple, everyday language.
 - **Protected routes**: All /api/* routes require authentication
 - **Session secret**: Required via SESSION_SECRET environment variable
 
+### Multi-Tenant Architecture
+- **Organisations**: Each cabinet/clinic has its own isolated data
+- All data tables include `organisationId` for tenant isolation
+- Users are linked to organisations, ensuring data separation
+- Default organisation: "Cabinet par défaut" (ID: default-org-001)
+
 ### Key Data Models
-- **Users**: Authentication with username, hashed password, and role
-- **Patients**: Core entity with personal info and medical context
-- **Operations**: Surgical interventions linked to patients (supports multiple intervention types)
-- **Implants**: Individual implants with manufacturer details, positioning, and ISQ tracking
-- **Radios**: Radiograph images (panoramic, CBCT, retroalveolar)
-- **Visites**: Follow-up visits with ISQ measurements and notes
+- **Organisations**: Multi-tenant containers (id, nom, createdAt)
+- **Users**: Authentication with username, hashed password, role, and organisationId
+- **Patients**: Core entity with personal info, medical context, and organisationId
+- **Operations**: Surgical interventions linked to patients and organisations
+- **Implants**: Individual implants with manufacturer details, positioning, ISQ tracking, and organisationId
+- **Radios**: Radiograph images (panoramic, CBCT, retroalveolar) with organisationId
+- **Visites**: Follow-up visits with ISQ measurements, notes, and organisationId
 
 ### Project Structure
 ```
