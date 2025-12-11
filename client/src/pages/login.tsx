@@ -166,7 +166,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                     <FormItem>
                       <FormLabel>Nom d'utilisateur</FormLabel>
                       <FormControl>
-                        <Input placeholder="dr.dupont" {...field} data-testid="input-username-register" />
+                        <Input 
+                          placeholder="dr.dupont" 
+                          autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck="false"
+                          {...field} 
+                          data-testid="input-username-register" 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
