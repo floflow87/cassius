@@ -65,12 +65,32 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+  // Gestionnaire d'erreurs global - robuste pour contexte SaaS médical
+  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    // Si les headers ont déjà été envoyés, déléguer à Express
+    if (res.headersSent) {
+      return next(err);
+    }
 
-    res.status(status).json({ message });
-    throw err;
+    // Logger l'erreur côté serveur
+    console.error("Unhandled error:", err);
+
+    // Déterminer le code de statut
+    const status = err.status || err.statusCode || 500;
+
+    // Construire la réponse d'erreur structurée
+    const errorResponse: { error: string; message: string; details?: any } = {
+      error: status >= 500 ? "InternalServerError" : "RequestError",
+      message: err.message || "Internal Server Error",
+    };
+
+    // En développement, inclure plus de détails
+    if (process.env.NODE_ENV !== "production" && err.stack) {
+      errorResponse.details = err.stack;
+    }
+
+    res.status(status).json(errorResponse);
+    // Ne pas relancer l'erreur - la réponse a été envoyée
   });
 
   // importantly only setup vite in development and after
