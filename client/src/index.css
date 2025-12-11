@@ -263,8 +263,8 @@
     inset: 0px;
     /*border-radius: inherit;   match rounded corners */
     border-radius: inherit;
-    z-index: 999;
-    /* sits in front of content */
+    z-index: 1;
+    /* sits in front of content but below inputs */
   }
 
   .hover-elevate:hover:not(.no-default-hover-elevate)::after,
