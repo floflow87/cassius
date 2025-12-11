@@ -77,9 +77,9 @@ export function requireJwtOrSession(req: Request, res: Response, next: NextFunct
   });
 }
 
-export function generateToken(payload: JwtPayload, expiresIn: string = "4h"): string {
+export function generateToken(payload: JwtPayload, expiresInSeconds: number = 14400): string {
   if (!JWT_SECRET) {
     throw new Error("JWT_SECRET non configuré");
   }
-  return jwt.sign(payload, JWT_SECRET, { expiresIn });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: expiresInSeconds });
 }

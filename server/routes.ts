@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { requireAuth } from "./auth";
+import { requireJwt, requireJwtOrSession } from "./jwtMiddleware";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -112,7 +112,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients", requireAuth, async (_req, res) => {
+  app.get("/api/patients", requireJwtOrSession, async (_req, res) => {
     try {
       const patients = await storage.getPatients();
       res.json(patients);
@@ -122,7 +122,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:id", requireAuth, async (req, res) => {
+  app.get("/api/patients/:id", requireJwtOrSession, async (req, res) => {
     try {
       const patient = await storage.getPatientWithDetails(req.params.id);
       if (!patient) {
@@ -135,7 +135,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/patients", requireAuth, async (req, res) => {
+  app.post("/api/patients", requireJwtOrSession, async (req, res) => {
     try {
       const data = insertPatientSchema.parse(req.body);
       const patient = await storage.createPatient(data);
@@ -149,7 +149,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/search", requireAuth, async (req, res) => {
+  app.get("/api/patients/search", requireJwtOrSession, async (req, res) => {
     try {
       const query = req.query.q as string || "";
       const patients = await storage.searchPatients(query);
@@ -160,7 +160,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/operations/:id", requireAuth, async (req, res) => {
+  app.get("/api/operations/:id", requireJwtOrSession, async (req, res) => {
     try {
       const operation = await storage.getOperation(req.params.id);
       if (!operation) {
@@ -189,7 +189,7 @@ export async function registerRoutes(
     ).default([]),
   });
 
-  app.post("/api/operations", requireAuth, async (req, res) => {
+  app.post("/api/operations", requireJwtOrSession, async (req, res) => {
     try {
       const data = operationWithImplantsSchema.parse(req.body);
       const { implants: implantData, ...operationData } = data;
@@ -218,7 +218,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants/brands", requireAuth, async (_req, res) => {
+  app.get("/api/implants/brands", requireJwtOrSession, async (_req, res) => {
     try {
       const brands = await storage.getImplantBrands();
       res.json(brands);
@@ -228,7 +228,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants/:id", requireAuth, async (req, res) => {
+  app.get("/api/implants/:id", requireJwtOrSession, async (req, res) => {
     try {
       const implant = await storage.getImplantWithDetails(req.params.id);
       if (!implant) {
@@ -241,7 +241,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:id/implants", requireAuth, async (req, res) => {
+  app.get("/api/patients/:id/implants", requireJwtOrSession, async (req, res) => {
     try {
       const implants = await storage.getPatientImplants(req.params.id);
       res.json(implants);
@@ -251,7 +251,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/implants", requireAuth, async (req, res) => {
+  app.post("/api/implants", requireJwtOrSession, async (req, res) => {
     try {
       const data = insertImplantSchema.parse(req.body);
       const implant = await storage.createImplant(data);
@@ -265,7 +265,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/radios/:id", requireAuth, async (req, res) => {
+  app.get("/api/radios/:id", requireJwtOrSession, async (req, res) => {
     try {
       const radio = await storage.getRadio(req.params.id);
       if (!radio) {
@@ -278,7 +278,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/radios", requireAuth, async (req, res) => {
+  app.post("/api/radios", requireJwtOrSession, async (req, res) => {
     try {
       const data = insertRadioSchema.parse(req.body);
       const radio = await storage.createRadio(data);
@@ -292,7 +292,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants/:id/visites", requireAuth, async (req, res) => {
+  app.get("/api/implants/:id/visites", requireJwtOrSession, async (req, res) => {
     try {
       const visites = await storage.getImplantVisites(req.params.id);
       res.json(visites);
@@ -302,7 +302,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/visites", requireAuth, async (req, res) => {
+  app.post("/api/visites", requireJwtOrSession, async (req, res) => {
     try {
       const data = insertVisiteSchema.parse(req.body);
       const visite = await storage.createVisite(data);
@@ -316,7 +316,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/stats", requireAuth, async (_req, res) => {
+  app.get("/api/stats", requireJwtOrSession, async (_req, res) => {
     try {
       const stats = await storage.getStats();
       res.json(stats);
@@ -326,7 +326,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/stats/advanced", requireAuth, async (_req, res) => {
+  app.get("/api/stats/advanced", requireJwtOrSession, async (_req, res) => {
     try {
       const stats = await storage.getAdvancedStats();
       res.json(stats);
@@ -336,7 +336,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants", requireAuth, async (req, res) => {
+  app.get("/api/implants", requireJwtOrSession, async (req, res) => {
     try {
       const { marque, siteFdi, typeOs, statut } = req.query;
       if (marque || siteFdi || typeOs || statut) {
@@ -356,7 +356,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/objects/upload", requireAuth, async (_req, res) => {
+  app.post("/api/objects/upload", requireJwtOrSession, async (_req, res) => {
     try {
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
       res.json({ uploadURL });
@@ -366,7 +366,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/radios/upload-complete", requireAuth, async (req, res) => {
+  app.put("/api/radios/upload-complete", requireJwtOrSession, async (req, res) => {
     try {
       const { uploadURL } = req.body;
       if (!uploadURL) {

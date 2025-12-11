@@ -5,6 +5,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
+import { generateToken } from "./jwtMiddleware";
 
 declare global {
   namespace Express {
@@ -117,12 +118,27 @@ export function setupAuth(app: Express): void {
         if (err) {
           return next(err);
         }
+
+        let token: string | null = null;
+        try {
+          token = generateToken({
+            userId: user.id,
+            username: user.username,
+            role: user.role,
+          });
+        } catch (e) {
+          console.warn("JWT_SECRET non configuré, token JWT non généré");
+        }
+
         return res.json({
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          nom: user.nom,
-          prenom: user.prenom,
+          token,
+          user: {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            nom: user.nom,
+            prenom: user.prenom,
+          },
         });
       });
     })(req, res, next);
