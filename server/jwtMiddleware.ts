@@ -5,6 +5,7 @@ export interface JwtPayload {
   userId: string;
   username: string;
   role: string;
+  organisationId: string | null;
 }
 
 declare global {

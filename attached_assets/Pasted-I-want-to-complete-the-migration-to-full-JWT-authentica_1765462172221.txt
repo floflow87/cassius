@@ -1,0 +1,152 @@
+I want to complete the migration to full JWT authentication and enable proper multi-tenant protections across all routes.
+
+Please perform the following steps:
+
+1. Update auth login to include organisationId
+
+In server/auth.ts, when a user logs in:
+
+After validating username/password, load the user’s organisationId
+
+Include it inside the JWT payload:
+
+{
+  userId,
+  username,
+  role,
+  organisationId
+}
+
+
+Ensure the login response returns:
+
+{
+  "token": "...",
+  "user": {
+    "id": "...",
+    "username": "...",
+    "role": "...",
+    "organisationId": "...",
+    "nom": "...",
+    "prenom": "..."
+  }
+}
+
+2. Remove all session-based authentication
+
+I want JWT-only authentication, so please:
+
+Remove or disable any remaining session / cookie logic
+
+Remove old middleware like requireAuth that relied on sessions
+
+Ensure only this middleware is used:
+
+requireJwt
+
+A pure JWT middleware that:
+
+Reads Authorization: Bearer <token>
+
+Verifies the JWT
+
+Injects into the request:
+
+req.jwtUser = {
+  userId,
+  username,
+  role,
+  organisationId
+};
+
+
+Returns a clean error if:
+
+token missing
+
+token invalid or expired
+
+Please update server/jwtMiddleware.ts accordingly.
+
+3. Protect all sensitive API routes with requireJwt
+
+Update server/routes.ts:
+
+Every route under /api/* must be protected with requireJwt
+
+Remove mixed logic (JWT OR session)
+
+Example:
+
+app.get("/api/patients", requireJwt, handler)
+app.post("/api/patients", requireJwt, handler)
+
+4. Update routes to pass organisationId into storage
+
+In each route handler:
+
+const organisationId = req.jwtUser.organisationId;
+
+
+Then:
+
+Pass this organisationId to all storage functions
+
+Example for patients:
+
+storage.getPatients(organisationId)
+storage.createPatient(organisationId, data)
+
+
+This ensures full tenant isolation.
+
+5. Update storage.ts to enforce tenant filtering
+
+All read/write operations must include organisationId:
+
+getPatients(organisationId)
+
+getPatientWithDetails(organisationId, patientId)
+
+createPatient(organisationId, data) → insert organisationId
+
+Same for operations, implants, visits, radios
+
+Example:
+
+return db.select()
+  .from(patients)
+  .where(eq(patients.organisationId, organisationId));
+
+
+Please update all existing methods accordingly.
+
+6. Confirm security is enforced
+
+Once done, please:
+
+Output the updated code for:
+
+auth.ts
+
+jwtMiddleware.ts
+
+updated routes (routes.ts)
+
+one example of updated storage method (patients)
+
+Explain briefly:
+
+how the tenant filtering works
+
+how to test with two different accounts (each should see only their own data)
+
+🎯 Expected Result
+
+Cassius becomes a true multi-tenant SaaS, where:
+
+Each user is bound to one organisationId
+
+Each organisation can only see its own patients / implants / operations / radios / visits
+
+All authentication is JWT-based, modern, scalable, secure

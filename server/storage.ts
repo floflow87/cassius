@@ -370,6 +370,7 @@ export class DatabaseStorage implements IStorage {
       role: (data.role as any) || "ASSISTANT",
       nom: data.nom || null,
       prenom: data.prenom || null,
+      organisationId: data.organisationId || null,
     }).returning();
     return user;
   }

@@ -237,6 +237,7 @@ export interface CreateUserInput {
   role?: Role;
   nom?: string | null;
   prenom?: string | null;
+  organisationId?: string | null;
 }
 
 export interface LoginInput {

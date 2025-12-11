@@ -15,6 +15,7 @@ declare global {
       role: "CHIRURGIEN" | "ASSISTANT" | "ADMIN";
       nom: string | null;
       prenom: string | null;
+      organisationId: string | null;
     }
   }
 }
@@ -77,6 +78,7 @@ export function setupAuth(app: Express): void {
           role: user.role,
           nom: user.nom,
           prenom: user.prenom,
+          organisationId: user.organisationId,
         });
       } catch (error) {
         return done(error);
@@ -100,6 +102,7 @@ export function setupAuth(app: Express): void {
         role: user.role,
         nom: user.nom,
         prenom: user.prenom,
+        organisationId: user.organisationId,
       });
     } catch (error) {
       done(error);
@@ -125,6 +128,7 @@ export function setupAuth(app: Express): void {
             userId: user.id,
             username: user.username,
             role: user.role,
+            organisationId: user.organisationId,
           });
         } catch (e) {
           console.warn("JWT_SECRET non configuré, token JWT non généré");
@@ -138,6 +142,7 @@ export function setupAuth(app: Express): void {
             role: user.role,
             nom: user.nom,
             prenom: user.prenom,
+            organisationId: user.organisationId,
           },
         });
       });
@@ -178,12 +183,14 @@ export function setupAuth(app: Express): void {
       }
 
       const hashedPassword = await hashPassword(password);
+      const DEFAULT_ORG_ID = "default-org-001";
       const user = await storage.createUser({
         username,
         password: hashedPassword,
         nom: nom || null,
         prenom: prenom || null,
         role: "ASSISTANT",
+        organisationId: DEFAULT_ORG_ID,
       });
 
       req.logIn(
@@ -193,6 +200,7 @@ export function setupAuth(app: Express): void {
           role: user.role,
           nom: user.nom,
           prenom: user.prenom,
+          organisationId: user.organisationId,
         },
         (err) => {
           if (err) {
@@ -204,6 +212,7 @@ export function setupAuth(app: Express): void {
             role: user.role,
             nom: user.nom,
             prenom: user.prenom,
+            organisationId: user.organisationId,
           });
         }
       );
