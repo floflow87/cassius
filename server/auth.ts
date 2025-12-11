@@ -221,6 +221,98 @@ export function setupAuth(app: Express): void {
       res.status(500).json({ error: "Erreur lors de l'inscription" });
     }
   });
+
+  // Inscription d'un nouveau cabinet avec création d'organisation et utilisateur ADMIN
+  app.post("/api/auth/register-cabinet", async (req, res) => {
+    try {
+      const { organisationName, username, password, nom, prenom } = req.body;
+
+      // Validation des champs requis
+      if (!organisationName || !username || !password) {
+        return res.status(400).json({ 
+          error: "Nom du cabinet, nom d'utilisateur et mot de passe requis" 
+        });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ 
+          error: "Le mot de passe doit contenir au moins 6 caractères" 
+        });
+      }
+
+      // Vérifier si le nom d'utilisateur existe déjà
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Ce nom d'utilisateur existe déjà" });
+      }
+
+      // 1. Créer la nouvelle organisation (cabinet)
+      const organisation = await storage.createOrganisation({
+        nom: organisationName,
+      });
+
+      // 2. Créer l'utilisateur ADMIN rattaché à cette organisation
+      const hashedPassword = await hashPassword(password);
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+        nom: nom || null,
+        prenom: prenom || null,
+        role: "ADMIN",
+        organisationId: organisation.id,
+      });
+
+      // 3. Générer le JWT avec organisationId
+      let token: string | null = null;
+      try {
+        token = generateToken({
+          userId: user.id,
+          username: user.username,
+          role: user.role,
+          organisationId: user.organisationId,
+        });
+      } catch (e) {
+        console.warn("JWT_SECRET non configuré, token JWT non généré");
+      }
+
+      // 4. Connecter l'utilisateur via session
+      req.logIn(
+        {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          nom: user.nom,
+          prenom: user.prenom,
+          organisationId: user.organisationId,
+        },
+        (err) => {
+          if (err) {
+            return res.status(500).json({ error: "Erreur lors de la connexion" });
+          }
+
+          // 5. Renvoyer la réponse complète
+          return res.status(201).json({
+            token,
+            user: {
+              id: user.id,
+              username: user.username,
+              role: user.role,
+              nom: user.nom,
+              prenom: user.prenom,
+              organisationId: user.organisationId,
+            },
+            organisation: {
+              id: organisation.id,
+              nom: organisation.nom,
+            },
+          });
+        }
+      );
+    } catch (error) {
+      console.error("Error registering cabinet:", error);
+      res.status(500).json({ error: "Erreur lors de l'inscription du cabinet" });
+    }
+  });
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
