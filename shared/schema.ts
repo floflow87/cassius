@@ -212,22 +212,27 @@ export const usersRelations = relations(users, ({ one }) => ({
 export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
   createdAt: true,
+  organisationId: true,
 });
 
 export const insertOperationSchema = createInsertSchema(operations).omit({
   id: true,
+  organisationId: true,
 });
 
 export const insertImplantSchema = createInsertSchema(implants).omit({
   id: true,
+  organisationId: true,
 });
 
 export const insertRadioSchema = createInsertSchema(radios).omit({
   id: true,
+  organisationId: true,
 });
 
 export const insertVisiteSchema = createInsertSchema(visites).omit({
   id: true,
+  organisationId: true,
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({

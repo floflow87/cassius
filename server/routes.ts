@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { requireJwt, requireJwtOrSession } from "./jwtMiddleware";
+import { requireJwt } from "./jwtMiddleware";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -31,15 +31,22 @@ import { z } from "zod";
 import { db, pool } from "./db";
 import { eq } from "drizzle-orm";
 
+function getOrganisationId(req: Request, res: Response): string | null {
+  const organisationId = req.jwtUser?.organisationId;
+  if (!organisationId) {
+    res.status(400).json({ error: "Organisation manquante dans le token" });
+    return null;
+  }
+  return organisationId;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   const objectStorageService = new ObjectStorageService();
 
-  // Endpoint de test de connexion à la base de données
   app.get("/db-test", async (_req, res) => {
-    const testId = `test-${Date.now()}`;
     const testPatient = {
       nom: "Doe",
       prenom: "John",
@@ -48,16 +55,15 @@ export async function registerRoutes(
       telephone: "+33600000000",
       email: "john.doe@test.com",
       contexteMedical: "Patient de test - à supprimer",
+      organisationId: "default-org-001",
     };
 
     try {
-      // Test 1: Vérifier la connexion
       const connectionTest = await pool.query("SELECT 1 as connected");
       if (!connectionTest.rows[0]?.connected) {
         throw new Error("Échec de la connexion à la base de données");
       }
 
-      // Test 2: INSERT - Créer un patient fictif
       const [insertedPatient] = await db
         .insert(patients)
         .values(testPatient)
@@ -67,7 +73,6 @@ export async function registerRoutes(
         throw new Error("Échec de l'insertion du patient test");
       }
 
-      // Test 3: SELECT - Récupérer le patient créé
       const [selectedPatient] = await db
         .select()
         .from(patients)
@@ -77,13 +82,11 @@ export async function registerRoutes(
         throw new Error("Échec de la lecture du patient test");
       }
 
-      // Test 4: DELETE - Supprimer le patient de test
       await db.delete(patients).where(eq(patients.id, insertedPatient.id));
 
-      // Succès
       res.json({
         success: true,
-        message: "Connexion à la base de données Supabase validée",
+        message: "Connexion à la base de données validée",
         tests: {
           connexion: "OK",
           insert: "OK",
@@ -106,15 +109,19 @@ export async function registerRoutes(
         message: "Erreur de connexion à la base de données",
         error: error instanceof Error ? error.message : "Erreur inconnue",
         database: process.env.NODE_ENV === "production" ? "Supabase" : "Replit PostgreSQL",
-        conseil: "Vérifiez que SUPABASE_DATABASE_URL (production) ou DATABASE_URL (développement) est correctement configuré dans les Secrets Replit",
+        conseil: "Vérifiez que DATABASE_URL est correctement configuré",
         timestamp: new Date().toISOString(),
       });
     }
   });
 
-  app.get("/api/patients", requireJwtOrSession, async (_req, res) => {
+  // ========== PATIENTS ==========
+  app.get("/api/patients", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
-      const patients = await storage.getPatients();
+      const patients = await storage.getPatients(organisationId);
       res.json(patients);
     } catch (error) {
       console.error("Error fetching patients:", error);
@@ -122,9 +129,26 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:id", requireJwtOrSession, async (req, res) => {
+  app.get("/api/patients/search", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
-      const patient = await storage.getPatientWithDetails(req.params.id);
+      const query = req.query.q as string || "";
+      const patients = await storage.searchPatients(organisationId, query);
+      res.json(patients);
+    } catch (error) {
+      console.error("Error searching patients:", error);
+      res.status(500).json({ error: "Failed to search patients" });
+    }
+  });
+
+  app.get("/api/patients/:id", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const patient = await storage.getPatientWithDetails(organisationId, req.params.id);
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
@@ -135,10 +159,13 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/patients", requireJwtOrSession, async (req, res) => {
+  app.post("/api/patients", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
       const data = insertPatientSchema.parse(req.body);
-      const patient = await storage.createPatient(data);
+      const patient = await storage.createPatient(organisationId, data);
       res.status(201).json(patient);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -149,20 +176,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/search", requireJwtOrSession, async (req, res) => {
-    try {
-      const query = req.query.q as string || "";
-      const patients = await storage.searchPatients(query);
-      res.json(patients);
-    } catch (error) {
-      console.error("Error searching patients:", error);
-      res.status(500).json({ error: "Failed to search patients" });
-    }
-  });
+  // ========== OPERATIONS ==========
+  app.get("/api/operations/:id", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
 
-  app.get("/api/operations/:id", requireJwtOrSession, async (req, res) => {
     try {
-      const operation = await storage.getOperation(req.params.id);
+      const operation = await storage.getOperation(organisationId, req.params.id);
       if (!operation) {
         return res.status(404).json({ error: "Operation not found" });
       }
@@ -189,16 +209,19 @@ export async function registerRoutes(
     ).default([]),
   });
 
-  app.post("/api/operations", requireJwtOrSession, async (req, res) => {
+  app.post("/api/operations", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
       const data = operationWithImplantsSchema.parse(req.body);
       const { implants: implantData, ...operationData } = data;
 
-      const operation = await storage.createOperation(operationData);
+      const operation = await storage.createOperation(organisationId, operationData);
 
       const createdImplants = await Promise.all(
         implantData.map((implant) =>
-          storage.createImplant({
+          storage.createImplant(organisationId, {
             ...implant,
             operationId: operation.id,
             patientId: operationData.patientId,
@@ -218,9 +241,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants/brands", requireJwtOrSession, async (_req, res) => {
+  // ========== IMPLANTS ==========
+  app.get("/api/implants/brands", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
-      const brands = await storage.getImplantBrands();
+      const brands = await storage.getImplantBrands(organisationId);
       res.json(brands);
     } catch (error) {
       console.error("Error fetching brands:", error);
@@ -228,9 +255,12 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants/:id", requireJwtOrSession, async (req, res) => {
+  app.get("/api/implants/:id", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
-      const implant = await storage.getImplantWithDetails(req.params.id);
+      const implant = await storage.getImplantWithDetails(organisationId, req.params.id);
       if (!implant) {
         return res.status(404).json({ error: "Implant not found" });
       }
@@ -241,9 +271,12 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:id/implants", requireJwtOrSession, async (req, res) => {
+  app.get("/api/patients/:id/implants", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
-      const implants = await storage.getPatientImplants(req.params.id);
+      const implants = await storage.getPatientImplants(organisationId, req.params.id);
       res.json(implants);
     } catch (error) {
       console.error("Error fetching patient implants:", error);
@@ -251,10 +284,13 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/implants", requireJwtOrSession, async (req, res) => {
+  app.post("/api/implants", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
       const data = insertImplantSchema.parse(req.body);
-      const implant = await storage.createImplant(data);
+      const implant = await storage.createImplant(organisationId, data);
       res.status(201).json(implant);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -265,9 +301,36 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/radios/:id", requireJwtOrSession, async (req, res) => {
+  app.get("/api/implants", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
-      const radio = await storage.getRadio(req.params.id);
+      const { marque, siteFdi, typeOs, statut } = req.query;
+      if (marque || siteFdi || typeOs || statut) {
+        const filtered = await storage.filterImplants(organisationId, {
+          marque: marque as string,
+          siteFdi: siteFdi as string,
+          typeOs: typeOs as string,
+          statut: statut as string,
+        });
+        return res.json(filtered);
+      }
+      const implants = await storage.getAllImplants(organisationId);
+      res.json(implants);
+    } catch (error) {
+      console.error("Error fetching implants:", error);
+      res.status(500).json({ error: "Failed to fetch implants" });
+    }
+  });
+
+  // ========== RADIOS ==========
+  app.get("/api/radios/:id", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const radio = await storage.getRadio(organisationId, req.params.id);
       if (!radio) {
         return res.status(404).json({ error: "Radio not found" });
       }
@@ -278,10 +341,13 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/radios", requireJwtOrSession, async (req, res) => {
+  app.post("/api/radios", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
       const data = insertRadioSchema.parse(req.body);
-      const radio = await storage.createRadio(data);
+      const radio = await storage.createRadio(organisationId, data);
       res.status(201).json(radio);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -292,9 +358,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants/:id/visites", requireJwtOrSession, async (req, res) => {
+  // ========== VISITES ==========
+  app.get("/api/implants/:id/visites", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
-      const visites = await storage.getImplantVisites(req.params.id);
+      const visites = await storage.getImplantVisites(organisationId, req.params.id);
       res.json(visites);
     } catch (error) {
       console.error("Error fetching visites:", error);
@@ -302,10 +372,13 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/visites", requireJwtOrSession, async (req, res) => {
+  app.post("/api/visites", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
       const data = insertVisiteSchema.parse(req.body);
-      const visite = await storage.createVisite(data);
+      const visite = await storage.createVisite(organisationId, data);
       res.status(201).json(visite);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -316,9 +389,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/stats", requireJwtOrSession, async (_req, res) => {
+  // ========== STATS ==========
+  app.get("/api/stats", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
-      const stats = await storage.getStats();
+      const stats = await storage.getStats(organisationId);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -326,9 +403,12 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/stats/advanced", requireJwtOrSession, async (_req, res) => {
+  app.get("/api/stats/advanced", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
-      const stats = await storage.getAdvancedStats();
+      const stats = await storage.getAdvancedStats(organisationId);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching advanced stats:", error);
@@ -336,27 +416,8 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants", requireJwtOrSession, async (req, res) => {
-    try {
-      const { marque, siteFdi, typeOs, statut } = req.query;
-      if (marque || siteFdi || typeOs || statut) {
-        const filtered = await storage.filterImplants({
-          marque: marque as string,
-          siteFdi: siteFdi as string,
-          typeOs: typeOs as string,
-          statut: statut as string,
-        });
-        return res.json(filtered);
-      }
-      const implants = await storage.getAllImplants();
-      res.json(implants);
-    } catch (error) {
-      console.error("Error fetching implants:", error);
-      res.status(500).json({ error: "Failed to fetch implants" });
-    }
-  });
-
-  app.post("/api/objects/upload", requireJwtOrSession, async (_req, res) => {
+  // ========== OBJECT STORAGE ==========
+  app.post("/api/objects/upload", requireJwt, async (_req, res) => {
     try {
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
       res.json({ uploadURL });
@@ -366,7 +427,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/radios/upload-complete", requireJwtOrSession, async (req, res) => {
+  app.put("/api/radios/upload-complete", requireJwt, async (req, res) => {
     try {
       const { uploadURL } = req.body;
       if (!uploadURL) {
