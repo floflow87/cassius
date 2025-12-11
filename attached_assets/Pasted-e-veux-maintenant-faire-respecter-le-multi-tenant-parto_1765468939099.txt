@@ -1,0 +1,96 @@
+e veux maintenant faire respecter le multi-tenant partout dans mon backend Cassius.
+L’objectif : chaque utilisateur ne voit que les données de son organisation (cabinet).
+
+Merci de faire les actions suivantes :
+
+1. Mettre à jour les méthodes de lecture/écriture dans server/storage.ts
+
+Pour toutes les méthodes qui lisent ou écrivent des données métier, ajouter un paramètre organisationId et filtrer ou insérer en conséquence.
+
+Par exemple :
+
+getPatients() → doit devenir getPatients(organisationId: string) et faire :
+
+return db.select().from(patients)
+  .where(eq(patients.organisationId, organisationId));
+
+
+createPatient() → doit prendre organisationId et insérer :
+
+await db.insert(patients).values({
+  ...data,
+  organisationId,
+});
+
+
+Merci d’appliquer ce principe à toutes les méthodes pertinentes :
+
+getPatients, searchPatients, getPatientWithDetails
+
+createPatient
+
+createOperation, getOperation, getPatientOperations (ou équivalents)
+
+createImplant, getImplant, getPatientImplants, getAllImplants, filterImplants
+
+createVisite, getImplantVisites
+
+createRadio, getRadio
+
+getStats, getAdvancedStats (filtrées par organisationId)
+
+2. Mettre à jour les routes dans server/routes.ts
+
+Dans chaque handler /api/... qui manipule des données métier :
+
+Récupérer organisationId depuis le JWT :
+
+const organisationId = req.jwtUser?.organisationId;
+if (!organisationId) {
+  return res.status(400).json({ error: "Organisation manquante dans le token" });
+}
+
+
+Passer organisationId en paramètre à storage :
+
+const patients = await storage.getPatients(organisationId);
+const newPatient = await storage.createPatient(organisationId, data);
+
+
+Merci d’illustrer clairement sur au moins :
+
+GET /api/patients
+
+POST /api/patients
+
+GET /api/patients/:id
+
+POST /api/operations
+
+GET /api/implants ou équivalent
+
+un endpoint de stats si possible (/api/stats/...)
+
+3. Confirmer que le session-based auth n’est plus utilisé
+
+Si du code utilise encore req.user ou une session Express pour l’auth :
+
+le supprimer
+
+ou le laisser mais ne plus le considérer comme source d’autorité : tout doit passer par req.jwtUser.
+
+Le middleware de protection principal doit être un requireJwt clair, sans fallback sur la session.
+
+4. Résultat attendu
+
+Avec le même token (même organisationId) → je vois toutes mes données habituelles
+
+Si plus tard je crée un autre user dans une autre organisation → il ne doit voir aucun des patients / opérations / implants de la première.
+
+Merci de me montrer :
+
+un exemple de méthode storage modifiée
+
+un exemple de route modifiée (patients ou opérations)
+
+une explication rapide de comment tester avec deux organisations différentes.
