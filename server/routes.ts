@@ -214,21 +214,15 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
+      // Validation du body avec Zod
       const data = operationWithImplantsSchema.parse(req.body);
       const { implants: implantData, ...operationData } = data;
 
-      const operation = await storage.createOperation(organisationId, operationData);
-
-      const createdImplants = await Promise.all(
-        implantData.map((implant) =>
-          storage.createImplant(organisationId, {
-            ...implant,
-            operationId: operation.id,
-            patientId: operationData.patientId,
-            datePose: operationData.dateOperation,
-            statut: "EN_SUIVI",
-          })
-        )
+      // Création transactionnelle : opération + implants (atomique)
+      const { operation, implants: createdImplants } = await storage.createOperationWithImplants(
+        organisationId,
+        operationData,
+        implantData
       );
 
       res.status(201).json({ ...operation, implants: createdImplants });
@@ -237,7 +231,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: error.errors });
       }
       console.error("Error creating operation:", error);
-      res.status(500).json({ error: "Failed to create operation" });
+      res.status(500).json({ error: "Erreur lors de la création de l'opération" });
     }
   });
 
