@@ -3,6 +3,22 @@ import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum } from "
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Table organisations (multi-tenant)
+export const organisations = pgTable("organisations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nom: text("nom").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const organisationsRelations = relations(organisations, ({ many }) => ({
+  users: many(users),
+  patients: many(patients),
+  operations: many(operations),
+  implants: many(implants),
+  visites: many(visites),
+  radios: many(radios),
+}));
+
 export const sexeEnum = pgEnum("sexe", ["HOMME", "FEMME"]);
 
 export const typeInterventionEnum = pgEnum("type_intervention", [
@@ -25,6 +41,7 @@ export const roleEnum = pgEnum("role", ["CHIRURGIEN", "ASSISTANT", "ADMIN"]);
 
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
   nom: text("nom").notNull(),
   prenom: text("prenom").notNull(),
   dateNaissance: date("date_naissance").notNull(),
@@ -35,7 +52,11 @@ export const patients = pgTable("patients", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const patientsRelations = relations(patients, ({ many }) => ({
+export const patientsRelations = relations(patients, ({ one, many }) => ({
+  organisation: one(organisations, {
+    fields: [patients.organisationId],
+    references: [organisations.id],
+  }),
   operations: many(operations),
   implants: many(implants),
   radios: many(radios),
@@ -44,6 +65,7 @@ export const patientsRelations = relations(patients, ({ many }) => ({
 
 export const operations = pgTable("operations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
   patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
   dateOperation: date("date_operation").notNull(),
   typeIntervention: typeInterventionEnum("type_intervention").notNull(),
@@ -60,6 +82,10 @@ export const operations = pgTable("operations", {
 });
 
 export const operationsRelations = relations(operations, ({ one, many }) => ({
+  organisation: one(organisations, {
+    fields: [operations.organisationId],
+    references: [organisations.id],
+  }),
   patient: one(patients, {
     fields: [operations.patientId],
     references: [patients.id],
@@ -70,6 +96,7 @@ export const operationsRelations = relations(operations, ({ one, many }) => ({
 
 export const implants = pgTable("implants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
   operationId: varchar("operation_id").notNull().references(() => operations.id, { onDelete: "cascade" }),
   patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
   marque: text("marque").notNull(),
@@ -89,6 +116,10 @@ export const implants = pgTable("implants", {
 });
 
 export const implantsRelations = relations(implants, ({ one, many }) => ({
+  organisation: one(organisations, {
+    fields: [implants.organisationId],
+    references: [organisations.id],
+  }),
   operation: one(operations, {
     fields: [implants.operationId],
     references: [operations.id],
@@ -103,6 +134,7 @@ export const implantsRelations = relations(implants, ({ one, many }) => ({
 
 export const radios = pgTable("radios", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
   patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
   operationId: varchar("operation_id").references(() => operations.id, { onDelete: "set null" }),
   implantId: varchar("implant_id").references(() => implants.id, { onDelete: "set null" }),
@@ -112,6 +144,10 @@ export const radios = pgTable("radios", {
 });
 
 export const radiosRelations = relations(radios, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [radios.organisationId],
+    references: [organisations.id],
+  }),
   patient: one(patients, {
     fields: [radios.patientId],
     references: [patients.id],
@@ -128,6 +164,7 @@ export const radiosRelations = relations(radios, ({ one }) => ({
 
 export const visites = pgTable("visites", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
   implantId: varchar("implant_id").notNull().references(() => implants.id, { onDelete: "cascade" }),
   patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
   date: date("date").notNull(),
@@ -137,6 +174,10 @@ export const visites = pgTable("visites", {
 });
 
 export const visitesRelations = relations(visites, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [visites.organisationId],
+    references: [organisations.id],
+  }),
   implant: one(implants, {
     fields: [visites.implantId],
     references: [implants.id],
@@ -153,12 +194,20 @@ export const visitesRelations = relations(visites, ({ one }) => ({
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").references(() => organisations.id, { onDelete: "cascade" }),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   role: roleEnum("role").default("ASSISTANT").notNull(),
   nom: text("nom"),
   prenom: text("prenom"),
 });
+
+export const usersRelations = relations(users, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [users.organisationId],
+    references: [organisations.id],
+  }),
+}));
 
 export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
@@ -185,6 +234,14 @@ export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
 });
+
+export const insertOrganisationSchema = createInsertSchema(organisations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertOrganisation = z.infer<typeof insertOrganisationSchema>;
+export type Organisation = typeof organisations.$inferSelect;
 
 export type InsertPatient = z.infer<typeof insertPatientSchema>;
 export type Patient = typeof patients.$inferSelect;
