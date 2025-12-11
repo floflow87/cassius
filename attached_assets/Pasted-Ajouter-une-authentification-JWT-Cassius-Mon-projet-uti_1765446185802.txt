@@ -1,0 +1,39 @@
+Ajouter une authentification JWT à Cassius
+
+Mon projet utilise déjà Express + TypeScript + Drizzle ORM, avec une auth basée sur login + cookies.
+
+Je voudrais ajouter une authentification basée sur JWT pour protéger mes endpoints API.
+
+Merci de m’aider à faire les actions suivantes :
+	1.	Mettre en place le JWT côté backend
+	•	Ajouter la dépendance jsonwebtoken (et les types pour TypeScript si besoin).
+	•	Créer un secret JWT_SECRET à lire depuis les variables d’environnement (Replit Secrets).
+	•	Dans la logique de login (par exemple dans server/auth.ts ou là où se trouve POST /api/login), une fois les credentials validés :
+	•	générer un token JWT avec un payload du type :
+{ userId: <id de l’utilisateur>, username: <nom utilisateur> }
+	•	définir une durée d’expiration raisonnable (par exemple 1h ou 4h).
+	•	renvoyer ce token dans la réponse JSON, par exemple :
+{ token: "<JWT_ICI>", user: { ... } }
+	2.	Créer un middleware d’authentification JWT
+	•	Créer un fichier (par exemple) server/jwtMiddleware.ts.
+	•	Ce middleware doit :
+	•	lire le header Authorization: Bearer <token>
+	•	vérifier le token avec JWT_SECRET
+	•	en cas de succès, attacher le payload décodé à req.user
+	•	en cas d’échec (token absent ou invalide), renvoyer un 401 Unauthorized avec un message clair.
+	3.	Protéger les routes sensibles
+	•	Appliquer ce middleware au minimum sur les routes suivantes :
+	•	POST /api/patients
+	•	POST /api/operations
+	•	POST /api/visites
+	•	Option : protéger aussi GET /api/patients et GET /api/patients/:id (tu peux me conseiller sur ce qui est logique à ce stade).
+	4.	Conserver la compatibilité avec l’existant
+	•	Ne pas casser les endpoints déjà en place.
+	•	Si nécessaire, adapter la route POST /api/login pour renvoyer à la fois :
+	•	le token JWT
+	•	et éventuellement continuer à gérer la session par cookies si elle existe déjà.
+	5.	Fournir des exemples de test
+	•	Me donner un exemple de requête POST /api/login (avec un payload JSON de login concret) et la réponse attendue contenant le JWT.
+	•	Me donner un exemple de requête POST /api/patients avec le header :
+	•	Authorization: Bearer <TOKEN_RECU_AU_LOGIN>
+	•	M’expliquer comment tester tout ça avec curl ou un client REST (ex : Postman / Thunder Client).
