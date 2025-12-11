@@ -43,6 +43,11 @@ export interface IStorage {
   // Operation methods
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
   createOperation(organisationId: string, operation: InsertOperation): Promise<Operation>;
+  createOperationWithImplants(
+    organisationId: string,
+    operationData: InsertOperation,
+    implantsData: Array<Omit<InsertImplant, 'operationId' | 'patientId' | 'datePose' | 'statut'>>
+  ): Promise<{ operation: Operation; implants: Implant[] }>;
 
   // Implant methods
   getImplant(organisationId: string, id: string): Promise<Implant | undefined>;
@@ -200,6 +205,36 @@ export class DatabaseStorage implements IStorage {
       organisationId,
     }).returning();
     return newOperation;
+  }
+
+  async createOperationWithImplants(
+    organisationId: string,
+    operationData: InsertOperation,
+    implantsData: Array<Omit<InsertImplant, 'operationId' | 'patientId' | 'datePose' | 'statut'>>
+  ): Promise<{ operation: Operation; implants: Implant[] }> {
+    return await db.transaction(async (tx) => {
+      // 1. Créer l'opération
+      const [operation] = await tx.insert(operations).values({
+        ...operationData,
+        organisationId,
+      }).returning();
+
+      // 2. Créer tous les implants associés
+      const createdImplants: Implant[] = [];
+      for (const implantData of implantsData) {
+        const [implant] = await tx.insert(implants).values({
+          ...implantData,
+          organisationId,
+          operationId: operation.id,
+          patientId: operationData.patientId,
+          datePose: operationData.dateOperation,
+          statut: "EN_SUIVI",
+        }).returning();
+        createdImplants.push(implant);
+      }
+
+      return { operation, implants: createdImplants };
+    });
   }
 
   // ========== IMPLANTS ==========
