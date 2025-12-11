@@ -17,6 +17,7 @@ export const organisationsRelations = relations(organisations, ({ many }) => ({
   implants: many(implants),
   visites: many(visites),
   radios: many(radios),
+  protheses: many(protheses),
 }));
 
 export const sexeEnum = pgEnum("sexe", ["HOMME", "FEMME"]);
@@ -38,6 +39,10 @@ export const typeOsEnum = pgEnum("type_os", ["D1", "D2", "D3", "D4"]);
 export const statutImplantEnum = pgEnum("statut_implant", ["EN_SUIVI", "SUCCES", "COMPLICATION", "ECHEC"]);
 export const typeRadioEnum = pgEnum("type_radio", ["PANORAMIQUE", "CBCT", "RETROALVEOLAIRE"]);
 export const roleEnum = pgEnum("role", ["CHIRURGIEN", "ASSISTANT", "ADMIN"]);
+
+// Enums pour les prothèses supra-implantaires
+export const typeProtheseEnum = pgEnum("type_prothese", ["VISSEE", "SCELLEE"]);
+export const typePilierEnum = pgEnum("type_pilier", ["DROIT", "ANGULE", "MULTI_UNIT"]);
 
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -130,6 +135,7 @@ export const implantsRelations = relations(implants, ({ one, many }) => ({
   }),
   radios: many(radios),
   visites: many(visites),
+  protheses: many(protheses),
 }));
 
 export const radios = pgTable("radios", {
@@ -192,6 +198,29 @@ export const visitesRelations = relations(visites, ({ one }) => ({
   }),
 }));
 
+// Table prothèses supra-implantaires
+export const protheses = pgTable("protheses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  implantId: varchar("implant_id").notNull().references(() => implants.id, { onDelete: "cascade" }),
+  protheseUnitaire: boolean("prothese_unitaire").default(true).notNull(),
+  typeProthese: typeProtheseEnum("type_prothese").notNull(),
+  typePilier: typePilierEnum("type_pilier"),
+  datePose: date("date_pose"),
+  notes: text("notes"),
+});
+
+export const prothesesRelations = relations(protheses, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [protheses.organisationId],
+    references: [organisations.id],
+  }),
+  implant: one(implants, {
+    fields: [protheses.implantId],
+    references: [implants.id],
+  }),
+}));
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organisationId: varchar("organisation_id").references(() => organisations.id, { onDelete: "cascade" }),
@@ -235,6 +264,11 @@ export const insertVisiteSchema = createInsertSchema(visites).omit({
   organisationId: true,
 });
 
+export const insertProtheseSchema = createInsertSchema(protheses).omit({
+  id: true,
+  organisationId: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -262,6 +296,9 @@ export type Radio = typeof radios.$inferSelect;
 
 export type InsertVisite = z.infer<typeof insertVisiteSchema>;
 export type Visite = typeof visites.$inferSelect;
+
+export type InsertProthese = z.infer<typeof insertProtheseSchema>;
+export type Prothese = typeof protheses.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;

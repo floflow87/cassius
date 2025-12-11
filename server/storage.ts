@@ -4,6 +4,7 @@ import {
   implants,
   radios,
   visites,
+  protheses,
   users,
   organisations,
   type Patient,
@@ -16,6 +17,8 @@ import {
   type InsertRadio,
   type Visite,
   type InsertVisite,
+  type Prothese,
+  type InsertProthese,
   type User,
   type Organisation,
   type InsertOrganisation,
@@ -66,6 +69,10 @@ export interface IStorage {
   getVisite(organisationId: string, id: string): Promise<Visite | undefined>;
   getImplantVisites(organisationId: string, implantId: string): Promise<Visite[]>;
   createVisite(organisationId: string, visite: InsertVisite): Promise<Visite>;
+
+  // Prothese methods
+  createProthese(organisationId: string, prothese: InsertProthese): Promise<Prothese>;
+  getImplantProtheses(organisationId: string, implantId: string): Promise<Prothese[]>;
 
   // Stats methods
   getStats(organisationId: string): Promise<DashboardStats>;
@@ -387,6 +394,26 @@ export class DatabaseStorage implements IStorage {
       organisationId,
     }).returning();
     return newVisite;
+  }
+
+  // ========== PROTHESES ==========
+  async createProthese(organisationId: string, prothese: InsertProthese): Promise<Prothese> {
+    const [newProthese] = await db.insert(protheses).values({
+      ...prothese,
+      organisationId,
+    }).returning();
+    return newProthese;
+  }
+
+  async getImplantProtheses(organisationId: string, implantId: string): Promise<Prothese[]> {
+    return db
+      .select()
+      .from(protheses)
+      .where(and(
+        eq(protheses.implantId, implantId),
+        eq(protheses.organisationId, organisationId)
+      ))
+      .orderBy(desc(protheses.datePose));
   }
 
   // ========== STATS ==========

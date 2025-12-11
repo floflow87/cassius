@@ -9,6 +9,7 @@ import {
   insertImplantSchema,
   insertRadioSchema,
   insertVisiteSchema,
+  insertProtheseSchema,
   patients,
 } from "@shared/schema";
 import type {
@@ -18,6 +19,7 @@ import type {
   Implant,
   Radio,
   Visite,
+  Prothese,
   ImplantDetail,
   DashboardStats,
   AdvancedStats,
@@ -380,6 +382,37 @@ export async function registerRoutes(
       }
       console.error("Error creating visite:", error);
       res.status(500).json({ error: "Failed to create visite" });
+    }
+  });
+
+  // ========== PROTHESES ==========
+  app.post("/api/protheses", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const data = insertProtheseSchema.parse(req.body);
+      const prothese = await storage.createProthese(organisationId, data);
+      res.status(201).json(prothese);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating prothese:", error);
+      res.status(500).json({ error: "Erreur lors de la création de la prothèse" });
+    }
+  });
+
+  app.get("/api/implants/:id/protheses", requireJwt, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const protheses = await storage.getImplantProtheses(organisationId, req.params.id);
+      res.json(protheses);
+    } catch (error) {
+      console.error("Error fetching protheses:", error);
+      res.status(500).json({ error: "Erreur lors de la récupération des prothèses" });
     }
   });
 

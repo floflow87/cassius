@@ -24,6 +24,10 @@ export type TypeRadio = "PANORAMIQUE" | "CBCT" | "RETROALVEOLAIRE";
 
 export type Role = "CHIRURGIEN" | "ASSISTANT" | "ADMIN";
 
+export type TypeProthese = "VISSEE" | "SCELLEE";
+
+export type TypePilier = "DROIT" | "ANGULE" | "MULTI_UNIT";
+
 export interface Patient {
   id: string;
   nom: string;
@@ -91,6 +95,16 @@ export interface Visite {
   isq: number | null;
   notes: string | null;
   radioId: string | null;
+}
+
+export interface Prothese {
+  id: string;
+  implantId: string;
+  protheseUnitaire: boolean;
+  typeProthese: TypeProthese;
+  typePilier: TypePilier | null;
+  datePose: string | null;
+  notes: string | null;
 }
 
 export interface User {
