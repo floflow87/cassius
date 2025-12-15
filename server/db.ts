@@ -8,7 +8,7 @@ const { Pool } = pg;
 // DEV_DATABASE_URL = Supabase dev database
 // SUPABASE_DATABASE_URL = Supabase production database
 const isProduction = process.env.NODE_ENV === "production";
-const databaseUrl = isProduction 
+let databaseUrl = isProduction 
   ? process.env.SUPABASE_DATABASE_URL 
   : process.env.DEV_DATABASE_URL;
 
@@ -20,18 +20,21 @@ if (!databaseUrl) {
   );
 }
 
+// Remove sslmode from URL as we'll configure it separately in the pool
+const urlWithoutSslMode = databaseUrl.replace(/[?&]sslmode=[^&]*/, '');
+
 console.log(`Using ${isProduction ? 'production' : 'development'} Supabase database`);
 
 // Configure pool with robust settings for Supabase PostgreSQL
 export const pool = new Pool({ 
-  connectionString: databaseUrl,
+  connectionString: urlWithoutSslMode,
   connectionTimeoutMillis: 30000, // 30s timeout
   idleTimeoutMillis: 300000, // 5 minutes idle before releasing
   max: 10,
   keepAlive: true,
   keepAliveInitialDelayMillis: 0,
   ssl: {
-    rejectUnauthorized: false, // Required for Supabase connections
+    rejectUnauthorized: false,
   },
 });
 
