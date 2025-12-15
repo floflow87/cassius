@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Button } from "@/components/ui/button";
-import { LogOut, User } from "lucide-react";
+import { Bell, Calendar, LogOut } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import PatientsPage from "@/pages/patients";
 import PatientDetailsPage from "@/pages/patient-details";
@@ -28,6 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 interface UserInfo {
   id: string;
@@ -37,13 +36,96 @@ interface UserInfo {
   prenom: string | null;
 }
 
-function Router({ searchQuery }: { searchQuery: string }) {
+interface PageHeaderProps {
+  user: UserInfo;
+  onLogout: () => void;
+}
+
+function PageHeader({ user, onLogout }: PageHeaderProps) {
+  const [location] = useLocation();
+  
+  const getPageInfo = () => {
+    if (location === "/" || location.startsWith("/patient")) {
+      return { title: "Patients", subtitle: null };
+    }
+    if (location === "/implants" || location.includes("/implant/")) {
+      return { title: "Implants", subtitle: null };
+    }
+    if (location === "/dashboard" || location === "/stats") {
+      return { title: "Tableau de bord", subtitle: null };
+    }
+    return { title: "Cassius", subtitle: null };
+  };
+
+  const { title } = getPageInfo();
+  
+  const getUserInitials = () => {
+    const first = user.prenom?.[0] || "";
+    const last = user.nom?.[0] || "";
+    return (first + last).toUpperCase() || "U";
+  };
+
+  const roleLabels: Record<string, string> = {
+    CHIRURGIEN: "Chirurgien",
+    ASSISTANT: "Assistant",
+    ADMIN: "Administrateur",
+  };
+
+  return (
+    <header className="flex items-center justify-between gap-4 px-6 py-4 bg-background sticky top-0 z-50 border-b">
+      <div className="flex items-center gap-3">
+        <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
+          {title}
+        </h1>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-notifications">
+          <Bell className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-calendar">
+          <Calendar className="h-5 w-5" />
+        </Button>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="ghost" 
+              className="h-9 w-9 rounded-full bg-primary text-primary-foreground font-medium text-sm p-0"
+              data-testid="button-user-menu"
+            >
+              {getUserInitials()}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>
+              <div className="flex flex-col">
+                <span>{user.prenom} {user.nom}</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {roleLabels[user.role] || user.role}
+                </span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onLogout} data-testid="button-logout">
+              <LogOut className="h-4 w-4 mr-2" />
+              Déconnexion
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </header>
+  );
+}
+
+function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearchQuery: (q: string) => void }) {
   return (
     <Switch>
       <Route path="/">
-        {() => <PatientsPage searchQuery={searchQuery} />}
+        {() => <PatientsPage searchQuery={searchQuery} setSearchQuery={setSearchQuery} />}
       </Route>
       <Route path="/dashboard" component={DashboardPage} />
+      <Route path="/stats" component={DashboardPage} />
       <Route path="/implants" component={ImplantsPage} />
       <Route path="/patient/:id" component={PatientDetailsPage} />
       <Route path="/patient/:id/report" component={PatientReportPage} />
@@ -92,52 +174,19 @@ function AuthenticatedApp() {
     );
   }
 
-  const roleLabels: Record<string, string> = {
-    CHIRURGIEN: "Chirurgien",
-    ASSISTANT: "Assistant",
-    ADMIN: "Administrateur",
-  };
-
   const style = {
-    "--sidebar-width": "18rem",
-    "--sidebar-width-icon": "3.5rem",
+    "--sidebar-width": "4rem",
+    "--sidebar-width-icon": "4rem",
   };
 
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <AppSidebar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+    <SidebarProvider style={style as React.CSSProperties} defaultOpen={false}>
+      <div className="flex h-screen w-full bg-muted/30">
+        <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center justify-between gap-4 px-4 py-2 border-b bg-background sticky top-0 z-50">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" data-testid="button-user-menu">
-                    <User className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col">
-                      <span>{user.prenom} {user.nom}</span>
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {roleLabels[user.role] || user.role}
-                      </span>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Déconnexion
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </header>
-          <main className="flex-1 overflow-auto bg-background">
-            <Router searchQuery={searchQuery} />
+          <PageHeader user={user} onLogout={handleLogout} />
+          <main className="flex-1 overflow-auto">
+            <Router searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
           </main>
         </div>
       </div>
