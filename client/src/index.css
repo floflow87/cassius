@@ -26,10 +26,12 @@
   --popover: 0deg 0% 100%;
   --popover-foreground: 0deg 0% 0%;
   --popover-border: 0 0% 97%;
-  --primary: 203.83deg 100% 58.04%;
-  --primary-foreground: 0deg 0% 100%;
-  --secondary: 0deg 0% 100%;
-  --secondary-foreground: 0 0% 10.2%;
+  /* Cassius mainBlue #2563EB */
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  /* Cassius secondaryBlue #0D5C94 */
+  --secondary: 203 83% 32%;
+  --secondary-foreground: 0 0% 100%;
   --muted: 0 0% 89.02%;
   --muted-foreground: 0 0% 12.94%;
   --accent: 0 0% 100%;
