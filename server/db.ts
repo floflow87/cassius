@@ -4,35 +4,35 @@ import * as schema from "@shared/schema";
 
 const { Pool } = pg;
 
-// Use Supabase in production, Replit DB in development
+// Use Supabase for both production and development
+// DEV_DATABASE_URL = Supabase dev database
+// SUPABASE_DATABASE_URL = Supabase production database
 const isProduction = process.env.NODE_ENV === "production";
-let databaseUrl = isProduction 
+const databaseUrl = isProduction 
   ? process.env.SUPABASE_DATABASE_URL 
-  : process.env.DATABASE_URL;
+  : process.env.DEV_DATABASE_URL;
 
 if (!databaseUrl) {
   throw new Error(
     isProduction 
       ? "SUPABASE_DATABASE_URL must be set for production."
-      : "DATABASE_URL must be set. Did you forget to provision a database?",
+      : "DEV_DATABASE_URL must be set for development. Add your Supabase dev database connection string.",
   );
 }
 
-// Use Neon's connection pooler for better connection handling
-// This is recommended by Replit for their PostgreSQL databases
-if (!isProduction && databaseUrl.includes('.us-east-2')) {
-  databaseUrl = databaseUrl.replace('.us-east-2', '-pooler.us-east-2');
-  console.log('Using Neon connection pooler');
-}
+console.log(`Using ${isProduction ? 'production' : 'development'} Supabase database`);
 
-// Configure pool with robust settings for Replit PostgreSQL
+// Configure pool with robust settings for Supabase PostgreSQL
 export const pool = new Pool({ 
   connectionString: databaseUrl,
-  connectionTimeoutMillis: 60000, // 60s to allow for DB wake-up
+  connectionTimeoutMillis: 30000, // 30s timeout
   idleTimeoutMillis: 300000, // 5 minutes idle before releasing
   max: 10,
   keepAlive: true,
   keepAliveInitialDelayMillis: 0,
+  ssl: {
+    rejectUnauthorized: false, // Required for Supabase connections
+  },
 });
 
 // Handle pool errors to prevent crashes
