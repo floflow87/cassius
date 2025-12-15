@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -16,52 +16,38 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { LogIn, UserPlus, Activity } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 
 const loginSchema = z.object({
-  username: z.string().min(1, "Nom d'utilisateur requis"),
+  email: z.string().email("Adresse email invalide"),
   password: z.string().min(1, "Mot de passe requis"),
-});
-
-const registerSchema = z.object({
-  username: z.string().min(3, "Minimum 3 caractères"),
-  password: z.string().min(6, "Minimum 6 caractères"),
-  nom: z.string().optional(),
-  prenom: z.string().optional(),
+  rememberMe: z.boolean().optional(),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
-type RegisterForm = z.infer<typeof registerSchema>;
 
 interface LoginPageProps {
   onLoginSuccess: () => void;
 }
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
-  const [isRegister, setIsRegister] = useState(false);
   const { toast } = useToast();
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
-    },
-  });
-
-  const registerForm = useForm<RegisterForm>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-      nom: "",
-      prenom: "",
+      rememberMe: false,
     },
   });
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginForm) => {
-      const response = await apiRequest("POST", "/api/auth/login", data);
+      const response = await apiRequest("POST", "/api/auth/login", {
+        username: data.email,
+        password: data.password,
+      });
       return response.json();
     },
     onSuccess: () => {
@@ -81,164 +67,105 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     },
   });
 
-  const registerMutation = useMutation({
-    mutationFn: async (data: RegisterForm) => {
-      const response = await apiRequest("POST", "/api/auth/register", data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({
-        title: "Compte créé",
-        description: "Bienvenue sur Cassius",
-      });
-      onLoginSuccess();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Échec de l'inscription",
-        description: error.message || "Erreur lors de la création du compte",
-        variant: "destructive",
-      });
-    },
-  });
-
   const onLogin = (data: LoginForm) => {
     loginMutation.mutate(data);
   };
 
-  const onRegister = (data: RegisterForm) => {
-    registerMutation.mutate(data);
-  };
+  const features = [
+    "Documentez chaque implant avec précision",
+    "Centralisez radios et visites de contrôle",
+    "Analysez vos performances cliniques",
+  ];
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 bg-primary/10 rounded-full">
-              <Activity className="h-8 w-8 text-primary" />
-            </div>
-          </div>
-          <CardTitle className="text-2xl">
-            {isRegister ? "Créer un compte" : "Connexion"}
-          </CardTitle>
-          <p className="text-muted-foreground text-sm mt-2">
-            Plateforme de gestion implantologique
-          </p>
-        </CardHeader>
-        <CardContent>
-          {isRegister ? (
-            <Form {...registerForm}>
-              <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={registerForm.control}
-                    name="prenom"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Prénom</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Jean" {...field} data-testid="input-prenom" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={registerForm.control}
-                    name="nom"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nom</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Dupont" {...field} data-testid="input-nom" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="username-field" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    Nom d'utilisateur
-                  </label>
-                  <input
-                    id="username-field"
-                    type="text"
-                    placeholder="dr.dupont"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-                    {...registerForm.register("username")}
-                    data-testid="input-username-register"
-                  />
-                  {registerForm.formState.errors.username && (
-                    <p className="text-sm font-medium text-destructive">
-                      {registerForm.formState.errors.username.message}
-                    </p>
-                  )}
-                </div>
-                <FormField
-                  control={registerForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Mot de passe</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="Min. 6 caractères" {...field} data-testid="input-password-register" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={registerMutation.isPending}
-                  data-testid="button-register"
-                >
-                  {registerMutation.isPending ? (
-                    "Création..."
-                  ) : (
-                    <>
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Créer le compte
-                    </>
-                  )}
-                </Button>
-              </form>
-            </Form>
-          ) : (
+    <div className="min-h-screen flex">
+      {/* Left side - Login form */}
+      <div className="flex-1 flex flex-col justify-between bg-white dark:bg-gray-950 p-8 lg:p-12">
+        <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
+          {/* Logo */}
+          <h1 className="text-3xl font-semibold italic text-primary mb-12" data-testid="text-logo">
+            Cassius
+          </h1>
+
+          {/* Form */}
+          <div>
+            <h2 className="text-2xl font-semibold text-foreground mb-8" data-testid="text-connexion-title">
+              Connexion
+            </h2>
+
             <Form {...loginForm}>
-              <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
+              <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-6">
                 <FormField
                   control={loginForm.control}
-                  name="username"
+                  name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nom d'utilisateur</FormLabel>
+                      <FormLabel className="text-sm text-muted-foreground">Adresse email</FormLabel>
                       <FormControl>
-                        <Input placeholder="dr.dupont" {...field} data-testid="input-username" />
+                        <Input 
+                          type="email"
+                          placeholder="votre@email.com" 
+                          className="h-11 border-gray-300 dark:border-gray-700"
+                          {...field} 
+                          data-testid="input-email" 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={loginForm.control}
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Mot de passe</FormLabel>
+                      <div className="flex items-center justify-between gap-2">
+                        <FormLabel className="text-sm text-muted-foreground">Mot de passe</FormLabel>
+                        <button 
+                          type="button"
+                          className="text-sm text-primary hover:underline"
+                          data-testid="link-forgot-password"
+                        >
+                          Mot de passe oublié ?
+                        </button>
+                      </div>
                       <FormControl>
-                        <Input type="password" placeholder="Mot de passe" {...field} data-testid="input-password" />
+                        <Input 
+                          type="password" 
+                          placeholder="••••••••" 
+                          className="h-11 border-gray-300 dark:border-gray-700"
+                          {...field} 
+                          data-testid="input-password" 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={loginForm.control}
+                  name="rememberMe"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-remember"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm text-muted-foreground font-normal cursor-pointer">
+                        Se souvenir de moi
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
+
                 <Button 
                   type="submit" 
-                  className="w-full" 
+                  className="w-full h-11 text-base font-medium" 
                   disabled={loginMutation.isPending}
                   data-testid="button-login"
                 >
@@ -246,28 +173,75 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                     "Connexion..."
                   ) : (
                     <>
-                      <LogIn className="h-4 w-4 mr-2" />
                       Se connecter
+                      <ArrowRight className="h-4 w-4 ml-2" />
                     </>
                   )}
                 </Button>
               </form>
             </Form>
-          )}
 
-          <div className="mt-6 text-center">
-            <Button
-              variant="ghost"
-              onClick={() => setIsRegister(!isRegister)}
-              data-testid="button-toggle-register"
-            >
-              {isRegister
-                ? "Déjà un compte ? Se connecter"
-                : "Pas de compte ? S'inscrire"}
-            </Button>
+            {/* Request access */}
+            <div className="mt-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Vous n'avez pas de compte ?
+              </p>
+              <button 
+                type="button"
+                className="text-sm text-primary hover:underline font-medium mt-1"
+                data-testid="link-request-access"
+              >
+                Demander un accès
+              </button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-8">
+          <p className="text-xs text-muted-foreground" data-testid="text-rgpd">
+            Données médicales chiffrées et conformes RGPD
+          </p>
+        </div>
+      </div>
+
+      {/* Right side - Blue gradient with features */}
+      <div className="hidden lg:flex flex-1 relative overflow-hidden bg-gradient-to-br from-primary via-primary to-secondary">
+        {/* Decorative circles */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-white/10" />
+          <div className="absolute top-[20%] right-[15%] w-[300px] h-[300px] rounded-full bg-white/5" />
+          <div className="absolute bottom-[-15%] left-[-10%] w-[500px] h-[500px] rounded-full bg-white/5" />
+          <div className="absolute bottom-[10%] right-[-5%] w-[250px] h-[250px] rounded-full bg-white/10" />
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center justify-center w-full px-12 text-white">
+          <h2 className="text-4xl font-semibold italic mb-3" data-testid="text-brand-title">
+            Cassius
+          </h2>
+          <p className="text-lg opacity-90 mb-8" data-testid="text-tagline">
+            Votre Mémoire Clinique, Éclairée.
+          </p>
+
+          {/* Divider */}
+          <div className="w-16 h-0.5 bg-white/60 mb-8" />
+
+          {/* Features */}
+          <ul className="space-y-4">
+            {features.map((feature, index) => (
+              <li key={index} className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                  <Check className="w-3 h-3 text-white" />
+                </div>
+                <span className="text-base opacity-95" data-testid={`text-feature-${index}`}>
+                  {feature}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
