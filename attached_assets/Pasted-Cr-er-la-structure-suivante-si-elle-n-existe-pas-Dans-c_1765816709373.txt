@@ -1,0 +1,147 @@
+Créer la structure suivante (si elle n’existe pas)
+
+Dans client/src/ :
+
+design-system/
+
+tokens/
+
+colors.ts
+
+spacing.ts (placeholder)
+
+typography.ts (placeholder)
+
+radii.ts (placeholder)
+
+theme/
+
+index.ts (expose theme object)
+
+components/
+
+Button.tsx (starter composant simple, réutilisable)
+
+Badge.tsx
+
+Card.tsx
+
+icons/ (si certains SVG doivent devenir des composants)
+
+Dans client/src/styles/ :
+
+globals.css (ou équivalent, centraliser les variables CSS si utilisé)
+
+Dans client/public/ :
+
+assets/
+
+logos/
+
+icons/
+
+illustrations/
+
+images/
+
+fonts/ (si besoin)
+
+Dans /docs/ :
+
+design-system/
+
+01-overview.md
+
+02-tokens.md
+
+03-components.md
+
+assets-inventory.md
+
+2) Implémenter les tokens de couleurs
+
+Créer client/src/design-system/tokens/colors.ts contenant :
+
+mainBlue: "#2563EB"
+
+secondaryBlue: "#0D5C94"
+
+plus des neutres minimum (white, black, gray50..gray900)
+
+exposer une structure claire (ex: export const colors = { ... })
+
+Si Tailwind est utilisé :
+
+intégrer ces couleurs comme primary et secondary dans tailwind.config
+
+éviter les valeurs hex hardcodées dans les composants après migration
+
+3) Ajouter un thème central
+
+Créer client/src/design-system/theme/index.ts qui :
+
+exporte theme avec colors, radii, spacing, typography
+
+sert de point d’entrée pour le reste du front
+
+4) Créer 3 composants UI de base (starter kit)
+
+Dans client/src/design-system/components/ :
+
+Button (variants : primary/secondary/ghost, sizes)
+
+Badge (success/warning/error/info)
+
+Card (header/content/footer simples)
+
+Les styles doivent utiliser les tokens et non des hex.
+
+5) Organiser les assets déjà envoyés
+
+Déplacer tous les assets statiques vers client/public/assets/...
+
+Mettre à jour tous les chemins de référence dans le code
+
+Ajouter une page docs/design-system/assets-inventory.md listant :
+
+nom du fichier
+
+type (logo/icon/illustration)
+
+usage recommandé
+
+où il est utilisé (si connu)
+
+6) Migration progressive des couleurs hardcodées
+
+Chercher dans client/src/ toutes les occurrences de #2563EB et #0D5C94 et remplacer par tokens (ou classes Tailwind text-primary, bg-primary, etc.)
+
+Repérer d’autres hex hardcodées et proposer une stratégie (ne pas tout migrer si trop large, mais faire une première passe sur les composants principaux)
+
+7) Documentation
+
+Remplir docs/design-system/01-overview.md avec :
+
+philosophie (tokens → composants → pages)
+
+règles de contribution (où mettre quoi)
+
+conventions (noms de fichiers, naming assets)
+
+Remplir docs/design-system/02-tokens.md avec :
+
+palette mainBlue / secondaryBlue
+
+règles d’usage (ex : primary CTA, secondary accents, hover states)
+
+Livrables attendus
+
+Arborescence créée + fichiers ajoutés
+
+Tokens couleurs disponibles et utilisés
+
+3 composants UI prêts à être utilisés
+
+Assets déplacés et chemins mis à jour
+
+Documentation design system + inventaire assets
