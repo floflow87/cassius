@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -6,7 +5,6 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -16,60 +14,69 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, UserPlus } from "lucide-react";
 import { Link } from "wouter";
 
-const loginSchema = z.object({
-  email: z.string().email("Adresse email invalide"),
-  password: z.string().min(1, "Mot de passe requis"),
-  rememberMe: z.boolean().optional(),
+const registerSchema = z.object({
+  username: z.string().min(3, "Minimum 3 caractères"),
+  password: z.string().min(6, "Minimum 6 caractères"),
+  confirmPassword: z.string().min(6, "Minimum 6 caractères"),
+  nom: z.string().min(1, "Nom requis"),
+  prenom: z.string().min(1, "Prénom requis"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Les mots de passe ne correspondent pas",
+  path: ["confirmPassword"],
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
+type RegisterForm = z.infer<typeof registerSchema>;
 
-interface LoginPageProps {
-  onLoginSuccess: () => void;
+interface RegisterPageProps {
+  onRegisterSuccess: () => void;
 }
 
-export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
+export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
   const { toast } = useToast();
 
-  const loginForm = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
+  const registerForm = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
     defaultValues: {
-      email: "",
+      username: "",
       password: "",
-      rememberMe: false,
+      confirmPassword: "",
+      nom: "",
+      prenom: "",
     },
   });
 
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginForm) => {
-      const response = await apiRequest("POST", "/api/auth/login", {
-        username: data.email,
+  const registerMutation = useMutation({
+    mutationFn: async (data: RegisterForm) => {
+      const response = await apiRequest("POST", "/api/auth/register", {
+        username: data.username,
         password: data.password,
+        nom: data.nom,
+        prenom: data.prenom,
       });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
-        title: "Connexion réussie",
+        title: "Compte créé",
         description: "Bienvenue sur Cassius",
       });
-      onLoginSuccess();
+      onRegisterSuccess();
     },
     onError: (error: Error) => {
       toast({
-        title: "Échec de connexion",
-        description: error.message || "Identifiants incorrects",
+        title: "Échec de l'inscription",
+        description: error.message || "Erreur lors de la création du compte",
         variant: "destructive",
       });
     },
   });
 
-  const onLogin = (data: LoginForm) => {
-    loginMutation.mutate(data);
+  const onRegister = (data: RegisterForm) => {
+    registerMutation.mutate(data);
   };
 
   const features = [
@@ -80,7 +87,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left side - Login form */}
+      {/* Left side - Register form */}
       <div className="flex-1 flex flex-col justify-between bg-white dark:bg-gray-950 p-8 lg:p-12">
         <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
           {/* Logo */}
@@ -90,15 +97,57 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
           {/* Form */}
           <div>
-            <h2 className="text-2xl font-semibold text-foreground mb-8" data-testid="text-connexion-title">
-              Connexion
+            <h2 className="text-2xl font-semibold text-foreground mb-2" data-testid="text-register-title">
+              Demander un accès
             </h2>
+            <p className="text-muted-foreground mb-8">
+              Créez votre compte pour accéder à la plateforme
+            </p>
 
-            <Form {...loginForm}>
-              <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-6">
+            <Form {...registerForm}>
+              <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={registerForm.control}
+                    name="prenom"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm text-muted-foreground">Prénom</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Jean" 
+                            className="h-11 border-gray-300 dark:border-gray-700"
+                            {...field} 
+                            data-testid="input-prenom" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={registerForm.control}
+                    name="nom"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm text-muted-foreground">Nom</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Dupont" 
+                            className="h-11 border-gray-300 dark:border-gray-700"
+                            {...field} 
+                            data-testid="input-nom" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
                 <FormField
-                  control={loginForm.control}
-                  name="email"
+                  control={registerForm.control}
+                  name="username"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-sm text-muted-foreground">Adresse email</FormLabel>
@@ -108,7 +157,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                           placeholder="votre@email.com" 
                           className="h-11 border-gray-300 dark:border-gray-700"
                           {...field} 
-                          data-testid="input-email" 
+                          data-testid="input-username" 
                         />
                       </FormControl>
                       <FormMessage />
@@ -117,24 +166,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 />
 
                 <FormField
-                  control={loginForm.control}
+                  control={registerForm.control}
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel className="text-sm text-muted-foreground">Mot de passe</FormLabel>
-                        <button 
-                          type="button"
-                          className="text-sm text-primary hover:underline"
-                          data-testid="link-forgot-password"
-                        >
-                          Mot de passe oublié ?
-                        </button>
-                      </div>
+                      <FormLabel className="text-sm text-muted-foreground">Mot de passe</FormLabel>
                       <FormControl>
                         <Input 
                           type="password" 
-                          placeholder="••••••••" 
+                          placeholder="Min. 6 caractères" 
                           className="h-11 border-gray-300 dark:border-gray-700"
                           {...field} 
                           data-testid="input-password" 
@@ -146,20 +186,21 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 />
 
                 <FormField
-                  control={loginForm.control}
-                  name="rememberMe"
+                  control={registerForm.control}
+                  name="confirmPassword"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                    <FormItem>
+                      <FormLabel className="text-sm text-muted-foreground">Confirmer le mot de passe</FormLabel>
                       <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="checkbox-remember"
+                        <Input 
+                          type="password" 
+                          placeholder="Confirmez votre mot de passe" 
+                          className="h-11 border-gray-300 dark:border-gray-700"
+                          {...field} 
+                          data-testid="input-confirm-password" 
                         />
                       </FormControl>
-                      <FormLabel className="text-sm text-muted-foreground font-normal cursor-pointer">
-                        Se souvenir de moi
-                      </FormLabel>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -167,14 +208,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 <Button 
                   type="submit" 
                   className="w-full h-11 text-base font-medium" 
-                  disabled={loginMutation.isPending}
-                  data-testid="button-login"
+                  disabled={registerMutation.isPending}
+                  data-testid="button-register"
                 >
-                  {loginMutation.isPending ? (
-                    "Connexion..."
+                  {registerMutation.isPending ? (
+                    "Création..."
                   ) : (
                     <>
-                      Se connecter
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Créer mon compte
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </>
                   )}
@@ -182,17 +224,17 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               </form>
             </Form>
 
-            {/* Request access */}
+            {/* Back to login */}
             <div className="mt-8 text-center">
               <p className="text-sm text-muted-foreground">
-                Vous n'avez pas de compte ?
+                Vous avez déjà un compte ?
               </p>
               <Link 
-                href="/register"
+                href="/login"
                 className="text-sm text-primary hover:underline font-medium mt-1 inline-block"
-                data-testid="link-request-access"
+                data-testid="link-login"
               >
-                Demander un accès
+                Se connecter
               </Link>
             </div>
           </div>

@@ -17,6 +17,7 @@ import PatientReportPage from "@/pages/patient-report";
 import DashboardPage from "@/pages/dashboard";
 import ImplantsPage from "@/pages/implants";
 import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
 import { apiRequest } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -79,7 +80,16 @@ function AuthenticatedApp() {
   }
 
   if (!user) {
-    return <LoginPage onLoginSuccess={() => refetch()} />;
+    return (
+      <Switch>
+        <Route path="/register">
+          {() => <RegisterPage onRegisterSuccess={() => refetch()} />}
+        </Route>
+        <Route>
+          {() => <LoginPage onLoginSuccess={() => refetch()} />}
+        </Route>
+      </Switch>
+    );
   }
 
   const roleLabels: Record<string, string> = {
