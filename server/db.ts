@@ -18,5 +18,10 @@ if (!databaseUrl) {
   );
 }
 
-export const pool = new Pool({ connectionString: databaseUrl });
+export const pool = new Pool({ 
+  connectionString: databaseUrl,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 10,
+});
 export const db = drizzle(pool, { schema });
