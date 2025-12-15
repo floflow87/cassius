@@ -1,0 +1,89 @@
+Avant de valider, je veux verrouiller quelques points pour être sûr que le design system soit vraiment une source de vérité unique, maintenable et cohérente avec Tailwind.
+
+1) Source de vérité : tokens vs CSS variables vs Tailwind
+
+Tu as :
+
+colors.ts (tokens)
+
+des variables CSS --primary/--secondary
+
+et du Tailwind bg-primary
+
+👉 Peux-tu préciser et appliquer une règle claire : qui est la source de vérité ?
+Mon attente :
+
+1 seule source (idéalement Tailwind + CSS variables si shadcn, ou tokens TS si on ne dépend pas de Tailwind)
+
+pas de duplication qui diverge.
+
+✅ À faire : documenter la règle dans docs/design-system/01-overview.md (ex : “les tokens vivent dans tailwind.config, les fichiers TS ne font que réexporter les valeurs”).
+
+2) Intégration Tailwind : montre-moi le mapping exact
+
+Peux-tu me donner le diff / extrait de :
+
+tailwind.config.(js|ts)
+
+globals.css (où sont déclarés --primary / --secondary)
+
+et confirmer que bg-primary fonctionne sans classes custom ?
+
+Je veux voir clairement que primary et secondary sont bien dans la config Tailwind (ou via shadcn).
+
+3) Alias d’imports
+
+Tu utilises @/design-system/theme.
+Peux-tu confirmer que l’alias @ est bien configuré dans :
+
+tsconfig.json (paths)
+
+bundler (vite/next/etc.)
+
+Sinon on va avoir des imports cassés selon l’environnement.
+
+4) Assets : naming + optimisation
+
+Tu as logo_Cassius.png.
+✅ Peux-tu :
+
+renommer en convention stable : logo-cassius.png (kebab-case)
+
+vérifier que les PNG sont optimisés (poids)
+
+et ajouter aussi les variantes si prévues : logo-cassius-mark, logo-cassius-dark/light etc. (sinon on le note dans l’inventaire)
+
+5) Icônes : stratégie (public vs composants)
+
+Les icônes sont dans public/assets/icons.
+👉 Confirme-moi la stratégie :
+
+soit on les charge en <img src="/assets/icons/...">
+
+soit on les convertit en composants SVG dans src/design-system/icons
+Mais on évite le mix qui devient vite ingérable.
+
+6) Composants DS : où sont-ils ?
+
+Tu mentionnes 03-components.md, mais dans ton résumé je ne vois pas de client/src/design-system/components/.
+👉 Est-ce qu’ils existent déjà (Button/Badge/Card) ?
+Si oui : donne-moi les chemins + exemples d’usage.
+Si non : on les ajoute maintenant, même en version starter, sinon on n’a pas vraiment de DS côté UI.
+
+7) Migration : état réel
+
+Peux-tu me donner :
+
+combien d’occurrences de #2563EB / #0D5C94 il reste dans client/src/
+
+et quelles pages ont déjà été migrées (au moins layout + navigation + boutons) ?
+
+Livrables pour clôturer
+
+Liste des fichiers modifiés + diff principal
+
+Règle de source de vérité (tokens) écrite dans la doc
+
+Confirmation sur Tailwind + alias @
+
+Composants DS présents ou ajoutés (Button/Badge/Card)

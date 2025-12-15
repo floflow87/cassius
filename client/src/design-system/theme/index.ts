@@ -67,3 +67,13 @@ export {
   radii,
   componentRadii,
 };
+
+// Re-export des composants Design System
+export {
+  CassiusButton,
+  CassiusBadge,
+  CassiusCard,
+  CassiusCardHeader,
+  CassiusCardContent,
+  CassiusCardFooter,
+} from "../components";

@@ -1,5 +1,36 @@
 # Cassius Design System - Vue d'ensemble
 
+## Source de vérité (RÈGLE FONDAMENTALE)
+
+**La source de vérité unique pour les couleurs est :**
+
+```
+Variables CSS (index.css) → Tailwind config → Classes Tailwind
+```
+
+### Hiérarchie
+
+1. **Variables CSS** (`client/src/index.css`) : Définissent `--primary`, `--secondary`, etc. en HSL
+2. **Tailwind config** (`tailwind.config.ts`) : Consomme les variables CSS via `hsl(var(--primary))`
+3. **Classes Tailwind** : `bg-primary`, `text-primary`, etc. - **C'est ce qu'on utilise dans le code**
+4. **Tokens TS** (`design-system/tokens/`) : Réexportent les valeurs pour usage programmatique (charts, styles dynamiques)
+
+### Règle d'or
+
+> **Les fichiers TypeScript de tokens ne font que DOCUMENTER et RÉEXPORTER les valeurs définies dans CSS/Tailwind. Ils ne sont PAS la source de vérité.**
+
+Si une couleur change :
+1. Modifier `client/src/index.css` (variable CSS)
+2. Mettre à jour `design-system/tokens/colors.ts` pour refléter le changement (documentation)
+
+### Ce qui est interdit
+
+- Utiliser des valeurs hex directement dans les composants (`#2563EB`)
+- Créer de nouvelles couleurs uniquement dans les tokens TS sans les ajouter aux CSS/Tailwind
+- Dupliquer les valeurs avec des définitions différentes
+
+---
+
 ## Philosophie
 
 Le design system Cassius suit une architecture en couches :
