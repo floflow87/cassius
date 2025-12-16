@@ -53,6 +53,10 @@ export const patients = pgTable("patients", {
   sexe: sexeEnum("sexe").notNull(),
   telephone: text("telephone"),
   email: text("email"),
+  adresse: text("adresse"),
+  codePostal: text("code_postal"),
+  ville: text("ville"),
+  pays: text("pays"),
   contexteMedical: text("contexte_medical"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
