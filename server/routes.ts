@@ -30,7 +30,7 @@ import type {
   UploadUrlResponse,
 } from "@shared/types";
 import { z } from "zod";
-import { db, pool } from "./db";
+import { db, pool, testConnection, getDbEnv } from "./db";
 import { eq } from "drizzle-orm";
 
 function getOrganisationId(req: Request, res: Response): string | null {
@@ -48,71 +48,24 @@ export async function registerRoutes(
 ): Promise<Server> {
   const objectStorageService = new ObjectStorageService();
 
-  app.get("/db-test", async (_req, res) => {
-    const testPatient = {
-      nom: "Doe",
-      prenom: "John",
-      dateNaissance: "1990-01-15",
-      sexe: "HOMME" as const,
-      telephone: "+33600000000",
-      email: "john.doe@test.com",
-      contexteMedical: "Patient de test - à supprimer",
-      organisationId: "default-org-001",
-    };
-
-    try {
-      const connectionTest = await pool.query("SELECT 1 as connected");
-      if (!connectionTest.rows[0]?.connected) {
-        throw new Error("Échec de la connexion à la base de données");
-      }
-
-      const [insertedPatient] = await db
-        .insert(patients)
-        .values(testPatient)
-        .returning();
-
-      if (!insertedPatient) {
-        throw new Error("Échec de l'insertion du patient test");
-      }
-
-      const [selectedPatient] = await db
-        .select()
-        .from(patients)
-        .where(eq(patients.id, insertedPatient.id));
-
-      if (!selectedPatient) {
-        throw new Error("Échec de la lecture du patient test");
-      }
-
-      await db.delete(patients).where(eq(patients.id, insertedPatient.id));
-
+  app.get("/api/health/db", async (_req, res) => {
+    const result = await testConnection();
+    const env = getDbEnv();
+    
+    if (result.ok) {
       res.json({
-        success: true,
-        message: "Connexion à la base de données validée",
-        tests: {
-          connexion: "OK",
-          insert: "OK",
-          select: "OK",
-          delete: "OK (patient test supprimé)",
-        },
-        patientTest: {
-          id: insertedPatient.id,
-          nom: selectedPatient.nom,
-          prenom: selectedPatient.prenom,
-          dateNaissance: selectedPatient.dateNaissance,
-        },
-        database: process.env.NODE_ENV === "production" ? "Supabase" : "Replit PostgreSQL",
-        timestamp: new Date().toISOString(),
+        ok: true,
+        db: "connected",
+        latencyMs: result.latencyMs,
+        env,
       });
-    } catch (error) {
-      console.error("Erreur test DB:", error);
+    } else {
       res.status(500).json({
-        success: false,
-        message: "Erreur de connexion à la base de données",
-        error: error instanceof Error ? error.message : "Erreur inconnue",
-        database: process.env.NODE_ENV === "production" ? "Supabase" : "Replit PostgreSQL",
-        conseil: "Vérifiez que DATABASE_URL est correctement configuré",
-        timestamp: new Date().toISOString(),
+        ok: false,
+        db: "disconnected",
+        latencyMs: result.latencyMs,
+        error: result.error,
+        env,
       });
     }
   });
