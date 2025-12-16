@@ -101,6 +101,8 @@ CREATE TABLE IF NOT EXISTS patients (
   code_postal TEXT,
   ville TEXT,
   pays TEXT,
+  allergies TEXT,
+  medicaments TEXT,
   contexte_medical TEXT,
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );

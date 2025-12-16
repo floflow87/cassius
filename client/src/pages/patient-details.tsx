@@ -81,6 +81,8 @@ export default function PatientDetailsPage() {
     codePostal: "",
     ville: "",
     pays: "",
+    allergies: "",
+    medicaments: "",
     contexteMedical: "",
   });
 
@@ -118,6 +120,8 @@ export default function PatientDetailsPage() {
         codePostal: patient.codePostal || "",
         ville: patient.ville || "",
         pays: patient.pays || "",
+        allergies: patient.allergies || "",
+        medicaments: patient.medicaments || "",
         contexteMedical: patient.contexteMedical || "",
       });
       setEditDialogOpen(true);
@@ -518,13 +522,35 @@ export default function PatientDetailsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="contexteMedical">Contexte médical</Label>
+                      <Label htmlFor="allergies">Allergies</Label>
+                      <Textarea
+                        id="allergies"
+                        value={editForm.allergies}
+                        onChange={(e) => setEditForm({ ...editForm, allergies: e.target.value })}
+                        placeholder="Pénicilline, latex..."
+                        rows={2}
+                        data-testid="input-edit-allergies"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="medicaments">Médicaments</Label>
+                      <Textarea
+                        id="medicaments"
+                        value={editForm.medicaments}
+                        onChange={(e) => setEditForm({ ...editForm, medicaments: e.target.value })}
+                        placeholder="Traitements en cours..."
+                        rows={2}
+                        data-testid="input-edit-medicaments"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contexteMedical">Conditions médicales</Label>
                       <Textarea
                         id="contexteMedical"
                         value={editForm.contexteMedical}
                         onChange={(e) => setEditForm({ ...editForm, contexteMedical: e.target.value })}
-                        placeholder="Notes médicales, antécédents..."
-                        rows={3}
+                        placeholder="Diabète, hypertension..."
+                        rows={2}
                         data-testid="input-edit-contexte-medical"
                       />
                     </div>
@@ -554,14 +580,18 @@ export default function PatientDetailsPage() {
                     <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Allergies</p>
-                      <p className="text-xs text-muted-foreground">Aucune connue</p>
+                      <p className="text-xs text-muted-foreground">
+                        {patient.allergies || "Aucune connue"}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/50 border-l-4 border-amber-400">
                     <Pill className="h-4 w-4 text-amber-600 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Médicaments</p>
-                      <p className="text-xs text-muted-foreground">Aucun traitement en cours</p>
+                      <p className="text-xs text-muted-foreground">
+                        {patient.medicaments || "Aucun traitement en cours"}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-pink-50 dark:bg-pink-950/50 border-l-4 border-pink-400">
@@ -635,7 +665,7 @@ export default function PatientDetailsPage() {
 
             <div className="lg:col-span-2 space-y-6">
               <div className="grid grid-cols-4 gap-4">
-                <Card className="bg-muted/30">
+                <Card className="bg-white dark:bg-zinc-900">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <Activity className="h-4 w-4 text-primary" />
@@ -645,7 +675,7 @@ export default function PatientDetailsPage() {
                     <p className="text-xs text-primary">{successRate}% réussite</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-muted/30">
+                <Card className="bg-white dark:bg-zinc-900">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <ClipboardList className="h-4 w-4 text-primary" />
@@ -657,7 +687,7 @@ export default function PatientDetailsPage() {
                     </p>
                   </CardContent>
                 </Card>
-                <Card className="bg-muted/30">
+                <Card className="bg-white dark:bg-zinc-900">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <Stethoscope className="h-4 w-4 text-primary" />
@@ -667,7 +697,7 @@ export default function PatientDetailsPage() {
                     <p className="text-xs text-muted-foreground">Suivi régulier</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-muted/30">
+                <Card className="bg-white dark:bg-zinc-900">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <ImageIcon className="h-4 w-4 text-primary" />
