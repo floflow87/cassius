@@ -166,7 +166,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
               Nouveau patient
             </Button>
           </SheetTrigger>
-          <SheetContent className="w-[540px] sm:max-w-[540px] overflow-y-auto">
+          <SheetContent className="w-[540px] sm:max-w-[540px] overflow-y-auto bg-white dark:bg-gray-950">
             <SheetHeader className="mb-6">
               <SheetTitle>Nouveau patient</SheetTitle>
             </SheetHeader>

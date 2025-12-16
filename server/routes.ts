@@ -30,7 +30,7 @@ import type {
   UploadUrlResponse,
 } from "@shared/types";
 import { z } from "zod";
-import { db, pool, testConnection, getDbEnv } from "./db";
+import { db, pool, testConnection, getDbEnv, getDbConnectionInfo } from "./db";
 import { eq } from "drizzle-orm";
 
 function getOrganisationId(req: Request, res: Response): string | null {
@@ -51,9 +51,10 @@ export async function registerRoutes(
   app.get("/api/health/db", requireJwtOrSession, async (_req, res) => {
     const result = await testConnection();
     const env = getDbEnv();
+    const { dbHost, dbName } = getDbConnectionInfo();
     const status = result.ok ? "connected" : "unreachable";
     
-    console.log(`[DB-HEALTH] env=${env} latency=${result.latencyMs}ms status=${status}`);
+    console.log(`[DB-HEALTH] env=${env} host=${dbHost} db=${dbName} latency=${result.latencyMs}ms status=${status}`);
     
     if (result.ok) {
       res.json({
@@ -61,6 +62,8 @@ export async function registerRoutes(
         db: "connected",
         latencyMs: result.latencyMs,
         env,
+        dbHost,
+        dbName,
       });
     } else {
       const errorCode = result.error?.includes("ETIMEDOUT") ? "ETIMEDOUT" 
@@ -71,6 +74,8 @@ export async function registerRoutes(
         ok: false,
         db: "unreachable",
         env,
+        dbHost,
+        dbName,
         error: errorCode,
       });
     }

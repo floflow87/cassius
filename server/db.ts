@@ -87,3 +87,18 @@ export const db = drizzle(pool, { schema });
 export function getDbEnv() {
   return APP_ENV;
 }
+
+export function getDbConnectionInfo(): { dbHost: string; dbName: string } {
+  try {
+    const url = new URL(databaseUrl);
+    return {
+      dbHost: url.hostname,
+      dbName: url.pathname.replace(/^\//, '') || 'postgres',
+    };
+  } catch {
+    return {
+      dbHost: 'unknown',
+      dbName: 'unknown',
+    };
+  }
+}
