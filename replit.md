@@ -17,6 +17,27 @@ The MVP focuses on:
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (December 16, 2025)
+
+### UI Refactoring - Sidebar and Patients Page
+- **Sidebar**: Refactored to use Shadcn primitives (Sidebar, SidebarProvider, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton)
+- **Color tokens**: Updated CSS variables for Cassius mainBlue (#2563EB / 217 91% 60%) in both light and dark modes
+- **Icons**: Using custom PNG icons for navigation (home, patient, implants, actes, stats, settings)
+- **Active state**: White semi-transparent background (bg-white/20) with full opacity icons
+- **Tooltips**: Added to sidebar navigation items
+
+### Design Tokens
+- **Primary (mainBlue)**: #2563EB - HSL 217 91% 60%
+- **Secondary Blue**: #0D5C94
+- **Sidebar width**: 4.5rem (72px)
+- **Sidebar background**: Uses --sidebar CSS variable which is now mainBlue
+
+### Patients Page Structure
+- Uses semantic HTML table (`<table>`, `<thead>`, `<tbody>`, `<tr>`, `<th>`, `<td>`) for accessibility
+- Columns: Patient (name + ID), Date de naissance, Contact, Implants, Dernière visite, Statut
+- Features: Search, filters with badges, pagination, patient selection checkboxes
+- Status badges: Actif (green), En traitement (blue), Suivi (yellow), Inactif (gray)
+
 ## System Architecture
 
 ### Frontend Architecture
