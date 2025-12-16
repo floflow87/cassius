@@ -97,6 +97,10 @@ CREATE TABLE IF NOT EXISTS patients (
   sexe sexe NOT NULL,
   telephone TEXT,
   email TEXT,
+  adresse TEXT,
+  code_postal TEXT,
+  ville TEXT,
+  pays TEXT,
   contexte_medical TEXT,
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );

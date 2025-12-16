@@ -83,15 +83,28 @@ export async function registerRoutes(
 
   // ========== PATIENTS ==========
   app.get("/api/patients", requireJwtOrSession, async (req, res) => {
-    const organisationId = getOrganisationId(req, res);
-    if (!organisationId) return;
+    const env = process.env.APP_ENV || process.env.NODE_ENV || "unknown";
+    const userId = req.jwtUser?.userId || "none";
+    const hasSession = req.isAuthenticated?.() ?? false;
+    const hasBearer = !!req.headers.authorization?.startsWith("Bearer ");
+    const organisationId = req.jwtUser?.organisationId || "none";
+    
+    console.log(`[API] GET /api/patients | env=${env} | userId=${userId} | hasSession=${hasSession} | hasBearer=${hasBearer} | orgId=${organisationId}`);
+
+    if (!req.jwtUser?.organisationId) {
+      console.log(`[API] GET /api/patients | REJECTED: no organisationId`);
+      return res.status(403).json({ error: "Organisation manquante dans le token" });
+    }
 
     try {
-      const patients = await storage.getPatients(organisationId);
+      const patients = await storage.getPatients(req.jwtUser.organisationId);
+      console.log(`[API] GET /api/patients | SUCCESS: ${patients.length} patients`);
       res.json(patients);
     } catch (error) {
-      console.error("Error fetching patients:", error);
-      res.status(500).json({ error: "Failed to fetch patients" });
+      const err = error as Error;
+      console.error(`[API] GET /api/patients | ERROR:`, err.message);
+      console.error(err.stack);
+      res.status(500).json({ error: "Failed to fetch patients", details: err.message });
     }
   });
 
@@ -139,6 +152,26 @@ export async function registerRoutes(
       }
       console.error("Error creating patient:", error);
       res.status(500).json({ error: "Failed to create patient" });
+    }
+  });
+
+  app.patch("/api/patients/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const data = insertPatientSchema.partial().parse(req.body);
+      const patient = await storage.updatePatient(organisationId, req.params.id, data);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      res.json(patient);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error updating patient:", error);
+      res.status(500).json({ error: "Failed to update patient" });
     }
   });
 

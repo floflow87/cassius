@@ -208,8 +208,8 @@ function AuthenticatedApp() {
   }
 
   const style = {
-    "--sidebar-width": "4.5rem",
-    "--sidebar-width-icon": "4.5rem",
+    "--sidebar-width": "4rem",
+    "--sidebar-width-icon": "4rem",
   };
 
   return (
