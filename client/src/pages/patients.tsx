@@ -170,7 +170,10 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
             <SheetHeader className="mb-6">
               <SheetTitle>Nouveau patient</SheetTitle>
             </SheetHeader>
-            <PatientForm onSuccess={() => setSheetOpen(false)} />
+            <PatientForm onSuccess={(patientId) => {
+              setSheetOpen(false);
+              setLocation(`/patients/${patientId}`);
+            }} />
           </SheetContent>
         </Sheet>
       </div>

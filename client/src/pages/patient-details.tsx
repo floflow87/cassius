@@ -85,6 +85,7 @@ export default function PatientDetailsPage() {
 
   const [medicalDialogOpen, setMedicalDialogOpen] = useState(false);
   const [medicalForm, setMedicalForm] = useState({
+    contexteMedical: "",
     allergies: "",
     traitement: "",
     conditions: "",
@@ -153,6 +154,7 @@ export default function PatientDetailsPage() {
   const openMedicalDialog = () => {
     if (patient) {
       setMedicalForm({
+        contexteMedical: patient.contexteMedical || "",
         allergies: patient.allergies || "",
         traitement: patient.traitement || "",
         conditions: patient.conditions || "",
@@ -581,6 +583,15 @@ export default function PatientDetailsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/50 border-l-4 border-blue-400">
+                    <ClipboardList className="h-4 w-4 text-blue-500 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Contexte médical</p>
+                      <p className="text-xs text-muted-foreground">
+                        {patient.contexteMedical || "Aucun contexte renseigné"}
+                      </p>
+                    </div>
+                  </div>
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/50 border-l-4 border-red-400">
                     <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
                     <div>
@@ -617,6 +628,17 @@ export default function PatientDetailsPage() {
                     <SheetTitle>Contexte médical</SheetTitle>
                   </SheetHeader>
                   <form onSubmit={handleMedicalSubmit} className="mt-6 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="contexteMedical">Contexte médical</Label>
+                      <Textarea
+                        id="contexteMedical"
+                        value={medicalForm.contexteMedical}
+                        onChange={(e) => setMedicalForm({ ...medicalForm, contexteMedical: e.target.value })}
+                        placeholder="Antécédents médicaux généraux..."
+                        rows={3}
+                        data-testid="input-edit-contexte-medical"
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="allergies">Allergies</Label>
                       <Textarea

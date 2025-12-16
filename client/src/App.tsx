@@ -50,7 +50,7 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
     if (location === "/patients" || location.startsWith("/patients/")) {
       return { 
         title: "Patients", 
-        subtitle: patientCount !== undefined ? `${patientCount} patients actifs` : null 
+        subtitle: null 
       };
     }
     if (location === "/implants" || location.startsWith("/implants/")) {
@@ -133,13 +133,13 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
   return (
     <Switch>
       <Route path="/">
-        <Redirect to="/patients" />
+        <Redirect to="/dashboard" />
       </Route>
       <Route path="/register">
-        <Redirect to="/patients" />
+        <Redirect to="/dashboard" />
       </Route>
       <Route path="/login">
-        <Redirect to="/patients" />
+        <Redirect to="/dashboard" />
       </Route>
       <Route path="/patient/:id">
         {(params) => <Redirect to={`/patients/${params.id}`} />}
