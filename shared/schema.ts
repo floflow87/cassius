@@ -57,6 +57,9 @@ export const patients = pgTable("patients", {
   codePostal: text("code_postal"),
   ville: text("ville"),
   pays: text("pays"),
+  allergies: text("allergies"),
+  traitement: text("traitement"),
+  conditions: text("conditions"),
   contexteMedical: text("contexte_medical"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

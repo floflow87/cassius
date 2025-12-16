@@ -81,7 +81,13 @@ export default function PatientDetailsPage() {
     codePostal: "",
     ville: "",
     pays: "",
-    contexteMedical: "",
+  });
+
+  const [medicalDialogOpen, setMedicalDialogOpen] = useState(false);
+  const [medicalForm, setMedicalForm] = useState({
+    allergies: "",
+    traitement: "",
+    conditions: "",
   });
 
   const updatePatientMutation = useMutation({
@@ -105,6 +111,27 @@ export default function PatientDetailsPage() {
     },
   });
 
+  const updateMedicalMutation = useMutation({
+    mutationFn: async (data: typeof medicalForm) => {
+      return apiRequest("PATCH", `/api/patients/${patientId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      setMedicalDialogOpen(false);
+      toast({
+        title: "Contexte médical mis à jour",
+        description: "Les informations médicales ont été enregistrées.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le contexte médical.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const openEditDialog = () => {
     if (patient) {
       setEditForm({
@@ -118,15 +145,30 @@ export default function PatientDetailsPage() {
         codePostal: patient.codePostal || "",
         ville: patient.ville || "",
         pays: patient.pays || "",
-        contexteMedical: patient.contexteMedical || "",
       });
       setEditDialogOpen(true);
+    }
+  };
+
+  const openMedicalDialog = () => {
+    if (patient) {
+      setMedicalForm({
+        allergies: patient.allergies || "",
+        traitement: patient.traitement || "",
+        conditions: patient.conditions || "",
+      });
+      setMedicalDialogOpen(true);
     }
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updatePatientMutation.mutate(editForm);
+  };
+
+  const handleMedicalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateMedicalMutation.mutate(medicalForm);
   };
 
   const calculateAge = (dateNaissance: string) => {
@@ -517,17 +559,6 @@ export default function PatientDetailsPage() {
                         data-testid="input-edit-pays"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="contexteMedical">Contexte médical</Label>
-                      <Textarea
-                        id="contexteMedical"
-                        value={editForm.contexteMedical}
-                        onChange={(e) => setEditForm({ ...editForm, contexteMedical: e.target.value })}
-                        placeholder="Notes médicales, antécédents..."
-                        rows={3}
-                        data-testid="input-edit-contexte-medical"
-                      />
-                    </div>
                     <div className="flex justify-end gap-3 pt-4">
                       <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
                         Annuler
@@ -544,7 +575,7 @@ export default function PatientDetailsPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-base font-medium">Contexte médical</CardTitle>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" onClick={openMedicalDialog} data-testid="button-edit-medical">
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </div>
@@ -554,14 +585,18 @@ export default function PatientDetailsPage() {
                     <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Allergies</p>
-                      <p className="text-xs text-muted-foreground">Aucune connue</p>
+                      <p className="text-xs text-muted-foreground">
+                        {patient.allergies || "Aucune connue"}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/50 border-l-4 border-amber-400">
                     <Pill className="h-4 w-4 text-amber-600 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Médicaments</p>
-                      <p className="text-xs text-muted-foreground">Aucun traitement en cours</p>
+                      <p className="text-sm font-medium">Traitement</p>
+                      <p className="text-xs text-muted-foreground">
+                        {patient.traitement || "Aucun traitement en cours"}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-pink-50 dark:bg-pink-950/50 border-l-4 border-pink-400">
@@ -569,12 +604,63 @@ export default function PatientDetailsPage() {
                     <div>
                       <p className="text-sm font-medium">Conditions</p>
                       <p className="text-xs text-muted-foreground">
-                        {patient.contexteMedical || "Aucune condition signalée"}
+                        {patient.conditions || "Aucune condition signalée"}
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+
+              <Sheet open={medicalDialogOpen} onOpenChange={setMedicalDialogOpen}>
+                <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>Contexte médical</SheetTitle>
+                  </SheetHeader>
+                  <form onSubmit={handleMedicalSubmit} className="mt-6 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="allergies">Allergies</Label>
+                      <Textarea
+                        id="allergies"
+                        value={medicalForm.allergies}
+                        onChange={(e) => setMedicalForm({ ...medicalForm, allergies: e.target.value })}
+                        placeholder="Ex: Pénicilline, latex..."
+                        rows={2}
+                        data-testid="input-edit-allergies"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="traitement">Traitement</Label>
+                      <Textarea
+                        id="traitement"
+                        value={medicalForm.traitement}
+                        onChange={(e) => setMedicalForm({ ...medicalForm, traitement: e.target.value })}
+                        placeholder="Médicaments en cours..."
+                        rows={2}
+                        data-testid="input-edit-traitement"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="conditions">Conditions</Label>
+                      <Textarea
+                        id="conditions"
+                        value={medicalForm.conditions}
+                        onChange={(e) => setMedicalForm({ ...medicalForm, conditions: e.target.value })}
+                        placeholder="Diabète, hypertension..."
+                        rows={2}
+                        data-testid="input-edit-conditions"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button type="button" variant="outline" onClick={() => setMedicalDialogOpen(false)}>
+                        Annuler
+                      </Button>
+                      <Button type="submit" disabled={updateMedicalMutation.isPending} data-testid="button-save-medical">
+                        {updateMedicalMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+                      </Button>
+                    </div>
+                  </form>
+                </SheetContent>
+              </Sheet>
 
               <Card>
                 <CardHeader className="pb-3">
@@ -635,7 +721,7 @@ export default function PatientDetailsPage() {
 
             <div className="lg:col-span-2 space-y-6">
               <div className="grid grid-cols-4 gap-4">
-                <Card className="bg-muted/30">
+                <Card className="bg-white dark:bg-zinc-900">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <Activity className="h-4 w-4 text-primary" />
@@ -645,7 +731,7 @@ export default function PatientDetailsPage() {
                     <p className="text-xs text-primary">{successRate}% réussite</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-muted/30">
+                <Card className="bg-white dark:bg-zinc-900">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <ClipboardList className="h-4 w-4 text-primary" />
@@ -657,7 +743,7 @@ export default function PatientDetailsPage() {
                     </p>
                   </CardContent>
                 </Card>
-                <Card className="bg-muted/30">
+                <Card className="bg-white dark:bg-zinc-900">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <Stethoscope className="h-4 w-4 text-primary" />
@@ -667,7 +753,7 @@ export default function PatientDetailsPage() {
                     <p className="text-xs text-muted-foreground">Suivi régulier</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-muted/30">
+                <Card className="bg-white dark:bg-zinc-900">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <ImageIcon className="h-4 w-4 text-primary" />
