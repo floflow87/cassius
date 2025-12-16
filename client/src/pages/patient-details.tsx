@@ -25,12 +25,12 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { OperationForm } from "@/components/operation-form";
 import { ImplantCard } from "@/components/implant-card";
 import { RadioCard } from "@/components/radio-card";
@@ -207,8 +207,8 @@ export default function PatientDetailsPage() {
     : 0;
 
   return (
-    <div className="p-6 space-y-4 bg-white dark:bg-gray-950 min-h-full">
-      <div className="flex items-center gap-4 pb-2">
+    <div className="p-6 space-y-4 bg-muted/30 min-h-full">
+      <div className="flex items-center gap-4 pb-2 border-b border-border">
         <Link href="/patients">
           <Button variant="ghost" size="icon" data-testid="button-back-to-patients">
             <ArrowLeft className="h-4 w-4" />
@@ -225,23 +225,47 @@ export default function PatientDetailsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-muted/50 p-1 h-auto">
-          <TabsTrigger value="overview" className="text-sm" data-testid="tab-overview">
+        <TabsList className="bg-transparent p-0 h-auto gap-6 border-b-0">
+          <TabsTrigger 
+            value="overview" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-overview"
+          >
             Vue d'ensemble
           </TabsTrigger>
-          <TabsTrigger value="implants" className="text-sm" data-testid="tab-implants">
+          <TabsTrigger 
+            value="implants" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-implants"
+          >
             Implants ({implantCount})
           </TabsTrigger>
-          <TabsTrigger value="operations" className="text-sm" data-testid="tab-operations">
+          <TabsTrigger 
+            value="operations" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-operations"
+          >
             Actes chirurgicaux
           </TabsTrigger>
-          <TabsTrigger value="radios" className="text-sm" data-testid="tab-radios">
+          <TabsTrigger 
+            value="radios" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-radios"
+          >
             Radiographies
           </TabsTrigger>
-          <TabsTrigger value="visits" className="text-sm" data-testid="tab-visits">
+          <TabsTrigger 
+            value="visits" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-visits"
+          >
             Suivi & Visites
           </TabsTrigger>
-          <TabsTrigger value="notes" className="text-sm" data-testid="tab-notes">
+          <TabsTrigger 
+            value="notes" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-notes"
+          >
             Notes
           </TabsTrigger>
         </TabsList>
@@ -283,8 +307,14 @@ export default function PatientDetailsPage() {
                       <p>{patient.email}</p>
                     </div>
                   )}
+                  {patient.adresse && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">Adresse</span>
+                      <p>{patient.adresse}</p>
+                    </div>
+                  )}
                   <div>
-                    <span className="text-muted-foreground text-xs">Patient depuis</span>
+                    <span className="text-muted-foreground text-xs">Patient depuis le</span>
                     <p>{formatDate(patient.createdAt)}</p>
                   </div>
                 </CardContent>
@@ -300,28 +330,22 @@ export default function PatientDetailsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-md bg-red-50 dark:bg-red-950">
-                      <AlertTriangle className="h-4 w-4 text-red-600" />
-                    </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/50 border-l-4 border-red-400">
+                    <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Allergies</p>
                       <p className="text-xs text-muted-foreground">Aucune connue</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-md bg-blue-50 dark:bg-blue-950">
-                      <Pill className="h-4 w-4 text-blue-600" />
-                    </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/50 border-l-4 border-amber-400">
+                    <Pill className="h-4 w-4 text-amber-600 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Médicaments</p>
                       <p className="text-xs text-muted-foreground">Aucun traitement en cours</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-md bg-purple-50 dark:bg-purple-950">
-                      <Heart className="h-4 w-4 text-purple-600" />
-                    </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-pink-50 dark:bg-pink-950/50 border-l-4 border-pink-400">
+                    <Heart className="h-4 w-4 text-pink-500 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Conditions</p>
                       <p className="text-xs text-muted-foreground">
@@ -337,23 +361,25 @@ export default function PatientDetailsPage() {
                   <CardTitle className="text-base font-medium">Actions rapides</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <Dialog open={operationDialogOpen} onOpenChange={setOperationDialogOpen}>
-                    <DialogTrigger asChild>
+                  <Sheet open={operationDialogOpen} onOpenChange={setOperationDialogOpen}>
+                    <SheetTrigger asChild>
                       <Button variant="ghost" className="w-full justify-start gap-3" data-testid="button-add-implant">
                         <Activity className="h-4 w-4 text-primary" />
                         Ajouter un implant
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle>Nouvelle opération</DialogTitle>
-                      </DialogHeader>
-                      <OperationForm
-                        patientId={patient.id}
-                        onSuccess={() => setOperationDialogOpen(false)}
-                      />
-                    </DialogContent>
-                  </Dialog>
+                    </SheetTrigger>
+                    <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+                      <SheetHeader>
+                        <SheetTitle>Nouvelle opération</SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-6">
+                        <OperationForm
+                          patientId={patient.id}
+                          onSuccess={() => setOperationDialogOpen(false)}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
                   <Button variant="ghost" className="w-full justify-start gap-3">
                     <ClipboardList className="h-4 w-4 text-primary" />
                     Enregistrer un acte
@@ -362,25 +388,27 @@ export default function PatientDetailsPage() {
                     <Calendar className="h-4 w-4 text-primary" />
                     Planifier une visite
                   </Button>
-                  <Dialog open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
-                    <DialogTrigger asChild>
+                  <Sheet open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
+                    <SheetTrigger asChild>
                       <Button variant="ghost" className="w-full justify-start gap-3" data-testid="button-add-radio">
                         <FileImage className="h-4 w-4 text-primary" />
                         Ajouter une radio
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-lg">
-                      <DialogHeader>
-                        <DialogTitle>Ajouter une radiographie</DialogTitle>
-                      </DialogHeader>
-                      <RadioUploadForm
-                        patientId={patient.id}
-                        operations={patient.operations || []}
-                        implants={patient.implants || []}
-                        onSuccess={() => setRadioDialogOpen(false)}
-                      />
-                    </DialogContent>
-                  </Dialog>
+                    </SheetTrigger>
+                    <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                      <SheetHeader>
+                        <SheetTitle>Ajouter une radiographie</SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-6">
+                        <RadioUploadForm
+                          patientId={patient.id}
+                          operations={patient.operations || []}
+                          implants={patient.implants || []}
+                          onSuccess={() => setRadioDialogOpen(false)}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
                 </CardContent>
               </Card>
             </div>
@@ -389,9 +417,9 @@ export default function PatientDetailsPage() {
               <div className="grid grid-cols-4 gap-4">
                 <Card className="bg-muted/30">
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Activity className="h-4 w-4" />
-                      <span className="text-xs">Implants</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Activity className="h-4 w-4 text-primary" />
+                      <span className="text-xs text-muted-foreground">Implants</span>
                     </div>
                     <p className="text-2xl font-semibold">{implantCount}</p>
                     <p className="text-xs text-primary">{successRate}% réussite</p>
@@ -399,9 +427,9 @@ export default function PatientDetailsPage() {
                 </Card>
                 <Card className="bg-muted/30">
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <ClipboardList className="h-4 w-4" />
-                      <span className="text-xs">Actes</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <ClipboardList className="h-4 w-4 text-primary" />
+                      <span className="text-xs text-muted-foreground">Actes</span>
                     </div>
                     <p className="text-2xl font-semibold">{operationCount}</p>
                     <p className="text-xs text-muted-foreground">
@@ -411,9 +439,9 @@ export default function PatientDetailsPage() {
                 </Card>
                 <Card className="bg-muted/30">
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Stethoscope className="h-4 w-4" />
-                      <span className="text-xs">Visites</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Stethoscope className="h-4 w-4 text-primary" />
+                      <span className="text-xs text-muted-foreground">Visites</span>
                     </div>
                     <p className="text-2xl font-semibold">{visiteCount}</p>
                     <p className="text-xs text-muted-foreground">Suivi régulier</p>
@@ -421,9 +449,9 @@ export default function PatientDetailsPage() {
                 </Card>
                 <Card className="bg-muted/30">
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <ImageIcon className="h-4 w-4" />
-                      <span className="text-xs">Radios</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <ImageIcon className="h-4 w-4 text-primary" />
+                      <span className="text-xs text-muted-foreground">Radios</span>
                     </div>
                     <p className="text-2xl font-semibold">{radioCount}</p>
                     <p className="text-xs text-muted-foreground">
@@ -518,23 +546,25 @@ export default function PatientDetailsPage() {
                       >
                         Voir détails
                       </Button>
-                      <Dialog open={operationDialogOpen} onOpenChange={setOperationDialogOpen}>
-                        <DialogTrigger asChild>
+                      <Sheet open={operationDialogOpen} onOpenChange={setOperationDialogOpen}>
+                        <SheetTrigger asChild>
                           <Button size="sm" data-testid="button-new-act">
                             <Plus className="h-4 w-4 mr-1" />
                             Nouvel acte
                           </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>Nouvelle opération</DialogTitle>
-                          </DialogHeader>
-                          <OperationForm
-                            patientId={patient.id}
-                            onSuccess={() => setOperationDialogOpen(false)}
-                          />
-                        </DialogContent>
-                      </Dialog>
+                        </SheetTrigger>
+                        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+                          <SheetHeader>
+                            <SheetTitle>Nouvelle opération</SheetTitle>
+                          </SheetHeader>
+                          <div className="mt-6">
+                            <OperationForm
+                              patientId={patient.id}
+                              onSuccess={() => setOperationDialogOpen(false)}
+                            />
+                          </div>
+                        </SheetContent>
+                      </Sheet>
                     </div>
                   </div>
                 </CardHeader>
@@ -603,23 +633,25 @@ export default function PatientDetailsPage() {
 
         <TabsContent value="operations" className="mt-4 space-y-4">
           <div className="flex justify-end">
-            <Dialog open={operationDialogOpen} onOpenChange={setOperationDialogOpen}>
-              <DialogTrigger asChild>
+            <Sheet open={operationDialogOpen} onOpenChange={setOperationDialogOpen}>
+              <SheetTrigger asChild>
                 <Button data-testid="button-new-operation">
                   <Plus className="h-4 w-4 mr-2" />
                   Nouvelle opération
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Nouvelle opération</DialogTitle>
-                </DialogHeader>
-                <OperationForm
-                  patientId={patient.id}
-                  onSuccess={() => setOperationDialogOpen(false)}
-                />
-              </DialogContent>
-            </Dialog>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Nouvelle opération</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6">
+                  <OperationForm
+                    patientId={patient.id}
+                    onSuccess={() => setOperationDialogOpen(false)}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
 
           {operationCount === 0 ? (
@@ -693,25 +725,27 @@ export default function PatientDetailsPage() {
 
         <TabsContent value="radios" className="mt-4 space-y-4">
           <div className="flex justify-end">
-            <Dialog open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
-              <DialogTrigger asChild>
+            <Sheet open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
+              <SheetTrigger asChild>
                 <Button variant="outline" data-testid="button-new-radio">
                   <Plus className="h-4 w-4 mr-2" />
                   Ajouter une radio
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Ajouter une radiographie</DialogTitle>
-                </DialogHeader>
-                <RadioUploadForm
-                  patientId={patient.id}
-                  operations={patient.operations || []}
-                  implants={patient.implants || []}
-                  onSuccess={() => setRadioDialogOpen(false)}
-                />
-              </DialogContent>
-            </Dialog>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Ajouter une radiographie</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6">
+                  <RadioUploadForm
+                    patientId={patient.id}
+                    operations={patient.operations || []}
+                    implants={patient.implants || []}
+                    onSuccess={() => setRadioDialogOpen(false)}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
 
           {radioCount === 0 ? (
