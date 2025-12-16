@@ -1,4 +1,3 @@
-import { forwardRef } from "react";
 import { useLocation } from "wouter";
 import {
   Sidebar,
@@ -6,7 +5,6 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import {
@@ -24,58 +22,15 @@ import statsIcon from "/assets/icons/statistiques.png";
 import settingsIcon from "/assets/icons/settings.png";
 
 const menuItems = [
-  {
-    title: "Accueil",
-    url: "/dashboard",
-    icon: homeIcon,
-  },
-  {
-    title: "Patients",
-    url: "/patients",
-    icon: patientIcon,
-  },
-  {
-    title: "Implants",
-    url: "/implants",
-    icon: implantsIcon,
-  },
-  {
-    title: "Actes",
-    url: "/actes",
-    icon: actesIcon,
-  },
-  {
-    title: "Statistiques",
-    url: "/stats",
-    icon: statsIcon,
-  },
+  { title: "Accueil", url: "/dashboard", icon: homeIcon },
+  { title: "Patients", url: "/patients", icon: patientIcon },
+  { title: "Implants", url: "/implants", icon: implantsIcon },
+  { title: "Actes", url: "/actes", icon: actesIcon },
+  { title: "Statistiques", url: "/stats", icon: statsIcon },
 ];
 
-interface NavLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
-  href: string;
-  children: React.ReactNode;
-}
-
-const NavLink = forwardRef<HTMLAnchorElement, NavLinkProps>(
-  ({ href, children, ...props }, ref) => {
-    const [, setLocation] = useLocation();
-    
-    const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-      e.preventDefault();
-      setLocation(href);
-    };
-    
-    return (
-      <a ref={ref} href={href} onClick={handleClick} {...props}>
-        {children}
-      </a>
-    );
-  }
-);
-NavLink.displayName = "NavLink";
-
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   const isActive = (url: string) => {
     if (url === "/patients") {
@@ -85,6 +40,11 @@ export function AppSidebar() {
       return location === "/implants" || location.startsWith("/implants/");
     }
     return location === url || location.startsWith(url + "/");
+  };
+
+  const handleNavClick = (url: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    setLocation(url);
   };
 
   return (
@@ -102,23 +62,22 @@ export function AppSidebar() {
               <SidebarMenuItem key={item.title} className="px-0">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      className={`h-12 w-full rounded-none justify-center ${
+                    <a
+                      href={item.url}
+                      onClick={handleNavClick(item.url)}
+                      className={`flex h-12 w-full items-center justify-center ${
                         active 
                           ? "bg-secondary" 
                           : "bg-transparent hover:bg-white/10"
                       }`}
+                      data-testid={`link-nav-${item.title.toLowerCase()}`}
                     >
-                      <NavLink href={item.url} data-testid={`link-nav-${item.title.toLowerCase()}`}>
-                        <img 
-                          src={item.icon} 
-                          alt={item.title}
-                          className="h-6 w-6 brightness-0 invert"
-                        />
-                      </NavLink>
-                    </SidebarMenuButton>
+                      <img 
+                        src={item.icon} 
+                        alt={item.title}
+                        className="h-6 w-6 brightness-0 invert"
+                      />
+                    </a>
                   </TooltipTrigger>
                   <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
                     {item.title}
@@ -135,18 +94,18 @@ export function AppSidebar() {
           <SidebarMenuItem className="px-0">
             <Tooltip>
               <TooltipTrigger asChild>
-                <SidebarMenuButton
-                  asChild
-                  className="h-12 w-full rounded-none justify-center bg-transparent hover:bg-white/10"
+                <a
+                  href="/settings"
+                  onClick={handleNavClick("/settings")}
+                  className="flex h-12 w-full items-center justify-center bg-transparent hover:bg-white/10"
+                  data-testid="link-settings"
                 >
-                  <NavLink href="/settings" data-testid="link-settings">
-                    <img 
-                      src={settingsIcon} 
-                      alt="Paramètres"
-                      className="h-6 w-6 brightness-0 invert"
-                    />
-                  </NavLink>
-                </SidebarMenuButton>
+                  <img 
+                    src={settingsIcon} 
+                    alt="Paramètres"
+                    className="h-6 w-6 brightness-0 invert"
+                  />
+                </a>
               </TooltipTrigger>
               <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
                 Paramètres

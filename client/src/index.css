@@ -9,8 +9,8 @@
   --opaque-button-border-intensity: -8;
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
-  /* Page background #E5E7EB */
-  --background: 220 13% 91%;
+  /* Page background #F9F9F9 */
+  --background: 0 0% 98%;
   --foreground: 0 0% 10.2%;
   --border: 0deg 0% 100%;
   --card: 0deg 0% 100%;
@@ -34,8 +34,8 @@
   /* Cassius secondaryBlue #0D5C94 */
   --secondary: 203 83% 32%;
   --secondary-foreground: 0 0% 100%;
-  /* Gray light #E5E7EB */
-  --muted: 220 13% 91%;
+  /* Gray light #F9F9F9 */
+  --muted: 0 0% 98%;
   --muted-foreground: 220 9% 46%;
   --accent: 0 0% 100%;
   --accent-foreground: 0 0% 10.2%;
