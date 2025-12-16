@@ -185,6 +185,23 @@ CREATE TABLE IF NOT EXISTS protheses (
   notes TEXT
 );
 
+-- Notes (patient notes)
+DO $$ BEGIN
+  CREATE TYPE type_note_tag AS ENUM ('CONSULTATION', 'CHIRURGIE', 'SUIVI', 'COMPLICATION', 'ADMINISTRATIVE');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS notes (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  patient_id VARCHAR NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tag type_note_tag,
+  contenu TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_patients_organisation ON patients(organisation_id);
 CREATE INDEX IF NOT EXISTS idx_patients_nom ON patients(nom);
@@ -196,3 +213,5 @@ CREATE INDEX IF NOT EXISTS idx_implants_operation ON implants(operation_id);
 CREATE INDEX IF NOT EXISTS idx_visites_implant ON visites(implant_id);
 CREATE INDEX IF NOT EXISTS idx_radios_patient ON radios(patient_id);
 CREATE INDEX IF NOT EXISTS idx_users_organisation ON users(organisation_id);
+CREATE INDEX IF NOT EXISTS idx_notes_patient ON notes(patient_id);
+CREATE INDEX IF NOT EXISTS idx_notes_organisation ON notes(organisation_id);

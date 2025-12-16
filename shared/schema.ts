@@ -43,6 +43,7 @@ export const roleEnum = pgEnum("role", ["CHIRURGIEN", "ASSISTANT", "ADMIN"]);
 // Enums pour les prothèses supra-implantaires
 export const typeProtheseEnum = pgEnum("type_prothese", ["VISSEE", "SCELLEE"]);
 export const typePilierEnum = pgEnum("type_pilier", ["DROIT", "ANGULE", "MULTI_UNIT"]);
+export const typeNoteTagEnum = pgEnum("type_note_tag", ["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"]);
 
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -228,6 +229,33 @@ export const prothesesRelations = relations(protheses, ({ one }) => ({
   }),
 }));
 
+// Table notes patients
+export const notes = pgTable("notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tag: typeNoteTagEnum("tag"),
+  contenu: text("contenu").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const notesRelations = relations(notes, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [notes.organisationId],
+    references: [organisations.id],
+  }),
+  patient: one(patients, {
+    fields: [notes.patientId],
+    references: [patients.id],
+  }),
+  user: one(users, {
+    fields: [notes.userId],
+    references: [users.id],
+  }),
+}));
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organisationId: varchar("organisation_id").references(() => organisations.id, { onDelete: "cascade" }),
@@ -281,6 +309,14 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
+export const insertNoteSchema = createInsertSchema(notes).omit({
+  id: true,
+  organisationId: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertOrganisationSchema = createInsertSchema(organisations).omit({
   id: true,
   createdAt: true,
@@ -309,3 +345,6 @@ export type Prothese = typeof protheses.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export type InsertNote = z.infer<typeof insertNoteSchema>;
+export type Note = typeof notes.$inferSelect;

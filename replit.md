@@ -11,6 +11,7 @@ The MVP focuses on:
 - Radiograph upload and storage
 - Follow-up visit management with ISQ progression
 - Patient and implant timeline views
+- Clinical notes with tags (Consultation, Chirurgie, Suivi, Complication, Administrative)
 - Basic search functionality
 
 ## User Preferences
@@ -49,6 +50,12 @@ APP_ENV=development npx tsx db/scripts/seed-dev.ts
 | `SUPABASE_DB_URL_PROD` | Yes | Supabase prod pooler URL (port 6543) |
 | `SESSION_SECRET` | Yes | Session encryption key (32+ chars) |
 | `JWT_SECRET` | Yes | JWT signing key (32+ chars) |
+
+### Clinical Notes System
+- **Table**: `notes` with id, patientId, userId, organisationId, contenu, tag, createdAt
+- **Tags enum**: CONSULTATION, CHIRURGIE, SUIVI, COMPLICATION, ADMINISTRATIVE
+- **API routes**: GET/POST `/api/patients/:patientId/notes`, PATCH/DELETE `/api/notes/:id`
+- **UI**: Note input with tag selection, chronological list with author, colored badges, edit/delete via dropdown
 
 ### UI Refactoring - Sidebar and Patients Page
 - **Sidebar**: Refactored to use Shadcn primitives (Sidebar, SidebarProvider, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton)

@@ -6,7 +6,6 @@ import {
   Search, 
   Filter, 
   User,
-  ChevronRight,
   X,
   ArrowUpDown,
   ArrowUp,
@@ -48,12 +47,12 @@ interface ColumnConfig {
 }
 
 const defaultColumns: ColumnConfig[] = [
-  { id: "patient", label: "Patient", sortable: true },
-  { id: "dateNaissance", label: "Date de naissance", sortable: true },
-  { id: "contact", label: "Contact", sortable: true },
+  { id: "patient", label: "Patient", width: "w-56", sortable: true },
+  { id: "dateNaissance", label: "Date de naissance", width: "w-40", sortable: true },
+  { id: "contact", label: "Contact", width: "w-44", sortable: true },
   { id: "implants", label: "Implants", width: "w-28", sortable: true },
-  { id: "derniereVisite", label: "Dernière visite", width: "w-32", sortable: true },
-  { id: "statut", label: "Statut", width: "w-24", sortable: true },
+  { id: "derniereVisite", label: "Dernière visite", width: "w-40", sortable: true },
+  { id: "statut", label: "Statut", width: "w-28", sortable: true },
 ];
 
 const STORAGE_KEY_COLUMNS = "cassius_patients_columns_order";
@@ -441,7 +440,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                       </div>
                     </th>
                   ))}
-                  <th className="w-10"></th>
                 </tr>
               </thead>
               <tbody>
@@ -478,9 +476,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                           {renderCellContent(column.id, patient)}
                         </td>
                       ))}
-                      <td className="px-4 py-3">
-                        <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-                      </td>
                     </tr>
                   ))
                 )}
@@ -552,9 +547,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                       )}
                     </div>
                     
-                    <div className="flex items-center justify-end mt-3 pt-3 border-t">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
                   </CardContent>
                 </Card>
               );

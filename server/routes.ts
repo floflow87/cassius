@@ -10,6 +10,7 @@ import {
   insertRadioSchema,
   insertVisiteSchema,
   insertProtheseSchema,
+  insertNoteSchema,
   patients,
 } from "@shared/schema";
 import type {
@@ -489,6 +490,75 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error serving public object:", error);
       res.status(500).json({ error: "Failed to serve object" });
+    }
+  });
+
+  // ========== NOTES ==========
+  app.get("/api/patients/:patientId/notes", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId } = req.params;
+      const notes = await storage.getPatientNotes(organisationId, patientId);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+      res.status(500).json({ error: "Failed to fetch notes" });
+    }
+  });
+
+  app.post("/api/patients/:patientId/notes", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId } = req.params;
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const noteData = insertNoteSchema.parse({ ...req.body, patientId });
+      const note = await storage.createNote(organisationId, userId, noteData);
+      res.status(201).json(note);
+    } catch (error) {
+      console.error("Error creating note:", error);
+      res.status(500).json({ error: "Failed to create note" });
+    }
+  });
+
+  app.patch("/api/notes/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const note = await storage.updateNote(organisationId, id, req.body);
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error("Error updating note:", error);
+      res.status(500).json({ error: "Failed to update note" });
+    }
+  });
+
+  app.delete("/api/notes/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteNote(organisationId, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      res.status(500).json({ error: "Failed to delete note" });
     }
   });
 

@@ -7,6 +7,7 @@ import {
   protheses,
   users,
   organisations,
+  notes,
   type Patient,
   type InsertPatient,
   type Operation,
@@ -22,6 +23,8 @@ import {
   type User,
   type Organisation,
   type InsertOrganisation,
+  type Note,
+  type InsertNote,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -86,6 +89,12 @@ export interface IStorage {
 
   // Organisation methods
   createOrganisation(data: InsertOrganisation): Promise<Organisation>;
+
+  // Note methods
+  getPatientNotes(organisationId: string, patientId: string): Promise<(Note & { user: { nom: string | null; prenom: string | null } })[]>;
+  createNote(organisationId: string, userId: string, note: InsertNote): Promise<Note>;
+  updateNote(organisationId: string, id: string, note: Partial<InsertNote>): Promise<Note | undefined>;
+  deleteNote(organisationId: string, id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -550,6 +559,75 @@ export class DatabaseStorage implements IStorage {
       nom: data.nom,
     }).returning();
     return org;
+  }
+
+  // ========== NOTES ==========
+  async getPatientNotes(organisationId: string, patientId: string): Promise<(Note & { user: { nom: string | null; prenom: string | null } })[]> {
+    const patientNotes = await db
+      .select({
+        id: notes.id,
+        organisationId: notes.organisationId,
+        patientId: notes.patientId,
+        userId: notes.userId,
+        tag: notes.tag,
+        contenu: notes.contenu,
+        createdAt: notes.createdAt,
+        updatedAt: notes.updatedAt,
+        userNom: users.nom,
+        userPrenom: users.prenom,
+      })
+      .from(notes)
+      .leftJoin(users, eq(notes.userId, users.id))
+      .where(and(
+        eq(notes.patientId, patientId),
+        eq(notes.organisationId, organisationId)
+      ))
+      .orderBy(desc(notes.createdAt));
+
+    return patientNotes.map(n => ({
+      id: n.id,
+      organisationId: n.organisationId,
+      patientId: n.patientId,
+      userId: n.userId,
+      tag: n.tag,
+      contenu: n.contenu,
+      createdAt: n.createdAt,
+      updatedAt: n.updatedAt,
+      user: {
+        nom: n.userNom,
+        prenom: n.userPrenom,
+      },
+    }));
+  }
+
+  async createNote(organisationId: string, userId: string, note: InsertNote): Promise<Note> {
+    const [created] = await db.insert(notes).values({
+      ...note,
+      organisationId,
+      userId,
+    }).returning();
+    return created;
+  }
+
+  async updateNote(organisationId: string, id: string, note: Partial<InsertNote>): Promise<Note | undefined> {
+    const [updated] = await db.update(notes)
+      .set({ ...note, updatedAt: new Date() })
+      .where(and(
+        eq(notes.id, id),
+        eq(notes.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteNote(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(notes)
+      .where(and(
+        eq(notes.id, id),
+        eq(notes.organisationId, organisationId)
+      ))
+      .returning();
+    return result.length > 0;
   }
 }
 

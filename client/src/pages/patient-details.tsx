@@ -19,6 +19,8 @@ import {
   Image as ImageIcon,
   Stethoscope,
   MapPin,
+  MoreVertical,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,13 +44,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { OperationForm } from "@/components/operation-form";
 import { ImplantCard } from "@/components/implant-card";
 import { RadioCard } from "@/components/radio-card";
 import { RadioUploadForm } from "@/components/radio-upload-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Patient, Operation, Implant, Radio, Visite } from "@shared/schema";
+import type { Patient, Operation, Implant, Radio, Visite, Note } from "@shared/schema";
 
 interface PatientWithDetails extends Patient {
   operations: (Operation & { implants: Implant[] })[];
@@ -90,6 +108,108 @@ export default function PatientDetailsPage() {
     traitement: "",
     conditions: "",
   });
+
+  // Notes state
+  type NoteTag = "CONSULTATION" | "CHIRURGIE" | "SUIVI" | "COMPLICATION" | "ADMINISTRATIVE";
+  interface NoteWithUser extends Note {
+    user: { nom: string | null; prenom: string | null };
+  }
+  const [noteContent, setNoteContent] = useState("");
+  const [selectedTag, setSelectedTag] = useState<NoteTag | null>(null);
+  const [editingNote, setEditingNote] = useState<NoteWithUser | null>(null);
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
+
+  const { data: patientNotes = [], isLoading: notesLoading } = useQuery<NoteWithUser[]>({
+    queryKey: ["/api/patients", patientId, "notes"],
+    enabled: !!patientId,
+  });
+
+  const createNoteMutation = useMutation({
+    mutationFn: async (data: { contenu: string; tag: NoteTag | null }) => {
+      return apiRequest("POST", `/api/patients/${patientId}/notes`, {
+        patientId,
+        contenu: data.contenu,
+        tag: data.tag,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
+      setNoteContent("");
+      setSelectedTag(null);
+      toast({ title: "Note ajoutée", description: "La note a été créée avec succès." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de créer la note.", variant: "destructive" });
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async (data: { id: string; contenu: string; tag: NoteTag | null }) => {
+      return apiRequest("PATCH", `/api/notes/${data.id}`, {
+        contenu: data.contenu,
+        tag: data.tag,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
+      setEditingNote(null);
+      toast({ title: "Note modifiée", description: "La note a été mise à jour." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier la note.", variant: "destructive" });
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/notes/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
+      setDeleteNoteId(null);
+      toast({ title: "Note supprimée", description: "La note a été supprimée." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de supprimer la note.", variant: "destructive" });
+    },
+  });
+
+  const handleAddNote = () => {
+    if (!noteContent.trim()) return;
+    createNoteMutation.mutate({ contenu: noteContent, tag: selectedTag });
+  };
+
+  const handleUpdateNote = () => {
+    if (!editingNote || !editingNote.contenu.trim()) return;
+    updateNoteMutation.mutate({
+      id: editingNote.id,
+      contenu: editingNote.contenu,
+      tag: editingNote.tag as NoteTag | null,
+    });
+  };
+
+  const getTagConfig = (tag: NoteTag | null) => {
+    const configs: Record<NoteTag, { label: string; className: string }> = {
+      CONSULTATION: { label: "Consultation", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
+      CHIRURGIE: { label: "Chirurgie", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+      SUIVI: { label: "Suivi", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+      COMPLICATION: { label: "Complication", className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
+      ADMINISTRATIVE: { label: "Administrative", className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400" },
+    };
+    return tag ? configs[tag] : null;
+  };
+
+  const formatNoteDatetime = (date: Date | string) => {
+    const d = new Date(date);
+    return d.toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }) + " à " + d.toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const updatePatientMutation = useMutation({
     mutationFn: async (data: typeof editForm) => {
@@ -1112,16 +1232,194 @@ export default function PatientDetailsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notes" className="mt-4 space-y-4">
+        <TabsContent value="notes" className="mt-4 space-y-6">
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Notes</h3>
-              <p className="text-sm text-muted-foreground">
-                Aucune note pour ce patient
-              </p>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium">Ajouter une note</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {(["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"] as const).map((tag) => {
+                  const config = getTagConfig(tag);
+                  return (
+                    <Button
+                      key={tag}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                      className={`${selectedTag === tag ? config?.className : ""} ${selectedTag === tag ? "ring-2 ring-primary" : ""}`}
+                      data-testid={`button-tag-${tag.toLowerCase()}`}
+                    >
+                      {config?.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="note-content">Note</Label>
+                <Textarea
+                  id="note-content"
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  placeholder="Saisissez votre note ici..."
+                  rows={4}
+                  data-testid="input-note-content"
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button 
+                  onClick={handleAddNote} 
+                  disabled={!noteContent.trim() || createNoteMutation.isPending}
+                  data-testid="button-add-note"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter la note
+                </Button>
+              </div>
             </CardContent>
           </Card>
+
+          <div className="space-y-4">
+            <h3 className="text-base font-semibold">Historique des notes</h3>
+            {notesLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-32 w-full" />
+                ))}
+              </div>
+            ) : patientNotes.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-sm text-muted-foreground">
+                    Aucune note pour ce patient
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {patientNotes.map((note) => {
+                  const tagConfig = getTagConfig(note.tag as any);
+                  const authorName = note.user.prenom && note.user.nom 
+                    ? `${note.user.prenom.charAt(0)}. ${note.user.nom}`
+                    : note.user.nom || "Utilisateur";
+                  
+                  return (
+                    <Card key={note.id} data-testid={`card-note-${note.id}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm">{authorName}</span>
+                              {tagConfig && (
+                                <Badge variant="secondary" className={`text-xs ${tagConfig.className}`}>
+                                  {tagConfig.label}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-3">
+                              {formatNoteDatetime(note.createdAt)}
+                            </p>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">
+                              {note.contenu}
+                            </p>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="shrink-0" data-testid={`button-note-menu-${note.id}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-white dark:bg-zinc-900">
+                              <DropdownMenuItem onClick={() => setEditingNote(note)} data-testid={`button-edit-note-${note.id}`}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Modifier
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => setDeleteNoteId(note.id)} 
+                                className="text-destructive"
+                                data-testid={`button-delete-note-${note.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Supprimer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <Sheet open={!!editingNote} onOpenChange={(open) => !open && setEditingNote(null)}>
+            <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-white dark:bg-zinc-900">
+              <SheetHeader>
+                <SheetTitle>Modifier la note</SheetTitle>
+              </SheetHeader>
+              {editingNote && (
+                <div className="mt-6 space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {(["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"] as const).map((tag) => {
+                      const config = getTagConfig(tag);
+                      return (
+                        <Button
+                          key={tag}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingNote({ ...editingNote, tag: editingNote.tag === tag ? null : tag })}
+                          className={`${editingNote.tag === tag ? config?.className : ""} ${editingNote.tag === tag ? "ring-2 ring-primary" : ""}`}
+                        >
+                          {config?.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-note-content">Note</Label>
+                    <Textarea
+                      id="edit-note-content"
+                      value={editingNote.contenu}
+                      onChange={(e) => setEditingNote({ ...editingNote, contenu: e.target.value })}
+                      rows={6}
+                      data-testid="input-edit-note-content"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button variant="outline" onClick={() => setEditingNote(null)}>
+                      Annuler
+                    </Button>
+                    <Button onClick={handleUpdateNote} disabled={updateNoteMutation.isPending} data-testid="button-save-note">
+                      Enregistrer
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </SheetContent>
+          </Sheet>
+
+          <AlertDialog open={!!deleteNoteId} onOpenChange={(open) => !open && setDeleteNoteId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Supprimer la note</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Êtes-vous sûr de vouloir supprimer cette note ? Cette action est irréversible.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteNoteId && deleteNoteMutation.mutate(deleteNoteId)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  data-testid="button-confirm-delete-note"
+                >
+                  Supprimer
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
       </Tabs>
     </div>
