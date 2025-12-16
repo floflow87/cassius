@@ -25,9 +25,12 @@
   --sidebar-accent: 217 91% 70%;
   --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-ring: 0 0% 100%;
-  --popover: 0deg 0% 100%;
-  --popover-foreground: 0deg 0% 0%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 0%;
   --popover-border: 0 0% 97%;
+  /* Dropdown menus - always white */
+  --dropdown-menu: 0 0% 100%;
+  --dropdown-menu-foreground: 0 0% 0%;
   /* Cassius mainBlue #2563EB */
   --primary: 217 91% 60%;
   --primary-foreground: 0 0% 100%;

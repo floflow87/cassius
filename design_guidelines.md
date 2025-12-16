@@ -71,6 +71,12 @@
 - **Secondary Actions**: Outlined buttons for navigation, cancel operations
 - **Tertiary Actions**: Text links for view details, edit, delete
 - **Modals**: Confirmation dialogs, image viewer for x-rays, quick patient lookup
+- **Buttons**: All buttons have cursor-pointer for clear interactivity
+
+### Overlays & Dropdowns
+- **Dropdown Menus**: Always white background (`bg-white dark:bg-gray-950`) for clarity and consistency
+- **Side Panels (Sheet)**: White background, slide-in from right, 540px width for forms
+- **Popovers**: White background, subtle shadow for elevation
 
 ---
 
