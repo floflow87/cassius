@@ -48,9 +48,12 @@ export async function registerRoutes(
 ): Promise<Server> {
   const objectStorageService = new ObjectStorageService();
 
-  app.get("/api/health/db", async (_req, res) => {
+  app.get("/api/health/db", requireJwtOrSession, async (_req, res) => {
     const result = await testConnection();
     const env = getDbEnv();
+    const status = result.ok ? "connected" : "unreachable";
+    
+    console.log(`[DB-HEALTH] env=${env} latency=${result.latencyMs}ms status=${status}`);
     
     if (result.ok) {
       res.json({
@@ -60,12 +63,15 @@ export async function registerRoutes(
         env,
       });
     } else {
+      const errorCode = result.error?.includes("ETIMEDOUT") ? "ETIMEDOUT" 
+        : result.error?.includes("ECONNREFUSED") ? "ECONNREFUSED"
+        : "CONNECTION_ERROR";
+      
       res.status(500).json({
         ok: false,
-        db: "disconnected",
-        latencyMs: result.latencyMs,
-        error: result.error,
+        db: "unreachable",
         env,
+        error: errorCode,
       });
     }
   });

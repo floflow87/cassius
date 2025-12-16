@@ -4,6 +4,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -13,35 +14,40 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Home, Users, Sparkles, Scissors, BarChart3, Settings } from "lucide-react";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
+import homeIcon from "/assets/icons/home.png";
+import patientIcon from "/assets/icons/patient.png";
+import implantsIcon from "/assets/icons/implants.png";
+import actesIcon from "/assets/icons/actes.png";
+import statsIcon from "/assets/icons/statistiques.png";
+import settingsIcon from "/assets/icons/settings.png";
 
 const menuItems = [
   {
     title: "Accueil",
     url: "/dashboard",
-    Icon: Home,
+    icon: homeIcon,
   },
   {
     title: "Patients",
     url: "/patients",
-    Icon: Users,
+    icon: patientIcon,
   },
   {
     title: "Implants",
     url: "/implants",
-    Icon: Sparkles,
+    icon: implantsIcon,
   },
   {
     title: "Actes",
     url: "/actes",
-    Icon: Scissors,
+    icon: actesIcon,
   },
   {
     title: "Statistiques",
     url: "/stats",
-    Icon: BarChart3,
+    icon: statsIcon,
   },
 ];
 
@@ -82,33 +88,34 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0">
-      <div className="flex items-center justify-center p-3 pt-4">
-        <img src={logoIcon} alt="Cassius" className="h-8 w-8" />
-      </div>
+    <Sidebar collapsible="icon" className="border-r-0 overflow-visible">
+      <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center p-3 pt-4 pb-4">
+        <img src={logoIcon} alt="Cassius" className="h-9 w-9" />
+      </SidebarHeader>
 
-      <SidebarContent className="px-2 py-4">
-        <SidebarMenu>
+      <SidebarContent className="bg-primary px-0 py-2">
+        <SidebarMenu className="gap-0">
           {menuItems.map((item) => {
             const active = isActive(item.url);
-            const IconComponent = item.Icon;
             
             return (
-              <SidebarMenuItem key={item.title}>
+              <SidebarMenuItem key={item.title} className="px-0">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <SidebarMenuButton
                       asChild
                       isActive={active}
-                      className={`h-11 w-11 mx-auto justify-center rounded-lg ${
+                      className={`h-12 w-full rounded-none justify-center ${
                         active 
-                          ? "bg-white/20" 
+                          ? "bg-secondary" 
                           : "bg-transparent hover:bg-white/10"
                       }`}
                     >
                       <NavLink href={item.url} data-testid={`link-nav-${item.title.toLowerCase()}`}>
-                        <IconComponent 
-                          className={`h-5 w-5 text-white ${active ? "opacity-100" : "opacity-70"}`}
+                        <img 
+                          src={item.icon} 
+                          alt={item.title}
+                          className="h-6 w-6 brightness-0 invert"
                         />
                       </NavLink>
                     </SidebarMenuButton>
@@ -123,17 +130,21 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="p-2 pb-4">
-        <SidebarMenu>
-          <SidebarMenuItem>
+      <SidebarFooter className="bg-primary px-0 py-2 pb-4 mt-auto">
+        <SidebarMenu className="gap-0">
+          <SidebarMenuItem className="px-0">
             <Tooltip>
               <TooltipTrigger asChild>
                 <SidebarMenuButton
                   asChild
-                  className="h-11 w-11 mx-auto justify-center rounded-lg bg-transparent hover:bg-white/10"
+                  className="h-12 w-full rounded-none justify-center bg-transparent hover:bg-white/10"
                 >
                   <NavLink href="/settings" data-testid="link-settings">
-                    <Settings className="h-5 w-5 text-white opacity-70" />
+                    <img 
+                      src={settingsIcon} 
+                      alt="Paramètres"
+                      className="h-6 w-6 brightness-0 invert"
+                    />
                   </NavLink>
                 </SidebarMenuButton>
               </TooltipTrigger>
