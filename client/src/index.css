@@ -51,6 +51,8 @@
   --font-sans: 'Poppins', sans-serif;
   --font-serif: 'Poppins', sans-serif;
   --font-mono: Menlo, monospace;
+  /* Border gray #E5E7EB */
+  --border-gray: 220 13% 91%;
   --radius: 0.8rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
@@ -122,6 +124,8 @@
   --secondary-foreground: 0 0% 100%;
   --muted: 20 14% 15%;
   --muted-foreground: 45 15% 46%;
+  /* Border gray - darker in dark mode */
+  --border-gray: 220 13% 25%;
   --accent: 25 45% 20%;
   --accent-foreground: 45 25% 85%;
   --destructive: 356.3033 90.5579% 54.3137%;

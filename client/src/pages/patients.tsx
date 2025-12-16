@@ -1,25 +1,24 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Plus, 
   Search, 
   Filter, 
   Download, 
-  LayoutGrid,
   User,
-  ChevronRight
+  ChevronRight,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { PatientForm } from "@/components/patient-form";
 import { CassiusBadge, CassiusChip, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import type { Patient } from "@shared/schema";
@@ -31,10 +30,9 @@ interface PatientsPageProps {
 
 export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPageProps) {
   const [, setLocation] = useLocation();
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedPatients, setSelectedPatients] = useState<string[]>([]);
-  const [activeFilters, setActiveFilters] = useState<string[]>(["Patients actifs"]);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const itemsPerPage = 20;
 
   const { data: patients, isLoading } = useQuery<Patient[]>({
@@ -100,20 +98,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     setActiveFilters(activeFilters.filter(f => f !== filter));
   };
 
-  const togglePatientSelection = (id: string) => {
-    setSelectedPatients(prev => 
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    );
-  };
-
-  const toggleAllSelection = () => {
-    if (selectedPatients.length === paginatedPatients.length && paginatedPatients.length > 0) {
-      setSelectedPatients([]);
-    } else {
-      setSelectedPatients(paginatedPatients.map(p => p.id));
-    }
-  };
-
   const getPatientStatus = (_patient: Patient): "actif" | "en-suivi" | "planifie" | "inactif" => {
     return "actif";
   };
@@ -175,20 +159,20 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           Exporter
         </Button>
         
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetTrigger asChild>
             <Button className="gap-2 shrink-0" data-testid="button-new-patient">
               <Plus className="h-4 w-4" />
               Nouveau patient
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Nouveau patient</DialogTitle>
-            </DialogHeader>
-            <PatientForm onSuccess={() => setDialogOpen(false)} />
-          </DialogContent>
-        </Dialog>
+          </SheetTrigger>
+          <SheetContent className="w-[540px] sm:max-w-[540px] overflow-y-auto">
+            <SheetHeader className="mb-6">
+              <SheetTitle>Nouveau patient</SheetTitle>
+            </SheetHeader>
+            <PatientForm onSuccess={() => setSheetOpen(false)} />
+          </SheetContent>
+        </Sheet>
       </div>
 
       {activeFilters.length > 0 && (
@@ -205,38 +189,11 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <Checkbox 
-            checked={selectedPatients.length === paginatedPatients.length && paginatedPatients.length > 0}
-            onCheckedChange={toggleAllSelection}
-            data-testid="checkbox-select-all"
-          />
-          <span className="text-sm text-muted-foreground">
-            {totalPatients} patient{totalPatients !== 1 ? 's' : ''}
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" data-testid="button-grid-view">
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-          <CassiusPagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalPatients}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-          />
-        </div>
-      </div>
-
-      <div className="bg-card rounded-lg border border-border/50 overflow-hidden">
+      <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border/50">
-                <th className="w-12 px-4 py-3.5"></th>
+              <tr className="border-b border-border-gray bg-border-gray">
                 <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Patient</th>
                 <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Date de naissance</th>
                 <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Contact</th>
@@ -249,7 +206,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
             <tbody>
               {paginatedPatients.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16">
+                  <td colSpan={7} className="px-4 py-16">
                     <div className="flex flex-col items-center justify-center">
                       <User className="h-12 w-12 text-muted-foreground/50 mb-4" />
                       <h3 className="text-base font-medium mb-2 text-foreground">Aucun patient</h3>
@@ -259,7 +216,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                           : "Commencez par ajouter votre premier patient"}
                       </p>
                       {!searchQuery && (
-                        <Button onClick={() => setDialogOpen(true)} data-testid="button-add-first-patient">
+                        <Button onClick={() => setSheetOpen(true)} data-testid="button-add-first-patient">
                           <Plus className="h-4 w-4 mr-2" />
                           Ajouter un patient
                         </Button>
@@ -276,22 +233,15 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                     <tr 
                       key={patient.id} 
                       onClick={() => navigateToPatient(patient.id)}
-                      className="border-b border-border/30 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer group"
+                      className="border-b border-border-gray/50 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer group"
                       data-testid={`row-patient-${patient.id}`}
                     >
-                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox 
-                          checked={selectedPatients.includes(patient.id)}
-                          onCheckedChange={() => togglePatientSelection(patient.id)}
-                          data-testid={`checkbox-patient-${patient.id}`}
-                        />
-                      </td>
                       <td className="px-4 py-4">
                         <div>
-                          <div className="font-medium text-foreground">
+                          <div className="text-sm font-medium text-foreground">
                             {patient.prenom} {patient.nom}
                           </div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-xs text-muted-foreground">
                             ID: {displayId}
                           </div>
                         </div>
@@ -304,7 +254,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                       <td className="px-4 py-4">
                         <div>
                           <div className="text-sm text-foreground">{formatPhoneNumber(patient.telephone)}</div>
-                          <div className="text-sm text-muted-foreground">{patient.email || '-'}</div>
+                          <div className="text-xs text-muted-foreground">{patient.email || '-'}</div>
                         </div>
                       </td>
                       <td className="px-4 py-4">
