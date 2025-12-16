@@ -29,8 +29,6 @@ import {
 import { Button } from "@/components/ui/button";
 import type { Patient } from "@shared/schema";
 
-import logoIcon from "@assets/logo_Cassius_1765878309061.png";
-
 interface UserInfo {
   id: string;
   username: string;
@@ -82,17 +80,14 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
   };
 
   return (
-    <header className="flex items-center justify-between gap-4 px-6 h-16 bg-background sticky top-0 z-50 border-b shrink-0">
-      <div className="flex items-center gap-3">
-        <img src={logoIcon} alt="Cassius" className="h-7 w-7" />
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
-            {title}
-          </h1>
-          {subtitle && (
-            <span className="text-sm text-muted-foreground">{subtitle}</span>
-          )}
-        </div>
+    <header className="flex items-center justify-between gap-4 px-6 h-16 bg-white dark:bg-gray-950 sticky top-0 z-50 border-b shrink-0">
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
+          {title}
+        </h1>
+        {subtitle && (
+          <span className="text-sm text-muted-foreground">{subtitle}</span>
+        )}
       </div>
       
       <div className="flex items-center gap-2">
