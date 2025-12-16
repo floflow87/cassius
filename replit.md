@@ -36,10 +36,20 @@ Preferred communication style: Simple, everyday language.
 - **Build Tool**: esbuild for server bundling, Vite for client
 
 ### Data Storage
-- **Database**: PostgreSQL with Drizzle ORM
-- **Schema Location**: `shared/schema.ts` (shared between client and server)
-- **Migrations**: Drizzle Kit (`drizzle-kit push`)
+- **Database**: Two Supabase PostgreSQL projects (cassius-dev, cassius-prod)
+- **Connection**: Session pooler (port 6543) for Replit compatibility
+- **ORM**: Drizzle ORM with type-safe queries
+- **Schema Location**: `shared/schema.ts` (Drizzle) + `db/schema.sql` (raw SQL)
+- **Migrations**: `tsx db/scripts/apply-schema.ts` (idempotent)
 - **Object Storage**: Google Cloud Storage via Replit's sidecar service for radiograph images
+
+### Environment Variables
+- **APP_ENV**: `development` or `production` (selects which DB to use)
+- **SUPABASE_DB_URL_DEV**: Supabase dev database URI (pooler)
+- **SUPABASE_DB_URL_PROD**: Supabase prod database URI (pooler)
+- **DB_SSL**: Enable SSL (default: true)
+- **DB_POOL_MAX**: Max pool connections (default: 5)
+- **DB_CONN_TIMEOUT_MS**: Connection timeout (default: 60000)
 
 ### Authentication
 - **Session-based auth**: Passport.js with LocalStrategy
@@ -70,9 +80,17 @@ Preferred communication style: Simple, everyday language.
 │   ├── pages/           # Route pages (patients, patient-details, implant-details, dashboard)
 │   └── lib/             # Utilities and query client
 ├── server/              # Express backend
+│   ├── db.ts            # Database connection (Pool singleton, SSL, health check)
 │   ├── routes.ts        # API endpoint definitions
 │   ├── storage.ts       # Database operations interface
 │   └── objectStorage.ts # File upload handling
+├── db/                  # Database management
+│   ├── schema.sql       # Source of truth for DB structure
+│   ├── seed.dev.sql     # Test data (dev only)
+│   ├── scripts/         # Migration scripts
+│   └── README.md        # DB documentation
+├── docs/                # Documentation
+│   └── setup.md         # Environment setup guide
 └── shared/              # Shared code
     └── schema.ts        # Drizzle schema and Zod types
 ```
@@ -80,8 +98,10 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 ### Database
-- **PostgreSQL**: Primary database accessed via `DATABASE_URL` environment variable
+- **Supabase PostgreSQL**: Two separate projects (cassius-dev, cassius-prod)
+- **Connection**: Via session pooler (port 6543) - required for Replit IPv6 compatibility
 - **Drizzle ORM**: Type-safe database queries with automatic schema inference
+- **Health Check**: GET /api/health/db returns connection status and latency
 
 ### Object Storage
 - **Google Cloud Storage**: Radiograph image storage via Replit sidecar at `http://127.0.0.1:1106`
