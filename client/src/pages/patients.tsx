@@ -34,12 +34,6 @@ interface PatientsPageProps {
   setSearchQuery: (query: string) => void;
 }
 
-interface PatientWithStats extends Patient {
-  implantCount?: number;
-  lastVisit?: string | null;
-  status?: string;
-}
-
 export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPageProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,12 +45,10 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     queryKey: ["/api/patients"],
   });
 
-  // Reset to first page when search query changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
 
-  // Reset to first page when data changes and current page is out of bounds
   useEffect(() => {
     if (patients && currentPage > 1) {
       const maxPage = Math.max(1, Math.ceil(patients.length / itemsPerPage));
@@ -66,7 +58,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     }
   }, [patients, currentPage, itemsPerPage]);
 
-  // Filter patients based on search query
   const filteredPatients = patients?.filter((patient) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -79,7 +70,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     );
   }) || [];
 
-  // Pagination
   const totalPatients = filteredPatients.length;
   const totalPages = Math.ceil(totalPatients / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -121,7 +111,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   };
 
   const toggleAllSelection = () => {
-    if (selectedPatients.length === paginatedPatients.length) {
+    if (selectedPatients.length === paginatedPatients.length && paginatedPatients.length > 0) {
       setSelectedPatients([]);
     } else {
       setSelectedPatients(paginatedPatients.map(p => p.id));
@@ -133,30 +123,37 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   const goToPrevPage = () => setCurrentPage(prev => Math.max(1, prev - 1));
   const goToNextPage = () => setCurrentPage(prev => Math.min(totalPages, prev + 1));
 
-  // Get patient status based on context (placeholder logic)
   const getPatientStatus = (patient: Patient): string => {
-    // For now, return "Actif" as default - this would be computed from actual data
     return "Actif";
   };
 
   const getStatusBadgeClasses = (status: string) => {
     switch (status) {
       case "Actif":
-        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+        return "bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800";
       case "En suivi":
-        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+        return "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800";
       case "Planifié":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+        return "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800";
       default:
-        return "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
+        return "bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800";
     }
+  };
+
+  const formatPhoneNumber = (phone: string | null | undefined) => {
+    if (!phone) return "-";
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+      return cleaned.replace(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+    }
+    return phone;
   };
 
   if (isLoading) {
     return (
       <div className="p-6 space-y-4">
-        <Skeleton className="h-10 w-full max-w-xl" />
-        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-11 w-full max-w-xl" />
+        <Skeleton className="h-10 w-full" />
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <Skeleton key={i} className="h-16 w-full" />
         ))}
@@ -166,7 +163,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
 
   return (
     <div className="p-6">
-      {/* Search and Actions Bar */}
       <div className="flex items-center gap-4 mb-4">
         <div className="relative flex-1 max-w-xl">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -206,7 +202,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         </Dialog>
       </div>
 
-      {/* Active Filters */}
       {activeFilters.length > 0 && (
         <div className="flex items-center gap-2 mb-4">
           <span className="text-sm text-muted-foreground">Filtres actifs:</span>
@@ -214,7 +209,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
             <Badge 
               key={filter} 
               variant="secondary" 
-              className="gap-1 cursor-pointer"
+              className="gap-1 cursor-pointer bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
               onClick={() => removeFilter(filter)}
             >
               {filter}
@@ -224,7 +219,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         </div>
       )}
 
-      {/* Patient Count and Pagination Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Checkbox 
@@ -285,100 +279,115 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-background rounded-lg border">
-        {/* Table Header */}
-        <div className="grid grid-cols-[auto_1fr_1fr_1fr_auto_auto_auto] gap-4 px-4 py-3 border-b bg-muted/30 text-sm font-medium text-muted-foreground">
-          <div className="w-6"></div>
-          <div>Patient</div>
-          <div>Date de naissance</div>
-          <div>Contact</div>
-          <div className="w-24">Implants</div>
-          <div className="w-28">Dernière visite</div>
-          <div className="w-24">Statut</div>
-        </div>
-
-        {/* Table Body */}
-        {paginatedPatients.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <User className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Aucun patient</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              {searchQuery
-                ? "Aucun patient ne correspond à votre recherche"
-                : "Commencez par ajouter votre premier patient"}
-            </p>
-            {!searchQuery && (
-              <Button onClick={() => setDialogOpen(true)} data-testid="button-add-first-patient">
-                <Plus className="h-4 w-4 mr-2" />
-                Ajouter un patient
-              </Button>
+      <div className="bg-background rounded-lg border overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b bg-muted/30">
+              <th className="w-12 px-4 py-3"></th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Patient</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Date de naissance</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Contact</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">Implants</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-32">Dernière visite</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginatedPatients.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-12">
+                  <div className="flex flex-col items-center justify-center">
+                    <User className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Aucun patient</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {searchQuery
+                        ? "Aucun patient ne correspond à votre recherche"
+                        : "Commencez par ajouter votre premier patient"}
+                    </p>
+                    {!searchQuery && (
+                      <Button onClick={() => setDialogOpen(true)} data-testid="button-add-first-patient">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Ajouter un patient
+                      </Button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              paginatedPatients.map((patient) => {
+                const status = getPatientStatus(patient);
+                const displayId = `PAT-${new Date(patient.createdAt || Date.now()).getFullYear()}-${patient.id.slice(0, 4).toUpperCase()}`;
+                
+                return (
+                  <tr 
+                    key={patient.id} 
+                    className="border-b last:border-b-0 hover:bg-muted/50 cursor-pointer"
+                    data-testid={`row-patient-${patient.id}`}
+                  >
+                    <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox 
+                        checked={selectedPatients.includes(patient.id)}
+                        onCheckedChange={() => togglePatientSelection(patient.id)}
+                        data-testid={`checkbox-patient-${patient.id}`}
+                      />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Link href={`/patient/${patient.id}`}>
+                        <div className="cursor-pointer">
+                          <div className="font-medium text-foreground">
+                            {patient.prenom} {patient.nom}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            ID: {displayId}
+                          </div>
+                        </div>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-4">
+                      <Link href={`/patient/${patient.id}`}>
+                        <span className="text-sm text-muted-foreground cursor-pointer">
+                          {formatDateWithAge(patient.dateNaissance)}
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-4">
+                      <Link href={`/patient/${patient.id}`}>
+                        <div className="cursor-pointer">
+                          <div className="text-sm text-foreground">{formatPhoneNumber(patient.telephone)}</div>
+                          <div className="text-sm text-muted-foreground">{patient.email || '-'}</div>
+                        </div>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-4">
+                      <Link href={`/patient/${patient.id}`}>
+                        <span className="text-sm text-muted-foreground cursor-pointer">
+                          <span className="font-medium text-foreground">-</span> implants
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-4">
+                      <Link href={`/patient/${patient.id}`}>
+                        <span className="text-sm text-muted-foreground cursor-pointer">-</span>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-4">
+                      <Link href={`/patient/${patient.id}`}>
+                        <Badge 
+                          variant="outline"
+                          className={`${getStatusBadgeClasses(status)} cursor-pointer`}
+                        >
+                          {status}
+                        </Badge>
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })
             )}
-          </div>
-        ) : (
-          paginatedPatients.map((patient) => {
-            const status = getPatientStatus(patient);
-            // Format patient ID for display
-            const displayId = `PAT-${new Date(patient.createdAt || Date.now()).getFullYear()}-${patient.id.slice(0, 4).toUpperCase()}`;
-            
-            return (
-              <Link key={patient.id} href={`/patient/${patient.id}`}>
-                <div 
-                  className="grid grid-cols-[auto_1fr_1fr_1fr_auto_auto_auto] gap-4 px-4 py-4 border-b last:border-b-0 hover:bg-muted/50 cursor-pointer items-center"
-                  data-testid={`row-patient-${patient.id}`}
-                >
-                  <div className="w-6" onClick={(e) => e.preventDefault()}>
-                    <Checkbox 
-                      checked={selectedPatients.includes(patient.id)}
-                      onCheckedChange={() => togglePatientSelection(patient.id)}
-                      data-testid={`checkbox-patient-${patient.id}`}
-                    />
-                  </div>
-                  
-                  <div>
-                    <div className="font-medium text-foreground">
-                      {patient.prenom} {patient.nom}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      ID: {displayId}
-                    </div>
-                  </div>
-                  
-                  <div className="text-sm text-muted-foreground">
-                    {formatDateWithAge(patient.dateNaissance)}
-                  </div>
-                  
-                  <div className="text-sm">
-                    <div className="text-foreground">{patient.telephone || '-'}</div>
-                    <div className="text-muted-foreground">{patient.email || '-'}</div>
-                  </div>
-                  
-                  <div className="w-24 text-sm text-muted-foreground">
-                    {/* Implant count would come from API */}
-                    <span className="font-medium text-foreground">-</span> implants
-                  </div>
-                  
-                  <div className="w-28 text-sm text-muted-foreground">
-                    {/* Last visit would come from API */}
-                    -
-                  </div>
-                  
-                  <div className="w-24">
-                    <Badge 
-                      variant="secondary"
-                      className={getStatusBadgeClasses(status)}
-                    >
-                      {status}
-                    </Badge>
-                  </div>
-                </div>
-              </Link>
-            );
-          })
-        )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Bottom Pagination */}
       {totalPatients > 0 && (
         <div className="flex items-center justify-end gap-2 mt-4">
           <span className="text-sm text-muted-foreground">

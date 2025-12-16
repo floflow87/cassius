@@ -15,14 +15,15 @@
   --card: 0deg 0% 100%;
   --card-foreground: 0 0% 0%;
   --card-border: 0 0% 97%;
-  --sidebar: 45 25% 97%;
-  --sidebar-foreground: 20 14% 17%;
-  --sidebar-border: 45 15% 80%;
-  --sidebar-primary: 9 75% 61%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 25 45% 80%;
-  --sidebar-accent-foreground: 20 14% 17%;
-  --sidebar-ring: 9 75% 61%;
+  /* Sidebar with Cassius mainBlue #2563EB */
+  --sidebar: 217 91% 60%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-border: 217 91% 55%;
+  --sidebar-primary: 0 0% 100%;
+  --sidebar-primary-foreground: 217 91% 60%;
+  --sidebar-accent: 217 91% 70%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-ring: 0 0% 100%;
   --popover: 0deg 0% 100%;
   --popover-foreground: 0deg 0% 0%;
   --popover-border: 0 0% 97%;
@@ -101,14 +102,15 @@
   --card: 20 14% 8%;
   --card-foreground: 45 25% 85%;
   --card-border: 20 14% 15%;
-  --sidebar: 20 14% 8%;
-  --sidebar-foreground: 45 25% 85%;
-  --sidebar-border: 20 14% 15%;
-  --sidebar-primary: 9 75% 61%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 25 45% 20%;
-  --sidebar-accent-foreground: 45 25% 85%;
-  --sidebar-ring: 9 75% 61%;
+  /* Sidebar with Cassius mainBlue #2563EB - same in dark mode */
+  --sidebar: 217 91% 50%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-border: 217 91% 45%;
+  --sidebar-primary: 0 0% 100%;
+  --sidebar-primary-foreground: 217 91% 50%;
+  --sidebar-accent: 217 91% 60%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-ring: 0 0% 100%;
   --popover: 20 14% 4%;
   --popover-foreground: 45 25% 91%;
   --popover-border: 20 14% 10%;

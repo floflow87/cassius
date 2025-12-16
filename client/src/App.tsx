@@ -27,6 +27,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import type { Patient } from "@shared/schema";
+
+import logoIcon from "@assets/logo_Cassius_1765878309061.png";
 
 interface UserInfo {
   id: string;
@@ -39,14 +42,18 @@ interface UserInfo {
 interface PageHeaderProps {
   user: UserInfo;
   onLogout: () => void;
+  patientCount?: number;
 }
 
-function PageHeader({ user, onLogout }: PageHeaderProps) {
+function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
   const [location] = useLocation();
   
   const getPageInfo = () => {
     if (location === "/" || location.startsWith("/patient")) {
-      return { title: "Patients", subtitle: null };
+      return { 
+        title: "Patients", 
+        subtitle: patientCount !== undefined ? `${patientCount} patients actifs` : null 
+      };
     }
     if (location === "/implants" || location.includes("/implant/")) {
       return { title: "Implants", subtitle: null };
@@ -54,10 +61,13 @@ function PageHeader({ user, onLogout }: PageHeaderProps) {
     if (location === "/dashboard" || location === "/stats") {
       return { title: "Tableau de bord", subtitle: null };
     }
+    if (location === "/actes") {
+      return { title: "Actes", subtitle: null };
+    }
     return { title: "Cassius", subtitle: null };
   };
 
-  const { title } = getPageInfo();
+  const { title, subtitle } = getPageInfo();
   
   const getUserInitials = () => {
     const first = user.prenom?.[0] || "";
@@ -72,11 +82,17 @@ function PageHeader({ user, onLogout }: PageHeaderProps) {
   };
 
   return (
-    <header className="flex items-center justify-between gap-4 px-6 py-4 bg-background sticky top-0 z-50 border-b">
+    <header className="flex items-center justify-between gap-4 px-6 h-16 bg-background sticky top-0 z-50 border-b shrink-0">
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
-          {title}
-        </h1>
+        <img src={logoIcon} alt="Cassius" className="h-7 w-7" />
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
+            {title}
+          </h1>
+          {subtitle && (
+            <span className="text-sm text-muted-foreground">{subtitle}</span>
+          )}
+        </div>
       </div>
       
       <div className="flex items-center gap-2">
@@ -127,6 +143,7 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/stats" component={DashboardPage} />
       <Route path="/implants" component={ImplantsPage} />
+      <Route path="/actes" component={DashboardPage} />
       <Route path="/patient/:id" component={PatientDetailsPage} />
       <Route path="/patient/:id/report" component={PatientReportPage} />
       <Route path="/patient/:patientId/implant/:implantId" component={ImplantDetailsPage} />
@@ -141,6 +158,11 @@ function AuthenticatedApp() {
   const { data: user, isLoading, refetch } = useQuery<UserInfo>({
     queryKey: ["/api/auth/user"],
     retry: false,
+  });
+
+  const { data: patients } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
+    enabled: !!user,
   });
 
   const handleLogout = async () => {
@@ -175,16 +197,16 @@ function AuthenticatedApp() {
   }
 
   const style = {
-    "--sidebar-width": "4rem",
-    "--sidebar-width-icon": "4rem",
+    "--sidebar-width": "4.5rem",
+    "--sidebar-width-icon": "4.5rem",
   };
 
   return (
     <SidebarProvider style={style as React.CSSProperties} defaultOpen={false}>
-      <div className="flex h-screen w-full bg-muted/30">
+      <div className="flex h-screen w-full">
         <AppSidebar />
-        <div className="flex flex-col flex-1 min-w-0">
-          <PageHeader user={user} onLogout={handleLogout} />
+        <div className="flex flex-col flex-1 min-w-0 bg-muted/30">
+          <PageHeader user={user} onLogout={handleLogout} patientCount={patients?.length} />
           <main className="flex-1 overflow-auto">
             <Router searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
           </main>
