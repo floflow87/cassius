@@ -1,22 +1,16 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Plus, 
   Search, 
   Filter, 
   Download, 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronsLeft, 
-  ChevronsRight,
   LayoutGrid,
   User,
-  X
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -27,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PatientForm } from "@/components/patient-form";
+import { CassiusBadge, CassiusChip, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import type { Patient } from "@shared/schema";
 
 interface PatientsPageProps {
@@ -35,6 +30,7 @@ interface PatientsPageProps {
 }
 
 export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPageProps) {
+  const [, setLocation] = useLocation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedPatients, setSelectedPatients] = useState<string[]>([]);
@@ -118,25 +114,17 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     }
   };
 
-  const goToFirstPage = () => setCurrentPage(1);
-  const goToLastPage = () => setCurrentPage(totalPages);
-  const goToPrevPage = () => setCurrentPage(prev => Math.max(1, prev - 1));
-  const goToNextPage = () => setCurrentPage(prev => Math.min(totalPages, prev + 1));
-
-  const getPatientStatus = (patient: Patient): string => {
-    return "Actif";
+  const getPatientStatus = (_patient: Patient): "actif" | "en-suivi" | "planifie" | "inactif" => {
+    return "actif";
   };
 
-  const getStatusBadgeClasses = (status: string) => {
+  const getStatusLabel = (status: string): string => {
     switch (status) {
-      case "Actif":
-        return "bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800";
-      case "En suivi":
-        return "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800";
-      case "Planifié":
-        return "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800";
-      default:
-        return "bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800";
+      case "actif": return "Actif";
+      case "en-suivi": return "En suivi";
+      case "planifie": return "Planifié";
+      case "inactif": return "Inactif";
+      default: return "Actif";
     }
   };
 
@@ -149,10 +137,14 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     return phone;
   };
 
+  const navigateToPatient = (patientId: string) => {
+    setLocation(`/patients/${patientId}`);
+  };
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-4">
-        <Skeleton className="h-11 w-full max-w-xl" />
+        <Skeleton className="h-11 w-full max-w-2xl" />
         <Skeleton className="h-10 w-full" />
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <Skeleton key={i} className="h-16 w-full" />
@@ -163,32 +155,29 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
 
   return (
     <div className="p-6">
-      <div className="flex items-center gap-4 mb-4">
-        <div className="relative flex-1 max-w-xl">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Rechercher un patient (nom, prénom, date de naissance...)"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-11 bg-background"
-            data-testid="input-search-patients"
-          />
-        </div>
+      <div className="flex items-center gap-4 mb-5">
+        <CassiusSearchInput
+          placeholder="Rechercher un patient (nom, prénom, date de naissance...)"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          icon={<Search className="h-4 w-4" />}
+          className="max-w-2xl"
+          data-testid="input-search-patients"
+        />
         
-        <Button variant="outline" className="gap-2" data-testid="button-filter">
+        <Button variant="outline" className="gap-2 shrink-0" data-testid="button-filter">
           <Filter className="h-4 w-4" />
           Filtrer
         </Button>
         
-        <Button variant="outline" className="gap-2" data-testid="button-export">
+        <Button variant="outline" className="gap-2 shrink-0" data-testid="button-export">
           <Download className="h-4 w-4" />
           Exporter
         </Button>
         
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2" data-testid="button-new-patient">
+            <Button className="gap-2 shrink-0" data-testid="button-new-patient">
               <Plus className="h-4 w-4" />
               Nouveau patient
             </Button>
@@ -203,24 +192,21 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
       </div>
 
       {activeFilters.length > 0 && (
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-5">
           <span className="text-sm text-muted-foreground">Filtres actifs:</span>
           {activeFilters.map((filter) => (
-            <Badge 
+            <CassiusChip 
               key={filter} 
-              variant="secondary" 
-              className="gap-1 cursor-pointer bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
-              onClick={() => removeFilter(filter)}
+              onRemove={() => removeFilter(filter)}
             >
               {filter}
-              <X className="h-3 w-3" />
-            </Badge>
+            </CassiusChip>
           ))}
         </div>
       )}
 
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Checkbox 
             checked={selectedPatients.length === paginatedPatients.length && paginatedPatients.length > 0}
             onCheckedChange={toggleAllSelection}
@@ -231,109 +217,77 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           </span>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" data-testid="button-grid-view">
             <LayoutGrid className="h-4 w-4" />
           </Button>
-          <span className="text-sm text-muted-foreground">
-            {totalPatients > 0 ? `${startIndex + 1} – ${endIndex} de ${totalPatients}` : '0 de 0'}
-          </span>
-          <div className="flex items-center">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === 1} 
-              onClick={goToFirstPage}
-              data-testid="button-first-page"
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === 1} 
-              onClick={goToPrevPage}
-              data-testid="button-prev-page"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === totalPages || totalPages === 0}
-              onClick={goToNextPage}
-              data-testid="button-next-page"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === totalPages || totalPages === 0}
-              onClick={goToLastPage}
-              data-testid="button-last-page"
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-          </div>
+          <CassiusPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalPatients}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
         </div>
       </div>
 
-      <div className="bg-background rounded-lg border overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-muted/30">
-              <th className="w-12 px-4 py-3"></th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Patient</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Date de naissance</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Contact</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-28">Implants</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-32">Dernière visite</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground w-24">Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedPatients.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-12">
-                  <div className="flex flex-col items-center justify-center">
-                    <User className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-2">Aucun patient</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {searchQuery
-                        ? "Aucun patient ne correspond à votre recherche"
-                        : "Commencez par ajouter votre premier patient"}
-                    </p>
-                    {!searchQuery && (
-                      <Button onClick={() => setDialogOpen(true)} data-testid="button-add-first-patient">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Ajouter un patient
-                      </Button>
-                    )}
-                  </div>
-                </td>
+      <div className="bg-card rounded-lg border border-border/50 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border/50">
+                <th className="w-12 px-4 py-3.5"></th>
+                <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Patient</th>
+                <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Date de naissance</th>
+                <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Contact</th>
+                <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider w-28">Implants</th>
+                <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider w-32">Dernière visite</th>
+                <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider w-24">Statut</th>
+                <th className="w-10"></th>
               </tr>
-            ) : (
-              paginatedPatients.map((patient) => {
-                const status = getPatientStatus(patient);
-                const displayId = `PAT-${new Date(patient.createdAt || Date.now()).getFullYear()}-${patient.id.slice(0, 4).toUpperCase()}`;
-                
-                return (
-                  <tr 
-                    key={patient.id} 
-                    className="border-b last:border-b-0 hover:bg-muted/50 cursor-pointer"
-                    data-testid={`row-patient-${patient.id}`}
-                  >
-                    <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox 
-                        checked={selectedPatients.includes(patient.id)}
-                        onCheckedChange={() => togglePatientSelection(patient.id)}
-                        data-testid={`checkbox-patient-${patient.id}`}
-                      />
-                    </td>
-                    <td className="px-4 py-4">
-                      <Link href={`/patients/${patient.id}`}>
-                        <div className="cursor-pointer">
+            </thead>
+            <tbody>
+              {paginatedPatients.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-16">
+                    <div className="flex flex-col items-center justify-center">
+                      <User className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                      <h3 className="text-base font-medium mb-2 text-foreground">Aucun patient</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {searchQuery
+                          ? "Aucun patient ne correspond à votre recherche"
+                          : "Commencez par ajouter votre premier patient"}
+                      </p>
+                      {!searchQuery && (
+                        <Button onClick={() => setDialogOpen(true)} data-testid="button-add-first-patient">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Ajouter un patient
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedPatients.map((patient) => {
+                  const status = getPatientStatus(patient);
+                  const displayId = `PAT-${new Date(patient.createdAt || Date.now()).getFullYear()}-${patient.id.slice(0, 4).toUpperCase()}`;
+                  
+                  return (
+                    <tr 
+                      key={patient.id} 
+                      onClick={() => navigateToPatient(patient.id)}
+                      className="border-b border-border/30 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer group"
+                      data-testid={`row-patient-${patient.id}`}
+                    >
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox 
+                          checked={selectedPatients.includes(patient.id)}
+                          onCheckedChange={() => togglePatientSelection(patient.id)}
+                          data-testid={`checkbox-patient-${patient.id}`}
+                        />
+                      </td>
+                      <td className="px-4 py-4">
+                        <div>
                           <div className="font-medium text-foreground">
                             {patient.prenom} {patient.nom}
                           </div>
@@ -341,96 +295,52 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                             ID: {displayId}
                           </div>
                         </div>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-4">
-                      <Link href={`/patients/${patient.id}`}>
-                        <span className="text-sm text-muted-foreground cursor-pointer">
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="text-sm text-muted-foreground">
                           {formatDateWithAge(patient.dateNaissance)}
                         </span>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-4">
-                      <Link href={`/patients/${patient.id}`}>
-                        <div className="cursor-pointer">
+                      </td>
+                      <td className="px-4 py-4">
+                        <div>
                           <div className="text-sm text-foreground">{formatPhoneNumber(patient.telephone)}</div>
                           <div className="text-sm text-muted-foreground">{patient.email || '-'}</div>
                         </div>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-4">
-                      <Link href={`/patients/${patient.id}`}>
-                        <span className="text-sm text-muted-foreground cursor-pointer">
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="text-sm text-muted-foreground">
                           <span className="font-medium text-foreground">-</span> implants
                         </span>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-4">
-                      <Link href={`/patients/${patient.id}`}>
-                        <span className="text-sm text-muted-foreground cursor-pointer">-</span>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-4">
-                      <Link href={`/patients/${patient.id}`}>
-                        <Badge 
-                          variant="outline"
-                          className={`${getStatusBadgeClasses(status)} cursor-pointer`}
-                        >
-                          {status}
-                        </Badge>
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="text-sm text-muted-foreground">-</span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <CassiusBadge status={status}>
+                          {getStatusLabel(status)}
+                        </CassiusBadge>
+                      </td>
+                      <td className="px-4 py-4">
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {totalPatients > 0 && (
-        <div className="flex items-center justify-end gap-2 mt-4">
-          <span className="text-sm text-muted-foreground">
-            {startIndex + 1} – {endIndex} de {totalPatients}
-          </span>
-          <div className="flex items-center">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === 1}
-              onClick={goToFirstPage}
-              data-testid="button-first-page-bottom"
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === 1}
-              onClick={goToPrevPage}
-              data-testid="button-prev-page-bottom"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === totalPages}
-              onClick={goToNextPage}
-              data-testid="button-next-page-bottom"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === totalPages}
-              onClick={goToLastPage}
-              data-testid="button-last-page-bottom"
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-          </div>
+        <div className="flex items-center justify-end mt-4">
+          <CassiusPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalPatients}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
         </div>
       )}
     </div>

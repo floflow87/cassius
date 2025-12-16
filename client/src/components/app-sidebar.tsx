@@ -75,7 +75,7 @@ export function AppSidebar() {
                       <img 
                         src={item.icon} 
                         alt={item.title}
-                        className="h-6 w-6 brightness-0 invert"
+                        className="h-5 w-auto brightness-0 invert"
                       />
                     </a>
                   </TooltipTrigger>
@@ -103,7 +103,7 @@ export function AppSidebar() {
                   <img 
                     src={settingsIcon} 
                     alt="Paramètres"
-                    className="h-6 w-6 brightness-0 invert"
+                    className="h-5 w-auto brightness-0 invert"
                   />
                 </a>
               </TooltipTrigger>
