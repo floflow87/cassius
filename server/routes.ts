@@ -155,6 +155,26 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/patients/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const data = insertPatientSchema.partial().parse(req.body);
+      const patient = await storage.updatePatient(organisationId, req.params.id, data);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      res.json(patient);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error updating patient:", error);
+      res.status(500).json({ error: "Failed to update patient" });
+    }
+  });
+
   // ========== OPERATIONS ==========
   app.get("/api/operations/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

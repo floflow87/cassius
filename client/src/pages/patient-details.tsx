@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import {
   ArrowLeft,
@@ -18,6 +18,7 @@ import {
   CheckCircle,
   Image as ImageIcon,
   Stethoscope,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,10 +32,22 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { OperationForm } from "@/components/operation-form";
 import { ImplantCard } from "@/components/implant-card";
 import { RadioCard } from "@/components/radio-card";
 import { RadioUploadForm } from "@/components/radio-upload-form";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Patient, Operation, Implant, Radio, Visite } from "@shared/schema";
 
 interface PatientWithDetails extends Patient {
@@ -48,12 +61,73 @@ export default function PatientDetailsPage() {
   const patientId = params?.id;
   const [operationDialogOpen, setOperationDialogOpen] = useState(false);
   const [radioDialogOpen, setRadioDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const { toast } = useToast();
 
   const { data: patient, isLoading } = useQuery<PatientWithDetails>({
     queryKey: ["/api/patients", patientId],
     enabled: !!patientId,
   });
+
+  const [editForm, setEditForm] = useState({
+    nom: "",
+    prenom: "",
+    dateNaissance: "",
+    sexe: "HOMME" as "HOMME" | "FEMME",
+    telephone: "",
+    email: "",
+    adresse: "",
+    codePostal: "",
+    ville: "",
+    pays: "",
+    contexteMedical: "",
+  });
+
+  const updatePatientMutation = useMutation({
+    mutationFn: async (data: typeof editForm) => {
+      return apiRequest("PATCH", `/api/patients/${patientId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      setEditDialogOpen(false);
+      toast({
+        title: "Patient mis à jour",
+        description: "Les informations du patient ont été enregistrées.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le patient.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openEditDialog = () => {
+    if (patient) {
+      setEditForm({
+        nom: patient.nom,
+        prenom: patient.prenom,
+        dateNaissance: patient.dateNaissance,
+        sexe: patient.sexe,
+        telephone: patient.telephone || "",
+        email: patient.email || "",
+        adresse: patient.adresse || "",
+        codePostal: patient.codePostal || "",
+        ville: patient.ville || "",
+        pays: patient.pays || "",
+        contexteMedical: patient.contexteMedical || "",
+      });
+      setEditDialogOpen(true);
+    }
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updatePatientMutation.mutate(editForm);
+  };
 
   const calculateAge = (dateNaissance: string) => {
     const birthDate = new Date(dateNaissance);
@@ -277,7 +351,7 @@ export default function PatientDetailsPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-base font-medium">Informations patient</CardTitle>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" onClick={openEditDialog} data-testid="button-edit-patient">
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </div>
@@ -307,10 +381,16 @@ export default function PatientDetailsPage() {
                       <p>{patient.email}</p>
                     </div>
                   )}
-                  {patient.adresse && (
+                  {(patient.adresse || patient.codePostal || patient.ville || patient.pays) && (
                     <div>
                       <span className="text-muted-foreground text-xs">Adresse</span>
-                      <p>{patient.adresse}</p>
+                      <p>
+                        {patient.adresse && <span>{patient.adresse}<br /></span>}
+                        {(patient.codePostal || patient.ville) && (
+                          <span>{patient.codePostal} {patient.ville}<br /></span>
+                        )}
+                        {patient.pays && <span>{patient.pays}</span>}
+                      </p>
                     </div>
                   )}
                   <div>
@@ -319,6 +399,146 @@ export default function PatientDetailsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Sheet open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>Modifier le patient</SheetTitle>
+                  </SheetHeader>
+                  <form onSubmit={handleEditSubmit} className="mt-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="prenom">Prénom</Label>
+                        <Input
+                          id="prenom"
+                          value={editForm.prenom}
+                          onChange={(e) => setEditForm({ ...editForm, prenom: e.target.value })}
+                          required
+                          data-testid="input-edit-prenom"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="nom">Nom</Label>
+                        <Input
+                          id="nom"
+                          value={editForm.nom}
+                          onChange={(e) => setEditForm({ ...editForm, nom: e.target.value })}
+                          required
+                          data-testid="input-edit-nom"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="dateNaissance">Date de naissance</Label>
+                        <Input
+                          id="dateNaissance"
+                          type="date"
+                          value={editForm.dateNaissance}
+                          onChange={(e) => setEditForm({ ...editForm, dateNaissance: e.target.value })}
+                          required
+                          data-testid="input-edit-date-naissance"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="sexe">Sexe</Label>
+                        <Select
+                          value={editForm.sexe}
+                          onValueChange={(value: "HOMME" | "FEMME") => setEditForm({ ...editForm, sexe: value })}
+                        >
+                          <SelectTrigger data-testid="select-edit-sexe">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="HOMME">Homme</SelectItem>
+                            <SelectItem value="FEMME">Femme</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="telephone">Téléphone</Label>
+                        <Input
+                          id="telephone"
+                          value={editForm.telephone}
+                          onChange={(e) => setEditForm({ ...editForm, telephone: e.target.value })}
+                          data-testid="input-edit-telephone"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={editForm.email}
+                          onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                          data-testid="input-edit-email"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="adresse">Adresse</Label>
+                      <Input
+                        id="adresse"
+                        value={editForm.adresse}
+                        onChange={(e) => setEditForm({ ...editForm, adresse: e.target.value })}
+                        placeholder="Numéro et rue"
+                        data-testid="input-edit-adresse"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="codePostal">Code postal</Label>
+                        <Input
+                          id="codePostal"
+                          value={editForm.codePostal}
+                          onChange={(e) => setEditForm({ ...editForm, codePostal: e.target.value })}
+                          data-testid="input-edit-code-postal"
+                        />
+                      </div>
+                      <div className="space-y-2 col-span-2">
+                        <Label htmlFor="ville">Ville</Label>
+                        <Input
+                          id="ville"
+                          value={editForm.ville}
+                          onChange={(e) => setEditForm({ ...editForm, ville: e.target.value })}
+                          data-testid="input-edit-ville"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pays">Pays</Label>
+                      <Input
+                        id="pays"
+                        value={editForm.pays}
+                        onChange={(e) => setEditForm({ ...editForm, pays: e.target.value })}
+                        placeholder="France"
+                        data-testid="input-edit-pays"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contexteMedical">Contexte médical</Label>
+                      <Textarea
+                        id="contexteMedical"
+                        value={editForm.contexteMedical}
+                        onChange={(e) => setEditForm({ ...editForm, contexteMedical: e.target.value })}
+                        placeholder="Notes médicales, antécédents..."
+                        rows={3}
+                        data-testid="input-edit-contexte-medical"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
+                        Annuler
+                      </Button>
+                      <Button type="submit" disabled={updatePatientMutation.isPending} data-testid="button-save-patient">
+                        {updatePatientMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+                      </Button>
+                    </div>
+                  </form>
+                </SheetContent>
+              </Sheet>
 
               <Card>
                 <CardHeader className="pb-3">

@@ -18,8 +18,7 @@ let databaseUrl: string;
 
 if (isProduction) {
   if (!process.env.SUPABASE_DB_URL_PROD) {
-    console.error("SUPABASE_DB_URL_PROD must be set for production.");
-    process.exit(1);
+    throw new Error("SUPABASE_DB_URL_PROD is required in production");
   }
   databaseUrl = process.env.SUPABASE_DB_URL_PROD;
 } else {

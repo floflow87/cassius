@@ -41,6 +41,7 @@ export interface IStorage {
   getPatient(organisationId: string, id: string): Promise<Patient | undefined>;
   getPatientWithDetails(organisationId: string, id: string): Promise<PatientDetail | undefined>;
   createPatient(organisationId: string, patient: InsertPatient): Promise<Patient>;
+  updatePatient(organisationId: string, id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined>;
   searchPatients(organisationId: string, query: string): Promise<Patient[]>;
 
   // Operation methods
@@ -176,6 +177,17 @@ export class DatabaseStorage implements IStorage {
       organisationId,
     }).returning();
     return newPatient;
+  }
+
+  async updatePatient(organisationId: string, id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined> {
+    const [updated] = await db.update(patients)
+      .set(patient)
+      .where(and(
+        eq(patients.id, id),
+        eq(patients.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
   }
 
   async searchPatients(organisationId: string, query: string): Promise<Patient[]> {
