@@ -19,6 +19,37 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (December 16, 2025)
 
+### Production Debugging & Logs
+- **Structured auth logs**: All auth endpoints now log `[AUTH] timestamp | env= | route= | action=` with error stacks
+- **Smoke test script**: `db/scripts/smoke.ts` for testing DB connection and table counts
+- **Logout fix**: Uses `queryClient.setQueryData` for immediate UI update
+
+### Database Commands
+
+```bash
+# Test DB connection (checks tables and default org)
+APP_ENV=development npx tsx db/scripts/smoke.ts
+APP_ENV=production npx tsx db/scripts/smoke.ts
+
+# Apply schema (dev)
+APP_ENV=development npx tsx db/scripts/apply-schema.ts
+
+# Apply schema (prod - requires confirmation)
+APP_ENV=production CONFIRM_PROD_SCHEMA_APPLY=true npx tsx db/scripts/apply-schema.ts
+
+# Seed dev data
+APP_ENV=development npx tsx db/scripts/seed-dev.ts
+```
+
+### Required Environment Variables for Production (Render)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `APP_ENV` | Yes | Must be `production` |
+| `SUPABASE_DB_URL_PROD` | Yes | Supabase prod pooler URL (port 6543) |
+| `SESSION_SECRET` | Yes | Session encryption key (32+ chars) |
+| `JWT_SECRET` | Yes | JWT signing key (32+ chars) |
+
 ### UI Refactoring - Sidebar and Patients Page
 - **Sidebar**: Refactored to use Shadcn primitives (Sidebar, SidebarProvider, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton)
 - **Color tokens**: Updated CSS variables for Cassius mainBlue (#2563EB / 217 91% 60%) in both light and dark modes
