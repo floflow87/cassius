@@ -42,7 +42,7 @@
 ## Component Library
 
 ### Navigation
-- **Sidebar**: Fixed left navigation (w-64) with patient search, main menu (Patients, Operations, Statistics), user profile
+- **Sidebar**: Fixed left icon-only navigation (w-16 / 4rem) with main menu icons, tooltips on hover
 - **Top Bar**: Breadcrumb navigation, patient context indicator when viewing patient data, quick actions
 
 ### Data Display
@@ -77,6 +77,11 @@
 - **Dropdown Menus**: Always white background (`bg-white dark:bg-gray-950`) for clarity and consistency
 - **Side Panels (Sheet)**: White background, slide-in from right, 540px width for forms
 - **Popovers**: White background, subtle shadow for elevation
+
+### Toast Notifications
+- **Success**: Light pastel green (`bg-green-50 border-green-200 text-green-900`) - for confirmations, saves, successful operations
+- **Destructive**: Red (`bg-destructive text-destructive-foreground`) - for errors, failures
+- **Default**: Standard background - for neutral information
 
 ---
 
