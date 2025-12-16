@@ -7,6 +7,14 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { generateToken } from "./jwtMiddleware";
 
+const APP_ENV = process.env.APP_ENV || "development";
+
+function authLog(route: string, action: string, data?: Record<string, unknown>) {
+  const timestamp = new Date().toISOString();
+  const safeData = data ? JSON.stringify(data) : "";
+  console.log(`[AUTH] ${timestamp} | env=${APP_ENV} | route=${route} | action=${action} ${safeData}`);
+}
+
 declare global {
   namespace Express {
     interface User {
@@ -110,15 +118,21 @@ export function setupAuth(app: Express): void {
   });
 
   app.post("/api/auth/login", (req, res, next) => {
+    const { username } = req.body;
+    authLog("/api/auth/login", "START", { username });
+    
     passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
       if (err) {
+        authLog("/api/auth/login", "ERROR", { error: err.message, stack: err.stack });
         return next(err);
       }
       if (!user) {
+        authLog("/api/auth/login", "FAILED", { reason: info?.message });
         return res.status(401).json({ error: info?.message || "Échec de connexion" });
       }
       req.logIn(user, (err) => {
         if (err) {
+          authLog("/api/auth/login", "SESSION_ERROR", { error: err.message });
           return next(err);
         }
 
@@ -134,6 +148,7 @@ export function setupAuth(app: Express): void {
           console.warn("JWT_SECRET non configuré, token JWT non généré");
         }
 
+        authLog("/api/auth/login", "SUCCESS", { userId: user.id, organisationId: user.organisationId });
         return res.json({
           token,
           user: {
@@ -166,24 +181,33 @@ export function setupAuth(app: Express): void {
   });
 
   app.post("/api/auth/register", async (req, res) => {
+    const DEFAULT_ORG_ID = "default-org-001";
+    authLog("/api/auth/register", "START", { organisationId: DEFAULT_ORG_ID });
+    
     try {
       const { username, password, nom, prenom } = req.body;
+      authLog("/api/auth/register", "VALIDATING", { username, hasNom: !!nom, hasPrenom: !!prenom });
 
       if (!username || !password) {
+        authLog("/api/auth/register", "VALIDATION_FAILED", { reason: "missing_credentials" });
         return res.status(400).json({ error: "Nom d'utilisateur et mot de passe requis" });
       }
 
       if (password.length < 6) {
+        authLog("/api/auth/register", "VALIDATION_FAILED", { reason: "password_too_short" });
         return res.status(400).json({ error: "Le mot de passe doit contenir au moins 6 caractères" });
       }
 
+      authLog("/api/auth/register", "CHECKING_EXISTING_USER");
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
+        authLog("/api/auth/register", "USER_EXISTS", { username });
         return res.status(400).json({ error: "Ce nom d'utilisateur existe déjà" });
       }
 
       const hashedPassword = await hashPassword(password);
-      const DEFAULT_ORG_ID = "default-org-001";
+      authLog("/api/auth/register", "CREATING_USER", { username, organisationId: DEFAULT_ORG_ID });
+      
       const user = await storage.createUser({
         username,
         password: hashedPassword,
@@ -192,6 +216,8 @@ export function setupAuth(app: Express): void {
         role: "ASSISTANT",
         organisationId: DEFAULT_ORG_ID,
       });
+
+      authLog("/api/auth/register", "USER_CREATED", { userId: user.id });
 
       req.logIn(
         {
@@ -204,8 +230,10 @@ export function setupAuth(app: Express): void {
         },
         (err) => {
           if (err) {
+            authLog("/api/auth/register", "SESSION_ERROR", { error: err.message });
             return res.status(500).json({ error: "Erreur lors de la connexion" });
           }
+          authLog("/api/auth/register", "SUCCESS", { userId: user.id });
           return res.status(201).json({
             id: user.id,
             username: user.username,
@@ -216,8 +244,12 @@ export function setupAuth(app: Express): void {
           });
         }
       );
-    } catch (error) {
-      console.error("Error registering user:", error);
+    } catch (error: any) {
+      authLog("/api/auth/register", "ERROR", { 
+        message: error?.message, 
+        stack: error?.stack,
+        code: error?.code 
+      });
       res.status(500).json({ error: "Erreur lors de l'inscription" });
     }
   });
