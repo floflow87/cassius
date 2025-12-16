@@ -57,14 +57,30 @@ const defaultColumns: ColumnConfig[] = [
 
 const STORAGE_KEY_COLUMNS = "cassius_patients_columns_order";
 const STORAGE_KEY_SORT = "cassius_patients_sort";
+const STORAGE_KEY_VIEW_MODE = "cassius_patients_view_mode";
 
 export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPageProps) {
   const [, setLocation] = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [viewMode, setViewMode] = useState<"table" | "cards">(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_VIEW_MODE);
+      if (saved === "table" || saved === "cards") {
+        return saved;
+      }
+    } catch {}
+    return "table";
+  });
   const itemsPerPage = 20;
+
+  const handleViewModeChange = (mode: "table" | "cards") => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem(STORAGE_KEY_VIEW_MODE, mode);
+    } catch {}
+  };
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
@@ -361,7 +377,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           <Button
             variant={viewMode === "table" ? "secondary" : "ghost"}
             size="icon"
-            onClick={() => setViewMode("table")}
+            onClick={() => handleViewModeChange("table")}
             data-testid="button-view-table"
             className="rounded-r-none"
           >
@@ -370,7 +386,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           <Button
             variant={viewMode === "cards" ? "secondary" : "ghost"}
             size="icon"
-            onClick={() => setViewMode("cards")}
+            onClick={() => handleViewModeChange("cards")}
             data-testid="button-view-cards"
             className="rounded-l-none"
           >
