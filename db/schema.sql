@@ -79,11 +79,12 @@ CREATE TABLE IF NOT EXISTS organisations (
 -- Users
 CREATE TABLE IF NOT EXISTS users (
   id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  organisation_id VARCHAR REFERENCES organisations(id) ON DELETE CASCADE,
   username TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL,
   role role NOT NULL DEFAULT 'ASSISTANT',
-  created_at TIMESTAMP DEFAULT NOW() NOT NULL
+  nom TEXT,
+  prenom TEXT
 );
 
 -- Patients
