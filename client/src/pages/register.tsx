@@ -97,7 +97,7 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
             <img 
               src={logoBlue} 
               alt="Cassius" 
-              className="h-14 object-contain"
+              className="h-[80px] object-contain"
               data-testid="img-logo-blue"
             />
           </div>
@@ -270,7 +270,7 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
           <img 
             src={logoWhite} 
             alt="Cassius" 
-            className="h-16 object-contain mb-3"
+            className="h-[120px] object-contain mb-3"
             data-testid="img-logo-white"
           />
           <p className="text-[15px] italic opacity-90 mb-8" data-testid="text-tagline">
