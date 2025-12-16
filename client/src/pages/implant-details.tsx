@@ -36,7 +36,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 };
 
 export default function ImplantDetailsPage() {
-  const [, params] = useRoute("/patient/:patientId/implant/:implantId");
+  const [, params] = useRoute("/patients/:patientId/implants/:implantId");
   const patientId = params?.patientId;
   const implantId = params?.implantId;
 
@@ -90,7 +90,7 @@ export default function ImplantDetailsPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Activity className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">Implant non trouvé</h3>
-            <Link href={`/patient/${patientId}`}>
+            <Link href={`/patients/${patientId}`}>
               <Button variant="outline">Retour au patient</Button>
             </Link>
           </CardContent>
@@ -105,7 +105,7 @@ export default function ImplantDetailsPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Link href={`/patient/${patientId}`}>
+        <Link href={`/patients/${patientId}`}>
           <Button variant="ghost" size="icon" data-testid="button-back-to-patient">
             <ArrowLeft className="h-4 w-4" />
           </Button>

@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { requireJwt } from "./jwtMiddleware";
+import { requireJwtOrSession } from "./jwtMiddleware";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -71,7 +71,7 @@ export async function registerRoutes(
   });
 
   // ========== PATIENTS ==========
-  app.get("/api/patients", requireJwt, async (req, res) => {
+  app.get("/api/patients", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -84,7 +84,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/search", requireJwt, async (req, res) => {
+  app.get("/api/patients/search", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -98,7 +98,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:id", requireJwt, async (req, res) => {
+  app.get("/api/patients/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -114,7 +114,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/patients", requireJwt, async (req, res) => {
+  app.post("/api/patients", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -132,7 +132,7 @@ export async function registerRoutes(
   });
 
   // ========== OPERATIONS ==========
-  app.get("/api/operations/:id", requireJwt, async (req, res) => {
+  app.get("/api/operations/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -164,7 +164,7 @@ export async function registerRoutes(
     ).default([]),
   });
 
-  app.post("/api/operations", requireJwt, async (req, res) => {
+  app.post("/api/operations", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -191,7 +191,7 @@ export async function registerRoutes(
   });
 
   // ========== IMPLANTS ==========
-  app.get("/api/implants/brands", requireJwt, async (req, res) => {
+  app.get("/api/implants/brands", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -204,7 +204,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants/:id", requireJwt, async (req, res) => {
+  app.get("/api/implants/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -220,7 +220,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/patients/:id/implants", requireJwt, async (req, res) => {
+  app.get("/api/patients/:id/implants", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -233,7 +233,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/implants", requireJwt, async (req, res) => {
+  app.post("/api/implants", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -250,7 +250,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants", requireJwt, async (req, res) => {
+  app.get("/api/implants", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -274,7 +274,7 @@ export async function registerRoutes(
   });
 
   // ========== RADIOS ==========
-  app.get("/api/radios/:id", requireJwt, async (req, res) => {
+  app.get("/api/radios/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -290,7 +290,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/radios", requireJwt, async (req, res) => {
+  app.post("/api/radios", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -308,7 +308,7 @@ export async function registerRoutes(
   });
 
   // ========== VISITES ==========
-  app.get("/api/implants/:id/visites", requireJwt, async (req, res) => {
+  app.get("/api/implants/:id/visites", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -321,7 +321,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/visites", requireJwt, async (req, res) => {
+  app.post("/api/visites", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -339,7 +339,7 @@ export async function registerRoutes(
   });
 
   // ========== PROTHESES ==========
-  app.post("/api/protheses", requireJwt, async (req, res) => {
+  app.post("/api/protheses", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -356,7 +356,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants/:id/protheses", requireJwt, async (req, res) => {
+  app.get("/api/implants/:id/protheses", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -370,7 +370,7 @@ export async function registerRoutes(
   });
 
   // ========== STATS ==========
-  app.get("/api/stats", requireJwt, async (req, res) => {
+  app.get("/api/stats", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -383,7 +383,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/stats/advanced", requireJwt, async (req, res) => {
+  app.get("/api/stats/advanced", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
@@ -397,7 +397,7 @@ export async function registerRoutes(
   });
 
   // ========== OBJECT STORAGE ==========
-  app.post("/api/objects/upload", requireJwt, async (_req, res) => {
+  app.post("/api/objects/upload", requireJwtOrSession, async (_req, res) => {
     try {
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
       res.json({ uploadURL });
@@ -407,7 +407,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/radios/upload-complete", requireJwt, async (req, res) => {
+  app.put("/api/radios/upload-complete", requireJwtOrSession, async (req, res) => {
     try {
       const { uploadURL } = req.body;
       if (!uploadURL) {

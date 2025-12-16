@@ -63,7 +63,13 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
 }
 
 export function requireJwtOrSession(req: Request, res: Response, next: NextFunction) {
-  if (typeof req.isAuthenticated === "function" && req.isAuthenticated()) {
+  if (typeof req.isAuthenticated === "function" && req.isAuthenticated() && req.user) {
+    req.jwtUser = {
+      userId: req.user.id,
+      username: req.user.username,
+      role: req.user.role,
+      organisationId: req.user.organisationId,
+    };
     return next();
   }
 

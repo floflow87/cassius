@@ -332,7 +332,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                       />
                     </td>
                     <td className="px-4 py-4">
-                      <Link href={`/patient/${patient.id}`}>
+                      <Link href={`/patients/${patient.id}`}>
                         <div className="cursor-pointer">
                           <div className="font-medium text-foreground">
                             {patient.prenom} {patient.nom}
@@ -344,14 +344,14 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                       </Link>
                     </td>
                     <td className="px-4 py-4">
-                      <Link href={`/patient/${patient.id}`}>
+                      <Link href={`/patients/${patient.id}`}>
                         <span className="text-sm text-muted-foreground cursor-pointer">
                           {formatDateWithAge(patient.dateNaissance)}
                         </span>
                       </Link>
                     </td>
                     <td className="px-4 py-4">
-                      <Link href={`/patient/${patient.id}`}>
+                      <Link href={`/patients/${patient.id}`}>
                         <div className="cursor-pointer">
                           <div className="text-sm text-foreground">{formatPhoneNumber(patient.telephone)}</div>
                           <div className="text-sm text-muted-foreground">{patient.email || '-'}</div>
@@ -359,19 +359,19 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                       </Link>
                     </td>
                     <td className="px-4 py-4">
-                      <Link href={`/patient/${patient.id}`}>
+                      <Link href={`/patients/${patient.id}`}>
                         <span className="text-sm text-muted-foreground cursor-pointer">
                           <span className="font-medium text-foreground">-</span> implants
                         </span>
                       </Link>
                     </td>
                     <td className="px-4 py-4">
-                      <Link href={`/patient/${patient.id}`}>
+                      <Link href={`/patients/${patient.id}`}>
                         <span className="text-sm text-muted-foreground cursor-pointer">-</span>
                       </Link>
                     </td>
                     <td className="px-4 py-4">
-                      <Link href={`/patient/${patient.id}`}>
+                      <Link href={`/patients/${patient.id}`}>
                         <Badge 
                           variant="outline"
                           className={`${getStatusBadgeClasses(status)} cursor-pointer`}

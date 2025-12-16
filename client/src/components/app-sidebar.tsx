@@ -1,4 +1,5 @@
-import { Link, useLocation } from "wouter";
+import { forwardRef } from "react";
+import { useLocation } from "wouter";
 import {
   Sidebar,
   SidebarContent,
@@ -29,7 +30,7 @@ const menuItems = [
   },
   {
     title: "Patients",
-    url: "/",
+    url: "/patients",
     icon: patientIcon,
   },
   {
@@ -49,15 +50,38 @@ const menuItems = [
   },
 ];
 
+interface NavLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
+  href: string;
+  children: React.ReactNode;
+}
+
+const NavLink = forwardRef<HTMLAnchorElement, NavLinkProps>(
+  ({ href, children, ...props }, ref) => {
+    const [, setLocation] = useLocation();
+    
+    const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      setLocation(href);
+    };
+    
+    return (
+      <a ref={ref} href={href} onClick={handleClick} {...props}>
+        {children}
+      </a>
+    );
+  }
+);
+NavLink.displayName = "NavLink";
+
 export function AppSidebar() {
   const [location] = useLocation();
 
   const isActive = (url: string) => {
-    if (url === "/") {
-      return location === "/" || (location.startsWith("/patient") && !location.includes("/implant/"));
+    if (url === "/patients") {
+      return location === "/patients" || location.startsWith("/patients/");
     }
     if (url === "/implants") {
-      return location === "/implants" || location.includes("/implant/");
+      return location === "/implants" || location.startsWith("/implants/");
     }
     return location === url || location.startsWith(url + "/");
   };
@@ -86,13 +110,13 @@ export function AppSidebar() {
                           : "bg-transparent hover:bg-white/10"
                       }`}
                     >
-                      <Link href={item.url} data-testid={`link-nav-${item.title.toLowerCase()}`}>
+                      <NavLink href={item.url} data-testid={`link-nav-${item.title.toLowerCase()}`}>
                         <img 
                           src={item.icon} 
                           alt={item.title} 
                           className={`h-5 w-5 ${active ? "opacity-100" : "opacity-70"}`}
                         />
-                      </Link>
+                      </NavLink>
                     </SidebarMenuButton>
                   </TooltipTrigger>
                   <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
@@ -114,9 +138,9 @@ export function AppSidebar() {
                   asChild
                   className="h-11 w-11 mx-auto justify-center rounded-lg bg-transparent hover:bg-white/10"
                 >
-                  <Link href="/settings" data-testid="link-settings">
+                  <NavLink href="/settings" data-testid="link-settings">
                     <img src={settingsIcon} alt="Paramètres" className="h-5 w-5 opacity-70" />
-                  </Link>
+                  </NavLink>
                 </SidebarMenuButton>
               </TooltipTrigger>
               <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">

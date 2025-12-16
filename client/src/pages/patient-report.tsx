@@ -12,7 +12,7 @@ interface PatientWithDetails extends Patient {
 }
 
 export default function PatientReportPage() {
-  const [, params] = useRoute("/patient/:id/report");
+  const [, params] = useRoute("/patients/:id/report");
   const patientId = params?.id;
 
   const { data: patient, isLoading } = useQuery<PatientWithDetails>({
@@ -78,7 +78,7 @@ export default function PatientReportPage() {
     return (
       <div className="p-6">
         <p>Patient non trouvé</p>
-        <Link href="/">
+        <Link href="/patients">
           <Button variant="outline">Retour</Button>
         </Link>
       </div>
@@ -88,7 +88,7 @@ export default function PatientReportPage() {
   return (
     <>
       <div className="p-4 print:hidden flex items-center justify-between border-b bg-background sticky top-0 z-10">
-        <Link href={`/patient/${patientId}`}>
+        <Link href={`/patients/${patientId}`}>
           <Button variant="ghost" size="sm" data-testid="button-back-from-report">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Retour

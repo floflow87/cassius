@@ -206,7 +206,7 @@ export default function ImplantsPage() {
           {filteredImplants?.map((implant) => {
             const status = statusConfig[implant.statut] || statusConfig.EN_SUIVI;
             return (
-              <Link key={implant.id} href={`/patient/${implant.patientId}/implant/${implant.id}`}>
+              <Link key={implant.id} href={`/patients/${implant.patientId}/implants/${implant.id}`}>
                 <Card className="hover-elevate cursor-pointer" data-testid={`card-implant-${implant.id}`}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">

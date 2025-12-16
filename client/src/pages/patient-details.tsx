@@ -39,7 +39,7 @@ interface PatientWithDetails extends Patient {
 }
 
 export default function PatientDetailsPage() {
-  const [, params] = useRoute("/patient/:id");
+  const [, params] = useRoute("/patients/:id");
   const patientId = params?.id;
   const [operationDialogOpen, setOperationDialogOpen] = useState(false);
   const [radioDialogOpen, setRadioDialogOpen] = useState(false);
@@ -98,7 +98,7 @@ export default function PatientDetailsPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <User className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">Patient non trouvé</h3>
-            <Link href="/">
+            <Link href="/patients">
               <Button variant="outline">Retour à la liste</Button>
             </Link>
           </CardContent>
@@ -110,7 +110,7 @@ export default function PatientDetailsPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/">
+        <Link href="/patients">
           <Button variant="ghost" size="icon" data-testid="button-back-to-patients">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -123,7 +123,7 @@ export default function PatientDetailsPage() {
             Patient depuis {formatDate(patient.createdAt)}
           </p>
         </div>
-        <Link href={`/patient/${patientId}/report`}>
+        <Link href={`/patients/${patientId}/report`}>
           <Button variant="outline" data-testid="button-print-report">
             <Printer className="h-4 w-4 mr-2" />
             Rapport

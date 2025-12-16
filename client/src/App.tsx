@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -49,16 +49,16 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
   const [location] = useLocation();
   
   const getPageInfo = () => {
-    if (location === "/" || location.startsWith("/patient")) {
+    if (location === "/patients" || location.startsWith("/patients/")) {
       return { 
         title: "Patients", 
         subtitle: patientCount !== undefined ? `${patientCount} patients actifs` : null 
       };
     }
-    if (location === "/implants" || location.includes("/implant/")) {
+    if (location === "/implants" || location.startsWith("/implants/")) {
       return { title: "Implants", subtitle: null };
     }
-    if (location === "/dashboard" || location === "/stats") {
+    if (location === "/dashboard" || location === "/" || location === "/stats") {
       return { title: "Tableau de bord", subtitle: null };
     }
     if (location === "/actes") {
@@ -138,15 +138,30 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
   return (
     <Switch>
       <Route path="/">
+        <Redirect to="/patients" />
+      </Route>
+      <Route path="/register">
+        <Redirect to="/patients" />
+      </Route>
+      <Route path="/login">
+        <Redirect to="/patients" />
+      </Route>
+      <Route path="/patient/:id">
+        {(params) => <Redirect to={`/patients/${params.id}`} />}
+      </Route>
+      <Route path="/patient/:patientId/implant/:implantId">
+        {(params) => <Redirect to={`/patients/${params.patientId}/implants/${params.implantId}`} />}
+      </Route>
+      <Route path="/patients">
         {() => <PatientsPage searchQuery={searchQuery} setSearchQuery={setSearchQuery} />}
       </Route>
+      <Route path="/patients/:id" component={PatientDetailsPage} />
+      <Route path="/patients/:id/report" component={PatientReportPage} />
+      <Route path="/patients/:patientId/implants/:implantId" component={ImplantDetailsPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/stats" component={DashboardPage} />
       <Route path="/implants" component={ImplantsPage} />
       <Route path="/actes" component={DashboardPage} />
-      <Route path="/patient/:id" component={PatientDetailsPage} />
-      <Route path="/patient/:id/report" component={PatientReportPage} />
-      <Route path="/patient/:patientId/implant/:implantId" component={ImplantDetailsPage} />
       <Route component={NotFound} />
     </Switch>
   );
