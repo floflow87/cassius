@@ -118,7 +118,7 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onLogout} data-testid="button-logout">
+            <DropdownMenuItem onSelect={onLogout} data-testid="button-logout">
               <LogOut className="h-4 w-4 mr-2" />
               Déconnexion
             </DropdownMenuItem>
@@ -178,8 +178,9 @@ function AuthenticatedApp() {
   const handleLogout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
+      // Clear user data immediately to trigger unauthenticated state
+      queryClient.setQueryData(["/api/auth/user"], null);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      refetch();
     } catch (error) {
       console.error("Logout error:", error);
     }
