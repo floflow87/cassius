@@ -50,7 +50,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0 overflow-visible">
       <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center p-3 pt-4 pb-4">
-        <img src={logoIcon} alt="Cassius" className="h-9 w-9" />
+        <img src={logoIcon} alt="Cassius" className="h-7 w-7" />
       </SidebarHeader>
 
       <SidebarContent className="bg-primary px-0 py-2">
