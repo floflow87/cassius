@@ -333,9 +333,14 @@ export default function PatientDetailsPage() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold" data-testid="text-patient-name">
-            {patient.prenom} {patient.nom}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold" data-testid="text-patient-name">
+              {patient.prenom} {patient.nom}
+            </h1>
+            <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" data-testid="badge-patient-status">
+              Actif
+            </Badge>
+          </div>
           <p className="text-sm text-muted-foreground">
             {calculateAge(patient.dateNaissance)} ans - Depuis {new Date(patient.createdAt).getFullYear()}
           </p>
