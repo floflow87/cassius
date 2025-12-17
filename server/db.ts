@@ -13,16 +13,14 @@ const DB_SSL = process.env.DB_SSL !== "false";
 const DB_POOL_MAX = parseInt(process.env.DB_POOL_MAX || "5", 10);
 const DB_CONN_TIMEOUT_MS = parseInt(process.env.DB_CONN_TIMEOUT_MS || "60000", 10);
 
-// Use SUPABASE_DATABASE_URL - value differs per environment (Replit DEV vs Render PROD)
-// This is separate from Replit's built-in DATABASE_URL which points to internal PostgreSQL
-// Fallback to legacy variables during migration period
-const databaseUrl = process.env.SUPABASE_DATABASE_URL 
-  || process.env.SUPABASE_DB_URL_DEV 
-  || process.env.SUPABASE_DB_URL_PROD;
+// SUPABASE_DATABASE_URL - STRICT: no fallback, no hardcoded values
+// DEV (Replit) -> Supabase DEV connection string
+// PROD (Render) -> Supabase PROD connection string
+const databaseUrl = process.env.SUPABASE_DATABASE_URL;
 
 if (!databaseUrl) {
-  console.error("[DB] ERROR: SUPABASE_DATABASE_URL environment variable is required");
-  console.error("[DB] Set SUPABASE_DATABASE_URL to your Supabase connection string (pooler, port 6543)");
+  console.error("[DB] FATAL: SUPABASE_DATABASE_URL is required");
+  console.error("[DB] Configure this in Secrets with your Supabase connection string (pooler, port 6543)");
   process.exit(1);
 }
 
@@ -37,8 +35,8 @@ try {
   dbHost = "invalid-url";
 }
 
-console.log(`[DB] Environment: ${APP_ENV}`);
-console.log(`[DB] Connected to: ${dbHost}`);
+const envLabel = APP_ENV === "production" ? "PROD" : "DEV";
+console.log(`[ENV=${envLabel}] Database host: ${dbHost}`);
 
 export const pool = new Pool({
   connectionString: urlWithoutSslMode,
