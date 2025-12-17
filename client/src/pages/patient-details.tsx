@@ -66,7 +66,7 @@ import { RadioCard } from "@/components/radio-card";
 import { RadioUploadForm } from "@/components/radio-upload-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Patient, Operation, Implant, Radio, Visite, Note } from "@shared/schema";
+import type { Patient, Operation, Implant, Radio, Visite, Note, RendezVous } from "@shared/schema";
 
 interface PatientWithDetails extends Patient {
   operations: (Operation & { implants: Implant[] })[];
@@ -123,6 +123,102 @@ export default function PatientDetailsPage() {
     queryKey: ["/api/patients", patientId, "notes"],
     enabled: !!patientId,
   });
+
+  // Rendez-vous state
+  type RdvTag = "CONSULTATION" | "SUIVI" | "CHIRURGIE";
+  const [rdvDialogOpen, setRdvDialogOpen] = useState(false);
+  const [rdvForm, setRdvForm] = useState({
+    titre: "",
+    description: "",
+    date: "",
+    heureDebut: "09:00",
+    heureFin: "09:30",
+    tag: "CONSULTATION" as RdvTag,
+  });
+  const [editingRdv, setEditingRdv] = useState<RendezVous | null>(null);
+  const [deleteRdvId, setDeleteRdvId] = useState<string | null>(null);
+
+  const { data: patientRdvs = [], isLoading: rdvsLoading } = useQuery<RendezVous[]>({
+    queryKey: ["/api/patients", patientId, "rendez-vous"],
+    enabled: !!patientId,
+  });
+
+  const createRdvMutation = useMutation({
+    mutationFn: async (data: typeof rdvForm) => {
+      return apiRequest("POST", `/api/patients/${patientId}/rendez-vous`, {
+        patientId,
+        titre: data.titre,
+        description: data.description || null,
+        date: data.date,
+        heureDebut: data.heureDebut,
+        heureFin: data.heureFin,
+        tag: data.tag,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "rendez-vous"] });
+      setRdvDialogOpen(false);
+      setRdvForm({ titre: "", description: "", date: "", heureDebut: "09:00", heureFin: "09:30", tag: "CONSULTATION" });
+      toast({ title: "Rendez-vous créé", description: "Le rendez-vous a été ajouté." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de créer le rendez-vous.", variant: "destructive" });
+    },
+  });
+
+  const updateRdvMutation = useMutation({
+    mutationFn: async (data: { id: string } & typeof rdvForm) => {
+      return apiRequest("PATCH", `/api/rendez-vous/${data.id}`, {
+        titre: data.titre,
+        description: data.description || null,
+        date: data.date,
+        heureDebut: data.heureDebut,
+        heureFin: data.heureFin,
+        tag: data.tag,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "rendez-vous"] });
+      setEditingRdv(null);
+      toast({ title: "Rendez-vous modifié", description: "Le rendez-vous a été mis à jour." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le rendez-vous.", variant: "destructive" });
+    },
+  });
+
+  const deleteRdvMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/rendez-vous/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "rendez-vous"] });
+      setDeleteRdvId(null);
+      toast({ title: "Rendez-vous supprimé", description: "Le rendez-vous a été supprimé." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de supprimer le rendez-vous.", variant: "destructive" });
+    },
+  });
+
+  const getRdvTagConfig = (tag: RdvTag) => {
+    const configs: Record<RdvTag, { label: string; className: string; borderColor: string }> = {
+      CONSULTATION: { label: "Consultation", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400", borderColor: "border-l-orange-500" },
+      SUIVI: { label: "Suivi", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", borderColor: "border-l-green-500" },
+      CHIRURGIE: { label: "Chirurgie", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", borderColor: "border-l-red-500" },
+    };
+    return configs[tag];
+  };
+
+  const formatRdvDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const upcomingRdvs = patientRdvs.filter((r) => new Date(r.date) >= today).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const pastRdvs = patientRdvs.filter((r) => new Date(r.date) < today).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const createNoteMutation = useMutation({
     mutationFn: async (data: { contenu: string; tag: NoteTag | null }) => {
@@ -1220,16 +1316,350 @@ export default function PatientDetailsPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="visits" className="mt-4 space-y-4">
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Stethoscope className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Suivi & Visites</h3>
-              <p className="text-sm text-muted-foreground">
-                Les visites de suivi apparaîtront ici
-              </p>
-            </CardContent>
-          </Card>
+        <TabsContent value="visits" className="mt-4 space-y-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="text-lg font-semibold">Suivi & Visites</h2>
+            <Sheet open={rdvDialogOpen} onOpenChange={setRdvDialogOpen}>
+              <SheetTrigger asChild>
+                <Button data-testid="button-new-rdv">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nouveau rendez-vous
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-white dark:bg-zinc-900">
+                <SheetHeader>
+                  <SheetTitle>Nouveau rendez-vous</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rdv-titre">Titre</Label>
+                    <Input
+                      id="rdv-titre"
+                      value={rdvForm.titre}
+                      onChange={(e) => setRdvForm({ ...rdvForm, titre: e.target.value })}
+                      placeholder="Ex: Consultation pré-opératoire"
+                      data-testid="input-rdv-titre"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rdv-date">Date</Label>
+                    <Input
+                      id="rdv-date"
+                      type="date"
+                      value={rdvForm.date}
+                      onChange={(e) => setRdvForm({ ...rdvForm, date: e.target.value })}
+                      data-testid="input-rdv-date"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="rdv-heure-debut">Heure début</Label>
+                      <Input
+                        id="rdv-heure-debut"
+                        type="time"
+                        value={rdvForm.heureDebut}
+                        onChange={(e) => setRdvForm({ ...rdvForm, heureDebut: e.target.value })}
+                        data-testid="input-rdv-heure-debut"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="rdv-heure-fin">Heure fin</Label>
+                      <Input
+                        id="rdv-heure-fin"
+                        type="time"
+                        value={rdvForm.heureFin}
+                        onChange={(e) => setRdvForm({ ...rdvForm, heureFin: e.target.value })}
+                        data-testid="input-rdv-heure-fin"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {(["CONSULTATION", "SUIVI", "CHIRURGIE"] as const).map((tag) => {
+                        const config = getRdvTagConfig(tag);
+                        return (
+                          <Button
+                            key={tag}
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            onClick={() => setRdvForm({ ...rdvForm, tag })}
+                            className={rdvForm.tag === tag ? `${config.className} ring-2 ring-primary` : ""}
+                            data-testid={`button-rdv-tag-${tag.toLowerCase()}`}
+                          >
+                            {config.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rdv-description">Description (optionnelle)</Label>
+                    <Textarea
+                      id="rdv-description"
+                      value={rdvForm.description}
+                      onChange={(e) => setRdvForm({ ...rdvForm, description: e.target.value })}
+                      placeholder="Informations complémentaires..."
+                      rows={3}
+                      data-testid="input-rdv-description"
+                    />
+                  </div>
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      onClick={() => createRdvMutation.mutate(rdvForm)}
+                      disabled={!rdvForm.titre.trim() || !rdvForm.date || createRdvMutation.isPending}
+                      data-testid="button-submit-rdv"
+                    >
+                      Créer le rendez-vous
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {rdvsLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : patientRdvs.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Aucun rendez-vous</h3>
+                <p className="text-sm text-muted-foreground">
+                  Ajoutez un rendez-vous pour ce patient
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {upcomingRdvs.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-base font-medium text-muted-foreground">Rendez-vous à venir</h3>
+                  {upcomingRdvs.map((rdv) => {
+                    const tagConfig = getRdvTagConfig(rdv.tag as RdvTag);
+                    return (
+                      <div
+                        key={rdv.id}
+                        className={`bg-card rounded-md p-4 border-l-4 ${tagConfig.borderColor} border border-border`}
+                        data-testid={`card-rdv-upcoming-${rdv.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-medium text-sm">{rdv.titre}</span>
+                              <Badge variant="secondary" className={`text-xs ${tagConfig.className}`}>
+                                {tagConfig.label}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {formatRdvDate(rdv.date)} - {rdv.heureDebut} à {rdv.heureFin}
+                            </p>
+                            {rdv.description && (
+                              <p className="text-sm text-muted-foreground mt-2">{rdv.description}</p>
+                            )}
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="shrink-0" data-testid={`button-rdv-menu-${rdv.id}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-white dark:bg-zinc-900">
+                              <DropdownMenuItem onClick={() => setEditingRdv(rdv)} data-testid={`button-edit-rdv-${rdv.id}`}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Modifier
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setDeleteRdvId(rdv.id)} className="text-destructive" data-testid={`button-delete-rdv-${rdv.id}`}>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Supprimer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {pastRdvs.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-base font-medium text-muted-foreground">Historique</h3>
+                  {pastRdvs.map((rdv) => {
+                    const tagConfig = getRdvTagConfig(rdv.tag as RdvTag);
+                    return (
+                      <div
+                        key={rdv.id}
+                        className="bg-muted/50 rounded-md p-4 border border-border"
+                        data-testid={`card-rdv-past-${rdv.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-medium text-sm text-muted-foreground">{rdv.titre}</span>
+                              <Badge variant="secondary" className={`text-xs ${tagConfig.className}`}>
+                                {tagConfig.label}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {formatRdvDate(rdv.date)} - {rdv.heureDebut} à {rdv.heureFin}
+                            </p>
+                            {rdv.description && (
+                              <p className="text-sm text-muted-foreground mt-2">{rdv.description}</p>
+                            )}
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="shrink-0" data-testid={`button-rdv-menu-${rdv.id}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-white dark:bg-zinc-900">
+                              <DropdownMenuItem onClick={() => setEditingRdv(rdv)} data-testid={`button-edit-rdv-${rdv.id}`}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Modifier
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setDeleteRdvId(rdv.id)} className="text-destructive" data-testid={`button-delete-rdv-${rdv.id}`}>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Supprimer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          <Sheet open={!!editingRdv} onOpenChange={(open) => !open && setEditingRdv(null)}>
+            <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-white dark:bg-zinc-900">
+              <SheetHeader>
+                <SheetTitle>Modifier le rendez-vous</SheetTitle>
+              </SheetHeader>
+              {editingRdv && (
+                <div className="mt-6 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-rdv-titre">Titre</Label>
+                    <Input
+                      id="edit-rdv-titre"
+                      value={editingRdv.titre}
+                      onChange={(e) => setEditingRdv({ ...editingRdv, titre: e.target.value })}
+                      data-testid="input-edit-rdv-titre"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-rdv-date">Date</Label>
+                    <Input
+                      id="edit-rdv-date"
+                      type="date"
+                      value={editingRdv.date}
+                      onChange={(e) => setEditingRdv({ ...editingRdv, date: e.target.value })}
+                      data-testid="input-edit-rdv-date"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-rdv-heure-debut">Heure début</Label>
+                      <Input
+                        id="edit-rdv-heure-debut"
+                        type="time"
+                        value={editingRdv.heureDebut}
+                        onChange={(e) => setEditingRdv({ ...editingRdv, heureDebut: e.target.value })}
+                        data-testid="input-edit-rdv-heure-debut"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-rdv-heure-fin">Heure fin</Label>
+                      <Input
+                        id="edit-rdv-heure-fin"
+                        type="time"
+                        value={editingRdv.heureFin}
+                        onChange={(e) => setEditingRdv({ ...editingRdv, heureFin: e.target.value })}
+                        data-testid="input-edit-rdv-heure-fin"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {(["CONSULTATION", "SUIVI", "CHIRURGIE"] as const).map((tag) => {
+                        const config = getRdvTagConfig(tag);
+                        return (
+                          <Button
+                            key={tag}
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            onClick={() => setEditingRdv({ ...editingRdv, tag })}
+                            className={editingRdv.tag === tag ? `${config.className} ring-2 ring-primary` : ""}
+                            data-testid={`button-edit-rdv-tag-${tag.toLowerCase()}`}
+                          >
+                            {config.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-rdv-description">Description (optionnelle)</Label>
+                    <Textarea
+                      id="edit-rdv-description"
+                      value={editingRdv.description || ""}
+                      onChange={(e) => setEditingRdv({ ...editingRdv, description: e.target.value })}
+                      rows={3}
+                      data-testid="input-edit-rdv-description"
+                    />
+                  </div>
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      onClick={() => updateRdvMutation.mutate({
+                        id: editingRdv.id,
+                        titre: editingRdv.titre,
+                        description: editingRdv.description || "",
+                        date: editingRdv.date,
+                        heureDebut: editingRdv.heureDebut,
+                        heureFin: editingRdv.heureFin,
+                        tag: editingRdv.tag as RdvTag,
+                      })}
+                      disabled={!editingRdv.titre.trim() || !editingRdv.date || updateRdvMutation.isPending}
+                      data-testid="button-update-rdv"
+                    >
+                      Enregistrer
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </SheetContent>
+          </Sheet>
+
+          <AlertDialog open={!!deleteRdvId} onOpenChange={(open) => !open && setDeleteRdvId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Supprimer le rendez-vous ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Cette action est irréversible. Le rendez-vous sera définitivement supprimé.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete-rdv">Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteRdvId && deleteRdvMutation.mutate(deleteRdvId)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  data-testid="button-confirm-delete-rdv"
+                >
+                  Supprimer
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
 
         <TabsContent value="notes" className="mt-4 space-y-6">
