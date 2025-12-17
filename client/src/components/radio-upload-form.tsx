@@ -55,6 +55,7 @@ export function RadioUploadForm({
 }: RadioUploadFormProps) {
   const { toast } = useToast();
   const [uploadedUrl, setUploadedUrl] = useState<string>("");
+  const [uploadError, setUploadError] = useState<string>("");
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -107,9 +108,9 @@ export function RadioUploadForm({
   const handleUploadComplete = async (
     result: UploadResult<Record<string, unknown>, Record<string, unknown>>
   ) => {
+    setUploadError("");
     if (result.successful && result.successful.length > 0) {
       const uploadUrl = result.successful[0].uploadURL;
-      const file = result.successful[0].data;
       if (uploadUrl) {
         try {
           const res = await apiRequest("PUT", "/api/radios/upload-complete", {
@@ -131,17 +132,27 @@ export function RadioUploadForm({
             form.setValue("sizeBytes", result.successful[0].size);
           }
           toast({
-            title: "Image téléchargée",
-            description: "L'image a été téléchargée avec succès.",
+            title: "Image televersee",
+            description: "L'image a ete televersee avec succes.",
           });
         } catch (error) {
+          setUploadError("Impossible de finaliser le telechargement. Veuillez reessayer.");
+          form.setValue("url", "");
+          setUploadedUrl("");
           toast({
             title: "Erreur",
-            description: "Impossible de finaliser le téléchargement.",
+            description: "Impossible de finaliser le telechargement.",
             variant: "destructive",
           });
         }
       }
+    } else if (result.failed && result.failed.length > 0) {
+      setUploadError("Le telechargement a echoue. Veuillez reessayer.");
+      toast({
+        title: "Erreur",
+        description: "Le telechargement a echoue.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -302,8 +313,11 @@ export function RadioUploadForm({
                       variant="outline"
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      Télécharger une image
+                      Televerser une image
                     </ObjectUploader>
+                  )}
+                  {uploadError && (
+                    <p className="text-sm text-destructive">{uploadError}</p>
                   )}
                   <Input type="hidden" {...field} />
                 </div>

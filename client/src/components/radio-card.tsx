@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Calendar, FileImage, MoreVertical, Pencil, Download, Trash2, ZoomIn, ZoomOut, X } from "lucide-react";
+import { Calendar, FileImage, MoreVertical, Pencil, Download, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -49,7 +50,9 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [newTitle, setNewTitle] = useState(radio.title || "");
+  const [renameError, setRenameError] = useState("");
   const [zoom, setZoom] = useState(1);
+  const [imageError, setImageError] = useState(false);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("fr-FR", {
@@ -75,9 +78,10 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
       toast({ title: "Document renomme", description: "Le nom a ete mis a jour." });
       setRenameOpen(false);
+      setRenameError("");
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible de renommer le document.", variant: "destructive" });
+      setRenameError("Impossible de renommer le document. Veuillez reessayer.");
     },
   });
 
@@ -108,6 +112,23 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.25, 3));
   const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.25, 0.5));
 
+  const handleRenameSubmit = () => {
+    const trimmedTitle = newTitle.trim();
+    if (!trimmedTitle) {
+      setRenameError("Le titre ne peut pas etre vide.");
+      return;
+    }
+    setRenameError("");
+    renameMutation.mutate(trimmedTitle);
+  };
+
+  const handleRenameOpenChange = (open: boolean) => {
+    if (!open) {
+      setRenameError("");
+    }
+    setRenameOpen(open);
+  };
+
   return (
     <>
       <Card
@@ -118,18 +139,12 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
           className="aspect-square bg-muted cursor-pointer"
           onClick={() => setViewerOpen(true)}
         >
-          {radio.url ? (
+          {radio.url && !imageError ? (
             <img
               src={getImageUrl()}
               alt={radio.title || `Radio ${typeLabels[radio.type]}`}
               className="w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-                const parent = e.currentTarget.parentElement;
-                if (parent) {
-                  parent.innerHTML = `<div class="w-full h-full flex items-center justify-center"><svg class="h-12 w-12 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
-                }
-              }}
+              onError={() => setImageError(true)}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
@@ -166,6 +181,7 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
                 <DropdownMenuItem 
                   onClick={() => {
                     setNewTitle(radio.title || "");
+                    setRenameError("");
                     setRenameOpen(true);
                   }}
                   data-testid={`button-rename-radio-${radio.id}`}
@@ -194,7 +210,6 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
         </CardContent>
       </Card>
 
-      {/* Viewer plein ecran */}
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
           <DialogHeader className="p-4 border-b">
@@ -223,7 +238,7 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
             </div>
           </DialogHeader>
           <div className="flex-1 overflow-auto bg-black/90 flex items-center justify-center min-h-[60vh]">
-            {radio.url ? (
+            {radio.url && !imageError ? (
               <img
                 src={getImageUrl()}
                 alt={radio.title || `Radio ${typeLabels[radio.type]}`}
@@ -239,8 +254,7 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog renommer */}
-      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+      <Dialog open={renameOpen} onOpenChange={handleRenameOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Renommer le document</DialogTitle>
@@ -249,29 +263,38 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <Input
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="Nom du document"
-              data-testid="input-rename-radio"
-            />
+            <div className="space-y-2">
+              <Label htmlFor="rename-input">Nom du document</Label>
+              <Input
+                id="rename-input"
+                value={newTitle}
+                onChange={(e) => {
+                  setNewTitle(e.target.value);
+                  if (renameError) setRenameError("");
+                }}
+                placeholder="Nom du document"
+                data-testid="input-rename-radio"
+              />
+              {renameError && (
+                <p className="text-sm text-destructive">{renameError}</p>
+              )}
+            </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setRenameOpen(false)}>
+              <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={renameMutation.isPending}>
                 Annuler
               </Button>
               <Button 
-                onClick={() => renameMutation.mutate(newTitle)}
+                onClick={handleRenameSubmit}
                 disabled={!newTitle.trim() || renameMutation.isPending}
                 data-testid="button-confirm-rename"
               >
-                Enregistrer
+                {renameMutation.isPending ? "Enregistrement..." : "Enregistrer"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog confirmation suppression */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -281,13 +304,19 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete-radio">Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending} data-testid="button-cancel-delete-radio">
+              Annuler
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteMutation.mutate()}
+              onClick={(e) => {
+                e.preventDefault();
+                deleteMutation.mutate();
+              }}
+              disabled={deleteMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete-radio"
             >
-              Supprimer
+              {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
