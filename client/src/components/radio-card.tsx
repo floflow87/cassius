@@ -223,7 +223,7 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
                   {formatDate(radio.date)}
                 </DialogDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mr-10">
                 <Button variant="outline" size="icon" onClick={handleZoomOut} data-testid="button-zoom-out">
                   <ZoomOut className="h-4 w-4" />
                 </Button>

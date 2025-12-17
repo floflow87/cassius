@@ -60,6 +60,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { OperationForm } from "@/components/operation-form";
 import { ImplantCard } from "@/components/implant-card";
 import { RadioCard } from "@/components/radio-card";
@@ -127,6 +134,7 @@ export default function PatientDetailsPage() {
   // Rendez-vous state
   type RdvTag = "CONSULTATION" | "SUIVI" | "CHIRURGIE";
   const [rdvDialogOpen, setRdvDialogOpen] = useState(false);
+  const [timelineRadioViewerId, setTimelineRadioViewerId] = useState<string | null>(null);
   const [rdvForm, setRdvForm] = useState({
     titre: "",
     description: "",
@@ -493,6 +501,7 @@ export default function PatientDetailsPage() {
     description?: string;
     badges?: string[];
     badgeClassName?: string;
+    radioId?: string;
   }
 
   const timelineEvents: TimelineEvent[] = [];
@@ -513,8 +522,9 @@ export default function PatientDetailsPage() {
       id: `radio-${radio.id}`,
       date: new Date(radio.date),
       type: "radio",
-      title: getRadioLabel(radio.type),
+      title: radio.title || getRadioLabel(radio.type),
       description: "Voir l'image",
+      radioId: radio.id,
     });
   });
 
@@ -1088,11 +1098,19 @@ export default function PatientDetailsPage() {
                               <div className="flex items-start justify-between gap-2">
                                 <div>
                                   <p className="font-medium text-sm">{event.title}</p>
-                                  {event.description && (
+                                  {event.description && event.radioId ? (
+                                    <button 
+                                      className="text-xs text-primary hover:underline mt-0.5 text-left"
+                                      onClick={() => setTimelineRadioViewerId(event.radioId!)}
+                                      data-testid={`button-view-radio-${event.radioId}`}
+                                    >
+                                      {event.description}
+                                    </button>
+                                  ) : event.description ? (
                                     <p className="text-xs text-muted-foreground mt-0.5">
                                       {event.description}
                                     </p>
-                                  )}
+                                  ) : null}
                                   {event.badges && event.badges.length > 0 && (
                                     <div className="flex gap-2 mt-2 flex-wrap">
                                       {event.badges.map((badge, i) => (
@@ -1313,7 +1331,7 @@ export default function PatientDetailsPage() {
           <div className="flex justify-end">
             <Sheet open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" data-testid="button-new-radio">
+                <Button data-testid="button-new-radio">
                   <Plus className="h-4 w-4 mr-2" />
                   Ajouter une radio
                 </Button>
@@ -1345,7 +1363,7 @@ export default function PatientDetailsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {patient.radios?.map((radio) => (
                 <RadioCard key={radio.id} radio={radio} patientId={patient.id} />
               ))}
@@ -1889,6 +1907,46 @@ export default function PatientDetailsPage() {
           </AlertDialog>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog aperçu radio depuis timeline */}
+      <Dialog open={!!timelineRadioViewerId} onOpenChange={(open) => !open && setTimelineRadioViewerId(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
+          {(() => {
+            const radio = patient.radios?.find(r => r.id === timelineRadioViewerId);
+            if (!radio) return null;
+            return (
+              <>
+                <DialogHeader className="p-4 border-b">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <DialogTitle className="flex items-center gap-2">
+                        <span>{radio.title || getRadioLabel(radio.type)}</span>
+                        <Badge variant="secondary">{getRadioLabel(radio.type)}</Badge>
+                      </DialogTitle>
+                      <DialogDescription className="text-sm text-muted-foreground">
+                        {formatDateShort(new Date(radio.date))}
+                      </DialogDescription>
+                    </div>
+                  </div>
+                </DialogHeader>
+                <div className="flex-1 overflow-auto bg-black/90 flex items-center justify-center min-h-[60vh]">
+                  {radio.url ? (
+                    <img
+                      src={radio.url}
+                      alt={radio.title || getRadioLabel(radio.type)}
+                      className="max-w-full max-h-[80vh] object-contain"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      <FileImage className="h-24 w-24 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
