@@ -9,6 +9,7 @@ import {
   organisations,
   notes,
   rendezVous,
+  documents,
   type Patient,
   type InsertPatient,
   type Operation,
@@ -28,6 +29,8 @@ import {
   type InsertNote,
   type RendezVous,
   type InsertRendezVous,
+  type Document,
+  type InsertDocument,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -107,6 +110,13 @@ export interface IStorage {
   createRendezVous(organisationId: string, rdv: InsertRendezVous): Promise<RendezVous>;
   updateRendezVous(organisationId: string, id: string, rdv: Partial<InsertRendezVous>): Promise<RendezVous | undefined>;
   deleteRendezVous(organisationId: string, id: string): Promise<boolean>;
+
+  // Document methods
+  getDocument(organisationId: string, id: string): Promise<Document | undefined>;
+  getPatientDocuments(organisationId: string, patientId: string): Promise<Document[]>;
+  createDocument(organisationId: string, doc: InsertDocument & { createdBy?: string | null }): Promise<Document>;
+  updateDocument(organisationId: string, id: string, updates: { title?: string; tags?: string[] }): Promise<Document | undefined>;
+  deleteDocument(organisationId: string, id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -706,6 +716,54 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(rendezVous.id, id),
         eq(rendezVous.organisationId, organisationId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ========== DOCUMENTS ==========
+  async getDocument(organisationId: string, id: string): Promise<Document | undefined> {
+    const [doc] = await db.select().from(documents)
+      .where(and(
+        eq(documents.id, id),
+        eq(documents.organisationId, organisationId)
+      ));
+    return doc || undefined;
+  }
+
+  async getPatientDocuments(organisationId: string, patientId: string): Promise<Document[]> {
+    return db.select().from(documents)
+      .where(and(
+        eq(documents.patientId, patientId),
+        eq(documents.organisationId, organisationId)
+      ))
+      .orderBy(desc(documents.createdAt));
+  }
+
+  async createDocument(organisationId: string, doc: InsertDocument & { createdBy?: string | null }): Promise<Document> {
+    const [created] = await db.insert(documents).values({
+      ...doc,
+      organisationId,
+    }).returning();
+    return created;
+  }
+
+  async updateDocument(organisationId: string, id: string, updates: { title?: string; tags?: string[] }): Promise<Document | undefined> {
+    const [updated] = await db.update(documents)
+      .set(updates)
+      .where(and(
+        eq(documents.id, id),
+        eq(documents.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteDocument(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(documents)
+      .where(and(
+        eq(documents.id, id),
+        eq(documents.organisationId, organisationId)
       ))
       .returning();
     return result.length > 0;

@@ -18,6 +18,7 @@ export const organisationsRelations = relations(organisations, ({ many }) => ({
   visites: many(visites),
   radios: many(radios),
   protheses: many(protheses),
+  documents: many(documents),
 }));
 
 export const sexeEnum = pgEnum("sexe", ["HOMME", "FEMME"]);
@@ -45,6 +46,7 @@ export const typeProtheseEnum = pgEnum("type_prothese", ["VISSEE", "SCELLEE"]);
 export const typePilierEnum = pgEnum("type_pilier", ["DROIT", "ANGULE", "MULTI_UNIT"]);
 export const typeNoteTagEnum = pgEnum("type_note_tag", ["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"]);
 export const typeRendezVousTagEnum = pgEnum("type_rdv_tag", ["CONSULTATION", "SUIVI", "CHIRURGIE"]);
+export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
 
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -75,6 +77,7 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   implants: many(implants),
   radios: many(radios),
   visites: many(visites),
+  documents: many(documents),
 }));
 
 export const operations = pgTable("operations", {
@@ -306,6 +309,36 @@ export const rendezVousRelations = relations(rendezVous, ({ one }) => ({
   }),
 }));
 
+// Table documents patients (PDF, etc.)
+export const documents = pgTable("documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  filePath: text("file_path").notNull(),
+  mimeType: text("mime_type"),
+  sizeBytes: bigint("size_bytes", { mode: "number" }),
+  fileName: text("file_name"),
+  tags: text("tags").array(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const documentsRelations = relations(documents, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [documents.organisationId],
+    references: [organisations.id],
+  }),
+  patient: one(patients, {
+    fields: [documents.patientId],
+    references: [patients.id],
+  }),
+  createdByUser: one(users, {
+    fields: [documents.createdBy],
+    references: [users.id],
+  }),
+}));
+
 export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
   createdAt: true,
@@ -361,6 +394,20 @@ export const insertRendezVousSchema = createInsertSchema(rendezVous).omit({
   createdAt: true,
 });
 
+export const insertDocumentSchema = createInsertSchema(documents).omit({
+  id: true,
+  organisationId: true,
+  createdAt: true,
+});
+
+export const documentTagValues = ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"] as const;
+export type DocumentTag = typeof documentTagValues[number];
+
+export const updateDocumentSchema = z.object({
+  title: z.string().min(1).optional(),
+  tags: z.array(z.enum(documentTagValues)).optional(),
+});
+
 export const insertOrganisationSchema = createInsertSchema(organisations).omit({
   id: true,
   createdAt: true,
@@ -395,3 +442,6 @@ export type Note = typeof notes.$inferSelect;
 
 export type InsertRendezVous = z.infer<typeof insertRendezVousSchema>;
 export type RendezVous = typeof rendezVous.$inferSelect;
+
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type Document = typeof documents.$inferSelect;

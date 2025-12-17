@@ -142,11 +142,14 @@ export function RadioUploadForm({
         body: file,
         headers: {
           "Content-Type": file.type,
+          "x-upsert": "true",
         },
       });
 
       if (!uploadRes.ok) {
-        throw new Error("Échec du téléversement");
+        const errorText = await uploadRes.text().catch(() => "Unknown error");
+        console.error("Upload failed:", uploadRes.status, errorText);
+        throw new Error(`Échec du téléversement: ${uploadRes.status}`);
       }
 
       // Step 3: Update form values

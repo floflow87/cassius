@@ -10,6 +10,7 @@ import {
   User,
   Activity,
   FileImage,
+  FileText,
   ClipboardList,
   Pencil,
   AlertTriangle,
@@ -21,6 +22,7 @@ import {
   MapPin,
   MoreVertical,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,9 +73,11 @@ import { OperationForm } from "@/components/operation-form";
 import { ImplantCard } from "@/components/implant-card";
 import { RadioCard } from "@/components/radio-card";
 import { RadioUploadForm } from "@/components/radio-upload-form";
+import { DocumentCard } from "@/components/document-card";
+import { DocumentUploadForm } from "@/components/document-upload-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Patient, Operation, Implant, Radio, Visite, Note, RendezVous } from "@shared/schema";
+import type { Patient, Operation, Implant, Radio, Visite, Note, RendezVous, Document } from "@shared/schema";
 
 interface PatientWithDetails extends Patient {
   operations: (Operation & { implants: Implant[] })[];
@@ -86,6 +90,7 @@ export default function PatientDetailsPage() {
   const patientId = params?.id;
   const [operationDialogOpen, setOperationDialogOpen] = useState(false);
   const [radioDialogOpen, setRadioDialogOpen] = useState(false);
+  const [docDialogOpen, setDocDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { toast } = useToast();
@@ -94,6 +99,13 @@ export default function PatientDetailsPage() {
     queryKey: ["/api/patients", patientId],
     enabled: !!patientId,
   });
+
+  // Documents query
+  const documentsQuery = useQuery<(Document & { signedUrl?: string | null })[]>({
+    queryKey: ["/api/patients", patientId, "documents"],
+    enabled: !!patientId,
+  });
+  const documents = documentsQuery.data;
 
   const [editForm, setEditForm] = useState({
     nom: "",
@@ -623,6 +635,13 @@ export default function PatientDetailsPage() {
             data-testid="tab-radios"
           >
             Radiographies
+          </TabsTrigger>
+          <TabsTrigger 
+            value="documents" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-documents"
+          >
+            Documents
           </TabsTrigger>
           <TabsTrigger 
             value="visits" 
@@ -1368,6 +1387,52 @@ export default function PatientDetailsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {patient.radios?.map((radio) => (
                 <RadioCard key={radio.id} radio={radio} patientId={patient.id} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="documents" className="mt-4 space-y-4">
+          <div className="flex justify-end">
+            <Sheet open={docDialogOpen} onOpenChange={setDocDialogOpen}>
+              <SheetTrigger asChild>
+                <Button data-testid="button-new-document">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter un document
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Ajouter un document</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6">
+                  <DocumentUploadForm
+                    patientId={patient.id}
+                    onSuccess={() => setDocDialogOpen(false)}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {documentsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : !documents || documents.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Aucun document</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Ajoutez des documents PDF pour ce patient (devis, consentements, etc.)
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {documents.map((doc) => (
+                <DocumentCard key={doc.id} document={doc} patientId={patient.id} />
               ))}
             </div>
           )}

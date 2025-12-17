@@ -244,6 +244,26 @@ CREATE TABLE IF NOT EXISTS rendez_vous (
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
 
+-- Documents (PDF and other patient documents)
+DO $$ BEGIN
+  CREATE TYPE type_document_tag AS ENUM ('DEVIS', 'CONSENTEMENT', 'COMPTE_RENDU', 'ASSURANCE', 'AUTRE');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS documents (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  patient_id VARCHAR NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  mime_type TEXT,
+  size_bytes BIGINT,
+  file_name TEXT,
+  tags TEXT[],
+  created_by VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_patients_organisation ON patients(organisation_id);
 CREATE INDEX IF NOT EXISTS idx_patients_nom ON patients(nom);
@@ -260,3 +280,6 @@ CREATE INDEX IF NOT EXISTS idx_notes_organisation ON notes(organisation_id);
 CREATE INDEX IF NOT EXISTS idx_rendez_vous_patient ON rendez_vous(patient_id);
 CREATE INDEX IF NOT EXISTS idx_rendez_vous_organisation ON rendez_vous(organisation_id);
 CREATE INDEX IF NOT EXISTS idx_rendez_vous_date ON rendez_vous(date);
+CREATE INDEX IF NOT EXISTS idx_documents_patient ON documents(patient_id);
+CREATE INDEX IF NOT EXISTS idx_documents_organisation ON documents(organisation_id);
+CREATE INDEX IF NOT EXISTS idx_documents_tags ON documents USING GIN(tags);

@@ -12,6 +12,8 @@ import {
   insertProtheseSchema,
   insertNoteSchema,
   insertRendezVousSchema,
+  insertDocumentSchema,
+  updateDocumentSchema,
   patients,
 } from "@shared/schema";
 import type {
@@ -528,6 +530,192 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting radio:", error);
       res.status(500).json({ error: "Failed to delete radio" });
+    }
+  });
+
+  // ========== DOCUMENTS (PDF) ==========
+  
+  // Get signed upload URL for client-side document upload
+  app.post("/api/documents/upload-url", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId, fileName, mimeType } = req.body;
+      if (!patientId || !fileName) {
+        return res.status(400).json({ error: "patientId and fileName are required" });
+      }
+
+      // Generate unique document ID
+      const documentId = crypto.randomUUID();
+      
+      // Generate file path: org/{orgId}/patients/{patientId}/documents/{docId}/{filename}
+      const filePath = `org/${organisationId}/patients/${patientId}/documents/${documentId}/${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+      // Get signed upload URL from Supabase
+      const { signedUrl, token, path } = await supabaseStorage.createSignedUploadUrl(filePath);
+
+      res.json({
+        documentId,
+        signedUrl,
+        token,
+        filePath: path,
+      });
+    } catch (error) {
+      console.error("Error getting document upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  // Get all documents for a patient with signed URLs
+  app.get("/api/patients/:patientId/documents", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const docs = await storage.getPatientDocuments(organisationId, req.params.patientId);
+      
+      // Generate signed URLs for all documents
+      const docsWithUrls = await Promise.all(docs.map(async (doc) => {
+        let signedUrl: string | null = null;
+        if (doc.filePath && supabaseStorage.isStorageConfigured()) {
+          try {
+            signedUrl = await supabaseStorage.getSignedUrl(doc.filePath);
+          } catch (err) {
+            console.error("Failed to get signed URL for document:", err);
+          }
+        }
+        return { ...doc, signedUrl };
+      }));
+      
+      res.json(docsWithUrls);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
+  // Get single document with fresh signed URL
+  app.get("/api/documents/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const doc = await storage.getDocument(organisationId, req.params.id);
+      if (!doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      let signedUrl: string | null = null;
+      if (doc.filePath && supabaseStorage.isStorageConfigured()) {
+        try {
+          signedUrl = await supabaseStorage.getSignedUrl(doc.filePath);
+        } catch (err) {
+          console.error("Failed to get signed URL:", err);
+        }
+      }
+      
+      res.json({ ...doc, signedUrl });
+    } catch (error) {
+      console.error("Error fetching document:", error);
+      res.status(500).json({ error: "Failed to fetch document" });
+    }
+  });
+
+  // Get fresh signed URL for a specific document
+  app.get("/api/documents/:id/signed-url", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const doc = await storage.getDocument(organisationId, req.params.id);
+      if (!doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      if (doc.filePath && supabaseStorage.isStorageConfigured()) {
+        const signedUrl = await supabaseStorage.getSignedUrl(doc.filePath);
+        return res.json({ signedUrl });
+      }
+      
+      res.status(400).json({ error: "No file associated with this document" });
+    } catch (error) {
+      console.error("Error getting document signed URL:", error);
+      res.status(500).json({ error: "Failed to get signed URL" });
+    }
+  });
+
+  // Create document record (after successful upload)
+  app.post("/api/documents", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const data = insertDocumentSchema.parse(req.body);
+      const userId = req.jwtUser?.userId || null;
+      const doc = await storage.createDocument(organisationId, { ...data, createdBy: userId });
+      res.status(201).json(doc);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating document:", error);
+      res.status(500).json({ error: "Failed to create document" });
+    }
+  });
+
+  // Update document (title, tags)
+  app.patch("/api/documents/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const updates = updateDocumentSchema.parse(req.body);
+      const doc = await storage.updateDocument(organisationId, req.params.id, updates);
+      if (!doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      res.json(doc);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error updating document:", error);
+      res.status(500).json({ error: "Failed to update document" });
+    }
+  });
+
+  // Delete document
+  app.delete("/api/documents/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      // Get document to find file path for deletion
+      const doc = await storage.getDocument(organisationId, req.params.id);
+      if (!doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      // Delete from Supabase Storage
+      if (doc.filePath && supabaseStorage.isStorageConfigured()) {
+        try {
+          await supabaseStorage.deleteFile(doc.filePath);
+        } catch (err) {
+          console.error("Failed to delete document from storage:", err);
+        }
+      }
+
+      // Delete from database
+      const deleted = await storage.deleteDocument(organisationId, req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      res.status(500).json({ error: "Failed to delete document" });
     }
   });
 
