@@ -18,6 +18,38 @@ The MVP focuses on:
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (December 17, 2025)
+
+### Migration vers Supabase Storage
+La gestion des radiographies a été migrée de Replit Object Storage vers Supabase Storage pour une meilleure intégration avec l'écosystème Supabase.
+
+#### Changements principaux
+- **Table `radios`**: Le champ `url` est remplacé par `file_path` (chemin dans Supabase Storage)
+- **Signed URLs**: Les URLs d'images sont générées dynamiquement à la demande (valides 1 heure)
+- **Upload direct**: Le frontend upload directement vers Supabase via signed upload URLs
+- **Structure de stockage**: `org/{orgId}/patients/{patientId}/radiographies/{docId}/{filename}`
+
+#### Variables d'environnement requises
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_URL` | Yes | URL du projet Supabase (ex: https://xxx.supabase.co) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Clé service role pour l'accès Storage |
+
+#### Nouveaux endpoints API
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/radios/upload-url` | Obtenir signed URL pour upload |
+| GET | `/api/patients/:patientId/radios` | Liste radios avec signed URLs |
+
+#### Fichiers modifiés
+- `server/supabaseStorage.ts` - Service Supabase Storage
+- `server/routes.ts` - Endpoints API mis à jour
+- `shared/schema.ts` - Table radios avec filePath
+- `client/src/components/radio-upload-form.tsx` - Upload Supabase
+- `client/src/components/radio-card.tsx` - Affichage signed URLs
+
+---
+
 ## Recent Changes (December 16, 2025)
 
 ### Production Debugging & Logs

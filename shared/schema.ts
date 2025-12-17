@@ -155,10 +155,13 @@ export const radios = pgTable("radios", {
   implantId: varchar("implant_id").references(() => implants.id, { onDelete: "set null" }),
   type: typeRadioEnum("type").notNull(),
   title: text("title").notNull(),
-  url: text("url").notNull(),
+  filePath: text("file_path"), // Supabase Storage path (nullable for legacy data)
+  url: text("url"), // Legacy Replit Object Storage URL (kept for backward compatibility)
   mimeType: text("mime_type"),
   sizeBytes: bigint("size_bytes", { mode: "number" }),
+  fileName: text("file_name"),
   date: date("date").notNull(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

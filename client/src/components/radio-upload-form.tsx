@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-import { Upload } from "lucide-react";
+import { Upload, FileImage, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,11 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ObjectUploader } from "@/components/ObjectUploader";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Operation, Implant } from "@shared/schema";
-import type { UploadResult } from "@uppy/core";
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"];
 
 const formSchema = z.object({
   title: z.string().min(1, "Le titre est requis"),
@@ -33,7 +34,8 @@ const formSchema = z.object({
   date: z.string().min(1, "La date est requise"),
   operationId: z.string().optional(),
   implantId: z.string().optional(),
-  url: z.string().min(1, "Veuillez télécharger une image"),
+  filePath: z.string().min(1, "Veuillez téléverser une image"),
+  fileName: z.string().optional(),
   mimeType: z.string().optional(),
   sizeBytes: z.number().optional(),
 });
@@ -54,8 +56,10 @@ export function RadioUploadForm({
   onSuccess,
 }: RadioUploadFormProps) {
   const { toast } = useToast();
-  const [uploadedUrl, setUploadedUrl] = useState<string>("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; path: string } | null>(null);
   const [uploadError, setUploadError] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -63,7 +67,8 @@ export function RadioUploadForm({
       title: "",
       type: "PANORAMIQUE",
       date: new Date().toISOString().split("T")[0],
-      url: "",
+      filePath: "",
+      fileName: "",
       mimeType: "",
       sizeBytes: 0,
     },
@@ -87,7 +92,7 @@ export function RadioUploadForm({
         variant: "success",
       });
       form.reset();
-      setUploadedUrl("");
+      setUploadedFile(null);
       onSuccess?.();
     },
     onError: (error) => {
@@ -99,63 +104,93 @@ export function RadioUploadForm({
     },
   });
 
-  const handleGetUploadParameters = async () => {
-    const res = await apiRequest("POST", "/api/objects/upload", {});
-    const data = await res.json();
-    return {
-      method: "PUT" as const,
-      url: data.uploadURL,
-    };
-  };
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const handleUploadComplete = async (
-    result: UploadResult<Record<string, unknown>, Record<string, unknown>>
-  ) => {
+    // Validate file type
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      setUploadError("Type de fichier non supporté. Utilisez JPEG, PNG, GIF, WebP ou PDF.");
+      return;
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError("Le fichier est trop volumineux. Maximum 10 Mo.");
+      return;
+    }
+
     setUploadError("");
-    if (result.successful && result.successful.length > 0) {
-      const uploadUrl = result.successful[0].uploadURL;
-      if (uploadUrl) {
-        try {
-          const res = await apiRequest("PUT", "/api/radios/upload-complete", {
-            uploadURL: uploadUrl,
-          });
-          const data = await res.json();
-          setUploadedUrl(data.objectPath);
-          form.setValue("url", data.objectPath);
-          // Auto-fill title from filename if empty
-          const fileName = result.successful[0].name || "Radio";
-          if (!form.getValues("title")) {
-            form.setValue("title", fileName.replace(/\.[^/.]+$/, ""));
-          }
-          // Capture file metadata
-          if (result.successful[0].type) {
-            form.setValue("mimeType", result.successful[0].type);
-          }
-          if (result.successful[0].size) {
-            form.setValue("sizeBytes", result.successful[0].size);
-          }
-          toast({
-            title: "Image televersee",
-            description: "L'image a ete televersee avec succes.",
-          });
-        } catch (error) {
-          setUploadError("Impossible de finaliser le telechargement. Veuillez reessayer.");
-          form.setValue("url", "");
-          setUploadedUrl("");
-          toast({
-            title: "Erreur",
-            description: "Impossible de finaliser le telechargement.",
-            variant: "destructive",
-          });
-        }
+    setIsUploading(true);
+
+    try {
+      // Step 1: Get signed upload URL from API
+      const urlRes = await apiRequest("POST", "/api/radios/upload-url", {
+        patientId,
+        fileName: file.name,
+        mimeType: file.type,
+      });
+      const urlData = await urlRes.json();
+      
+      if (!urlData.signedUrl || !urlData.filePath) {
+        throw new Error("Impossible d'obtenir l'URL d'upload");
       }
-    } else if (result.failed && result.failed.length > 0) {
-      setUploadError("Le telechargement a echoue. Veuillez reessayer.");
+
+      // Step 2: Upload file directly to Supabase Storage
+      const uploadRes = await fetch(urlData.signedUrl, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type,
+        },
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Échec du téléversement");
+      }
+
+      // Step 3: Update form values
+      setUploadedFile({ name: file.name, path: urlData.filePath });
+      form.setValue("filePath", urlData.filePath);
+      form.setValue("fileName", file.name);
+      form.setValue("mimeType", file.type);
+      form.setValue("sizeBytes", file.size);
+
+      // Auto-fill title from filename if empty
+      if (!form.getValues("title")) {
+        form.setValue("title", file.name.replace(/\.[^/.]+$/, ""));
+      }
+
+      toast({
+        title: "Image téléversée",
+        description: "L'image a été téléversée avec succès.",
+        variant: "success",
+      });
+    } catch (error) {
+      console.error("Upload error:", error);
+      setUploadError("Impossible de téléverser le fichier. Veuillez réessayer.");
       toast({
         title: "Erreur",
-        description: "Le telechargement a echoue.",
+        description: "Impossible de téléverser le fichier.",
         variant: "destructive",
       });
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setUploadedFile(null);
+    form.setValue("filePath", "");
+    form.setValue("fileName", "");
+    form.setValue("mimeType", "");
+    form.setValue("sizeBytes", 0);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -272,7 +307,7 @@ export function RadioUploadForm({
                   <SelectContent>
                     {implants.map((imp) => (
                       <SelectItem key={imp.id} value={imp.id}>
-                        Site {imp.siteFdi} - {imp.marque}
+                        Site {imp.siteFdi} - {imp.marque} ({imp.diametre}x{imp.longueur}mm)
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -285,44 +320,67 @@ export function RadioUploadForm({
 
         <FormField
           control={form.control}
-          name="url"
-          render={({ field }) => (
+          name="filePath"
+          render={() => (
             <FormItem>
               <FormLabel>Image</FormLabel>
               <FormControl>
-                <div className="space-y-2">
-                  {uploadedUrl ? (
-                    <div className="p-3 border rounded-md bg-muted/50 flex items-center gap-2">
-                      <Upload className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm truncate flex-1">Image téléchargée</span>
+                <div className="space-y-3">
+                  {!uploadedFile ? (
+                    <div className="flex items-center gap-4">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept={ACCEPTED_TYPES.join(",")}
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        id="radio-file-input"
+                        data-testid="input-radio-file"
+                      />
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setUploadedUrl("");
-                          form.setValue("url", "");
-                        }}
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="flex-1"
                       >
-                        Changer
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Téléversement...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Sélectionner une image
+                          </>
+                        )}
                       </Button>
                     </div>
                   ) : (
-                    <ObjectUploader
-                      maxNumberOfFiles={1}
-                      maxFileSize={10485760}
-                      onGetUploadParameters={handleGetUploadParameters}
-                      onComplete={handleUploadComplete}
-                      variant="outline"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Televerser une image
-                    </ObjectUploader>
+                    <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
+                      <FileImage className="h-8 w-8 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{uploadedFile.name}</p>
+                        <p className="text-xs text-muted-foreground">Prêt à enregistrer</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleRemoveFile}
+                        data-testid="button-remove-file"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                   {uploadError && (
                     <p className="text-sm text-destructive">{uploadError}</p>
                   )}
-                  <Input type="hidden" {...field} />
+                  <p className="text-xs text-muted-foreground">
+                    Formats acceptés : JPEG, PNG, GIF, WebP, PDF. Taille max : 10 Mo.
+                  </p>
                 </div>
               </FormControl>
               <FormMessage />
@@ -330,13 +388,20 @@ export function RadioUploadForm({
           )}
         />
 
-        <div className="flex justify-end gap-3 pt-4">
-          <Button
-            type="submit"
-            disabled={mutation.isPending || !uploadedUrl}
+        <div className="flex justify-end pt-2">
+          <Button 
+            type="submit" 
+            disabled={mutation.isPending || isUploading}
             data-testid="button-submit-radio"
           >
-            {mutation.isPending ? "Enregistrement..." : "Enregistrer la radio"}
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Enregistrement...
+              </>
+            ) : (
+              "Ajouter la radiographie"
+            )}
           </Button>
         </div>
       </form>

@@ -70,7 +70,10 @@ export interface IStorage {
 
   // Radio methods
   getRadio(organisationId: string, id: string): Promise<Radio | undefined>;
-  createRadio(organisationId: string, radio: InsertRadio): Promise<Radio>;
+  getPatientRadios(organisationId: string, patientId: string): Promise<Radio[]>;
+  createRadio(organisationId: string, radio: InsertRadio & { createdBy?: string | null }): Promise<Radio>;
+  updateRadio(organisationId: string, id: string, updates: { title?: string }): Promise<Radio | undefined>;
+  deleteRadio(organisationId: string, id: string): Promise<boolean>;
 
   // Visite methods
   getVisite(organisationId: string, id: string): Promise<Visite | undefined>;
@@ -389,7 +392,16 @@ export class DatabaseStorage implements IStorage {
     return radio || undefined;
   }
 
-  async createRadio(organisationId: string, radio: InsertRadio): Promise<Radio> {
+  async getPatientRadios(organisationId: string, patientId: string): Promise<Radio[]> {
+    return db.select().from(radios)
+      .where(and(
+        eq(radios.patientId, patientId),
+        eq(radios.organisationId, organisationId)
+      ))
+      .orderBy(desc(radios.createdAt));
+  }
+
+  async createRadio(organisationId: string, radio: InsertRadio & { createdBy?: string | null }): Promise<Radio> {
     const [newRadio] = await db.insert(radios).values({
       ...radio,
       organisationId,

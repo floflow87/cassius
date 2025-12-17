@@ -31,10 +31,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Radio } from "@shared/schema";
+import type { Radio } from "@shared/types";
 
 interface RadioCardProps {
-  radio: Radio;
+  radio: Radio & { signedUrl?: string | null };
   patientId: string;
 }
 
@@ -53,6 +53,33 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
   const [renameError, setRenameError] = useState("");
   const [zoom, setZoom] = useState(1);
   const [imageError, setImageError] = useState(false);
+  const [freshSignedUrl, setFreshSignedUrl] = useState<string | null>(null);
+  const [isLoadingUrl, setIsLoadingUrl] = useState(false);
+  const [urlError, setUrlError] = useState(false);
+
+  // Fetch fresh signed URL when opening viewer (handles expiration)
+  // Returns the fresh URL directly for immediate use
+  const refreshSignedUrl = async (): Promise<string | null> => {
+    if (!radio.filePath) return null; // Legacy URLs don't need refresh
+    
+    setIsLoadingUrl(true);
+    setUrlError(false);
+    try {
+      const res = await fetch(`/api/radios/${radio.id}/signed-url`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setFreshSignedUrl(data.signedUrl);
+        return data.signedUrl;
+      }
+      setUrlError(true);
+    } catch (err) {
+      console.error("Failed to refresh signed URL:", err);
+      setUrlError(true);
+    } finally {
+      setIsLoadingUrl(false);
+    }
+    return null;
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("fr-FR", {
@@ -62,11 +89,30 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
     });
   };
 
-  const getImageUrl = () => {
-    if (radio.url.startsWith("/objects/")) {
-      return radio.url;
+  const getImageUrl = (useFresh = false) => {
+    // Use fresh signed URL if available (for viewer/download)
+    if (useFresh && freshSignedUrl) {
+      return freshSignedUrl;
     }
-    return radio.url;
+    // Use signed URL from Supabase Storage (for new uploads)
+    if (radio.signedUrl) {
+      return radio.signedUrl;
+    }
+    // Fallback to legacy Replit Object Storage URL
+    if (radio.url) {
+      return radio.url.startsWith("/objects/") ? radio.url : `/objects/${radio.url}`;
+    }
+    return "";
+  };
+
+  const handleOpenViewer = async () => {
+    // Reset error state for fresh attempt in viewer
+    setImageError(false);
+    setViewerOpen(true);
+    // Refresh signed URL for new uploads (handles expiration)
+    if (radio.filePath) {
+      await refreshSignedUrl();
+    }
   };
 
   const renameMutation = useMutation({
@@ -99,9 +145,31 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
     },
   });
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    // Get fresh URL for download
+    let url: string | null = null;
+    
+    if (radio.filePath) {
+      url = await refreshSignedUrl();
+      if (!url) {
+        toast({ 
+          title: "Erreur", 
+          description: "Impossible de telecharger le document. Veuillez reessayer.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+    } else if (radio.url) {
+      url = radio.url.startsWith("/objects/") ? radio.url : `/objects/${radio.url}`;
+    }
+    
+    if (!url) {
+      toast({ title: "Erreur", description: "Aucun fichier disponible.", variant: "destructive" });
+      return;
+    }
+    
     const link = document.createElement("a");
-    link.href = getImageUrl();
+    link.href = url;
     link.download = radio.title || `radio-${radio.id}`;
     link.target = "_blank";
     document.body.appendChild(link);
@@ -137,9 +205,9 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
       >
         <div 
           className="aspect-square bg-muted cursor-pointer"
-          onClick={() => setViewerOpen(true)}
+          onClick={handleOpenViewer}
         >
-          {radio.url && !imageError ? (
+          {(radio.signedUrl || radio.url || radio.filePath) && !imageError ? (
             <img
               src={getImageUrl()}
               alt={radio.title || `Radio ${typeLabels[radio.type]}`}
@@ -238,9 +306,21 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
             </div>
           </DialogHeader>
           <div className="flex-1 overflow-auto bg-black/90 flex items-center justify-center min-h-[60vh]">
-            {radio.url && !imageError ? (
+            {isLoadingUrl ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+              </div>
+            ) : urlError && !radio.url ? (
+              <div className="flex flex-col items-center justify-center gap-2 text-white">
+                <FileImage className="h-16 w-16 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Impossible de charger l'image</p>
+                <Button variant="outline" size="sm" onClick={() => refreshSignedUrl()}>
+                  Reessayer
+                </Button>
+              </div>
+            ) : (freshSignedUrl || radio.url || radio.signedUrl) && !imageError ? (
               <img
-                src={getImageUrl()}
+                src={getImageUrl(true)}
                 alt={radio.title || `Radio ${typeLabels[radio.type]}`}
                 className="transition-transform duration-200"
                 style={{ transform: `scale(${zoom})` }}

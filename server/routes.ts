@@ -1,8 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { requireJwtOrSession } from "./jwtMiddleware";
+import * as supabaseStorage from "./supabaseStorage";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -48,7 +48,6 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  const objectStorageService = new ObjectStorageService();
 
   app.get("/api/health/db", requireJwtOrSession, async (_req, res) => {
     const result = await testConnection();
@@ -319,7 +318,46 @@ export async function registerRoutes(
     }
   });
 
-  // ========== RADIOS ==========
+  // ========== RADIOS (Supabase Storage) ==========
+  
+  // Get signed upload URL for client-side upload
+  app.post("/api/radios/upload-url", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId, fileName, mimeType } = req.body;
+      if (!patientId || !fileName) {
+        return res.status(400).json({ error: "patientId and fileName are required" });
+      }
+
+      // Generate unique document ID
+      const documentId = crypto.randomUUID();
+      
+      // Generate file path: org/{orgId}/patients/{patientId}/radiographies/{docId}/{filename}
+      const filePath = supabaseStorage.generateFilePath(
+        organisationId,
+        patientId,
+        documentId,
+        fileName
+      );
+
+      // Get signed upload URL from Supabase
+      const { signedUrl, token, path } = await supabaseStorage.createSignedUploadUrl(filePath);
+
+      res.json({
+        documentId,
+        signedUrl,
+        token,
+        filePath: path,
+      });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  // Get single radio with fresh signed URL (use for downloads/viewing)
   app.get("/api/radios/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -329,20 +367,93 @@ export async function registerRoutes(
       if (!radio) {
         return res.status(404).json({ error: "Radio not found" });
       }
-      res.json(radio);
+      
+      // Generate fresh signed URL for viewing/download
+      let signedUrl: string | null = null;
+      if (radio.filePath && supabaseStorage.isStorageConfigured()) {
+        try {
+          signedUrl = await supabaseStorage.getSignedUrl(radio.filePath);
+        } catch (err) {
+          console.error("Failed to get signed URL:", err);
+        }
+      }
+      
+      res.json({ ...radio, signedUrl });
     } catch (error) {
       console.error("Error fetching radio:", error);
       res.status(500).json({ error: "Failed to fetch radio" });
     }
   });
 
-  app.post("/api/radios", requireJwtOrSession, async (req, res) => {
+  // Get fresh signed URL for a specific radio (for expired URL refresh)
+  app.get("/api/radios/:id/signed-url", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
     try {
+      const radio = await storage.getRadio(organisationId, req.params.id);
+      if (!radio) {
+        return res.status(404).json({ error: "Radio not found" });
+      }
+      
+      // For legacy radios with only url field
+      if (!radio.filePath && radio.url) {
+        return res.json({ signedUrl: radio.url });
+      }
+      
+      // Generate fresh signed URL for new uploads
+      if (radio.filePath && supabaseStorage.isStorageConfigured()) {
+        const signedUrl = await supabaseStorage.getSignedUrl(radio.filePath);
+        return res.json({ signedUrl });
+      }
+      
+      res.status(400).json({ error: "No file associated with this radio" });
+    } catch (error) {
+      console.error("Error getting signed URL:", error);
+      res.status(500).json({ error: "Failed to get signed URL" });
+    }
+  });
+
+  // Get all radios for a patient with signed URLs
+  app.get("/api/patients/:patientId/radios", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const radios = await storage.getPatientRadios(organisationId, req.params.patientId);
+      
+      // Generate signed URLs for all radios
+      if (supabaseStorage.isStorageConfigured() && radios.length > 0) {
+        const filePaths = radios.map(r => r.filePath).filter(Boolean) as string[];
+        const signedUrls = await supabaseStorage.getSignedUrls(filePaths);
+        
+        const radiosWithUrls = radios.map(radio => ({
+          ...radio,
+          signedUrl: radio.filePath ? signedUrls.get(radio.filePath) || null : null,
+        }));
+        
+        return res.json(radiosWithUrls);
+      }
+      
+      res.json(radios.map(r => ({ ...r, signedUrl: null })));
+    } catch (error) {
+      console.error("Error fetching patient radios:", error);
+      res.status(500).json({ error: "Failed to fetch radios" });
+    }
+  });
+
+  app.post("/api/radios", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.jwtUser?.userId;
+
+    try {
       const data = insertRadioSchema.parse(req.body);
-      const radio = await storage.createRadio(organisationId, data);
+      const radioData = {
+        ...data,
+        createdBy: userId || null,
+      };
+      const radio = await storage.createRadio(organisationId, radioData);
       res.status(201).json(radio);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -384,13 +495,22 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Radio not found" });
       }
 
+      // Delete from Supabase Storage if configured
+      if (radio.filePath && supabaseStorage.isStorageConfigured()) {
+        try {
+          await supabaseStorage.deleteFile(radio.filePath);
+        } catch (err) {
+          console.error("Failed to delete file from storage:", err);
+          // Continue to delete database record even if storage deletion fails
+        }
+      }
+
       // Delete from database
       const deleted = await storage.deleteRadio(organisationId, req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Radio not found" });
       }
 
-      // TODO: Also delete from object storage using radio.url
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting radio:", error);
@@ -487,57 +607,7 @@ export async function registerRoutes(
     }
   });
 
-  // ========== OBJECT STORAGE ==========
-  app.post("/api/objects/upload", requireJwtOrSession, async (_req, res) => {
-    try {
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      res.json({ uploadURL });
-    } catch (error) {
-      console.error("Error getting upload URL:", error);
-      res.status(500).json({ error: "Failed to get upload URL" });
-    }
-  });
-
-  app.put("/api/radios/upload-complete", requireJwtOrSession, async (req, res) => {
-    try {
-      const { uploadURL } = req.body;
-      if (!uploadURL) {
-        return res.status(400).json({ error: "uploadURL is required" });
-      }
-      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-      res.json({ objectPath });
-    } catch (error) {
-      console.error("Error completing upload:", error);
-      res.status(500).json({ error: "Failed to complete upload" });
-    }
-  });
-
-  app.get("/objects/:objectPath(*)", async (req, res) => {
-    try {
-      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
-      await objectStorageService.downloadObject(objectFile, res);
-    } catch (error) {
-      console.error("Error serving object:", error);
-      if (error instanceof ObjectNotFoundError) {
-        return res.status(404).json({ error: "Object not found" });
-      }
-      res.status(500).json({ error: "Failed to serve object" });
-    }
-  });
-
-  app.get("/public-objects/:filePath(*)", async (req, res) => {
-    try {
-      const filePath = req.params.filePath;
-      const file = await objectStorageService.searchPublicObject(filePath);
-      if (!file) {
-        return res.status(404).json({ error: "File not found" });
-      }
-      await objectStorageService.downloadObject(file, res);
-    } catch (error) {
-      console.error("Error serving public object:", error);
-      res.status(500).json({ error: "Failed to serve object" });
-    }
-  });
+  // Note: Legacy Replit Object Storage routes removed - using Supabase Storage now
 
   // ========== NOTES ==========
   app.get("/api/patients/:patientId/notes", requireJwtOrSession, async (req, res) => {

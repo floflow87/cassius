@@ -58,6 +58,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       toast({
         title: "Connexion réussie",
         description: "Bienvenue sur Cassius",
+        variant: "success",
       });
       onLoginSuccess();
     },

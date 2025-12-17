@@ -1,0 +1,117 @@
+Remplacer entièrement le stockage actuel des radiographies (Replit Object Storage / Google Cloud Storage) par Supabase Storage privé, avec contrôle d’accès (RLS + policies) et URLs signées. Aucune donnée médicale ne doit transiter ou rester sur le storage Replit.
+
+1) Ce qui doit être supprimé / désactivé
+
+Retirer toute logique liée à :
+
+Replit Object Storage
+
+chemins /objects/uploads/...
+
+stockage dans .private/uploads/
+
+Retirer / remplacer les helpers et endpoints internes liés à ce storage.
+
+2) Stockage cible : Supabase Storage (privé)
+
+Créer/Utiliser un bucket Supabase Storage privé nommé radiographies (ou patient-documents).
+
+Les fichiers ne doivent jamais être publics.
+
+L’accès se fait via signed URLs (affichage + download).
+
+3) Stratégie de chemin (obligatoire)
+
+Chaque fichier doit être stocké avec un path structuré :
+
+org/{organisationId}/patients/{patientId}/radiographies/{documentId}/{originalFilename}
+
+documentId est un UUID généré avant upload.
+
+Le renommage ne renomme pas le fichier : il modifie seulement title en DB.
+
+4) Table de métadonnées (DB)
+
+Créer/Utiliser une table patient_documents avec au minimum :
+
+id (UUID, PK)
+
+organisation_id
+
+patient_id
+
+category (ex: radiography)
+
+title
+
+file_path
+
+mime_type
+
+size_bytes
+
+created_by
+
+created_at, updated_at
+
+5) Sécurité (RLS + Storage)
+
+Activer RLS sur patient_documents.
+
+Mettre en place les policies pour que :
+
+un user ne voit/édite que les documents des patients de son organisation,
+
+seuls les rôles autorisés peuvent upload/delete,
+
+l’accès aux fichiers Storage est conditionné par l’accès à la ligne patient_documents.
+
+6) Flux à implémenter (end-to-end)
+
+Upload
+
+Générer documentId
+
+Upload vers Supabase Storage bucket privé sur file_path
+
+Insert patient_documents
+
+Rafraîchir la grille
+
+Listing
+
+Lister via patient_documents filtré par patient_id
+
+Pour chaque doc : générer une signed URL courte durée (ex: 60–300 sec)
+
+Viewer
+
+Ouvrir le document via signed URL
+
+Zoom/pan pour images
+
+Actions
+
+Renommer : update title en DB
+
+Télécharger : signed URL dédiée download
+
+Supprimer : delete Storage + delete DB (pas d’orphelins)
+
+7) Migration (si des radios existent déjà)
+
+Ajouter une commande/admin script de migration :
+
+lister les anciennes radios (Replit Storage),
+
+les re-uploader dans Supabase Storage,
+
+recréer les entrées DB,
+
+vérifier intégrité,
+
+puis supprimer les fichiers côté Replit Storage.
+
+Ce que tu peux lui dire en 1 phrase (si tu veux être très direct)
+
+“Stop Replit Object Storage : on doit stocker les radiographies uniquement dans Supabase Storage privé (bucket + policies + signed URLs), lié à patient_documents.”

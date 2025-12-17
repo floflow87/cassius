@@ -79,12 +79,21 @@ export interface Implant {
 
 export interface Radio {
   id: string;
+  organisationId: string;
   patientId: string;
   operationId: string | null;
   implantId: string | null;
   type: TypeRadio;
-  url: string;
+  title: string;
+  filePath: string | null; // Supabase Storage path (nullable for legacy)
+  url: string | null; // Legacy Replit URL (kept for backward compatibility)
+  mimeType: string | null;
+  sizeBytes: number | null;
+  fileName: string | null;
   date: string;
+  createdBy: string | null;
+  createdAt: Date;
+  signedUrl?: string | null;
 }
 
 export interface Visite {

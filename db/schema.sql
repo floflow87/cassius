@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS implants (
   date_pose DATE NOT NULL
 );
 
--- Radios
+-- Radios (documents radiographiques)
 CREATE TABLE IF NOT EXISTS radios (
   id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
   organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
@@ -158,22 +158,28 @@ CREATE TABLE IF NOT EXISTS radios (
   implant_id VARCHAR REFERENCES implants(id) ON DELETE SET NULL,
   type type_radio NOT NULL,
   title TEXT NOT NULL,
-  url TEXT NOT NULL,
+  file_path TEXT, -- Supabase Storage path (nullable for legacy)
+  url TEXT, -- Legacy Replit Object Storage URL (kept for backward compatibility)
   mime_type TEXT,
   size_bytes BIGINT,
+  file_name TEXT,
   date DATE NOT NULL,
+  created_by VARCHAR REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
 
--- Add new columns if they don't exist (for existing databases)
+-- Migration: Add new columns for Supabase Storage (keeping legacy url for backward compatibility)
 DO $$ BEGIN
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS file_path TEXT;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS file_name TEXT;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS created_by VARCHAR REFERENCES users(id) ON DELETE SET NULL;
   ALTER TABLE radios ADD COLUMN IF NOT EXISTS title TEXT;
   ALTER TABLE radios ADD COLUMN IF NOT EXISTS mime_type TEXT;
   ALTER TABLE radios ADD COLUMN IF NOT EXISTS size_bytes BIGINT;
   ALTER TABLE radios ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+  
   -- Set default title for existing records
   UPDATE radios SET title = 'Radio ' || id WHERE title IS NULL;
-  -- Make title NOT NULL after setting defaults
   ALTER TABLE radios ALTER COLUMN title SET NOT NULL;
 EXCEPTION WHEN OTHERS THEN null;
 END $$;
