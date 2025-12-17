@@ -8,35 +8,32 @@ dns.setDefaultResultOrder('ipv4first');
 const { Pool } = pg;
 
 const APP_ENV = process.env.APP_ENV || "development";
+const isProduction = APP_ENV === "production";
 
 const DB_SSL = process.env.DB_SSL !== "false";
 const DB_POOL_MAX = parseInt(process.env.DB_POOL_MAX || "5", 10);
 const DB_CONN_TIMEOUT_MS = parseInt(process.env.DB_CONN_TIMEOUT_MS || "60000", 10);
 
-// SUPABASE_DATABASE_URL - STRICT: no fallback, no hardcoded values
-// DEV (Replit) -> Supabase DEV connection string
-// PROD (Render) -> Supabase PROD connection string
-const databaseUrl = process.env.SUPABASE_DATABASE_URL;
+let databaseUrl: string;
 
-if (!databaseUrl) {
-  console.error("[DB] FATAL: SUPABASE_DATABASE_URL is required");
-  console.error("[DB] Configure this in Secrets with your Supabase connection string (pooler, port 6543)");
-  process.exit(1);
+if (isProduction) {
+  if (!process.env.SUPABASE_DB_URL_PROD) {
+    throw new Error("SUPABASE_DB_URL_PROD is required in production");
+  }
+  databaseUrl = process.env.SUPABASE_DB_URL_PROD;
+} else {
+  if (!process.env.SUPABASE_DB_URL_DEV) {
+    console.error("SUPABASE_DB_URL_DEV must be set for development.");
+    process.exit(1);
+  }
+  databaseUrl = process.env.SUPABASE_DB_URL_DEV;
 }
 
 const urlWithoutSslMode = databaseUrl.replace(/[?&]sslmode=[^&]*/g, '');
 
-// Extract host for logging (non-sensitive)
-let dbHost = "unknown";
-try {
-  const url = new URL(databaseUrl);
-  dbHost = url.hostname;
-} catch {
-  dbHost = "invalid-url";
-}
-
-const envLabel = APP_ENV === "production" ? "PROD" : "DEV";
-console.log(`[ENV=${envLabel}] Database host: ${dbHost}`);
+const maskedUrl = databaseUrl.replace(/:[^:@]+@/, ':***@');
+console.log(`[DB] Environment: ${APP_ENV}`);
+console.log(`[DB] Connecting to: ${maskedUrl.split('?')[0].split('@')[1] || 'configured host'}`);
 
 export const pool = new Pool({
   connectionString: urlWithoutSslMode,
@@ -92,7 +89,7 @@ export function getDbEnv() {
 
 export function getDbConnectionInfo(): { dbHost: string; dbName: string } {
   try {
-    const url = new URL(databaseUrl!);
+    const url = new URL(databaseUrl);
     return {
       dbHost: url.hostname,
       dbName: url.pathname.replace(/^\//, '') || 'postgres',

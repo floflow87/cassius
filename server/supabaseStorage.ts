@@ -10,20 +10,12 @@ function getSupabaseClient(): SupabaseClient {
     return supabaseClient;
   }
 
-  // STRICT: No fallback, no hardcoded values
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl) {
-    throw new Error('[Storage] FATAL: SUPABASE_URL is required. Configure in Secrets.');
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for file storage');
   }
-  if (!supabaseServiceRoleKey) {
-    throw new Error('[Storage] FATAL: SUPABASE_SERVICE_ROLE_KEY is required. Configure in Secrets.');
-  }
-
-  // Log connection target (non-sensitive - only URL, never keys)
-  const envLabel = process.env.APP_ENV === "production" ? "PROD" : "DEV";
-  console.log(`[ENV=${envLabel}] Supabase URL: ${supabaseUrl}`);
 
   supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
