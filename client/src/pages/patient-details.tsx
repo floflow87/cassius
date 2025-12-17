@@ -167,7 +167,7 @@ export default function PatientDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "rendez-vous"] });
       setRdvDialogOpen(false);
       setRdvForm({ titre: "", description: "", date: "", heureDebut: "09:00", heureFin: "09:30", tag: "CONSULTATION" });
-      toast({ title: "Rendez-vous créé", description: "Le rendez-vous a été ajouté." });
+      toast({ title: "Rendez-vous créé", description: "Le rendez-vous a été ajouté.", variant: "success" });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de créer le rendez-vous.", variant: "destructive" });
@@ -188,7 +188,7 @@ export default function PatientDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "rendez-vous"] });
       setEditingRdv(null);
-      toast({ title: "Rendez-vous modifié", description: "Le rendez-vous a été mis à jour." });
+      toast({ title: "Rendez-vous modifié", description: "Le rendez-vous a été mis à jour.", variant: "success" });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de modifier le rendez-vous.", variant: "destructive" });
@@ -202,7 +202,7 @@ export default function PatientDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "rendez-vous"] });
       setDeleteRdvId(null);
-      toast({ title: "Rendez-vous supprimé", description: "Le rendez-vous a été supprimé." });
+      toast({ title: "Rendez-vous supprimé", description: "Le rendez-vous a été supprimé.", variant: "success" });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de supprimer le rendez-vous.", variant: "destructive" });
@@ -240,7 +240,7 @@ export default function PatientDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
       setNoteContent("");
       setSelectedTag(null);
-      toast({ title: "Note ajoutée", description: "La note a été créée avec succès." });
+      toast({ title: "Note ajoutée", description: "La note a été créée avec succès.", variant: "success" });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de créer la note.", variant: "destructive" });
@@ -257,7 +257,7 @@ export default function PatientDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
       setEditingNote(null);
-      toast({ title: "Note modifiée", description: "La note a été mise à jour." });
+      toast({ title: "Note modifiée", description: "La note a été mise à jour.", variant: "success" });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de modifier la note.", variant: "destructive" });
@@ -271,7 +271,7 @@ export default function PatientDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
       setDeleteNoteId(null);
-      toast({ title: "Note supprimée", description: "La note a été supprimée." });
+      toast({ title: "Note supprimée", description: "La note a été supprimée.", variant: "success" });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de supprimer la note.", variant: "destructive" });
@@ -325,6 +325,7 @@ export default function PatientDetailsPage() {
       toast({
         title: "Patient mis à jour",
         description: "Les informations du patient ont été enregistrées.",
+        variant: "success",
       });
     },
     onError: () => {
@@ -346,6 +347,7 @@ export default function PatientDetailsPage() {
       toast({
         title: "Contexte médical mis à jour",
         description: "Les informations médicales ont été enregistrées.",
+        variant: "success",
       });
     },
     onError: () => {

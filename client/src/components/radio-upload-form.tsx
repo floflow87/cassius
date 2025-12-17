@@ -84,7 +84,10 @@ export function RadioUploadForm({
       toast({
         title: "Radio ajoutée",
         description: "La radiographie a été enregistrée.",
+        variant: "success",
       });
+      form.reset();
+      setUploadedUrl("");
       onSuccess?.();
     },
     onError: (error) => {

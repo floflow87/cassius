@@ -76,7 +76,7 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
-      toast({ title: "Document renomme", description: "Le nom a ete mis a jour." });
+      toast({ title: "Document renommé", description: "Le nom a été mis à jour.", variant: "success" });
       setRenameOpen(false);
       setRenameError("");
     },
@@ -91,7 +91,7 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
-      toast({ title: "Document supprime", description: "La radiographie a ete supprimee." });
+      toast({ title: "Document supprimé", description: "La radiographie a été supprimée.", variant: "success" });
       setDeleteOpen(false);
     },
     onError: () => {
