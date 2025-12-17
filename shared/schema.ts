@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -154,8 +154,12 @@ export const radios = pgTable("radios", {
   operationId: varchar("operation_id").references(() => operations.id, { onDelete: "set null" }),
   implantId: varchar("implant_id").references(() => implants.id, { onDelete: "set null" }),
   type: typeRadioEnum("type").notNull(),
+  title: text("title").notNull(),
   url: text("url").notNull(),
+  mimeType: text("mime_type"),
+  sizeBytes: bigint("size_bytes", { mode: "number" }),
   date: date("date").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const radiosRelations = relations(radios, ({ one }) => ({
@@ -318,6 +322,11 @@ export const insertImplantSchema = createInsertSchema(implants).omit({
 export const insertRadioSchema = createInsertSchema(radios).omit({
   id: true,
   organisationId: true,
+  createdAt: true,
+});
+
+export const updateRadioSchema = z.object({
+  title: z.string().optional(),
 });
 
 export const insertVisiteSchema = createInsertSchema(visites).omit({

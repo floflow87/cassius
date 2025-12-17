@@ -353,6 +353,51 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/radios/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { title } = req.body;
+      if (!title || typeof title !== "string") {
+        return res.status(400).json({ error: "Title is required" });
+      }
+      const radio = await storage.updateRadio(organisationId, req.params.id, { title });
+      if (!radio) {
+        return res.status(404).json({ error: "Radio not found" });
+      }
+      res.json(radio);
+    } catch (error) {
+      console.error("Error updating radio:", error);
+      res.status(500).json({ error: "Failed to update radio" });
+    }
+  });
+
+  app.delete("/api/radios/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      // Get radio to find file path for deletion
+      const radio = await storage.getRadio(organisationId, req.params.id);
+      if (!radio) {
+        return res.status(404).json({ error: "Radio not found" });
+      }
+
+      // Delete from database
+      const deleted = await storage.deleteRadio(organisationId, req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Radio not found" });
+      }
+
+      // TODO: Also delete from object storage using radio.url
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting radio:", error);
+      res.status(500).json({ error: "Failed to delete radio" });
+    }
+  });
+
   // ========== VISITES ==========
   app.get("/api/implants/:id/visites", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

@@ -1,27 +1,55 @@
 import { useState } from "react";
-import { Calendar, FileImage, ExternalLink } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { Calendar, FileImage, MoreVertical, Pencil, Download, Trash2, ZoomIn, ZoomOut, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Radio } from "@shared/schema";
 
 interface RadioCardProps {
   radio: Radio;
+  patientId: string;
 }
 
 const typeLabels: Record<string, string> = {
   PANORAMIQUE: "Panoramique",
   CBCT: "CBCT",
-  RETROALVEOLAIRE: "Rétro-alvéolaire",
+  RETROALVEOLAIRE: "Retro-alveolaire",
 };
 
-export function RadioCard({ radio }: RadioCardProps) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+export function RadioCard({ radio, patientId }: RadioCardProps) {
+  const { toast } = useToast();
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState(radio.title || "");
+  const [zoom, setZoom] = useState(1);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("fr-FR", {
@@ -38,18 +66,62 @@ export function RadioCard({ radio }: RadioCardProps) {
     return radio.url;
   };
 
+  const renameMutation = useMutation({
+    mutationFn: async (title: string) => {
+      const res = await apiRequest("PATCH", `/api/radios/${radio.id}`, { title });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      toast({ title: "Document renomme", description: "Le nom a ete mis a jour." });
+      setRenameOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de renommer le document.", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/radios/${radio.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      toast({ title: "Document supprime", description: "La radiographie a ete supprimee." });
+      setDeleteOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de supprimer le document.", variant: "destructive" });
+    },
+  });
+
+  const handleDownload = () => {
+    const link = document.createElement("a");
+    link.href = getImageUrl();
+    link.download = radio.title || `radio-${radio.id}`;
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.25, 3));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.25, 0.5));
+
   return (
     <>
       <Card
-        className="hover-elevate cursor-pointer overflow-hidden"
-        onClick={() => setDialogOpen(true)}
+        className="group relative overflow-hidden"
         data-testid={`card-radio-${radio.id}`}
       >
-        <div className="aspect-video bg-muted relative">
+        <div 
+          className="aspect-square bg-muted cursor-pointer"
+          onClick={() => setViewerOpen(true)}
+        >
           {radio.url ? (
             <img
               src={getImageUrl()}
-              alt={`Radio ${typeLabels[radio.type]}`}
+              alt={radio.title || `Radio ${typeLabels[radio.type]}`}
               className="w-full h-full object-cover"
               onError={(e) => {
                 e.currentTarget.style.display = "none";
@@ -64,46 +136,162 @@ export function RadioCard({ radio }: RadioCardProps) {
               <FileImage className="h-12 w-12 text-muted-foreground" />
             </div>
           )}
-          <Badge variant="secondary" className="absolute top-2 right-2">
+          <Badge variant="secondary" className="absolute top-2 left-2">
             {typeLabels[radio.type] || radio.type}
           </Badge>
         </div>
         <CardContent className="p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Calendar className="h-3 w-3" />
-              <span>{formatDate(radio.date)}</span>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate" data-testid={`text-radio-title-${radio.id}`}>
+                {radio.title || "Sans titre"}
+              </p>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                <Calendar className="h-3 w-3" />
+                <span>{formatDate(radio.date)}</span>
+              </div>
             </div>
-            <ExternalLink className="h-4 w-4 text-muted-foreground" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="shrink-0"
+                  data-testid={`button-radio-menu-${radio.id}`}
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-white dark:bg-zinc-900">
+                <DropdownMenuItem 
+                  onClick={() => {
+                    setNewTitle(radio.title || "");
+                    setRenameOpen(true);
+                  }}
+                  data-testid={`button-rename-radio-${radio.id}`}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Renommer
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={handleDownload}
+                  data-testid={`button-download-radio-${radio.id}`}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Telecharger
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setDeleteOpen(true)}
+                  className="text-destructive"
+                  data-testid={`button-delete-radio-${radio.id}`}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Supprimer
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Badge variant="secondary">{typeLabels[radio.type]}</Badge>
-              <span className="text-sm text-muted-foreground font-normal">
-                {formatDate(radio.date)}
-              </span>
-            </DialogTitle>
+      {/* Viewer plein ecran */}
+      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
+          <DialogHeader className="p-4 border-b">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <DialogTitle className="flex items-center gap-2">
+                  <span>{radio.title || "Sans titre"}</span>
+                  <Badge variant="secondary">{typeLabels[radio.type]}</Badge>
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground">
+                  {formatDate(radio.date)}
+                </DialogDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={handleZoomOut} data-testid="button-zoom-out">
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground w-12 text-center">{Math.round(zoom * 100)}%</span>
+                <Button variant="outline" size="icon" onClick={handleZoomIn} data-testid="button-zoom-in">
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={handleDownload} data-testid="button-viewer-download">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="aspect-video bg-muted rounded-md overflow-hidden">
+          <div className="flex-1 overflow-auto bg-black/90 flex items-center justify-center min-h-[60vh]">
             {radio.url ? (
               <img
                 src={getImageUrl()}
-                alt={`Radio ${typeLabels[radio.type]}`}
-                className="w-full h-full object-contain"
+                alt={radio.title || `Radio ${typeLabels[radio.type]}`}
+                className="transition-transform duration-200"
+                style={{ transform: `scale(${zoom})` }}
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
+              <div className="flex items-center justify-center">
                 <FileImage className="h-24 w-24 text-muted-foreground" />
               </div>
             )}
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog renommer */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renommer le document</DialogTitle>
+            <DialogDescription>
+              Entrez un nouveau nom pour ce document.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="Nom du document"
+              data-testid="input-rename-radio"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRenameOpen(false)}>
+                Annuler
+              </Button>
+              <Button 
+                onClick={() => renameMutation.mutate(newTitle)}
+                disabled={!newTitle.trim() || renameMutation.isPending}
+                data-testid="button-confirm-rename"
+              >
+                Enregistrer
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog confirmation suppression */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irreversible. Le document sera definitivement supprime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-radio">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-radio"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

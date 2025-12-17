@@ -157,9 +157,26 @@ CREATE TABLE IF NOT EXISTS radios (
   operation_id VARCHAR REFERENCES operations(id) ON DELETE SET NULL,
   implant_id VARCHAR REFERENCES implants(id) ON DELETE SET NULL,
   type type_radio NOT NULL,
+  title TEXT NOT NULL,
   url TEXT NOT NULL,
-  date DATE NOT NULL
+  mime_type TEXT,
+  size_bytes BIGINT,
+  date DATE NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
+
+-- Add new columns if they don't exist (for existing databases)
+DO $$ BEGIN
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS title TEXT;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS mime_type TEXT;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS size_bytes BIGINT;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+  -- Set default title for existing records
+  UPDATE radios SET title = 'Radio ' || id WHERE title IS NULL;
+  -- Make title NOT NULL after setting defaults
+  ALTER TABLE radios ALTER COLUMN title SET NOT NULL;
+EXCEPTION WHEN OTHERS THEN null;
+END $$;
 
 -- Visites (follow-up visits)
 CREATE TABLE IF NOT EXISTS visites (

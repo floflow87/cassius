@@ -28,11 +28,14 @@ import type { Operation, Implant } from "@shared/schema";
 import type { UploadResult } from "@uppy/core";
 
 const formSchema = z.object({
+  title: z.string().min(1, "Le titre est requis"),
   type: z.enum(["PANORAMIQUE", "CBCT", "RETROALVEOLAIRE"]),
   date: z.string().min(1, "La date est requise"),
   operationId: z.string().optional(),
   implantId: z.string().optional(),
   url: z.string().min(1, "Veuillez télécharger une image"),
+  mimeType: z.string().optional(),
+  sizeBytes: z.number().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -56,9 +59,12 @@ export function RadioUploadForm({
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      title: "",
       type: "PANORAMIQUE",
       date: new Date().toISOString().split("T")[0],
       url: "",
+      mimeType: "",
+      sizeBytes: 0,
     },
   });
 
@@ -103,6 +109,7 @@ export function RadioUploadForm({
   ) => {
     if (result.successful && result.successful.length > 0) {
       const uploadUrl = result.successful[0].uploadURL;
+      const file = result.successful[0].data;
       if (uploadUrl) {
         try {
           const res = await apiRequest("PUT", "/api/radios/upload-complete", {
@@ -111,6 +118,18 @@ export function RadioUploadForm({
           const data = await res.json();
           setUploadedUrl(data.objectPath);
           form.setValue("url", data.objectPath);
+          // Auto-fill title from filename if empty
+          const fileName = result.successful[0].name || "Radio";
+          if (!form.getValues("title")) {
+            form.setValue("title", fileName.replace(/\.[^/.]+$/, ""));
+          }
+          // Capture file metadata
+          if (result.successful[0].type) {
+            form.setValue("mimeType", result.successful[0].type);
+          }
+          if (result.successful[0].size) {
+            form.setValue("sizeBytes", result.successful[0].size);
+          }
           toast({
             title: "Image téléchargée",
             description: "L'image a été téléchargée avec succès.",
@@ -141,6 +160,23 @@ export function RadioUploadForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nom du document</FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="Ex: Radio panoramique pré-opératoire" 
+                  {...field} 
+                  data-testid="input-radio-title" 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}

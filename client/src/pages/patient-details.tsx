@@ -1347,7 +1347,7 @@ export default function PatientDetailsPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {patient.radios?.map((radio) => (
-                <RadioCard key={radio.id} radio={radio} />
+                <RadioCard key={radio.id} radio={radio} patientId={patient.id} />
               ))}
             </div>
           )}

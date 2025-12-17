@@ -397,6 +397,27 @@ export class DatabaseStorage implements IStorage {
     return newRadio;
   }
 
+  async updateRadio(organisationId: string, id: string, data: { title?: string }): Promise<Radio | undefined> {
+    const [updated] = await db.update(radios)
+      .set(data)
+      .where(and(
+        eq(radios.id, id),
+        eq(radios.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteRadio(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(radios)
+      .where(and(
+        eq(radios.id, id),
+        eq(radios.organisationId, organisationId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
   // ========== VISITES ==========
   async getVisite(organisationId: string, id: string): Promise<Visite | undefined> {
     const [visite] = await db.select().from(visites)
