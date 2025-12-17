@@ -132,6 +132,19 @@ export async function registerRoutes(
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
+      
+      // Add signed URLs to radios
+      if (supabaseStorage.isStorageConfigured() && patient.radios && patient.radios.length > 0) {
+        const filePaths = patient.radios.map(r => r.filePath).filter(Boolean) as string[];
+        if (filePaths.length > 0) {
+          const signedUrls = await supabaseStorage.getSignedUrls(filePaths);
+          patient.radios = patient.radios.map(radio => ({
+            ...radio,
+            signedUrl: radio.filePath ? signedUrls.get(radio.filePath) || null : null,
+          }));
+        }
+      }
+      
       res.json(patient);
     } catch (error) {
       console.error("Error fetching patient:", error);
