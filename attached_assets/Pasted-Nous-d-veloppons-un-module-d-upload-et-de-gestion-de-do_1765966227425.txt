@@ -1,0 +1,220 @@
+Nous développons un module d’upload et de gestion de documents médicaux (principalement des radiographies) dans une application CRM médicale.
+
+Les documents sont ajoutés depuis l’onglet Radiographies de la fiche d’un patient et sont liés à l’ID du patient (et à l’organisation / cabinet, si multi-tenant). Le stockage doit être privé et sécurisé (aucun bucket public).
+
+A. Fonctionnalités attendues
+1) Upload de documents
+
+Permettre l’upload de tout type de radiographie (formats à confirmer : JPG, PNG, PDF, DICOM, etc.).
+
+L’upload se fait uniquement depuis la fiche patient, onglet Radiographies.
+
+Chaque document uploadé est automatiquement rattaché à l’ID du patient.
+
+2) Affichage des documents
+
+Tous les documents doivent être affichés sous forme de miniatures au format uniforme (grille).
+
+Chaque vignette affiche :
+
+une prévisualisation du document (image ou aperçu),
+
+le nom du document,
+
+la date d’ajout.
+
+3) Consultation
+
+Un clic sur une miniature ouvre le document en mode affichage plein écran / viewer.
+
+Le viewer permet :
+
+la navigation (si plusieurs documents),
+
+un affichage optimisé pour les images (zoom, déplacement si pertinent).
+
+4) Actions sur un document
+
+Via un menu contextuel (icône “…”), permettre :
+
+Renommer le document,
+
+Télécharger le document,
+
+Supprimer le document.
+
+Les actions doivent être immédiates et reflétées visuellement dans l’interface.
+
+5) Ajout de nouveaux documents
+
+Un bouton « Nouvelle radio » permet d’ajouter un ou plusieurs documents.
+
+L’upload peut être unitaire ou multiple (drag & drop si possible).
+
+6) Contraintes
+
+Aucun document orphelin : suppression = suppression fichier + suppression métadonnées.
+
+UX simple, rapide, cohérente avec la fiche patient.
+
+Module conçu pour évoluer (annotations, classement, typologie).
+
+B. Spécifications techniques — Supabase Storage privé (type S3)
+1) Environnements
+
+Mettre en place deux environnements isolés :
+
+Supabase Staging (projet séparé)
+
+Supabase Production (projet séparé)
+
+Chaque environnement possède :
+
+sa base de données,
+
+ses buckets Storage,
+
+ses policies RLS et Storage.
+
+Interdiction d’utiliser un bucket public.
+
+2) Bucket Storage
+
+Créer un bucket privé : radiographies (ou patient-documents)
+
+Le bucket doit rester private.
+
+Les accès se font uniquement via :
+
+permissions/policies (RLS + Storage),
+
+URLs signées pour affichage/téléchargement.
+
+3) Stratégie de nommage / chemins (object keys)
+
+Stocker les fichiers avec une structure stable, multi-tenant et sans collision :
+
+org/{organisationId}/patients/{patientId}/radiographies/{documentId}/{originalFilename}
+
+Règles :
+
+documentId = UUID généré côté serveur (ou côté app) avant upload.
+
+Le nom affiché dans l’UI est stocké en base (renommage = update DB, pas rename du fichier).
+
+4) Table de métadonnées
+
+Créer une table SQL patient_documents (ou patient_radiographies) pour référencer chaque fichier stocké.
+
+Champs minimum :
+
+id UUID (PK)
+
+organisation_id UUID (multi-tenant)
+
+patient_id UUID (FK patients)
+
+category TEXT (ex: radiography)
+
+title TEXT (nom affiché, modifiable)
+
+file_path TEXT (chemin Storage exact)
+
+mime_type TEXT
+
+size_bytes BIGINT
+
+created_by UUID
+
+created_at TIMESTAMPTZ
+
+updated_at TIMESTAMPTZ
+
+Contraintes :
+
+indexer patient_id, organisation_id, created_at
+
+optionnel : checksum / hash pour éviter doublons
+
+5) Sécurité & accès (RLS + Storage Policies)
+
+Activer RLS sur patient_documents.
+
+Les règles doivent garantir :
+
+un utilisateur ne voit que les documents des patients de son organisation,
+
+seuls les rôles autorisés (ex: praticien/admin) peuvent ajouter/supprimer,
+
+l’accès aux fichiers Storage est conditionné à l’accès aux lignes patient_documents.
+
+Pattern recommandé
+
+Les fichiers sont privés dans Storage.
+
+L’UI obtient un accès via :
+
+createSignedUrl() pour afficher un document
+
+createSignedUrl() ou endpoint sécurisé pour téléchargement
+
+Les opérations sensibles (delete) doivent être autorisées uniquement si l’utilisateur a accès au patient.
+
+6) Flux techniques à implémenter
+Upload
+
+L’utilisateur clique « Nouvelle radio »
+
+L’app génère un documentId
+
+Upload du fichier vers Storage sur le file_path
+
+Insert en DB dans patient_documents
+
+Rafraîchir la grille (nouvelle vignette)
+
+Listing / affichage miniatures
+
+Lister via patient_documents filtré par patient_id
+
+Pour chaque item :
+
+générer une URL signée courte durée (ex: 60–300s)
+
+afficher l’image/aperçu
+
+Viewer
+
+Ouvrir le document avec l’URL signée
+
+Support zoom/pan si image
+
+(Si PDF/DICOM) ouvrir via viewer adapté ou fallback téléchargement
+
+Renommer
+
+Update title en DB uniquement
+
+Télécharger
+
+Générer une URL signée dédiée “download” ou utiliser la même URL signée
+
+Supprimer
+
+Supprimer l’objet Storage (via file_path)
+
+Supprimer la ligne DB correspondante
+
+Réfléter instantanément dans l’UI
+
+7) Observabilité et robustesse
+
+Gérer les erreurs (upload partiel, insert DB échoué, etc.)
+
+Éviter les fichiers orphelins :
+
+si upload OK mais insert DB KO → rollback / suppression Storage
+
+si insert DB OK mais upload KO → rollback DB
+
+Logger les actions : upload, delete, download (audit trail si nécessaire)

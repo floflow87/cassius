@@ -1053,19 +1053,31 @@ export default function PatientDetailsPage() {
                         const getEventIcon = () => {
                           switch (event.type) {
                             case "operation":
-                              return <Activity className="h-4 w-4 text-primary" />;
+                              return <Activity className="h-4 w-4 text-orange-500" />;
                             case "radio":
-                              return <ImageIcon className="h-4 w-4 text-primary" />;
+                              return <ImageIcon className="h-4 w-4 text-blue-500" />;
                             case "visite":
-                              return <Stethoscope className="h-4 w-4 text-primary" />;
+                              return <Stethoscope className="h-4 w-4 text-green-500" />;
                             case "rdv":
                               return <Calendar className="h-4 w-4 text-primary" />;
+                          }
+                        };
+                        const getEventBgColor = () => {
+                          switch (event.type) {
+                            case "operation":
+                              return "bg-orange-100 dark:bg-orange-900/30";
+                            case "radio":
+                              return "bg-blue-100 dark:bg-blue-900/30";
+                            case "visite":
+                              return "bg-green-100 dark:bg-green-900/30";
+                            case "rdv":
+                              return "bg-primary/10";
                           }
                         };
                         return (
                           <div key={event.id} className="flex gap-4">
                             <div className="flex flex-col items-center">
-                              <div className="p-2 rounded-full bg-primary/10">
+                              <div className={`p-2 rounded-full ${getEventBgColor()}`}>
                                 {getEventIcon()}
                               </div>
                               {index < Math.min(timelineEvents.length - 1, 3) && (
