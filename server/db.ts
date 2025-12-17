@@ -8,32 +8,33 @@ dns.setDefaultResultOrder('ipv4first');
 const { Pool } = pg;
 
 const APP_ENV = process.env.APP_ENV || "development";
-const isProduction = APP_ENV === "production";
 
 const DB_SSL = process.env.DB_SSL !== "false";
 const DB_POOL_MAX = parseInt(process.env.DB_POOL_MAX || "5", 10);
 const DB_CONN_TIMEOUT_MS = parseInt(process.env.DB_CONN_TIMEOUT_MS || "60000", 10);
 
-let databaseUrl: string;
+// Use generic DATABASE_URL - value differs per environment (Replit DEV vs Render PROD)
+const databaseUrl = process.env.DATABASE_URL;
 
-if (isProduction) {
-  if (!process.env.SUPABASE_DB_URL_PROD) {
-    throw new Error("SUPABASE_DB_URL_PROD is required in production");
-  }
-  databaseUrl = process.env.SUPABASE_DB_URL_PROD;
-} else {
-  if (!process.env.SUPABASE_DB_URL_DEV) {
-    console.error("SUPABASE_DB_URL_DEV must be set for development.");
-    process.exit(1);
-  }
-  databaseUrl = process.env.SUPABASE_DB_URL_DEV;
+if (!databaseUrl) {
+  console.error("[DB] ERROR: DATABASE_URL environment variable is required");
+  console.error("[DB] Set DATABASE_URL to your Supabase connection string (pooler, port 6543)");
+  process.exit(1);
 }
 
 const urlWithoutSslMode = databaseUrl.replace(/[?&]sslmode=[^&]*/g, '');
 
-const maskedUrl = databaseUrl.replace(/:[^:@]+@/, ':***@');
+// Extract host for logging (non-sensitive)
+let dbHost = "unknown";
+try {
+  const url = new URL(databaseUrl);
+  dbHost = url.hostname;
+} catch {
+  dbHost = "invalid-url";
+}
+
 console.log(`[DB] Environment: ${APP_ENV}`);
-console.log(`[DB] Connecting to: ${maskedUrl.split('?')[0].split('@')[1] || 'configured host'}`);
+console.log(`[DB] Connected to: ${dbHost}`);
 
 export const pool = new Pool({
   connectionString: urlWithoutSslMode,
@@ -89,7 +90,7 @@ export function getDbEnv() {
 
 export function getDbConnectionInfo(): { dbHost: string; dbName: string } {
   try {
-    const url = new URL(databaseUrl);
+    const url = new URL(databaseUrl!);
     return {
       dbHost: url.hostname,
       dbName: url.pathname.replace(/^\//, '') || 'postgres',

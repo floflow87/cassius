@@ -1,0 +1,91 @@
+Mettre en place un environnement DEV / STAGING complètement isolé, connecté exclusivement au projet Supabase DEV (base de données + Storage), sans aucun accès ou écriture sur l’environnement PROD.
+
+1. Environnements cibles
+
+L’application doit fonctionner avec deux environnements distincts :
+
+🔹 Environnement DEV / STAGING
+
+Backend exécuté sur Replit
+
+Connecté au projet Supabase DEV
+
+Bucket Storage DEV : patient-documents (bucket privé)
+
+🔹 Environnement PROD
+
+Backend exécuté sur Render
+
+Connecté au projet Supabase PROD
+
+Bucket Storage PROD : patient-documents (bucket privé)
+
+Aucun partage de clés, d’URL ou de données entre les deux environnements.
+
+2. Variables d’environnement (obligatoire)
+
+Le code doit utiliser uniquement les variables génériques suivantes :
+
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+
+Valeurs attendues :
+
+DEV / STAGING (Replit)
+
+SUPABASE_URL → URL du projet Supabase DEV
+
+SUPABASE_SERVICE_ROLE_KEY → service_role key du projet Supabase DEV
+
+PROD (Render)
+
+SUPABASE_URL → URL du projet Supabase PROD
+
+SUPABASE_SERVICE_ROLE_KEY → service_role key du projet Supabase PROD
+
+⚠️ Aucun fallback, aucune valeur hardcodée, aucune variable _PROD / _DEV dans le code.
+
+3. Vérification au démarrage (obligatoire)
+
+Au démarrage du backend, ajouter un log non sensible indiquant l’environnement cible, par exemple :
+
+[Supabase] Connected to: https://<project-id>.supabase.co
+
+
+(uniquement l’URL, jamais les clés)
+
+Ce log permet de vérifier immédiatement que :
+
+le staging parle bien au Supabase DEV,
+
+la prod parle bien au Supabase PROD.
+
+4. Comportement attendu
+
+Tout upload effectué en DEV / STAGING :
+
+écrit uniquement dans le bucket Supabase DEV,
+
+crée des entrées uniquement dans la base Supabase DEV.
+
+Aucune action DEV ne doit écrire en PROD.
+
+La PROD ne doit jamais dépendre de variables DEV.
+
+5. Sécurité
+
+La SUPABASE_SERVICE_ROLE_KEY est utilisée exclusivement côté serveur.
+
+Aucune clé Supabase n’est exposée au frontend.
+
+Les accès Storage passent par des signed URLs uniquement.
+
+6. Critère d’acceptation
+
+Un upload en DEV apparaît uniquement dans Supabase DEV.
+
+Un upload en PROD apparaît uniquement dans Supabase PROD.
+
+Le log de démarrage confirme la cible Supabase correcte.
+
+Aucun fichier de test DEV n’apparaît dans le bucket PROD.

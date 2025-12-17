@@ -17,6 +17,9 @@ function getSupabaseClient(): SupabaseClient {
     throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for file storage');
   }
 
+  // Log connection target (non-sensitive - only URL, never keys)
+  console.log(`[Supabase] Connected to: ${supabaseUrl}`);
+
   supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
       autoRefreshToken: false,
