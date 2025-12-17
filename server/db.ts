@@ -13,12 +13,13 @@ const DB_SSL = process.env.DB_SSL !== "false";
 const DB_POOL_MAX = parseInt(process.env.DB_POOL_MAX || "5", 10);
 const DB_CONN_TIMEOUT_MS = parseInt(process.env.DB_CONN_TIMEOUT_MS || "60000", 10);
 
-// Use generic DATABASE_URL - value differs per environment (Replit DEV vs Render PROD)
-const databaseUrl = process.env.DATABASE_URL;
+// Use SUPABASE_DATABASE_URL - value differs per environment (Replit DEV vs Render PROD)
+// This is separate from Replit's built-in DATABASE_URL which points to internal PostgreSQL
+const databaseUrl = process.env.SUPABASE_DATABASE_URL;
 
 if (!databaseUrl) {
-  console.error("[DB] ERROR: DATABASE_URL environment variable is required");
-  console.error("[DB] Set DATABASE_URL to your Supabase connection string (pooler, port 6543)");
+  console.error("[DB] ERROR: SUPABASE_DATABASE_URL environment variable is required");
+  console.error("[DB] Set SUPABASE_DATABASE_URL to your Supabase connection string (pooler, port 6543)");
   process.exit(1);
 }
 
