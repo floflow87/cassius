@@ -11,6 +11,7 @@ import {
   insertVisiteSchema,
   insertProtheseSchema,
   insertNoteSchema,
+  insertRendezVousSchema,
   patients,
 } from "@shared/schema";
 import type {
@@ -559,6 +560,70 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting note:", error);
       res.status(500).json({ error: "Failed to delete note" });
+    }
+  });
+
+  // ========== RENDEZ-VOUS ==========
+  app.get("/api/patients/:patientId/rendez-vous", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId } = req.params;
+      const rdvList = await storage.getPatientRendezVous(organisationId, patientId);
+      res.json(rdvList);
+    } catch (error) {
+      console.error("Error fetching rendez-vous:", error);
+      res.status(500).json({ error: "Failed to fetch rendez-vous" });
+    }
+  });
+
+  app.post("/api/patients/:patientId/rendez-vous", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId } = req.params;
+      const rdvData = insertRendezVousSchema.parse({ ...req.body, patientId });
+      const rdv = await storage.createRendezVous(organisationId, rdvData);
+      res.status(201).json(rdv);
+    } catch (error) {
+      console.error("Error creating rendez-vous:", error);
+      res.status(500).json({ error: "Failed to create rendez-vous" });
+    }
+  });
+
+  app.patch("/api/rendez-vous/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const rdv = await storage.updateRendezVous(organisationId, id, req.body);
+      if (!rdv) {
+        return res.status(404).json({ error: "Rendez-vous not found" });
+      }
+      res.json(rdv);
+    } catch (error) {
+      console.error("Error updating rendez-vous:", error);
+      res.status(500).json({ error: "Failed to update rendez-vous" });
+    }
+  });
+
+  app.delete("/api/rendez-vous/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteRendezVous(organisationId, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Rendez-vous not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting rendez-vous:", error);
+      res.status(500).json({ error: "Failed to delete rendez-vous" });
     }
   });
 

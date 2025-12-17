@@ -44,6 +44,7 @@ export const roleEnum = pgEnum("role", ["CHIRURGIEN", "ASSISTANT", "ADMIN"]);
 export const typeProtheseEnum = pgEnum("type_prothese", ["VISSEE", "SCELLEE"]);
 export const typePilierEnum = pgEnum("type_pilier", ["DROIT", "ANGULE", "MULTI_UNIT"]);
 export const typeNoteTagEnum = pgEnum("type_note_tag", ["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"]);
+export const typeRendezVousTagEnum = pgEnum("type_rdv_tag", ["CONSULTATION", "SUIVI", "CHIRURGIE"]);
 
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -273,6 +274,31 @@ export const usersRelations = relations(users, ({ one }) => ({
   }),
 }));
 
+// Table rendez-vous patients
+export const rendezVous = pgTable("rendez_vous", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  titre: text("titre").notNull(),
+  description: text("description"),
+  date: date("date").notNull(),
+  heureDebut: text("heure_debut").notNull(),
+  heureFin: text("heure_fin").notNull(),
+  tag: typeRendezVousTagEnum("tag").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const rendezVousRelations = relations(rendezVous, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [rendezVous.organisationId],
+    references: [organisations.id],
+  }),
+  patient: one(patients, {
+    fields: [rendezVous.patientId],
+    references: [patients.id],
+  }),
+}));
+
 export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
   createdAt: true,
@@ -317,6 +343,12 @@ export const insertNoteSchema = createInsertSchema(notes).omit({
   updatedAt: true,
 });
 
+export const insertRendezVousSchema = createInsertSchema(rendezVous).omit({
+  id: true,
+  organisationId: true,
+  createdAt: true,
+});
+
 export const insertOrganisationSchema = createInsertSchema(organisations).omit({
   id: true,
   createdAt: true,
@@ -348,3 +380,6 @@ export type User = typeof users.$inferSelect;
 
 export type InsertNote = z.infer<typeof insertNoteSchema>;
 export type Note = typeof notes.$inferSelect;
+
+export type InsertRendezVous = z.infer<typeof insertRendezVousSchema>;
+export type RendezVous = typeof rendezVous.$inferSelect;

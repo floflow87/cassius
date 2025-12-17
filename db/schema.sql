@@ -202,6 +202,25 @@ CREATE TABLE IF NOT EXISTS notes (
   updated_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
 
+-- Rendez-vous (patient appointments)
+DO $$ BEGIN
+  CREATE TYPE type_rdv_tag AS ENUM ('CONSULTATION', 'SUIVI', 'CHIRURGIE');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS rendez_vous (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  patient_id VARCHAR NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  titre TEXT NOT NULL,
+  description TEXT,
+  date DATE NOT NULL,
+  heure_debut TEXT NOT NULL,
+  heure_fin TEXT NOT NULL,
+  tag type_rdv_tag NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_patients_organisation ON patients(organisation_id);
 CREATE INDEX IF NOT EXISTS idx_patients_nom ON patients(nom);
@@ -215,3 +234,6 @@ CREATE INDEX IF NOT EXISTS idx_radios_patient ON radios(patient_id);
 CREATE INDEX IF NOT EXISTS idx_users_organisation ON users(organisation_id);
 CREATE INDEX IF NOT EXISTS idx_notes_patient ON notes(patient_id);
 CREATE INDEX IF NOT EXISTS idx_notes_organisation ON notes(organisation_id);
+CREATE INDEX IF NOT EXISTS idx_rendez_vous_patient ON rendez_vous(patient_id);
+CREATE INDEX IF NOT EXISTS idx_rendez_vous_organisation ON rendez_vous(organisation_id);
+CREATE INDEX IF NOT EXISTS idx_rendez_vous_date ON rendez_vous(date);

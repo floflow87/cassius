@@ -8,6 +8,7 @@ import {
   users,
   organisations,
   notes,
+  rendezVous,
   type Patient,
   type InsertPatient,
   type Operation,
@@ -25,6 +26,8 @@ import {
   type InsertOrganisation,
   type Note,
   type InsertNote,
+  type RendezVous,
+  type InsertRendezVous,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -95,6 +98,12 @@ export interface IStorage {
   createNote(organisationId: string, userId: string, note: InsertNote): Promise<Note>;
   updateNote(organisationId: string, id: string, note: Partial<InsertNote>): Promise<Note | undefined>;
   deleteNote(organisationId: string, id: string): Promise<boolean>;
+
+  // RendezVous methods
+  getPatientRendezVous(organisationId: string, patientId: string): Promise<RendezVous[]>;
+  createRendezVous(organisationId: string, rdv: InsertRendezVous): Promise<RendezVous>;
+  updateRendezVous(organisationId: string, id: string, rdv: Partial<InsertRendezVous>): Promise<RendezVous | undefined>;
+  deleteRendezVous(organisationId: string, id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -625,6 +634,45 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(notes.id, id),
         eq(notes.organisationId, organisationId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ========== RENDEZ-VOUS ==========
+  async getPatientRendezVous(organisationId: string, patientId: string): Promise<RendezVous[]> {
+    return db.select().from(rendezVous)
+      .where(and(
+        eq(rendezVous.patientId, patientId),
+        eq(rendezVous.organisationId, organisationId)
+      ))
+      .orderBy(desc(rendezVous.date));
+  }
+
+  async createRendezVous(organisationId: string, rdv: InsertRendezVous): Promise<RendezVous> {
+    const [created] = await db.insert(rendezVous).values({
+      ...rdv,
+      organisationId,
+    }).returning();
+    return created;
+  }
+
+  async updateRendezVous(organisationId: string, id: string, rdv: Partial<InsertRendezVous>): Promise<RendezVous | undefined> {
+    const [updated] = await db.update(rendezVous)
+      .set(rdv)
+      .where(and(
+        eq(rendezVous.id, id),
+        eq(rendezVous.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteRendezVous(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(rendezVous)
+      .where(and(
+        eq(rendezVous.id, id),
+        eq(rendezVous.organisationId, organisationId)
       ))
       .returning();
     return result.length > 0;
