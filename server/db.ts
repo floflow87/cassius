@@ -15,7 +15,10 @@ const DB_CONN_TIMEOUT_MS = parseInt(process.env.DB_CONN_TIMEOUT_MS || "60000", 1
 
 // Use SUPABASE_DATABASE_URL - value differs per environment (Replit DEV vs Render PROD)
 // This is separate from Replit's built-in DATABASE_URL which points to internal PostgreSQL
-const databaseUrl = process.env.SUPABASE_DATABASE_URL;
+// Fallback to legacy variables during migration period
+const databaseUrl = process.env.SUPABASE_DATABASE_URL 
+  || process.env.SUPABASE_DB_URL_DEV 
+  || process.env.SUPABASE_DB_URL_PROD;
 
 if (!databaseUrl) {
   console.error("[DB] ERROR: SUPABASE_DATABASE_URL environment variable is required");
