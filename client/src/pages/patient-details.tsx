@@ -488,10 +488,11 @@ export default function PatientDetailsPage() {
   interface TimelineEvent {
     id: string;
     date: Date;
-    type: "operation" | "radio" | "visite";
+    type: "operation" | "radio" | "visite" | "rdv";
     title: string;
     description?: string;
     badges?: string[];
+    badgeClassName?: string;
   }
 
   const timelineEvents: TimelineEvent[] = [];
@@ -528,6 +529,24 @@ export default function PatientDetailsPage() {
         badges: visite.isq ? [`ISQ: ${visite.isq}`] : undefined,
       });
     });
+  });
+
+  // Ajouter les rendez-vous passés à la timeline
+  patientRdvs.forEach((rdv) => {
+    const rdvDate = new Date(rdv.date);
+    // Seulement les rendez-vous passés
+    if (rdvDate < today) {
+      const tagConfig = getRdvTagConfig(rdv.tag as RdvTag);
+      timelineEvents.push({
+        id: `rdv-${rdv.id}`,
+        date: rdvDate,
+        type: "rdv",
+        title: rdv.titre,
+        description: rdv.description || tagConfig.label,
+        badges: [tagConfig.label],
+        badgeClassName: tagConfig.className,
+      });
+    }
   });
 
   timelineEvents.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -1039,6 +1058,8 @@ export default function PatientDetailsPage() {
                               return <ImageIcon className="h-4 w-4 text-primary" />;
                             case "visite":
                               return <Stethoscope className="h-4 w-4 text-primary" />;
+                            case "rdv":
+                              return <Calendar className="h-4 w-4 text-primary" />;
                           }
                         };
                         return (
@@ -1063,7 +1084,11 @@ export default function PatientDetailsPage() {
                                   {event.badges && event.badges.length > 0 && (
                                     <div className="flex gap-2 mt-2 flex-wrap">
                                       {event.badges.map((badge, i) => (
-                                        <Badge key={i} variant="outline" className="text-xs">
+                                        <Badge 
+                                          key={i} 
+                                          variant="outline" 
+                                          className={`text-xs ${event.badgeClassName || ""}`}
+                                        >
                                           {badge}
                                         </Badge>
                                       ))}
