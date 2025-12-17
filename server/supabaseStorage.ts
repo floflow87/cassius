@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const BUCKET_NAME = 'radiographies';
+const BUCKET_NAME = 'patient-documents';
 const SIGNED_URL_EXPIRY = 3600; // 1 hour in seconds
 
 let supabaseClient: SupabaseClient | null = null;
