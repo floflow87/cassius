@@ -1707,7 +1707,7 @@ export default function PatientDetailsPage() {
                 <AlertDialogCancel data-testid="button-cancel-delete-rdv">Annuler</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => deleteRdvId && deleteRdvMutation.mutate(deleteRdvId)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-primary text-primary-foreground"
                   data-testid="button-confirm-delete-rdv"
                 >
                   Supprimer
@@ -1897,7 +1897,7 @@ export default function PatientDetailsPage() {
                 <AlertDialogCancel>Annuler</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => deleteNoteId && deleteNoteMutation.mutate(deleteNoteId)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-primary text-primary-foreground"
                   data-testid="button-confirm-delete-note"
                 >
                   Supprimer

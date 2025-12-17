@@ -313,7 +313,7 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
                 deleteMutation.mutate();
               }}
               disabled={deleteMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-primary text-primary-foreground"
               data-testid="button-confirm-delete-radio"
             >
               {deleteMutation.isPending ? "Suppression..." : "Supprimer"}

@@ -57,6 +57,70 @@ APP_ENV=development npx tsx db/scripts/seed-dev.ts
 - **API routes**: GET/POST `/api/patients/:patientId/notes`, PATCH/DELETE `/api/notes/:id`
 - **UI**: Note input with tag selection, chronological list with author, colored badges, edit/delete via dropdown
 
+### Radiograph Upload System
+
+#### Architecture Overview
+The radiograph upload system uses a client-side upload approach with Replit Object Storage (Google Cloud Storage backend).
+
+#### Data Model (`shared/schema.ts`)
+```typescript
+export const radios = pgTable("radios", {
+  id: text("id").primaryKey(),
+  patientId: text("patient_id").notNull().references(() => patients.id),
+  operationId: text("operation_id").references(() => operations.id),
+  organisationId: text("organisation_id").notNull().references(() => organisations.id),
+  type: text("type").notNull(),       // PANORAMIQUE, CBCT, RETROALVEOLAIRE
+  title: text("title"),                // Custom title (optional)
+  date: timestamp("date").notNull(),
+  url: text("url"),                    // Public URL after upload
+  notes: text("notes"),
+  mimeType: text("mime_type"),         // e.g., "image/jpeg", "image/png"
+  sizeBytes: integer("size_bytes"),    // File size in bytes
+  fileName: text("file_name"),         // Original filename
+});
+```
+
+#### Upload Flow
+
+1. **Frontend Component** (`client/src/components/radio-upload-form.tsx`)
+   - User selects file via `<input type="file">`
+   - Auto-captures: filename as default title, file size, MIME type
+   - User can edit title, select type (Panoramique/CBCT/Retroalveolaire), add notes
+
+2. **File Upload** (`server/objectStorage.ts`)
+   - Uses Replit sidecar service at `http://127.0.0.1:1106`
+   - Files stored in `.private/radios/` directory
+   - Returns signed public URL valid for 7 days
+
+3. **Database Record** (`server/routes.ts`)
+   - POST `/api/patients/:patientId/radios`
+   - Validates metadata with Zod schema
+   - Creates record with all metadata fields
+
+#### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/patients/:patientId/radios` | List all radios for a patient |
+| POST | `/api/patients/:patientId/radios` | Create new radio record |
+| PATCH | `/api/radios/:id` | Update radio (rename title) |
+| DELETE | `/api/radios/:id` | Delete radio record and file |
+| POST | `/api/upload/signed-url` | Get signed URL for upload |
+
+#### Frontend Components
+
+- **RadioUploadForm**: Sheet dialog with file input, title, type selector, notes
+- **RadioCard**: Displays thumbnail with menu (rename, download, delete)
+- **RadioViewer**: Full-screen modal with zoom controls (+/-), download button
+
+#### Key Features
+- Auto-capture of file metadata (name, size, MIME type)
+- Title field with filename as default value
+- Loading states for all mutations (upload, rename, delete)
+- Error handling with toast notifications
+- Timeline integration with clickable "Voir l'image" links
+- Responsive grid layout (2-5 columns based on screen size)
+
 ### UI Refactoring - Sidebar and Patients Page
 - **Sidebar**: Refactored to use Shadcn primitives (Sidebar, SidebarProvider, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton)
 - **Color tokens**: Updated CSS variables for Cassius mainBlue (#2563EB / 217 91% 60%) in both light and dark modes
