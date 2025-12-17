@@ -1,12 +1,17 @@
-import { Activity, Calendar, FileImage, ClipboardList, Stethoscope } from "lucide-react";
+import { Activity, Calendar, FileImage, ClipboardList, Stethoscope, Eye } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { Patient, Operation, Implant, Radio, Visite } from "@shared/schema";
+
+interface RadioWithSignedUrl extends Radio {
+  signedUrl?: string | null;
+}
 
 interface PatientWithDetails extends Patient {
   operations: (Operation & { implants: Implant[] })[];
   implants: (Implant & { visites: Visite[] })[];
-  radios: Radio[];
+  radios: RadioWithSignedUrl[];
 }
 
 interface TimelineEvent {
@@ -16,10 +21,12 @@ interface TimelineEvent {
   title: string;
   description?: string;
   metadata?: Record<string, string | number>;
+  radioData?: RadioWithSignedUrl;
 }
 
 interface PatientTimelineProps {
   patient: PatientWithDetails;
+  onViewRadio?: (radio: RadioWithSignedUrl) => void;
 }
 
 const typeIcons = {
@@ -51,7 +58,7 @@ const radioLabels: Record<string, string> = {
   RETROALVEOLAIRE: "Rétro-alvéolaire",
 };
 
-export function PatientTimeline({ patient }: PatientTimelineProps) {
+export function PatientTimeline({ patient, onViewRadio }: PatientTimelineProps) {
   const events: TimelineEvent[] = [];
 
   patient.operations?.forEach((op) => {
@@ -94,7 +101,8 @@ export function PatientTimeline({ patient }: PatientTimelineProps) {
       id: `radio-${radio.id}`,
       date: radio.date,
       type: "radio",
-      title: radioLabels[radio.type] || radio.type,
+      title: radio.title || radioLabels[radio.type] || radio.type,
+      radioData: radio,
     });
   });
 
@@ -178,6 +186,18 @@ export function PatientTimeline({ patient }: PatientTimelineProps) {
                               </span>
                             )}
                           </div>
+                        )}
+                        {event.type === "radio" && event.radioData && onViewRadio && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2 gap-2"
+                            onClick={() => onViewRadio(event.radioData!)}
+                            data-testid={`button-view-radio-${event.radioData.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                            Voir l'image
+                          </Button>
                         )}
                       </div>
                     </div>

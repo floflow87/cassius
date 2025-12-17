@@ -1932,9 +1932,9 @@ export default function PatientDetailsPage() {
                   </div>
                 </DialogHeader>
                 <div className="flex-1 overflow-auto bg-black/90 flex items-center justify-center min-h-[60vh]">
-                  {radio.url ? (
+                  {(radio as any).signedUrl || radio.url ? (
                     <img
-                      src={radio.url}
+                      src={(radio as any).signedUrl || radio.url}
                       alt={radio.title || getRadioLabel(radio.type)}
                       className="max-w-full max-h-[80vh] object-contain"
                     />
