@@ -645,6 +645,43 @@ export async function registerRoutes(
     }
   });
 
+  // Proxy endpoint to serve document file (bypasses CORS/CSP restrictions)
+  app.get("/api/documents/:id/file", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const doc = await storage.getDocument(organisationId, req.params.id);
+      if (!doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      if (!doc.filePath || !supabaseStorage.isStorageConfigured()) {
+        return res.status(400).json({ error: "No file associated with this document" });
+      }
+
+      // Get signed URL and fetch the file
+      const signedUrl = await supabaseStorage.getSignedUrl(doc.filePath);
+      const response = await fetch(signedUrl);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file: ${response.statusText}`);
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      
+      // Set appropriate headers
+      res.setHeader("Content-Type", doc.mimeType || "application/pdf");
+      res.setHeader("Content-Length", buffer.length);
+      res.setHeader("Content-Disposition", `inline; filename="${doc.fileName || 'document.pdf'}"`);
+      
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error proxying document file:", error);
+      res.status(500).json({ error: "Failed to fetch document file" });
+    }
+  });
+
   // Create document record (after successful upload)
   app.post("/api/documents", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
