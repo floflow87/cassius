@@ -7,6 +7,7 @@ import {
   insertPatientSchema,
   insertOperationSchema,
   insertImplantSchema,
+  insertSurgeryImplantSchema,
   insertRadioSchema,
   insertVisiteSchema,
   insertProtheseSchema,
@@ -135,6 +136,19 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching implant counts:", error);
       res.status(500).json({ error: "Failed to fetch implant counts" });
+    }
+  });
+
+  app.get("/api/patients/last-visits", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const lastVisits = await storage.getPatientLastVisits(organisationId);
+      res.json(lastVisits);
+    } catch (error) {
+      console.error("Error fetching last visits:", error);
+      res.status(500).json({ error: "Failed to fetch last visits" });
     }
   });
 
@@ -326,6 +340,42 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching surgery implant:", error);
       res.status(500).json({ error: "Failed to fetch surgery implant" });
+    }
+  });
+
+  // Delete multiple surgery implants (bulk delete)
+  app.delete("/api/surgery-implants", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "IDs array is required" });
+      }
+      const deletedCount = await storage.deleteSurgeryImplants(organisationId, ids);
+      res.json({ deleted: deletedCount });
+    } catch (error) {
+      console.error("Error deleting surgery implants:", error);
+      res.status(500).json({ error: "Failed to delete surgery implants" });
+    }
+  });
+
+  // Create a new surgery implant (implant posé)
+  app.post("/api/surgery-implants", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const data = insertSurgeryImplantSchema.parse(req.body);
+      const surgeryImplant = await storage.createSurgeryImplant(organisationId, data);
+      res.status(201).json(surgeryImplant);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating surgery implant:", error);
+      res.status(500).json({ error: "Failed to create surgery implant" });
     }
   });
 

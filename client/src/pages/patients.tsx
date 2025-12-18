@@ -134,6 +134,10 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     queryKey: ["/api/patients/implant-counts"],
   });
 
+  const { data: lastVisits } = useQuery<Record<string, { date: string; notes: string | null }>>({
+    queryKey: ["/api/patients/last-visits"],
+  });
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
@@ -178,6 +182,14 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         case "implants":
           comparison = (implantCounts?.[a.id] || 0) - (implantCounts?.[b.id] || 0);
           break;
+        case "derniereVisite":
+          const dateA = lastVisits?.[a.id]?.date;
+          const dateB = lastVisits?.[b.id]?.date;
+          if (!dateA && !dateB) comparison = 0;
+          else if (!dateA) comparison = 1;
+          else if (!dateB) comparison = -1;
+          else comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
+          break;
         case "statut":
           comparison = 0;
           break;
@@ -187,7 +199,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
       
       return sortDirection === "desc" ? -comparison : comparison;
     });
-  }, [sortColumn, sortDirection, implantCounts]);
+  }, [sortColumn, sortDirection, implantCounts, lastVisits]);
 
   const sortedPatients = sortPatients(filteredPatients);
   const totalPatients = sortedPatients.length;
@@ -340,7 +352,15 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           </span>
         );
       case "derniereVisite":
-        return <span className="text-sm text-muted-foreground">-</span>;
+        const lastVisit = lastVisits?.[patient.id];
+        if (lastVisit) {
+          return (
+            <span className="text-sm text-muted-foreground">
+              {new Date(lastVisit.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+            </span>
+          );
+        }
+        return <span className="text-sm text-muted-foreground">—</span>;
       case "statut":
         return (
           <CassiusBadge status={status}>

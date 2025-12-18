@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   TrendingUp,
   ChevronRight,
-  Plus,
   FileText,
   Trash2,
 } from "lucide-react";
@@ -81,11 +80,33 @@ export default function ImplantDetailsPage() {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesContent, setNotesContent] = useState("");
   const [selectedActs, setSelectedActs] = useState<string[]>([]);
-  const [newActSheetOpen, setNewActSheetOpen] = useState(false);
 
   const { data: implantData, isLoading } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
     enabled: !!implantId,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return apiRequest("DELETE", "/api/surgery-implants", { ids });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/implant-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      setSelectedActs([]);
+      toast({
+        title: "Suppression effectuée",
+        description: "Les actes sélectionnés ont été supprimés",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la suppression",
+        variant: "destructive",
+      });
+    },
   });
 
   const formatDate = (dateString: string) => {
@@ -329,6 +350,44 @@ export default function ImplantDetailsPage() {
                 <p className="font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
               </div>
             </div>
+            <div className="flex justify-end mt-4 pt-4 border-t">
+              <Link href={`/implants/${implantData.implant.id}`}>
+                <span className="text-sm text-primary flex items-center cursor-pointer hover:underline" data-testid="link-view-catalog-implant">
+                  Voir l'implant
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </span>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Informations de pose</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="text-sm text-muted-foreground">Position</span>
+                <p className="font-medium" data-testid="text-position">
+                  {implantData.positionImplant?.replace(/_/g, " ") || "—"}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Site FDI</span>
+                <p className="font-medium font-mono" data-testid="text-site-fdi">{implantData.siteFdi}</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Type d'os</span>
+                <p className="font-medium" data-testid="text-type-os">{implantData.typeOs || "—"}</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Greffe</span>
+                <p className="font-medium" data-testid="text-greffe">
+                  {implantData.greffeOsseuse ? (implantData.typeGreffe || "Oui") : "Non"}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -512,81 +571,18 @@ export default function ImplantDetailsPage() {
             <FileText className="h-4 w-4" />
             Actes chirurgicaux avec cet implant
           </CardTitle>
-          <div className="flex items-center gap-2">
-            {selectedActs.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => {
-                  toast({
-                    title: "Suppression",
-                    description: `${selectedActs.length} acte(s) sélectionné(s) pour suppression`,
-                  });
-                  setSelectedActs([]);
-                }}
-                data-testid="button-delete-selected"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Supprimer ({selectedActs.length})
-              </Button>
-            )}
-            <Sheet open={newActSheetOpen} onOpenChange={setNewActSheetOpen}>
-              <SheetTrigger asChild>
-                <Button size="sm" data-testid="button-new-act">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Nouvel acte
-                </Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>Nouvel acte chirurgical</SheetTitle>
-                </SheetHeader>
-                <div className="py-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label>Date de l'intervention</Label>
-                    <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} data-testid="input-act-date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Type d'intervention</Label>
-                    <Select defaultValue="POSE_IMPLANT">
-                      <SelectTrigger data-testid="select-act-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="POSE_IMPLANT">Pose d'implant</SelectItem>
-                        <SelectItem value="GREFFE_OSSEUSE">Greffe osseuse</SelectItem>
-                        <SelectItem value="SINUS_LIFT">Sinus lift</SelectItem>
-                        <SelectItem value="REPRISE_IMPLANT">Reprise d'implant</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Site (notation FDI)</Label>
-                    <Input placeholder="Ex: 36" data-testid="input-act-site" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Notes</Label>
-                    <Textarea placeholder="Notes sur l'intervention..." data-testid="input-act-notes" />
-                  </div>
-                  <div className="pt-4">
-                    <Button 
-                      className="w-full" 
-                      onClick={() => {
-                        setNewActSheetOpen(false);
-                        toast({
-                          title: "Acte créé",
-                          description: "L'acte chirurgical a été créé avec succès",
-                        });
-                      }}
-                      data-testid="button-create-act"
-                    >
-                      Créer l'acte
-                    </Button>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+          {selectedActs.length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => deleteMutation.mutate(selectedActs)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-delete-selected"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              {deleteMutation.isPending ? "Suppression..." : `Supprimer (${selectedActs.length})`}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <Table>

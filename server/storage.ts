@@ -98,6 +98,8 @@ export interface IStorage {
   getSurgeryImplantsByCatalogImplant(organisationId: string, implantId: string): Promise<SurgeryImplantWithDetails[]>;
   getAllSurgeryImplants(organisationId: string): Promise<SurgeryImplantWithDetails[]>;
   filterSurgeryImplants(organisationId: string, filters: ImplantFilters): Promise<ImplantWithPatient[]>;
+  createSurgeryImplant(organisationId: string, data: InsertSurgeryImplant): Promise<SurgeryImplant>;
+  deleteSurgeryImplants(organisationId: string, ids: string[]): Promise<number>;
 
   // Radio methods
   getRadio(organisationId: string, id: string): Promise<Radio | undefined>;
@@ -110,6 +112,7 @@ export interface IStorage {
   getVisite(organisationId: string, id: string): Promise<Visite | undefined>;
   getImplantVisites(organisationId: string, implantId: string): Promise<Visite[]>;
   createVisite(organisationId: string, visite: InsertVisite): Promise<Visite>;
+  getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; notes: string | null }>>;
 
   // Prothese methods
   createProthese(organisationId: string, prothese: InsertProthese): Promise<Prothese>;
@@ -661,6 +664,30 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async createSurgeryImplant(organisationId: string, data: InsertSurgeryImplant): Promise<SurgeryImplant> {
+    const [newSurgeryImplant] = await db.insert(surgeryImplants).values({
+      ...data,
+      organisationId,
+    }).returning();
+    return newSurgeryImplant;
+  }
+
+  async deleteSurgeryImplants(organisationId: string, ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    
+    let deletedCount = 0;
+    for (const id of ids) {
+      const result = await db.delete(surgeryImplants)
+        .where(and(
+          eq(surgeryImplants.id, id),
+          eq(surgeryImplants.organisationId, organisationId)
+        ))
+        .returning();
+      if (result.length > 0) deletedCount++;
+    }
+    return deletedCount;
+  }
+
   // ========== RADIOS ==========
   async getRadio(organisationId: string, id: string): Promise<Radio | undefined> {
     const [radio] = await db.select().from(radios)
@@ -736,6 +763,25 @@ export class DatabaseStorage implements IStorage {
       organisationId,
     }).returning();
     return newVisite;
+  }
+
+  async getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; notes: string | null }>> {
+    const allVisites = await db
+      .select()
+      .from(visites)
+      .where(eq(visites.organisationId, organisationId))
+      .orderBy(desc(visites.date));
+
+    const lastVisitByPatient: Record<string, { date: string; notes: string | null }> = {};
+    for (const visite of allVisites) {
+      if (!lastVisitByPatient[visite.patientId]) {
+        lastVisitByPatient[visite.patientId] = {
+          date: visite.date,
+          notes: visite.notes,
+        };
+      }
+    }
+    return lastVisitByPatient;
   }
 
   // ========== PROTHESES ==========
