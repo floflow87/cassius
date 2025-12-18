@@ -95,10 +95,73 @@ export function DocumentUploadForm({
     },
   });
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      processFile(file);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
+  const handleRemoveFile = () => {
+    setUploadedFile(null);
+    form.setValue("filePath", "");
+    form.setValue("fileName", "");
+    form.setValue("mimeType", "");
+    form.setValue("sizeBytes", 0);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const toggleTag = (tag: string) => {
+    const currentTags = form.getValues("tags");
+    if (currentTags.includes(tag)) {
+      form.setValue("tags", currentTags.filter(t => t !== tag));
+    } else {
+      form.setValue("tags", [...currentTags, tag]);
+    }
+  };
+
+  const onSubmit = (data: FormData) => {
+    mutation.mutate(data);
+  };
+
+  const selectedTags = form.watch("tags");
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      processFile(file);
+    }
+  };
+
+  const processFile = async (file: File) => {
     if (!ACCEPTED_TYPES.includes(file.type)) {
       setUploadError("Type de fichier non supporte. Utilisez uniquement des fichiers PDF.");
       return;
@@ -164,37 +227,12 @@ export function DocumentUploadForm({
       });
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
-  const handleRemoveFile = () => {
-    setUploadedFile(null);
-    form.setValue("filePath", "");
-    form.setValue("fileName", "");
-    form.setValue("mimeType", "");
-    form.setValue("sizeBytes", 0);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+  const handleFileClick = () => {
+    fileInputRef.current?.click();
   };
-
-  const toggleTag = (tag: string) => {
-    const currentTags = form.getValues("tags");
-    if (currentTags.includes(tag)) {
-      form.setValue("tags", currentTags.filter(t => t !== tag));
-    } else {
-      form.setValue("tags", [...currentTags, tag]);
-    }
-  };
-
-  const onSubmit = (data: FormData) => {
-    mutation.mutate(data);
-  };
-
-  const selectedTags = form.watch("tags");
 
   return (
     <Form {...form}>
@@ -264,17 +302,29 @@ export function DocumentUploadForm({
                       </Button>
                     </div>
                   ) : (
-                    <div className="relative">
+                    <div>
                       <input
                         ref={fileInputRef}
                         type="file"
                         accept=".pdf,application/pdf"
                         onChange={handleFileSelect}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        className="hidden"
                         disabled={isUploading}
                         data-testid="input-document-file"
                       />
-                      <div className="flex items-center justify-center gap-2 p-6 border-2 border-dashed rounded-md hover-elevate">
+                      <div 
+                        onClick={handleFileClick}
+                        onDragOver={handleDragOver}
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        className={`flex items-center justify-center gap-2 p-6 border-2 border-dashed rounded-md cursor-pointer transition-colors ${
+                          isDragging 
+                            ? "border-primary bg-primary/10" 
+                            : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
+                        }`}
+                        data-testid="dropzone-document"
+                      >
                         {isUploading ? (
                           <>
                             <Loader2 className="h-5 w-5 animate-spin" />
