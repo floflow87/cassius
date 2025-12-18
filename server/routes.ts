@@ -353,25 +353,15 @@ export async function registerRoutes(
     }
   });
 
-  // Legacy route - retourne les implants catalogue
+  // Route catalogue - retourne les implants du catalogue produit
   app.get("/api/implants", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
     try {
-      const { marque, siteFdi, typeOs, statut } = req.query;
-      if (marque || siteFdi || typeOs || statut) {
-        const filtered = await storage.filterSurgeryImplants(organisationId, {
-          marque: marque as string,
-          siteFdi: siteFdi as string,
-          typeOs: typeOs as string,
-          statut: statut as string,
-        });
-        return res.json(filtered);
-      }
-      // Retourne tous les surgery_implants enrichis (comportement équivalent à l'ancien)
-      const surgeryImplants = await storage.getAllSurgeryImplants(organisationId);
-      res.json(surgeryImplants);
+      // Retourne le catalogue d'implants (sans données de pose)
+      const catalogueImplants = await storage.getAllImplants(organisationId);
+      res.json(catalogueImplants);
     } catch (error) {
       console.error("Error fetching implants:", error);
       res.status(500).json({ error: "Failed to fetch implants" });
