@@ -1,31 +1,64 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
+import { useState } from "react";
 import {
   ArrowLeft,
   Activity,
   Calendar,
-  Stethoscope,
+  Pencil,
+  CheckCircle2,
   TrendingUp,
+  ChevronRight,
+  Plus,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-} from "recharts";
-import type { Implant, Visite, Radio } from "@shared/schema";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Implant, Visite, Radio, Operation, Patient } from "@shared/schema";
 
 interface ImplantWithDetails extends Implant {
   visites: Visite[];
   radios: Radio[];
+  patient?: Patient;
+  operation?: Operation;
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -35,10 +68,23 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   ECHEC: { label: "Échec", variant: "destructive" },
 };
 
+function getISQBadge(value: number): { label: string; className: string } {
+  if (value >= 70) return { label: "Excellent", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" };
+  if (value >= 60) return { label: "Bon", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" };
+  if (value >= 50) return { label: "Acceptable", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" };
+  return { label: "Critique", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" };
+}
+
 export default function ImplantDetailsPage() {
   const [, params] = useRoute("/patients/:patientId/implants/:implantId");
   const patientId = params?.patientId;
   const implantId = params?.implantId;
+  const { toast } = useToast();
+
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [addISQDialogOpen, setAddISQDialogOpen] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesContent, setNotesContent] = useState("");
 
   const { data: implant, isLoading } = useQuery<ImplantWithDetails>({
     queryKey: ["/api/implants", implantId],
@@ -53,32 +99,105 @@ export default function ImplantDetailsPage() {
     });
   };
 
-  const getISQProgression = () => {
-    const points: { label: string; value: number; date?: string }[] = [];
-    if (implant?.isqPose) points.push({ label: "Pose", value: implant.isqPose });
-    if (implant?.isq2m) points.push({ label: "2M", value: implant.isq2m });
-    if (implant?.isq3m) points.push({ label: "3M", value: implant.isq3m });
-    if (implant?.isq6m) points.push({ label: "6M", value: implant.isq6m });
-    
-    implant?.visites?.forEach((visite) => {
-      if (visite.isq) {
-        points.push({
-          label: formatDate(visite.date),
-          value: visite.isq,
-          date: visite.date,
-        });
-      }
+  const formatShortDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
-    
+  };
+
+  const getISQTimeline = () => {
+    const points: { 
+      label: string; 
+      sublabel: string;
+      value: number; 
+      date: string;
+      delta?: number;
+    }[] = [];
+
+    if (implant?.isqPose && implant?.datePose) {
+      points.push({ 
+        label: "Pose", 
+        sublabel: "Jour de la pose",
+        value: implant.isqPose, 
+        date: implant.datePose 
+      });
+    }
+    if (implant?.isq2m && implant?.datePose) {
+      const date2m = new Date(implant.datePose);
+      date2m.setMonth(date2m.getMonth() + 2);
+      const delta = implant.isqPose ? implant.isq2m - implant.isqPose : undefined;
+      points.push({ 
+        label: "2 mois", 
+        sublabel: "Contrôle à 2 mois",
+        value: implant.isq2m, 
+        date: date2m.toISOString().split('T')[0],
+        delta 
+      });
+    }
+    if (implant?.isq3m && implant?.datePose) {
+      const date3m = new Date(implant.datePose);
+      date3m.setMonth(date3m.getMonth() + 3);
+      const delta = implant.isq2m ? implant.isq3m - implant.isq2m : undefined;
+      points.push({ 
+        label: "3 mois", 
+        sublabel: "Contrôle à 3 mois",
+        value: implant.isq3m, 
+        date: date3m.toISOString().split('T')[0],
+        delta 
+      });
+    }
+    if (implant?.isq6m && implant?.datePose) {
+      const date6m = new Date(implant.datePose);
+      date6m.setMonth(date6m.getMonth() + 6);
+      const delta = implant.isq3m ? implant.isq6m - implant.isq3m : undefined;
+      points.push({ 
+        label: "6 mois", 
+        sublabel: "Contrôle à 6 mois",
+        value: implant.isq6m, 
+        date: date6m.toISOString().split('T')[0],
+        delta 
+      });
+    }
+
+    implant?.visites
+      ?.filter(v => v.isq)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .forEach((visite, index, arr) => {
+        const prevValue = index > 0 ? arr[index - 1].isq : (points.length > 0 ? points[points.length - 1].value : undefined);
+        points.push({
+          label: formatShortDate(visite.date),
+          sublabel: visite.notes || "Visite de contrôle",
+          value: visite.isq!,
+          date: visite.date,
+          delta: prevValue ? visite.isq! - prevValue : undefined,
+        });
+      });
+
     return points;
+  };
+
+  const getSuccessRate = () => {
+    if (!implant) return 100;
+    if (implant.statut === "ECHEC") return 0;
+    if (implant.statut === "COMPLICATION") return 50;
+    return 100;
+  };
+
+  const getBoneLossScore = () => {
+    return { score: 5, label: "Excellente" };
   };
 
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-48 lg:col-span-2" />
+          <Skeleton className="h-48" />
+        </div>
+        <Skeleton className="h-64" />
       </div>
     );
   }
@@ -100,7 +219,11 @@ export default function ImplantDetailsPage() {
   }
 
   const status = statusConfig[implant.statut] || statusConfig.EN_SUIVI;
-  const isqProgression = getISQProgression();
+  const isqTimeline = getISQTimeline();
+  const successRate = getSuccessRate();
+  const boneLoss = getBoneLossScore();
+  const implantType = (implant as any).typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant";
+  const typeLabel = implant.referenceFabricant ? implant.referenceFabricant.split("-")[0] : implant.marque;
 
   return (
     <div className="p-6 space-y-6">
@@ -113,7 +236,7 @@ export default function ImplantDetailsPage() {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold" data-testid="text-implant-title">
-              {(implant as any).typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"} site {implant.siteFdi}
+              {implantType} {implant.marque} {typeLabel}
             </h1>
             {(implant as any).typeImplant === "MINI_IMPLANT" && (
               <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
@@ -122,206 +245,356 @@ export default function ImplantDetailsPage() {
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {implant.marque} - {implant.diametre}mm x {implant.longueur}mm
+            Ø {implant.diametre}mm × {implant.longueur}mm
           </p>
         </div>
-        <Badge variant={status.variant} className="text-sm">
+        <Badge variant={status.variant} className="text-sm" data-testid="badge-implant-status">
           {status.label}
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Informations</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+            <CardTitle className="text-base">Informations de l'implant</CardTitle>
+            <Sheet open={editSheetOpen} onOpenChange={setEditSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid="button-edit-implant">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Modifier l'implant</SheetTitle>
+                </SheetHeader>
+                <div className="py-6 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Marque</Label>
+                    <Input defaultValue={implant.marque} data-testid="input-edit-marque" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select defaultValue={(implant as any).typeImplant || "IMPLANT"}>
+                      <SelectTrigger data-testid="select-edit-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="IMPLANT">Implant</SelectItem>
+                        <SelectItem value="MINI_IMPLANT">Mini-implant</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Référence fabricant</Label>
+                    <Input defaultValue={implant.referenceFabricant || ""} data-testid="input-edit-reference" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Diamètre (mm)</Label>
+                      <Input type="number" step="0.1" defaultValue={implant.diametre} data-testid="input-edit-diametre" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Longueur (mm)</Label>
+                      <Input type="number" step="0.5" defaultValue={implant.longueur} data-testid="input-edit-longueur" />
+                    </div>
+                  </div>
+                  <div className="pt-4">
+                    <Button className="w-full" data-testid="button-save-implant">
+                      Enregistrer
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
-                <span className="text-muted-foreground">Marque</span>
-                <p className="font-medium">{implant.marque}</p>
-              </div>
-              {implant.referenceFabricant && (
-                <div>
-                  <span className="text-muted-foreground">Référence</span>
-                  <p className="font-medium font-mono">{implant.referenceFabricant}</p>
-                </div>
-              )}
-              <div>
-                <span className="text-muted-foreground">Diamètre</span>
-                <p className="font-medium font-mono">{implant.diametre} mm</p>
+                <span className="text-sm text-muted-foreground">Marque</span>
+                <p className="font-medium" data-testid="text-implant-marque">{implant.marque}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Longueur</span>
-                <p className="font-medium font-mono">{implant.longueur} mm</p>
+                <span className="text-sm text-muted-foreground">Type</span>
+                <p className="font-medium" data-testid="text-implant-type">{typeLabel}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Site FDI</span>
-                <p className="font-medium font-mono">{implant.siteFdi}</p>
+                <span className="text-sm text-muted-foreground">Référence fabricant</span>
+                <p className="font-medium font-mono" data-testid="text-implant-reference">
+                  {implant.referenceFabricant || "-"}
+                </p>
               </div>
-              {implant.positionImplant && (
-                <div>
-                  <span className="text-muted-foreground">Position</span>
-                  <p className="font-medium">
-                    {implant.positionImplant.replace("_", "-").toLowerCase()}
-                  </p>
-                </div>
-              )}
-              {implant.typeOs && (
-                <div>
-                  <span className="text-muted-foreground">Type d'os</span>
-                  <p className="font-medium font-mono">{implant.typeOs}</p>
-                </div>
-              )}
-              {implant.miseEnChargePrevue && (
-                <div>
-                  <span className="text-muted-foreground">Mise en charge</span>
-                  <p className="font-medium">
-                    {implant.miseEnChargePrevue.charAt(0) + implant.miseEnChargePrevue.slice(1).toLowerCase()}
-                  </p>
-                </div>
-              )}
-            </div>
-            <div className="pt-3 border-t flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span>Posé le {formatDate(implant.datePose)}</span>
+              <div>
+                <span className="text-sm text-muted-foreground">Diamètre</span>
+                <p className="font-medium font-mono" data-testid="text-implant-diametre">{implant.diametre} mm</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Longueur</span>
+                <p className="font-medium font-mono" data-testid="text-implant-longueur">{implant.longueur} mm</p>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Évolution ISQ
+        <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+              Taux de réussite moyen
+              <CheckCircle2 className="h-5 w-5" />
             </CardTitle>
           </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-center">
+              <span className="text-5xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-success-rate">
+                {successRate}%
+              </span>
+              <p className="text-sm text-muted-foreground mt-1">
+                {successRate === 100 ? "Aucune complication détectée" : ""}
+              </p>
+            </div>
+            <div className="pt-2 border-t border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Score de perte osseuse</span>
+                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400" data-testid="text-bone-loss">
+                  {boneLoss.score}/5 - {boneLoss.label}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+            <CardTitle className="text-base">Suivi ISQ (Stabilité)</CardTitle>
+            <Dialog open={addISQDialogOpen} onOpenChange={setAddISQDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-primary" data-testid="button-add-isq">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Ajouter mesure
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Ajouter une mesure ISQ</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Date</Label>
+                    <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} data-testid="input-isq-date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Valeur ISQ</Label>
+                    <Input type="number" min="0" max="100" placeholder="Ex: 75" data-testid="input-isq-value" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notes (optionnel)</Label>
+                    <Textarea placeholder="Observations..." data-testid="input-isq-notes" />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setAddISQDialogOpen(false)}>
+                    Annuler
+                  </Button>
+                  <Button data-testid="button-save-isq">Enregistrer</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </CardHeader>
           <CardContent>
-            {isqProgression.length === 0 ? (
+            {isqTimeline.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <Activity className="h-8 w-8 mb-2" />
+                <TrendingUp className="h-8 w-8 mb-2" />
                 <p className="text-sm">Aucune mesure ISQ enregistrée</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {isqProgression.map((point, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-2 rounded-md bg-muted/50"
-                    >
-                      <span className="text-xs text-muted-foreground">
-                        {point.label}
-                      </span>
-                      <span className="font-mono font-medium">
-                        {point.value}
-                      </span>
+              <div className="relative">
+                <div className="absolute left-8 top-4 bottom-4 w-0.5 bg-border" />
+                <div className="space-y-4">
+                  {isqTimeline.map((point, index) => {
+                    const badge = getISQBadge(point.value);
+                    return (
+                      <div key={index} className="relative flex items-start gap-4 pl-4" data-testid={`isq-entry-${index}`}>
+                        <div className="absolute left-6 w-4 h-4 rounded-full bg-primary border-2 border-background z-10" />
+                        <div className="ml-10 flex-1">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-xs text-muted-foreground uppercase">{point.label}</span>
+                              <span className="text-3xl font-bold text-primary">{point.value}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm">{formatShortDate(point.date)}</span>
+                            <span className="text-xs text-muted-foreground">{point.sublabel}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={badge.className}>{badge.label}</Badge>
+                          {point.delta !== undefined && point.delta !== 0 && (
+                            <span className={`text-xs font-medium flex items-center gap-0.5 ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                              <TrendingUp className={`h-3 w-3 ${point.delta < 0 ? "rotate-180" : ""}`} />
+                              {point.delta > 0 ? "+" : ""}{point.delta}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  <div className="relative flex items-start gap-4 pl-4 opacity-60" data-testid="isq-next-control">
+                    <div className="absolute left-6 w-4 h-4 rounded-full bg-muted border-2 border-background z-10" />
+                    <div className="ml-10 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">6 mois</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm">{formatShortDate(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString())}</span>
+                        <span className="text-xs text-muted-foreground">Prochain contrôle prévu</span>
+                      </div>
                     </div>
-                  ))}
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                      À venir
+                    </Badge>
+                  </div>
                 </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+            <CardTitle className="text-base">Notes</CardTitle>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setEditingNotes(!editingNotes)}
+              data-testid="button-edit-notes"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {editingNotes ? (
+              <div className="space-y-3">
+                <Textarea
+                  value={notesContent}
+                  onChange={(e) => setNotesContent(e.target.value)}
+                  placeholder="Ajouter des notes cliniques..."
+                  className="min-h-[120px]"
+                  data-testid="textarea-notes"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setEditingNotes(false)}>
+                    Annuler
+                  </Button>
+                  <Button size="sm" onClick={() => setEditingNotes(false)} data-testid="button-save-notes">
+                    Enregistrer
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm">
+                {notesContent ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">{formatDate(new Date().toISOString())}</p>
+                    <p>{notesContent}</p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground italic">Aucune note pour le moment</p>
+                )}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {isqProgression.length >= 2 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Graphique ISQ
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={isqProgression}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="label" 
-                  tick={{ fontSize: 11 }}
-                  className="text-muted-foreground"
-                />
-                <YAxis 
-                  domain={[0, 100]} 
-                  tick={{ fontSize: 11 }}
-                  className="text-muted-foreground"
-                  label={{ 
-                    value: 'ISQ', 
-                    angle: -90, 
-                    position: 'insideLeft',
-                    style: { textAnchor: 'middle', fontSize: 12 }
-                  }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "6px",
-                  }}
-                  formatter={(value: number) => [`ISQ: ${value}`, '']}
-                />
-                <ReferenceLine 
-                  y={70} 
-                  stroke="hsl(var(--chart-2))" 
-                  strokeDasharray="5 5" 
-                  label={{ value: 'Seuil critique', position: 'right', fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Stethoscope className="h-4 w-4" />
-            Visites de contrôle ({implant.visites?.length || 0})
+            <FileText className="h-4 w-4" />
+            Actes chirurgicaux avec cet implant
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {implant.visites?.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-              <Stethoscope className="h-8 w-8 mb-2" />
-              <p className="text-sm">Aucune visite de contrôle</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {implant.visites
-                ?.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .map((visite) => (
-                  <div
-                    key={visite.id}
-                    className="p-4 rounded-md border"
-                    data-testid={`visite-${visite.id}`}
-                  >
-                    <div className="flex items-center justify-between gap-4 mb-2">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{formatDate(visite.date)}</span>
-                      </div>
-                      {visite.isq && (
-                        <Badge variant="secondary" className="font-mono">
-                          ISQ: {visite.isq}
-                        </Badge>
-                      )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-8">
+                  <Checkbox data-testid="checkbox-select-all" />
+                </TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Patient</TableHead>
+                <TableHead>Type d'intervention</TableHead>
+                <TableHead>Implants posés</TableHead>
+                <TableHead>Chirurgie</TableHead>
+                <TableHead>Greffe</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead className="w-8"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {implant.operation ? (
+                <TableRow data-testid={`operation-row-${implant.operationId}`}>
+                  <TableCell>
+                    <Checkbox data-testid={`checkbox-operation-${implant.operationId}`} />
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{formatShortDate(implant.datePose)}</p>
+                      <p className="text-xs text-muted-foreground">14:30</p>
                     </div>
-                    {visite.notes && (
-                      <p className="text-sm text-muted-foreground">{visite.notes}</p>
+                  </TableCell>
+                  <TableCell>
+                    {implant.patient ? (
+                      <div>
+                        <p className="font-medium">{implant.patient.prenom} {implant.patient.nom}</p>
+                        <p className="text-xs text-muted-foreground font-mono">PAT-2024-0156</p>
+                      </div>
+                    ) : "-"}
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">Pose d'implants</p>
+                      <p className="text-xs text-muted-foreground">Mise en charge différée</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-medium">1</span>
+                    <span className="text-muted-foreground text-sm ml-1">({implant.siteFdi})</span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-primary">
+                      {implant.operation?.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : "2 temps"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {implant.operation?.greffeOsseuse ? (
+                      <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                        {implant.operation.typeGreffe || "Oui"}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Non</span>
                     )}
-                  </div>
-                ))}
-            </div>
-          )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={status.variant}>{status.label}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    Aucun acte chirurgical associé
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

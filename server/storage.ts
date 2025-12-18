@@ -319,10 +319,22 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(desc(radios.date));
 
+    const [patient] = await db
+      .select()
+      .from(patients)
+      .where(eq(patients.id, implant.patientId));
+
+    const [operation] = await db
+      .select()
+      .from(operations)
+      .where(eq(operations.id, implant.operationId));
+
     return {
       ...implant,
       visites: implantVisites,
       radios: implantRadios,
+      patient: patient || undefined,
+      operation: operation || undefined,
     } as ImplantDetail;
   }
 
