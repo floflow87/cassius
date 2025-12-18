@@ -68,9 +68,14 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
       const saved = localStorage.getItem(STORAGE_KEY_COLUMNS);
       if (saved) {
         const savedOrder = JSON.parse(saved) as ColumnId[];
-        return savedOrder.map(id => defaultColumns.find(c => c.id === id)!).filter(Boolean);
+        const validIds = new Set(defaultColumns.map(c => c.id));
+        const validSavedOrder = savedOrder.filter(id => validIds.has(id));
+        if (validSavedOrder.length === defaultColumns.length) {
+          return validSavedOrder.map(id => defaultColumns.find(c => c.id === id)!);
+        }
       }
     } catch {}
+    localStorage.removeItem(STORAGE_KEY_COLUMNS);
     return defaultColumns;
   });
 
@@ -79,9 +84,13 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
       const saved = localStorage.getItem(STORAGE_KEY_SORT);
       if (saved) {
         const { column } = JSON.parse(saved);
-        return column;
+        const validIds = new Set(defaultColumns.map(c => c.id));
+        if (validIds.has(column)) {
+          return column;
+        }
       }
     } catch {}
+    localStorage.removeItem(STORAGE_KEY_SORT);
     return null;
   });
 
