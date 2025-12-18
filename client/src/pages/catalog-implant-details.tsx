@@ -1,10 +1,44 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Pencil, CheckCircle2, ChevronRight, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import {
+  ArrowLeft,
+  Activity,
+  Pencil,
+  CheckCircle2,
+  ChevronRight,
+  FileText,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { ImplantWithStats, SurgeryImplantWithDetails } from "@shared/schema";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -14,21 +48,14 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   ECHEC: { label: "Échec", variant: "destructive" },
 };
 
-const chirurgieTempsConfig: Record<string, { label: string; className: string }> = {
-  UN_TEMPS: { label: "1 temps", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
-  DEUX_TEMPS: { label: "2 temps", className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
-};
-
-const greffeConfig: Record<string, { label: string; className: string }> = {
-  autogene: { label: "Autogène", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
-  allogene: { label: "Allogène", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
-  xenogene: { label: "Xénogène", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
-};
-
 export default function CatalogImplantDetailsPage() {
   const [, params] = useRoute("/implants/:id");
   const implantId = params?.id;
   const [, setLocation] = useLocation();
+
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesContent, setNotesContent] = useState("");
 
   const { data: implant, isLoading: implantLoading } = useQuery<ImplantWithStats>({
     queryKey: ["/api/catalog-implants", implantId],
@@ -52,20 +79,31 @@ export default function CatalogImplantDetailsPage() {
 
   const isLoading = implantLoading || surgeriesLoading;
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  const formatShortDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-8 w-64" />
-        </div>
+        <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Skeleton className="h-48" />
-            <Skeleton className="h-64" />
-          </div>
+          <Skeleton className="h-48 lg:col-span-2" />
           <Skeleton className="h-48" />
         </div>
+        <Skeleton className="h-64" />
       </div>
     );
   }
@@ -73,34 +111,55 @@ export default function CatalogImplantDetailsPage() {
   if (!implant) {
     return (
       <div className="p-6">
-        <div className="flex flex-col items-center justify-center py-16">
-          <AlertCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-medium mb-2">Implant non trouvé</h3>
-          <Button variant="outline" onClick={() => setLocation("/implants")}>
-            Retour aux implants
-          </Button>
-        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Activity className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">Implant non trouvé</h3>
+            <Button variant="outline" onClick={() => setLocation("/implants")}>
+              Retour aux implants
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   const hasPoses = (implant.poseCount ?? 0) > 0;
   const successRate = implant.successRate ?? null;
-  const successRateColor = successRate === null ? "text-muted-foreground" 
-    : successRate >= 90 ? "text-emerald-500" 
-    : successRate >= 70 ? "text-amber-500" 
-    : "text-red-500";
+  const implantType = implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant";
+  const typeLabel = implant.referenceFabricant ? implant.referenceFabricant.split("-")[0] : implant.marque;
+
+  const getSuccessRateColor = () => {
+    if (successRate === null) return "text-muted-foreground";
+    if (successRate >= 90) return "text-emerald-600 dark:text-emerald-400";
+    if (successRate >= 70) return "text-amber-600 dark:text-amber-400";
+    return "text-red-600 dark:text-red-400";
+  };
+
+  const getSuccessRateCardStyle = () => {
+    if (!hasPoses || successRate === null) return "";
+    if (successRate >= 90) return "border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20";
+    if (successRate >= 70) return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20";
+    return "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20";
+  };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => setLocation("/implants")} data-testid="button-back">
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-xl font-semibold" data-testid="text-implant-title">
-            Implant {implant.marque} {implant.referenceFabricant || ""}
-          </h1>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold" data-testid="text-implant-title">
+              {implantType} {implant.marque} {typeLabel}
+            </h1>
+            {implant.typeImplant === "MINI_IMPLANT" && (
+              <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                Mini
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             Ø {implant.diametre}mm × {implant.longueur}mm
           </p>
@@ -108,216 +167,289 @@ export default function CatalogImplantDetailsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
-              <CardTitle className="text-base">Informations de l'implant</CardTitle>
-              <Button variant="ghost" size="icon" data-testid="button-edit-implant">
-                <Pencil className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Marque</p>
-                  <p className="font-medium">{implant.marque}</p>
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+            <CardTitle className="text-base">Informations de l'implant</CardTitle>
+            <Sheet open={editSheetOpen} onOpenChange={setEditSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid="button-edit-implant">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Modifier l'implant</SheetTitle>
+                </SheetHeader>
+                <div className="py-6 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Marque</Label>
+                    <Input defaultValue={implant.marque} data-testid="input-edit-marque" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select defaultValue={implant.typeImplant || "IMPLANT"}>
+                      <SelectTrigger data-testid="select-edit-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="IMPLANT">Implant</SelectItem>
+                        <SelectItem value="MINI_IMPLANT">Mini-implant</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Référence fabricant</Label>
+                    <Input defaultValue={implant.referenceFabricant || ""} data-testid="input-edit-reference" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Diamètre (mm)</Label>
+                      <Input type="number" step="0.1" defaultValue={implant.diametre} data-testid="input-edit-diametre" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Longueur (mm)</Label>
+                      <Input type="number" step="0.5" defaultValue={implant.longueur} data-testid="input-edit-longueur" />
+                    </div>
+                  </div>
+                  <div className="pt-4">
+                    <Button className="w-full" data-testid="button-save-implant">
+                      Enregistrer
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Type</p>
-                  <p className="font-medium">{implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Référence fabricant</p>
-                  <p className="font-medium">{implant.referenceFabricant || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Diamètre</p>
-                  <p className="font-medium">{implant.diametre} mm</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Longueur</p>
-                  <p className="font-medium">{implant.longueur} mm</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Numéro de lot</p>
-                  <p className="font-medium">{implant.lot || "—"}</p>
-                </div>
+              </SheetContent>
+            </Sheet>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div>
+                <span className="text-sm text-muted-foreground">Marque</span>
+                <p className="font-medium" data-testid="text-implant-marque">{implant.marque}</p>
               </div>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-4">
-            <h2 className="text-base font-semibold">Actes chirurgicaux avec cet implant</h2>
-            <div className="bg-card rounded-lg border border-border overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="w-10 px-3 py-2">
-                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300" />
-                      </th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Date</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Patient</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Type d'intervention</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Site</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Chirurgie</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Greffe</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Statut</th>
-                      <th className="w-8"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(!surgeries || surgeries.length === 0) ? (
-                      <tr>
-                        <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
-                          Aucun acte chirurgical avec cet implant
-                        </td>
-                      </tr>
-                    ) : (
-                      surgeries.map((surgery) => {
-                        const status = statusConfig[surgery.statut] || { label: surgery.statut, variant: "secondary" as const };
-                        const chirurgieTemps = surgery.typeChirurgieTemps ? chirurgieTempsConfig[surgery.typeChirurgieTemps] : null;
-                        const greffeType = surgery.typeGreffe?.toLowerCase();
-                        const greffe = greffeType && greffeConfig[greffeType] ? greffeConfig[greffeType] : null;
-                        const interventionType = surgery.surgery?.typeIntervention?.replace(/_/g, " ").toLowerCase() || "—";
-
-                        return (
-                          <tr 
-                            key={surgery.id} 
-                            className={`border-b hover-elevate ${surgery.patient ? "cursor-pointer" : ""}`}
-                            onClick={() => {
-                              if (surgery.patient) {
-                                setLocation(`/patients/${surgery.patient.id}/implants/${surgery.id}`);
-                              }
-                            }}
-                            data-testid={`row-surgery-${surgery.id}`}
-                          >
-                            <td className="px-3 py-2">
-                              <input 
-                                type="checkbox" 
-                                className="h-4 w-4 rounded border-gray-300"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <p className="text-sm font-medium">
-                                {new Date(surgery.datePose).toLocaleDateString("fr-FR")}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(surgery.datePose).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                              </p>
-                            </td>
-                            <td className="px-3 py-2">
-                              {surgery.patient ? (
-                                <>
-                                  <p className="text-sm font-medium">
-                                    {surgery.patient.prenom} {surgery.patient.nom}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    PAT-{surgery.patient.id.substring(0, 8).toUpperCase()}
-                                  </p>
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              <p className="text-sm capitalize">{interventionType}</p>
-                              {surgery.miseEnCharge && (
-                                <p className="text-xs text-muted-foreground capitalize">
-                                  Mise en charge {surgery.miseEnCharge.toLowerCase()}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              <p className="text-sm font-medium">{surgery.siteFdi}</p>
-                            </td>
-                            <td className="px-3 py-2">
-                              {chirurgieTemps ? (
-                                <Badge className={chirurgieTemps.className}>{chirurgieTemps.label}</Badge>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              {surgery.greffeOsseuse && greffe ? (
-                                <Badge className={greffe.className}>{greffe.label}</Badge>
-                              ) : surgery.greffeOsseuse ? (
-                                <Badge variant="secondary">Oui</Badge>
-                              ) : (
-                                <span className="text-muted-foreground">Non</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              <Badge variant={status.variant}>{status.label}</Badge>
-                            </td>
-                            <td className="px-3 py-2">
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+              <div>
+                <span className="text-sm text-muted-foreground">Type</span>
+                <p className="font-medium" data-testid="text-implant-type">
+                  {implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Référence fabricant</span>
+                <p className="font-medium font-mono" data-testid="text-implant-reference">
+                  {implant.referenceFabricant || "—"}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Diamètre</span>
+                <p className="font-medium font-mono" data-testid="text-implant-diametre">{implant.diametre} mm</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Longueur</span>
+                <p className="font-medium font-mono" data-testid="text-implant-longueur">{implant.longueur} mm</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Numéro de lot</span>
+                <p className="font-medium font-mono">{implant.lot || "—"}</p>
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="space-y-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <p className="text-sm text-muted-foreground">Taux de réussite moyen</p>
-                  {successRate !== null && successRate >= 90 && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
-                </div>
-                <p className={`text-4xl font-bold ${successRateColor}`} data-testid="text-success-rate">
-                  {hasPoses && successRate !== null ? `${successRate}%` : "—"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {!hasPoses 
-                    ? "Aucune pose enregistrée"
-                    : successRate !== null && successRate >= 90 
-                      ? "Aucune complication détectée" 
-                      : successRate !== null && successRate >= 70 
-                        ? "Quelques complications mineures" 
-                        : "Attention requise"}
-                </p>
-              </div>
-              <div className="mt-4 pt-4 border-t flex items-center justify-between">
+        <Card className={getSuccessRateCardStyle()}>
+          <CardHeader className="pb-2">
+            <CardTitle className={`text-base flex items-center gap-2 ${hasPoses && successRate !== null && successRate >= 90 ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
+              Taux de réussite moyen
+              {hasPoses && successRate !== null && successRate >= 90 && <CheckCircle2 className="h-5 w-5" />}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-center">
+              <span className={`text-5xl font-bold ${getSuccessRateColor()}`} data-testid="text-success-rate">
+                {hasPoses && successRate !== null ? `${successRate}%` : "—"}
+              </span>
+              <p className="text-sm text-muted-foreground mt-1">
+                {!hasPoses 
+                  ? "Aucune pose enregistrée"
+                  : successRate !== null && successRate >= 90 
+                    ? "Aucune complication détectée" 
+                    : successRate !== null && successRate >= 70 
+                      ? "Quelques complications mineures" 
+                      : "Attention requise"}
+              </p>
+            </div>
+            <div className="pt-2 border-t">
+              <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Nombre de poses</span>
                 <span className="text-sm font-medium">{implant.poseCount || 0}</span>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-base">Notes</CardTitle>
-              <Button variant="ghost" size="icon">
-                <Pencil className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {implant.lastPoseDate ? (
-                <>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Dernière pose: {new Date(implant.lastPoseDate).toLocaleDateString("fr-FR")}
-                  </p>
-                  <p className="text-sm">
-                    Cet implant a été utilisé {implant.poseCount} fois avec un taux de réussite de {successRate}%.
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Aucune pose enregistrée pour cet implant.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Actes chirurgicaux avec cet implant
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-8">
+                    <Checkbox data-testid="checkbox-select-all" />
+                  </TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Patient</TableHead>
+                  <TableHead>Type d'intervention</TableHead>
+                  <TableHead>Site</TableHead>
+                  <TableHead>Chirurgie</TableHead>
+                  <TableHead>Greffe</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead className="w-8"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(!surgeries || surgeries.length === 0) ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      Aucun acte chirurgical avec cet implant
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  surgeries.map((surgery) => {
+                    const status = statusConfig[surgery.statut] || { label: surgery.statut, variant: "secondary" as const };
+                    const interventionType = surgery.surgery?.typeIntervention?.replace(/_/g, " ").toLowerCase() || "—";
+
+                    return (
+                      <TableRow 
+                        key={surgery.id}
+                        className={surgery.patient ? "cursor-pointer hover-elevate" : ""}
+                        onClick={() => {
+                          if (surgery.patient) {
+                            setLocation(`/patients/${surgery.patient.id}/implants/${surgery.id}`);
+                          }
+                        }}
+                        data-testid={`row-surgery-${surgery.id}`}
+                      >
+                        <TableCell>
+                          <Checkbox 
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`checkbox-surgery-${surgery.id}`} 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{formatShortDate(surgery.datePose)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(surgery.datePose).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {surgery.patient ? (
+                            <div>
+                              <p className="font-medium">{surgery.patient.prenom} {surgery.patient.nom}</p>
+                              <p className="text-xs text-muted-foreground font-mono">
+                                PAT-{surgery.patient.id.substring(0, 8).toUpperCase()}
+                              </p>
+                            </div>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium capitalize">{interventionType}</p>
+                            {surgery.miseEnCharge && (
+                              <p className="text-xs text-muted-foreground capitalize">
+                                Mise en charge {surgery.miseEnCharge.toLowerCase()}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{surgery.siteFdi}</span>
+                        </TableCell>
+                        <TableCell>
+                          {surgery.surgery?.typeChirurgieTemps ? (
+                            <Badge variant="outline" className="text-primary">
+                              {surgery.surgery.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : "2 temps"}
+                            </Badge>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {surgery.greffeOsseuse ? (
+                            <Badge variant="secondary">Oui</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">Non</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={status.variant}>{status.label}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+            <CardTitle className="text-base">Notes</CardTitle>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setEditingNotes(!editingNotes)}
+              data-testid="button-edit-notes"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {editingNotes ? (
+              <div className="space-y-3">
+                <Textarea
+                  value={notesContent}
+                  onChange={(e) => setNotesContent(e.target.value)}
+                  placeholder="Ajouter des notes..."
+                  className="min-h-[120px]"
+                  data-testid="textarea-notes"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setEditingNotes(false)}>
+                    Annuler
+                  </Button>
+                  <Button size="sm" onClick={() => setEditingNotes(false)} data-testid="button-save-notes">
+                    Enregistrer
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm">
+                {implant.lastPoseDate ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Dernière pose: {formatDate(implant.lastPoseDate)}
+                    </p>
+                    <p>
+                      Cet implant a été utilisé {implant.poseCount} fois
+                      {successRate !== null && ` avec un taux de réussite de ${successRate}%`}.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground italic">Aucune note pour le moment</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
