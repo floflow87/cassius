@@ -57,6 +57,7 @@ export interface IStorage {
   createPatient(organisationId: string, patient: InsertPatient): Promise<Patient>;
   updatePatient(organisationId: string, id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined>;
   searchPatients(organisationId: string, query: string): Promise<Patient[]>;
+  getPatientImplantCounts(organisationId: string): Promise<Record<string, number>>;
 
   // Operation methods
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
@@ -262,6 +263,22 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(patients.createdAt));
+  }
+
+  async getPatientImplantCounts(organisationId: string): Promise<Record<string, number>> {
+    const result = await db
+      .select({
+        patientId: operations.patientId,
+      })
+      .from(surgeryImplants)
+      .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+      .where(eq(surgeryImplants.organisationId, organisationId));
+    
+    const counts: Record<string, number> = {};
+    for (const row of result) {
+      counts[row.patientId] = (counts[row.patientId] || 0) + 1;
+    }
+    return counts;
   }
 
   // ========== OPERATIONS ==========

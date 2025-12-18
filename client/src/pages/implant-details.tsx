@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link, useRoute } from "wouter";
+import { Link, useRoute, useLocation } from "wouter";
 import { useState } from "react";
 import {
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Plus,
   FileText,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,11 +74,14 @@ export default function ImplantDetailsPage() {
   const patientId = params?.patientId;
   const implantId = params?.implantId;
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [addISQDialogOpen, setAddISQDialogOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesContent, setNotesContent] = useState("");
+  const [selectedActs, setSelectedActs] = useState<string[]>([]);
+  const [newActSheetOpen, setNewActSheetOpen] = useState(false);
 
   const { data: implantData, isLoading } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
@@ -503,18 +507,105 @@ export default function ImplantDetailsPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-base flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Actes chirurgicaux avec cet implant
           </CardTitle>
+          <div className="flex items-center gap-2">
+            {selectedActs.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  toast({
+                    title: "Suppression",
+                    description: `${selectedActs.length} acte(s) sélectionné(s) pour suppression`,
+                  });
+                  setSelectedActs([]);
+                }}
+                data-testid="button-delete-selected"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Supprimer ({selectedActs.length})
+              </Button>
+            )}
+            <Sheet open={newActSheetOpen} onOpenChange={setNewActSheetOpen}>
+              <SheetTrigger asChild>
+                <Button size="sm" data-testid="button-new-act">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Nouvel acte
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Nouvel acte chirurgical</SheetTitle>
+                </SheetHeader>
+                <div className="py-6 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Date de l'intervention</Label>
+                    <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} data-testid="input-act-date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type d'intervention</Label>
+                    <Select defaultValue="POSE_IMPLANT">
+                      <SelectTrigger data-testid="select-act-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="POSE_IMPLANT">Pose d'implant</SelectItem>
+                        <SelectItem value="GREFFE_OSSEUSE">Greffe osseuse</SelectItem>
+                        <SelectItem value="SINUS_LIFT">Sinus lift</SelectItem>
+                        <SelectItem value="REPRISE_IMPLANT">Reprise d'implant</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Site (notation FDI)</Label>
+                    <Input placeholder="Ex: 36" data-testid="input-act-site" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notes</Label>
+                    <Textarea placeholder="Notes sur l'intervention..." data-testid="input-act-notes" />
+                  </div>
+                  <div className="pt-4">
+                    <Button 
+                      className="w-full" 
+                      onClick={() => {
+                        setNewActSheetOpen(false);
+                        toast({
+                          title: "Acte créé",
+                          description: "L'acte chirurgical a été créé avec succès",
+                        });
+                      }}
+                      data-testid="button-create-act"
+                    >
+                      Créer l'acte
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8">
-                  <Checkbox data-testid="checkbox-select-all" />
+                  <Checkbox 
+                    checked={implantData.surgery && selectedActs.includes(implantData.surgeryId)}
+                    onCheckedChange={(checked) => {
+                      if (implantData.surgery) {
+                        if (checked) {
+                          setSelectedActs([implantData.surgeryId]);
+                        } else {
+                          setSelectedActs([]);
+                        }
+                      }
+                    }}
+                    data-testid="checkbox-select-all" 
+                  />
                 </TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Patient</TableHead>
@@ -530,7 +621,17 @@ export default function ImplantDetailsPage() {
               {implantData.surgery ? (
                 <TableRow data-testid={`operation-row-${implantData.surgeryId}`}>
                   <TableCell>
-                    <Checkbox data-testid={`checkbox-operation-${implantData.surgeryId}`} />
+                    <Checkbox 
+                      checked={selectedActs.includes(implantData.surgeryId)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedActs([...selectedActs, implantData.surgeryId]);
+                        } else {
+                          setSelectedActs(selectedActs.filter(id => id !== implantData.surgeryId));
+                        }
+                      }}
+                      data-testid={`checkbox-operation-${implantData.surgeryId}`} 
+                    />
                   </TableCell>
                   <TableCell>
                     <div>

@@ -125,6 +125,19 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/patients/implant-counts", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const counts = await storage.getPatientImplantCounts(organisationId);
+      res.json(counts);
+    } catch (error) {
+      console.error("Error fetching implant counts:", error);
+      res.status(500).json({ error: "Failed to fetch implant counts" });
+    }
+  });
+
   app.get("/api/patients/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;

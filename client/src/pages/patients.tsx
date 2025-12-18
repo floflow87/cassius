@@ -130,6 +130,10 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     queryKey: ["/api/patients"],
   });
 
+  const { data: implantCounts } = useQuery<Record<string, number>>({
+    queryKey: ["/api/patients/implant-counts"],
+  });
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
@@ -171,6 +175,9 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         case "contact":
           comparison = (a.telephone || "").localeCompare(b.telephone || "");
           break;
+        case "implants":
+          comparison = (implantCounts?.[a.id] || 0) - (implantCounts?.[b.id] || 0);
+          break;
         case "statut":
           comparison = 0;
           break;
@@ -180,7 +187,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
       
       return sortDirection === "desc" ? -comparison : comparison;
     });
-  }, [sortColumn, sortDirection]);
+  }, [sortColumn, sortDirection, implantCounts]);
 
   const sortedPatients = sortPatients(filteredPatients);
   const totalPatients = sortedPatients.length;
@@ -326,9 +333,10 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           </div>
         );
       case "implants":
+        const implantCount = implantCounts?.[patient.id] || 0;
         return (
           <span className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">-</span> implants
+            <span className="font-medium text-foreground">{implantCount}</span> implant{implantCount !== 1 ? 's' : ''}
           </span>
         );
       case "derniereVisite":
