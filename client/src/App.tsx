@@ -11,6 +11,7 @@ import NotFound from "@/pages/not-found";
 import PatientsPage from "@/pages/patients";
 import PatientDetailsPage from "@/pages/patient-details";
 import ImplantDetailsPage from "@/pages/implant-details";
+import CatalogImplantDetailsPage from "@/pages/catalog-implant-details";
 import PatientReportPage from "@/pages/patient-report";
 import DashboardPage from "@/pages/dashboard";
 import ImplantsPage from "@/pages/implants";
@@ -156,6 +157,7 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/stats" component={DashboardPage} />
       <Route path="/implants" component={ImplantsPage} />
+      <Route path="/implants/:id" component={CatalogImplantDetailsPage} />
       <Route path="/actes" component={DashboardPage} />
       <Route component={NotFound} />
     </Switch>

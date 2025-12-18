@@ -94,6 +94,7 @@ export interface IStorage {
   getSurgeryImplant(organisationId: string, id: string): Promise<SurgeryImplant | undefined>;
   getSurgeryImplantWithDetails(organisationId: string, id: string): Promise<ImplantDetail | undefined>;
   getPatientSurgeryImplants(organisationId: string, patientId: string): Promise<SurgeryImplantWithDetails[]>;
+  getSurgeryImplantsByCatalogImplant(organisationId: string, implantId: string): Promise<SurgeryImplantWithDetails[]>;
   getAllSurgeryImplants(organisationId: string): Promise<SurgeryImplantWithDetails[]>;
   filterSurgeryImplants(organisationId: string, filters: ImplantFilters): Promise<ImplantWithPatient[]>;
 
@@ -511,6 +512,50 @@ export class DatabaseStorage implements IStorage {
     }
 
     return result.sort((a, b) => new Date(b.datePose).getTime() - new Date(a.datePose).getTime());
+  }
+
+  async getSurgeryImplantsByCatalogImplant(organisationId: string, implantId: string): Promise<SurgeryImplantWithDetails[]> {
+    const allSurgeryImplants = await db
+      .select()
+      .from(surgeryImplants)
+      .where(and(
+        eq(surgeryImplants.organisationId, organisationId),
+        eq(surgeryImplants.implantId, implantId)
+      ))
+      .orderBy(desc(surgeryImplants.datePose));
+
+    const [implant] = await db
+      .select()
+      .from(implants)
+      .where(eq(implants.id, implantId));
+
+    if (!implant) return [];
+
+    const result: SurgeryImplantWithDetails[] = [];
+    for (const si of allSurgeryImplants) {
+      const [surgery] = await db
+        .select()
+        .from(operations)
+        .where(eq(operations.id, si.surgeryId));
+
+      let patient: Patient | undefined;
+      if (surgery) {
+        const [p] = await db
+          .select()
+          .from(patients)
+          .where(eq(patients.id, surgery.patientId));
+        patient = p || undefined;
+      }
+
+      result.push({
+        ...si,
+        implant,
+        surgery: surgery || undefined,
+        patient,
+      });
+    }
+
+    return result;
   }
 
   async getAllSurgeryImplants(organisationId: string): Promise<SurgeryImplantWithDetails[]> {

@@ -265,6 +265,40 @@ export async function registerRoutes(
     }
   });
 
+  // Get catalog implant with stats
+  app.get("/api/catalog-implants/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const allImplantsWithStats = await storage.getAllImplantsWithStats(organisationId);
+      const implantWithStats = allImplantsWithStats.find(i => i.id === req.params.id);
+      
+      if (!implantWithStats) {
+        return res.status(404).json({ error: "Implant not found" });
+      }
+      
+      res.json(implantWithStats);
+    } catch (error) {
+      console.error("Error fetching catalog implant:", error);
+      res.status(500).json({ error: "Failed to fetch catalog implant" });
+    }
+  });
+
+  // Get surgeries using a catalog implant
+  app.get("/api/catalog-implants/:id/surgeries", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const surgeries = await storage.getSurgeryImplantsByCatalogImplant(organisationId, req.params.id);
+      res.json(surgeries);
+    } catch (error) {
+      console.error("Error fetching catalog implant surgeries:", error);
+      res.status(500).json({ error: "Failed to fetch surgeries" });
+    }
+  });
+
   // Get surgery implant with details (implant posé avec patient, surgery, visites, radios)
   app.get("/api/surgery-implants/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
