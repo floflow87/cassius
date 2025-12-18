@@ -58,12 +58,22 @@ Cassius employs a modern full-stack architecture designed for scalability, maint
 - **Organisations**: Top-level entities for tenant isolation.
 - **Users**: Authenticated individuals with specific roles within an organization.
 - **Patients**: Central entity, storing personal and medical data.
-- **Operations**: Records of surgical interventions.
-- **Implants**: Detailed information about individual implants.
+- **Operations (Surgeries)**: Records of surgical interventions.
+- **Implants**: Product catalog - implant specifications (brand, diameter, length, reference, lot).
+- **Surgery Implants**: Implants placed during surgery - links surgeries to implants with placement data (site FDI, status, ISQ measurements, bone type, loading, notes).
 - **Radios**: Stored radiograph images (panoramic, CBCT, retroalveolar).
 - **Visites**: Follow-up appointments, including ISQ measurements and clinical notes.
 - **Documents**: General PDF document management (quotes, consents, reports).
 - **Notes**: Clinical notes with customizable tags (Consultation, Chirurgie, Suivi, Complication, Administrative).
+
+### Data Model Architecture
+The implant tracking uses a two-table design:
+- **implants** (catalog): Contains product information - typeImplant, marque, referenceFabricant, diametre, longueur, lot
+- **surgery_implants** (placement): Contains placement data - surgeryId, implantId, siteFdi, positionImplant, typeOs, miseEnCharge, greffe, isqPose, isqContrôle, statut, datePose, notes
+
+Patient implant access path: patients → surgeries → surgery_implants → implants (via joins)
+
+Frontend components use `SurgeryImplantWithDetails` type which includes the full implant details via the `implant` property.
 
 ### Project Structure
 - `client/`: React frontend.
