@@ -38,10 +38,10 @@ interface ColumnConfig {
 }
 
 const defaultColumns: ColumnConfig[] = [
-  { id: "marqueRef", label: "Marque & Référence", width: "w-64", sortable: true },
-  { id: "dimensions", label: "Diamètre × Longueur", width: "w-40", sortable: true },
-  { id: "poseCount", label: "Nb de poses", width: "w-32", sortable: true },
-  { id: "successRate", label: "Réussite moyenne", width: "w-40", sortable: true },
+  { id: "marqueRef", label: "Marque & Référence", sortable: true },
+  { id: "dimensions", label: "Diamètre × Longueur", width: "w-48", sortable: true },
+  { id: "poseCount", label: "Nb de poses", width: "w-44", sortable: true },
+  { id: "successRate", label: "Réussite moyenne", width: "w-44", sortable: true },
 ];
 
 const STORAGE_KEY_COLUMNS = "cassius_implants_columns_order";
