@@ -34,7 +34,6 @@ const implantFormSchema = z.object({
 type ImplantFormData = z.infer<typeof implantFormSchema>;
 
 interface ImplantFormProps {
-  patientId: string;
   onSuccess?: () => void;
 }
 
@@ -49,7 +48,7 @@ const commonBrands = [
   "Neodent",
 ];
 
-export function ImplantForm({ patientId, onSuccess }: ImplantFormProps) {
+export function ImplantForm({ onSuccess }: ImplantFormProps) {
   const { toast } = useToast();
   const [customBrand, setCustomBrand] = useState(false);
 
@@ -66,42 +65,25 @@ export function ImplantForm({ patientId, onSuccess }: ImplantFormProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: ImplantFormData) => {
-      const operationData = {
-        patientId,
-        dateOperation: new Date().toISOString().split("T")[0],
-        typeIntervention: "POSE_IMPLANT",
-        typeChirurgieTemps: "UN_TEMPS",
-        typeChirurgieApproche: "FLAPLESS",
-        greffeOsseuse: false,
-        typeMiseEnCharge: "DIFFEREE",
-      };
-
-      const implantsData = [{
+      const implantData = {
         typeImplant: data.typeImplant,
         marque: data.marque,
         referenceFabricant: data.referenceFabricant || null,
         diametre: data.diametre,
         longueur: data.longueur,
-        siteFdi: "00",
-        typeOs: null,
-        positionImplant: "CRESTAL",
-        isqPose: null,
-      }];
+      };
 
-      const res = await apiRequest("POST", "/api/operations", {
-        operation: operationData,
-        implants: implantsData,
-      });
+      const res = await apiRequest("POST", "/api/implants", implantData);
       return res.json();
     },
     onSuccess: () => {
       toast({
         title: "Implant cree",
-        description: "L'implant a ete ajoute avec succes.",
+        description: "L'implant a ete ajoute au catalogue.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       form.reset();
+      setCustomBrand(false);
       onSuccess?.();
     },
     onError: (error) => {
@@ -250,7 +232,7 @@ export function ImplantForm({ patientId, onSuccess }: ImplantFormProps) {
             disabled={createMutation.isPending}
             data-testid="button-submit-implant"
           >
-            {createMutation.isPending ? "Creation..." : "Creer l'implant"}
+            {createMutation.isPending ? "Creation..." : "Ajouter au catalogue"}
           </Button>
         </div>
       </form>

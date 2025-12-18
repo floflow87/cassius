@@ -1,23 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { 
   Plus, 
   Search, 
   Filter, 
   Activity,
-  X,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
   GripVertical,
-  LayoutGrid,
-  LayoutList,
-  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -27,25 +22,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { CassiusChip, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import { ImplantForm } from "@/components/implant-form";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Implant, Patient } from "@shared/schema";
-
-interface ImplantWithPatient extends Implant {
-  patient?: Patient;
-}
+import { queryClient } from "@/lib/queryClient";
+import type { Implant } from "@shared/schema";
 
 type SortDirection = "asc" | "desc" | null;
-type ColumnId = "marque" | "dimensions" | "nbPoses" | "reussite";
+type ColumnId = "marque" | "dimensions" | "type" | "reference";
 
 interface ColumnConfig {
   id: ColumnId;
@@ -55,10 +38,10 @@ interface ColumnConfig {
 }
 
 const defaultColumns: ColumnConfig[] = [
-  { id: "marque", label: "Marque & Reference", width: "w-72", sortable: true },
-  { id: "dimensions", label: "Diametre x Longueur", width: "w-40", sortable: true },
-  { id: "nbPoses", label: "Nb de poses", width: "w-36", sortable: true },
-  { id: "reussite", label: "Reussite moyenne", width: "w-40", sortable: true },
+  { id: "marque", label: "Marque", width: "w-48", sortable: true },
+  { id: "reference", label: "Reference", width: "w-48", sortable: true },
+  { id: "dimensions", label: "Dimensions", width: "w-40", sortable: true },
+  { id: "type", label: "Type", width: "w-32", sortable: true },
 ];
 
 const STORAGE_KEY_COLUMNS = "cassius_implants_columns_order";
@@ -72,7 +55,6 @@ interface ImplantsPageProps {
 export default function ImplantsPage({ searchQuery: externalSearchQuery, setSearchQuery: externalSetSearchQuery }: ImplantsPageProps) {
   const [, setLocation] = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [implantType, setImplantType] = useState<"implants" | "mini">("implants");
@@ -80,10 +62,6 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   const searchQuery = externalSearchQuery ?? internalSearchQuery;
   const setSearchQuery = externalSetSearchQuery ?? setInternalSearchQuery;
   const itemsPerPage = 20;
-
-  const { data: patients } = useQuery<Patient[]>({
-    queryKey: ["/api/patients"],
-  });
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
@@ -129,7 +107,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
     localStorage.setItem(STORAGE_KEY_SORT, JSON.stringify({ column: sortColumn, direction: sortDirection }));
   }, [sortColumn, sortDirection]);
 
-  const { data: implants, isLoading } = useQuery<ImplantWithPatient[]>({
+  const { data: implants, isLoading } = useQuery<Implant[]>({
     queryKey: ["/api/implants"],
     queryFn: async () => {
       const res = await fetch("/api/implants", { credentials: "include" });
@@ -143,13 +121,11 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   }, [searchQuery]);
 
   const filteredImplants = implants?.filter((implant) => {
-    // Filter by implant type
     const expectedType = implantType === "mini" ? "MINI_IMPLANT" : "IMPLANT";
-    if ((implant as any).typeImplant && (implant as any).typeImplant !== expectedType) {
+    if (implant.typeImplant && implant.typeImplant !== expectedType) {
       return false;
     }
-    // If no typeImplant field (legacy data), treat as regular implant
-    if (!(implant as any).typeImplant && implantType === "mini") {
+    if (!implant.typeImplant && implantType === "mini") {
       return false;
     }
     
@@ -157,14 +133,11 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
     const query = searchQuery.toLowerCase();
     return (
       implant.marque.toLowerCase().includes(query) ||
-      implant.siteFdi.toLowerCase().includes(query) ||
-      implant.patient?.nom.toLowerCase().includes(query) ||
-      implant.patient?.prenom.toLowerCase().includes(query) ||
       implant.referenceFabricant?.toLowerCase().includes(query)
     );
   }) || [];
 
-  const sortImplants = useCallback((implantsToSort: ImplantWithPatient[]) => {
+  const sortImplants = useCallback((implantsToSort: Implant[]) => {
     if (!sortColumn || !sortDirection) return implantsToSort;
 
     return [...implantsToSort].sort((a, b) => {
@@ -174,16 +147,14 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
         case "marque":
           comparison = a.marque.localeCompare(b.marque);
           break;
+        case "reference":
+          comparison = (a.referenceFabricant || "").localeCompare(b.referenceFabricant || "");
+          break;
         case "dimensions":
           comparison = (a.diametre * 100 + a.longueur) - (b.diametre * 100 + b.longueur);
           break;
-        case "nbPoses":
-          comparison = new Date(a.datePose).getTime() - new Date(b.datePose).getTime();
-          break;
-        case "reussite":
-          const aIsq = a.isqPose || 0;
-          const bIsq = b.isqPose || 0;
-          comparison = aIsq - bIsq;
+        case "type":
+          comparison = (a.typeImplant || "").localeCompare(b.typeImplant || "");
           break;
         default:
           comparison = 0;
@@ -197,8 +168,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   const totalImplants = sortedImplants.length;
   const totalPages = Math.ceil(totalImplants / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalImplants);
-  const paginatedImplants = sortedImplants.slice(startIndex, endIndex);
+  const paginatedImplants = sortedImplants.slice(startIndex, startIndex + itemsPerPage);
 
   const handleSort = (columnId: ColumnId) => {
     if (sortColumn === columnId) {
@@ -242,14 +212,6 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
     setDragOverColumn(null);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  };
-
   const removeFilter = (filter: string) => {
     setActiveFilters(activeFilters.filter(f => f !== filter));
   };
@@ -264,14 +226,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
     return <ArrowDown className="h-3 w-3 ml-1" />;
   };
 
-  const getSuccessRate = (implant: ImplantWithPatient): number => {
-    if (implant.statut === "SUCCES") return 100;
-    if (implant.statut === "ECHEC") return 0;
-    const isq = implant.isq6m || implant.isq3m || implant.isq2m || implant.isqPose || 0;
-    return Math.min(100, Math.round(isq * 1.2));
-  };
-
-  const renderCellContent = (columnId: ColumnId, implant: ImplantWithPatient) => {
+  const renderCellContent = (columnId: ColumnId, implant: Implant) => {
     switch (columnId) {
       case "marque":
         return (
@@ -279,15 +234,16 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
             <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center shrink-0">
               <Activity className="h-4 w-4 text-primary" />
             </div>
-            <div>
-              <div className="text-sm font-medium text-foreground">
-                {implant.marque}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Ref: {implant.referenceFabricant || "-"}
-              </div>
-            </div>
+            <span className="text-sm font-medium text-foreground">
+              {implant.marque}
+            </span>
           </div>
+        );
+      case "reference":
+        return (
+          <span className="text-sm text-muted-foreground">
+            {implant.referenceFabricant || "-"}
+          </span>
         );
       case "dimensions":
         return (
@@ -295,23 +251,11 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
             {implant.diametre} x {implant.longueur} mm
           </span>
         );
-      case "nbPoses":
+      case "type":
         return (
-          <span className="text-sm text-muted-foreground">
-            {formatDate(implant.datePose)}
-          </span>
-        );
-      case "reussite":
-        const rate = getSuccessRate(implant);
-        return (
-          <div className="flex items-center gap-2">
-            <span className={`text-sm font-medium ${rate >= 90 ? "text-emerald-600 dark:text-emerald-400" : rate >= 70 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
-              {rate.toFixed(1)}%
-            </span>
-            {rate >= 90 && (
-              <Check className="h-4 w-4 text-emerald-500" />
-            )}
-          </div>
+          <Badge variant={implant.typeImplant === "MINI_IMPLANT" ? "secondary" : "outline"}>
+            {implant.typeImplant === "MINI_IMPLANT" ? "Mini" : "Implant"}
+          </Badge>
         );
       default:
         return null;
@@ -334,7 +278,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
     <div className="p-6">
       <div className="flex items-center gap-4 mb-5">
         <CassiusSearchInput
-          placeholder="Rechercher par marque, reference, patient, site FDI..."
+          placeholder="Rechercher par marque ou reference..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           icon={<Search className="h-4 w-4" />}
@@ -357,34 +301,16 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           <SheetContent className="w-[540px] sm:max-w-[540px] overflow-y-auto bg-white dark:bg-gray-950">
             <SheetHeader className="mb-6">
               <SheetTitle>Nouvel implant</SheetTitle>
+              <p className="text-sm text-muted-foreground">
+                Ajoutez un implant au catalogue produit
+              </p>
             </SheetHeader>
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="patient-select">Patient</Label>
-                <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
-                  <SelectTrigger id="patient-select" data-testid="select-patient-for-implant">
-                    <SelectValue placeholder="Selectionnez un patient" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patients?.map((patient) => (
-                      <SelectItem key={patient.id} value={patient.id}>
-                        {patient.prenom} {patient.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {selectedPatientId && (
-                <ImplantForm 
-                  patientId={selectedPatientId} 
-                  onSuccess={() => {
-                    setSheetOpen(false);
-                    setSelectedPatientId("");
-                    queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
-                  }} 
-                />
-              )}
-            </div>
+            <ImplantForm 
+              onSuccess={() => {
+                setSheetOpen(false);
+                queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
+              }} 
+            />
           </SheetContent>
         </Sheet>
       </div>
@@ -469,7 +395,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
                       <p className="text-sm text-muted-foreground mb-4">
                         {searchQuery
                           ? "Aucun implant ne correspond a votre recherche"
-                          : "Commencez par ajouter votre premier implant"}
+                          : "Commencez par ajouter votre premier implant au catalogue"}
                       </p>
                       {!searchQuery && (
                         <Button onClick={() => setSheetOpen(true)} data-testid="button-add-first-implant">
@@ -484,12 +410,16 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
                 paginatedImplants.map((implant) => (
                   <tr 
                     key={implant.id} 
-                    onClick={() => setLocation(`/patients/${implant.patientId}/implants/${implant.id}`)}
-                    className="border-b border-border-gray/50 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer group"
+                    className="border-b border-border-gray hover-elevate cursor-pointer"
+                    onClick={() => setLocation(`/implants/${implant.id}`)}
                     data-testid={`row-implant-${implant.id}`}
                   >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" className="h-4 w-4 rounded border-gray-300" />
+                    <td className="px-4 py-3">
+                      <input 
+                        type="checkbox" 
+                        className="h-4 w-4 rounded border-gray-300"
+                        onClick={(e) => e.stopPropagation()}
+                      />
                     </td>
                     {columns.map((column) => (
                       <td key={column.id} className="px-4 py-3">
@@ -503,18 +433,6 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           </table>
         </div>
       </div>
-
-      {totalImplants > 0 && (
-        <div className="flex items-center justify-end mt-4">
-          <CassiusPagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalImplants}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-          />
-        </div>
-      )}
     </div>
   );
 }
