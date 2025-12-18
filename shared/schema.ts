@@ -47,6 +47,7 @@ export const typePilierEnum = pgEnum("type_pilier", ["DROIT", "ANGULE", "MULTI_U
 export const typeNoteTagEnum = pgEnum("type_note_tag", ["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"]);
 export const typeRendezVousTagEnum = pgEnum("type_rdv_tag", ["CONSULTATION", "SUIVI", "CHIRURGIE"]);
 export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
+export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
 
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -65,6 +66,7 @@ export const patients = pgTable("patients", {
   traitement: text("traitement"),
   conditions: text("conditions"),
   contexteMedical: text("contexte_medical"),
+  statut: statutPatientEnum("statut").default("ACTIF"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
