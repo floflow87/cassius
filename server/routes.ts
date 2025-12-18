@@ -359,8 +359,8 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      // Retourne le catalogue d'implants (sans données de pose)
-      const catalogueImplants = await storage.getAllImplants(organisationId);
+      // Retourne le catalogue d'implants avec statistiques de pose
+      const catalogueImplants = await storage.getAllImplantsWithStats(organisationId);
       res.json(catalogueImplants);
     } catch (error) {
       console.error("Error fetching implants:", error);

@@ -34,6 +34,7 @@ import {
   type InsertRendezVous,
   type Document,
   type InsertDocument,
+  type ImplantWithStats,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -86,6 +87,7 @@ export interface IStorage {
   getImplant(organisationId: string, id: string): Promise<Implant | undefined>;
   createImplant(organisationId: string, implant: InsertImplant): Promise<Implant>;
   getAllImplants(organisationId: string): Promise<Implant[]>;
+  getAllImplantsWithStats(organisationId: string): Promise<ImplantWithStats[]>;
   getImplantBrands(organisationId: string): Promise<string[]>;
 
   // Surgery implant methods (implants posés)
@@ -362,6 +364,39 @@ export class DatabaseStorage implements IStorage {
   async getAllImplants(organisationId: string): Promise<Implant[]> {
     return db.select().from(implants)
       .where(eq(implants.organisationId, organisationId));
+  }
+
+  async getAllImplantsWithStats(organisationId: string): Promise<ImplantWithStats[]> {
+    const allImplants = await db.select().from(implants)
+      .where(eq(implants.organisationId, organisationId));
+    
+    const allSurgeryImplants = await db.select().from(surgeryImplants)
+      .where(eq(surgeryImplants.organisationId, organisationId));
+    
+    return allImplants.map(implant => {
+      const poses = allSurgeryImplants.filter(si => si.implantId === implant.id);
+      const poseCount = poses.length;
+      
+      const lastPose = poses.reduce((latest, pose) => {
+        if (!pose.datePose) return latest;
+        if (!latest) return pose.datePose;
+        return pose.datePose > latest ? pose.datePose : latest;
+      }, null as string | null);
+      
+      const successPoses = poses.filter(p => p.statut === "SUCCES");
+      const failedPoses = poses.filter(p => p.statut === "ECHEC");
+      const totalWithStatus = successPoses.length + failedPoses.length;
+      const successRate = totalWithStatus > 0 
+        ? Math.round((successPoses.length / totalWithStatus) * 1000) / 10
+        : null;
+      
+      return {
+        ...implant,
+        poseCount,
+        lastPoseDate: lastPose,
+        successRate,
+      };
+    });
   }
 
   async getImplantBrands(organisationId: string): Promise<string[]> {

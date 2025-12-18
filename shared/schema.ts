@@ -459,6 +459,12 @@ export type Operation = typeof operations.$inferSelect;
 export type InsertImplant = z.infer<typeof insertImplantSchema>;
 export type Implant = typeof implants.$inferSelect;
 
+export type ImplantWithStats = Implant & {
+  poseCount: number;
+  lastPoseDate: string | null;
+  successRate: number | null;
+};
+
 export type InsertSurgeryImplant = z.infer<typeof insertSurgeryImplantSchema>;
 export type SurgeryImplant = typeof surgeryImplants.$inferSelect;
 

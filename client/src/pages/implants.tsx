@@ -25,10 +25,10 @@ import {
 import { CassiusChip, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import { ImplantForm } from "@/components/implant-form";
 import { queryClient } from "@/lib/queryClient";
-import type { Implant } from "@shared/schema";
+import type { ImplantWithStats } from "@shared/schema";
 
 type SortDirection = "asc" | "desc" | null;
-type ColumnId = "marque" | "dimensions" | "type" | "reference";
+type ColumnId = "marqueRef" | "dimensions" | "poseCount" | "successRate";
 
 interface ColumnConfig {
   id: ColumnId;
@@ -38,10 +38,10 @@ interface ColumnConfig {
 }
 
 const defaultColumns: ColumnConfig[] = [
-  { id: "marque", label: "Marque", width: "w-48", sortable: true },
-  { id: "reference", label: "Reference", width: "w-48", sortable: true },
-  { id: "dimensions", label: "Dimensions", width: "w-40", sortable: true },
-  { id: "type", label: "Type", width: "w-32", sortable: true },
+  { id: "marqueRef", label: "Marque & Référence", width: "w-64", sortable: true },
+  { id: "dimensions", label: "Diamètre × Longueur", width: "w-40", sortable: true },
+  { id: "poseCount", label: "Nb de poses", width: "w-32", sortable: true },
+  { id: "successRate", label: "Réussite moyenne", width: "w-40", sortable: true },
 ];
 
 const STORAGE_KEY_COLUMNS = "cassius_implants_columns_order";
@@ -107,7 +107,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
     localStorage.setItem(STORAGE_KEY_SORT, JSON.stringify({ column: sortColumn, direction: sortDirection }));
   }, [sortColumn, sortDirection]);
 
-  const { data: implants, isLoading } = useQuery<Implant[]>({
+  const { data: implants, isLoading } = useQuery<ImplantWithStats[]>({
     queryKey: ["/api/implants"],
     queryFn: async () => {
       const res = await fetch("/api/implants", { credentials: "include" });
@@ -137,24 +137,24 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
     );
   }) || [];
 
-  const sortImplants = useCallback((implantsToSort: Implant[]) => {
+  const sortImplants = useCallback((implantsToSort: ImplantWithStats[]) => {
     if (!sortColumn || !sortDirection) return implantsToSort;
 
     return [...implantsToSort].sort((a, b) => {
       let comparison = 0;
       
       switch (sortColumn) {
-        case "marque":
+        case "marqueRef":
           comparison = a.marque.localeCompare(b.marque);
-          break;
-        case "reference":
-          comparison = (a.referenceFabricant || "").localeCompare(b.referenceFabricant || "");
           break;
         case "dimensions":
           comparison = (a.diametre * 100 + a.longueur) - (b.diametre * 100 + b.longueur);
           break;
-        case "type":
-          comparison = (a.typeImplant || "").localeCompare(b.typeImplant || "");
+        case "poseCount":
+          comparison = a.poseCount - b.poseCount;
+          break;
+        case "successRate":
+          comparison = (a.successRate ?? 0) - (b.successRate ?? 0);
           break;
         default:
           comparison = 0;
@@ -226,35 +226,52 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
     return <ArrowDown className="h-3 w-3 ml-1" />;
   };
 
-  const renderCellContent = (columnId: ColumnId, implant: Implant) => {
+  const renderCellContent = (columnId: ColumnId, implant: ImplantWithStats) => {
     switch (columnId) {
-      case "marque":
+      case "marqueRef":
         return (
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center shrink-0">
               <Activity className="h-4 w-4 text-primary" />
             </div>
-            <span className="text-sm font-medium text-foreground">
-              {implant.marque}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-foreground">
+                {implant.marque}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Réf: {implant.referenceFabricant || "-"}
+              </span>
+            </div>
           </div>
-        );
-      case "reference":
-        return (
-          <span className="text-sm text-muted-foreground">
-            {implant.referenceFabricant || "-"}
-          </span>
         );
       case "dimensions":
         return (
           <span className="text-sm text-muted-foreground">
-            {implant.diametre} x {implant.longueur} mm
+            {implant.diametre} × {implant.longueur} mm
           </span>
         );
-      case "type":
+      case "poseCount":
         return (
-          <Badge variant={implant.typeImplant === "MINI_IMPLANT" ? "secondary" : "outline"}>
-            {implant.typeImplant === "MINI_IMPLANT" ? "Mini" : "Implant"}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-foreground">
+              {implant.poseCount}
+            </span>
+            {implant.lastPoseDate && (
+              <span className="text-xs text-muted-foreground">
+                {new Date(implant.lastPoseDate).toLocaleDateString('fr-FR')}
+              </span>
+            )}
+          </div>
+        );
+      case "successRate":
+        if (implant.successRate === null) {
+          return <span className="text-sm text-muted-foreground">-</span>;
+        }
+        const rate = implant.successRate;
+        const colorClass = rate >= 90 ? "text-green-600" : rate >= 70 ? "text-yellow-600" : "text-red-600";
+        return (
+          <Badge variant="outline" className={colorClass}>
+            {rate.toFixed(1)}%
           </Badge>
         );
       default:
