@@ -379,6 +379,23 @@ export async function registerRoutes(
     }
   });
 
+  // Update surgery implant (informations de pose)
+  app.patch("/api/surgery-implants/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const updated = await storage.updateSurgeryImplant(organisationId, req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Surgery implant not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating surgery implant:", error);
+      res.status(500).json({ error: "Failed to update surgery implant" });
+    }
+  });
+
   // Legacy route for backward compatibility - redirects to surgery-implants
   app.get("/api/implants/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

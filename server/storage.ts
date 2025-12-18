@@ -688,6 +688,17 @@ export class DatabaseStorage implements IStorage {
     return deletedCount;
   }
 
+  async updateSurgeryImplant(organisationId: string, id: string, data: Partial<InsertSurgeryImplant>): Promise<SurgeryImplant | undefined> {
+    const [updated] = await db.update(surgeryImplants)
+      .set(data)
+      .where(and(
+        eq(surgeryImplants.id, id),
+        eq(surgeryImplants.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
   // ========== RADIOS ==========
   async getRadio(organisationId: string, id: string): Promise<Radio | undefined> {
     const [radio] = await db.select().from(radios)

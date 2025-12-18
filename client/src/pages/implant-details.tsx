@@ -75,11 +75,36 @@ export default function ImplantDetailsPage() {
   const [notesContent, setNotesContent] = useState("");
   const [selectedActs, setSelectedActs] = useState<string[]>([]);
   const [boneLossScore, setBoneLossScore] = useState<number>(0);
+  
+  const [poseFormData, setPoseFormData] = useState({
+    positionImplant: "",
+    siteFdi: "",
+    typeOs: "",
+    greffeOsseuse: false,
+    typeGreffe: "",
+  });
 
   const { data: implantData, isLoading } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
     enabled: !!implantId,
   });
+
+  const handleOpenPoseInfoSheet = (open: boolean) => {
+    if (open && implantData) {
+      setPoseFormData({
+        positionImplant: implantData.positionImplant || "",
+        siteFdi: implantData.siteFdi || "",
+        typeOs: implantData.typeOs || "",
+        greffeOsseuse: implantData.greffeOsseuse || false,
+        typeGreffe: implantData.typeGreffe || "",
+      });
+    }
+    setEditPoseInfoSheetOpen(open);
+  };
+
+  const handleSavePoseInfo = () => {
+    updatePoseInfoMutation.mutate(poseFormData);
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -99,6 +124,33 @@ export default function ImplantDetailsPage() {
       toast({
         title: "Erreur",
         description: "Une erreur est survenue lors de la suppression",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePoseInfoMutation = useMutation({
+    mutationFn: async (data: {
+      positionImplant?: string;
+      siteFdi?: string;
+      typeOs?: string;
+      greffeOsseuse?: boolean;
+      typeGreffe?: string;
+    }) => {
+      return apiRequest("PATCH", `/api/surgery-implants/${implantId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      setEditPoseInfoSheetOpen(false);
+      toast({
+        title: "Modifications enregistrées",
+        description: "Les informations de pose ont été mises à jour",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la mise à jour",
         variant: "destructive",
       });
     },
@@ -413,7 +465,7 @@ export default function ImplantDetailsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
             <CardTitle className="text-base">Informations de pose</CardTitle>
-            <Sheet open={editPoseInfoSheetOpen} onOpenChange={setEditPoseInfoSheetOpen}>
+            <Sheet open={editPoseInfoSheetOpen} onOpenChange={handleOpenPoseInfoSheet}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" data-testid="button-edit-pose-info">
                   <Pencil className="h-4 w-4" />
@@ -426,7 +478,10 @@ export default function ImplantDetailsPage() {
                 <div className="py-6 space-y-4">
                   <div className="space-y-2">
                     <Label>Position de l'implant</Label>
-                    <Select defaultValue={implantData.positionImplant || ""}>
+                    <Select 
+                      value={poseFormData.positionImplant} 
+                      onValueChange={(val) => setPoseFormData(prev => ({ ...prev, positionImplant: val }))}
+                    >
                       <SelectTrigger data-testid="select-edit-position">
                         <SelectValue placeholder="Sélectionner" />
                       </SelectTrigger>
@@ -440,11 +495,18 @@ export default function ImplantDetailsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Site FDI</Label>
-                    <Input defaultValue={implantData.siteFdi} data-testid="input-edit-site-fdi" />
+                    <Input 
+                      value={poseFormData.siteFdi}
+                      onChange={(e) => setPoseFormData(prev => ({ ...prev, siteFdi: e.target.value }))}
+                      data-testid="input-edit-site-fdi" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Type d'os</Label>
-                    <Select defaultValue={implantData.typeOs || ""}>
+                    <Select 
+                      value={poseFormData.typeOs}
+                      onValueChange={(val) => setPoseFormData(prev => ({ ...prev, typeOs: val }))}
+                    >
                       <SelectTrigger data-testid="select-edit-type-os">
                         <SelectValue placeholder="Sélectionner" />
                       </SelectTrigger>
@@ -458,7 +520,10 @@ export default function ImplantDetailsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Greffe osseuse</Label>
-                    <Select defaultValue={implantData.greffeOsseuse ? "oui" : "non"}>
+                    <Select 
+                      value={poseFormData.greffeOsseuse ? "oui" : "non"}
+                      onValueChange={(val) => setPoseFormData(prev => ({ ...prev, greffeOsseuse: val === "oui" }))}
+                    >
                       <SelectTrigger data-testid="select-edit-greffe">
                         <SelectValue />
                       </SelectTrigger>
@@ -470,11 +535,21 @@ export default function ImplantDetailsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Type de greffe</Label>
-                    <Input defaultValue={implantData.typeGreffe || ""} placeholder="Ex: Autogène" data-testid="input-edit-type-greffe" />
+                    <Input 
+                      value={poseFormData.typeGreffe}
+                      onChange={(e) => setPoseFormData(prev => ({ ...prev, typeGreffe: e.target.value }))}
+                      placeholder="Ex: Autogène" 
+                      data-testid="input-edit-type-greffe" 
+                    />
                   </div>
                   <div className="pt-4">
-                    <Button className="w-full" data-testid="button-save-pose-info">
-                      Enregistrer
+                    <Button 
+                      className="w-full" 
+                      onClick={handleSavePoseInfo}
+                      disabled={updatePoseInfoMutation.isPending}
+                      data-testid="button-save-pose-info"
+                    >
+                      {updatePoseInfoMutation.isPending ? "Enregistrement..." : "Enregistrer"}
                     </Button>
                   </div>
                 </div>
