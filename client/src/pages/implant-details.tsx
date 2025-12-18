@@ -111,9 +111,16 @@ export default function ImplantDetailsPage() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold" data-testid="text-implant-title">
-            Implant site {implant.siteFdi}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold" data-testid="text-implant-title">
+              {(implant as any).typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"} site {implant.siteFdi}
+            </h1>
+            {(implant as any).typeImplant === "MINI_IMPLANT" && (
+              <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                Mini
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             {implant.marque} - {implant.diametre}mm x {implant.longueur}mm
           </p>

@@ -211,6 +211,7 @@ export async function registerRoutes(
   const operationWithImplantsSchema = insertOperationSchema.extend({
     implants: z.array(
       z.object({
+        typeImplant: z.enum(["IMPLANT", "MINI_IMPLANT"]).optional().default("IMPLANT"),
         marque: z.string(),
         referenceFabricant: z.string().optional(),
         diametre: z.number(),

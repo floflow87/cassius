@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,10 +22,9 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Patient } from "@shared/schema";
 
 const implantFormSchema = z.object({
-  patientId: z.string().min(1, "Selectionnez un patient"),
+  typeImplant: z.enum(["IMPLANT", "MINI_IMPLANT"]),
   marque: z.string().min(1, "Marque requise"),
   referenceFabricant: z.string().optional(),
   diametre: z.coerce.number().min(1, "Diametre requis"),
@@ -35,6 +34,7 @@ const implantFormSchema = z.object({
 type ImplantFormData = z.infer<typeof implantFormSchema>;
 
 interface ImplantFormProps {
+  patientId: string;
   onSuccess?: () => void;
 }
 
@@ -49,18 +49,14 @@ const commonBrands = [
   "Neodent",
 ];
 
-export function ImplantForm({ onSuccess }: ImplantFormProps) {
+export function ImplantForm({ patientId, onSuccess }: ImplantFormProps) {
   const { toast } = useToast();
   const [customBrand, setCustomBrand] = useState(false);
-
-  const { data: patients } = useQuery<Patient[]>({
-    queryKey: ["/api/patients"],
-  });
 
   const form = useForm<ImplantFormData>({
     resolver: zodResolver(implantFormSchema),
     defaultValues: {
-      patientId: "",
+      typeImplant: "IMPLANT",
       marque: "",
       referenceFabricant: "",
       diametre: 4,
@@ -71,7 +67,7 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
   const createMutation = useMutation({
     mutationFn: async (data: ImplantFormData) => {
       const operationData = {
-        patientId: data.patientId,
+        patientId,
         dateOperation: new Date().toISOString().split("T")[0],
         typeIntervention: "POSE_IMPLANT",
         typeChirurgieTemps: "UN_TEMPS",
@@ -81,6 +77,7 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
       };
 
       const implantsData = [{
+        typeImplant: data.typeImplant,
         marque: data.marque,
         referenceFabricant: data.referenceFabricant || null,
         diametre: data.diametre,
@@ -126,22 +123,19 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
-          name="patientId"
+          name="typeImplant"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Patient</FormLabel>
+              <FormLabel>Type</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger data-testid="select-patient">
-                    <SelectValue placeholder="Selectionnez un patient" />
+                  <SelectTrigger data-testid="select-type-implant">
+                    <SelectValue placeholder="Selectionnez le type" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {patients?.map((patient) => (
-                    <SelectItem key={patient.id} value={patient.id}>
-                      {patient.prenom} {patient.nom}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="IMPLANT">Implant</SelectItem>
+                  <SelectItem value="MINI_IMPLANT">Mini-implant</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />

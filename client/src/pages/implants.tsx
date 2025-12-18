@@ -27,6 +27,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { CassiusChip, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import { ImplantForm } from "@/components/implant-form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -64,6 +72,7 @@ interface ImplantsPageProps {
 export default function ImplantsPage({ searchQuery: externalSearchQuery, setSearchQuery: externalSetSearchQuery }: ImplantsPageProps) {
   const [, setLocation] = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [implantType, setImplantType] = useState<"implants" | "mini">("implants");
@@ -71,6 +80,10 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   const searchQuery = externalSearchQuery ?? internalSearchQuery;
   const setSearchQuery = externalSetSearchQuery ?? setInternalSearchQuery;
   const itemsPerPage = 20;
+
+  const { data: patients } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
+  });
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
@@ -130,6 +143,16 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   }, [searchQuery]);
 
   const filteredImplants = implants?.filter((implant) => {
+    // Filter by implant type
+    const expectedType = implantType === "mini" ? "MINI_IMPLANT" : "IMPLANT";
+    if ((implant as any).typeImplant && (implant as any).typeImplant !== expectedType) {
+      return false;
+    }
+    // If no typeImplant field (legacy data), treat as regular implant
+    if (!(implant as any).typeImplant && implantType === "mini") {
+      return false;
+    }
+    
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -335,10 +358,33 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
             <SheetHeader className="mb-6">
               <SheetTitle>Nouvel implant</SheetTitle>
             </SheetHeader>
-            <ImplantForm onSuccess={() => {
-              setSheetOpen(false);
-              queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
-            }} />
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="patient-select">Patient</Label>
+                <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
+                  <SelectTrigger id="patient-select" data-testid="select-patient-for-implant">
+                    <SelectValue placeholder="Selectionnez un patient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {patients?.map((patient) => (
+                      <SelectItem key={patient.id} value={patient.id}>
+                        {patient.prenom} {patient.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedPatientId && (
+                <ImplantForm 
+                  patientId={selectedPatientId} 
+                  onSuccess={() => {
+                    setSheetOpen(false);
+                    setSelectedPatientId("");
+                    queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
+                  }} 
+                />
+              )}
+            </div>
           </SheetContent>
         </Sheet>
       </div>

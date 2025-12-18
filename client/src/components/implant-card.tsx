@@ -57,7 +57,14 @@ export function ImplantCard({ implant, patientId }: ImplantCardProps) {
               {implant.siteFdi}
             </div>
             <div>
-              <CardTitle className="text-sm">{implant.marque}</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm">{implant.marque}</CardTitle>
+                {(implant as any).typeImplant === "MINI_IMPLANT" && (
+                  <Badge variant="outline" className="text-xs h-5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                    Mini
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {implant.diametre}mm x {implant.longueur}mm
               </p>
