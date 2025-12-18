@@ -3,11 +3,15 @@ import { Link, useRoute } from "wouter";
 import { ArrowLeft, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Patient, Operation, Implant, Radio, Visite } from "@shared/schema";
+import type { Patient, Operation, Implant, Radio, Visite, SurgeryImplantWithDetails, OperationWithImplants } from "@shared/schema";
+
+interface SurgeryImplantWithVisites extends SurgeryImplantWithDetails {
+  visites?: Visite[];
+}
 
 interface PatientWithDetails extends Patient {
-  operations: (Operation & { implants: Implant[] })[];
-  implants: (Implant & { visites: Visite[] })[];
+  operations: OperationWithImplants[];
+  surgeryImplants: SurgeryImplantWithVisites[];
   radios: Radio[];
 }
 
@@ -169,7 +173,7 @@ export default function PatientReportPage() {
                       <h3 className="font-medium">{getInterventionLabel(op.typeIntervention)}</h3>
                       <p className="text-sm text-muted-foreground">{formatDate(op.dateOperation)}</p>
                     </div>
-                    <span className="text-sm bg-muted px-2 py-1 rounded">{op.implants?.length || 0} implant(s)</span>
+                    <span className="text-sm bg-muted px-2 py-1 rounded">{op.surgeryImplants?.length || 0} implant(s)</span>
                   </div>
                   {op.notesPerop && (
                     <div className="mt-2 text-sm">
@@ -189,9 +193,9 @@ export default function PatientReportPage() {
           </section>
         )}
 
-        {patient.implants && patient.implants.length > 0 && (
+        {patient.surgeryImplants && patient.surgeryImplants.length > 0 && (
           <section className="mb-8">
-            <h2 className="text-lg font-semibold border-b pb-2 mb-4">Implants ({patient.implants.length})</h2>
+            <h2 className="text-lg font-semibold border-b pb-2 mb-4">Implants ({patient.surgeryImplants.length})</h2>
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b">
@@ -206,28 +210,28 @@ export default function PatientReportPage() {
                 </tr>
               </thead>
               <tbody>
-                {patient.implants.map((implant) => (
-                  <tr key={implant.id} className="border-b">
-                    <td className="py-2 px-2 font-mono">{implant.siteFdi}</td>
-                    <td className="py-2 px-2">{implant.marque}</td>
-                    <td className="py-2 px-2 font-mono">{implant.diametre}x{implant.longueur}mm</td>
-                    <td className="py-2 px-2 font-mono">{implant.typeOs || "-"}</td>
-                    <td className="py-2 px-2 font-mono">{implant.isqPose || "-"}</td>
-                    <td className="py-2 px-2 font-mono">{implant.isq3m || "-"}</td>
-                    <td className="py-2 px-2 font-mono">{implant.isq6m || "-"}</td>
-                    <td className="py-2 px-2">{getStatusLabel(implant.statut)}</td>
+                {patient.surgeryImplants.map((surgeryImplant) => (
+                  <tr key={surgeryImplant.id} className="border-b">
+                    <td className="py-2 px-2 font-mono">{surgeryImplant.siteFdi}</td>
+                    <td className="py-2 px-2">{surgeryImplant.implant.marque}</td>
+                    <td className="py-2 px-2 font-mono">{surgeryImplant.implant.diametre}x{surgeryImplant.implant.longueur}mm</td>
+                    <td className="py-2 px-2 font-mono">{surgeryImplant.typeOs || "-"}</td>
+                    <td className="py-2 px-2 font-mono">{surgeryImplant.isqPose || "-"}</td>
+                    <td className="py-2 px-2 font-mono">{surgeryImplant.isq3m || "-"}</td>
+                    <td className="py-2 px-2 font-mono">{surgeryImplant.isq6m || "-"}</td>
+                    <td className="py-2 px-2">{getStatusLabel(surgeryImplant.statut)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
             <div className="mt-6 space-y-4">
-              {patient.implants.map((implant) => (
-                implant.visites && implant.visites.length > 0 && (
-                  <div key={`visits-${implant.id}`} className="border rounded p-4">
-                    <h4 className="font-medium mb-2">Visites de contrôle - Site {implant.siteFdi}</h4>
+              {patient.surgeryImplants.map((surgeryImplant) => (
+                surgeryImplant.visites && surgeryImplant.visites.length > 0 && (
+                  <div key={`visits-${surgeryImplant.id}`} className="border rounded p-4">
+                    <h4 className="font-medium mb-2">Visites de contrôle - Site {surgeryImplant.siteFdi}</h4>
                     <div className="space-y-2">
-                      {implant.visites.map((visite) => (
+                      {surgeryImplant.visites.map((visite) => (
                         <div key={visite.id} className="flex justify-between text-sm border-b pb-2">
                           <span>{formatDate(visite.date)}</span>
                           <span className="font-mono">{visite.isq ? `ISQ: ${visite.isq}` : "-"}</span>

@@ -82,11 +82,15 @@ import { DocumentCard } from "@/components/document-card";
 import { DocumentUploadForm } from "@/components/document-upload-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Patient, Operation, Implant, Radio, Visite, Note, RendezVous, Document } from "@shared/schema";
+import type { Patient, Operation, Implant, Radio, Visite, Note, RendezVous, Document, SurgeryImplantWithDetails, OperationWithImplants } from "@shared/schema";
+
+interface SurgeryImplantWithVisites extends SurgeryImplantWithDetails {
+  visites?: Visite[];
+}
 
 interface PatientWithDetails extends Patient {
-  operations: (Operation & { implants: Implant[] })[];
-  implants: (Implant & { visites: Visite[] })[];
+  operations: OperationWithImplants[];
+  surgeryImplants: SurgeryImplantWithVisites[];
   radios: Radio[];
 }
 
@@ -521,10 +525,10 @@ export default function PatientDetailsPage() {
     );
   }
 
-  const implantCount = patient.implants?.length || 0;
+  const implantCount = patient.surgeryImplants?.length || 0;
   const operationCount = patient.operations?.length || 0;
   const radioCount = patient.radios?.length || 0;
-  const visiteCount = patient.implants?.reduce((acc, imp) => acc + (imp.visites?.length || 0), 0) || 0;
+  const visiteCount = patient.surgeryImplants?.reduce((acc, imp) => acc + (imp.visites?.length || 0), 0) || 0;
 
   const sortedOperations = [...(patient.operations || [])].sort(
     (a, b) => new Date(b.dateOperation).getTime() - new Date(a.dateOperation).getTime()
@@ -550,8 +554,8 @@ export default function PatientDetailsPage() {
       date: new Date(op.dateOperation),
       type: "operation",
       title: getInterventionLabel(op.typeIntervention),
-      description: op.notesPerop || `${op.implants?.length || 0} implant(s)`,
-      badges: op.implants?.slice(0, 3).map(imp => `Site ${imp.siteFdi}`),
+      description: op.notesPerop || `${op.surgeryImplants?.length || 0} implant(s)`,
+      badges: op.surgeryImplants?.slice(0, 3).map(imp => `Site ${imp.siteFdi}`),
     });
   });
 
@@ -566,7 +570,7 @@ export default function PatientDetailsPage() {
     });
   });
 
-  patient.implants?.forEach((imp) => {
+  patient.surgeryImplants?.forEach((imp) => {
     imp.visites?.forEach((visite) => {
       timelineEvents.push({
         id: `visite-${visite.id}`,
@@ -626,7 +630,7 @@ export default function PatientDetailsPage() {
     : null;
 
   const successRate = implantCount > 0 
-    ? Math.round((patient.implants?.filter(i => i.statut === "SUCCES").length || 0) / implantCount * 100)
+    ? Math.round((patient.surgeryImplants?.filter(i => i.statut === "SUCCES").length || 0) / implantCount * 100)
     : 0;
 
   return (
@@ -1099,7 +1103,7 @@ export default function PatientDetailsPage() {
                         <RadioUploadForm
                           patientId={patient.id}
                           operations={patient.operations || []}
-                          implants={patient.implants || []}
+                          surgeryImplants={patient.surgeryImplants || []}
                           onSuccess={() => setRadioDialogOpen(false)}
                         />
                       </div>
@@ -1311,29 +1315,29 @@ export default function PatientDetailsPage() {
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {patient.implants?.slice(0, 4).map((implant) => (
-                        <div key={implant.id} className="border rounded-md p-4">
+                      {patient.surgeryImplants?.slice(0, 4).map((surgeryImplant) => (
+                        <div key={surgeryImplant.id} className="border rounded-md p-4">
                           <div className="flex items-center justify-between mb-3">
-                            <span className="font-medium">Site {implant.siteFdi}</span>
-                            {getStatusBadge(implant.statut)}
+                            <span className="font-medium">Site {surgeryImplant.siteFdi}</span>
+                            {getStatusBadge(surgeryImplant.statut)}
                           </div>
                           <div className="grid grid-cols-2 gap-y-2 text-sm">
                             <div>
                               <span className="text-muted-foreground text-xs">Marque:</span>
-                              <p>{implant.marque}</p>
+                              <p>{surgeryImplant.implant.marque}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground text-xs">Dimensions:</span>
-                              <p>{implant.diametre} x {implant.longueur}mm</p>
+                              <p>{surgeryImplant.implant.diametre} x {surgeryImplant.implant.longueur}mm</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground text-xs">Date pose:</span>
-                              <p>{formatDateShort(implant.datePose)}</p>
+                              <p>{formatDateShort(surgeryImplant.datePose)}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground text-xs">ISQ actuel:</span>
                               <p className="text-primary font-medium">
-                                {implant.isq6m || implant.isq3m || implant.isq2m || implant.isqPose || "-"}
+                                {surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose || "-"}
                               </p>
                             </div>
                           </div>
@@ -1360,8 +1364,8 @@ export default function PatientDetailsPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {patient.implants?.map((implant) => (
-                <ImplantCard key={implant.id} implant={implant} patientId={patient.id} />
+              {patient.surgeryImplants?.map((surgeryImplant) => (
+                <ImplantCard key={surgeryImplant.id} surgeryImplant={surgeryImplant} patientId={patient.id} />
               ))}
             </div>
           )}
@@ -1415,7 +1419,7 @@ export default function PatientDetailsPage() {
                         </p>
                       </div>
                       <Badge variant="secondary" className="font-mono">
-                        {operation.implants?.length || 0} implant{(operation.implants?.length || 0) !== 1 ? "s" : ""}
+                        {operation.surgeryImplants?.length || 0} implant{(operation.surgeryImplants?.length || 0) !== 1 ? "s" : ""}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -1476,7 +1480,7 @@ export default function PatientDetailsPage() {
                   <RadioUploadForm
                     patientId={patient.id}
                     operations={patient.operations || []}
-                    implants={patient.implants || []}
+                    surgeryImplants={patient.surgeryImplants || []}
                     onSuccess={() => setRadioDialogOpen(false)}
                   />
                 </div>

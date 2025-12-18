@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Operation, Implant } from "@shared/schema";
+import type { Operation, Implant, SurgeryImplantWithDetails } from "@shared/schema";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"];
@@ -45,14 +45,14 @@ type FormData = z.infer<typeof formSchema>;
 interface RadioUploadFormProps {
   patientId: string;
   operations: Operation[];
-  implants: Implant[];
+  surgeryImplants: SurgeryImplantWithDetails[];
   onSuccess?: () => void;
 }
 
 export function RadioUploadForm({
   patientId,
   operations,
-  implants,
+  surgeryImplants,
   onSuccess,
 }: RadioUploadFormProps) {
   const { toast } = useToast();
@@ -294,7 +294,7 @@ export function RadioUploadForm({
           />
         )}
 
-        {implants.length > 0 && (
+        {surgeryImplants.length > 0 && (
           <FormField
             control={form.control}
             name="implantId"
@@ -308,9 +308,9 @@ export function RadioUploadForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {implants.map((imp) => (
-                      <SelectItem key={imp.id} value={imp.id}>
-                        Site {imp.siteFdi} - {imp.marque} ({imp.diametre}x{imp.longueur}mm)
+                    {surgeryImplants.map((surgeryImp) => (
+                      <SelectItem key={surgeryImp.id} value={surgeryImp.id}>
+                        Site {surgeryImp.siteFdi} - {surgeryImp.implant.marque} ({surgeryImp.implant.diametre}x{surgeryImp.implant.longueur}mm)
                       </SelectItem>
                     ))}
                   </SelectContent>

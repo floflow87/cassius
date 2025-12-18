@@ -12,10 +12,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { VisiteForm } from "@/components/visite-form";
-import type { Implant, Visite } from "@shared/schema";
+import type { Implant, Visite, SurgeryImplantWithDetails } from "@shared/schema";
+
+interface SurgeryImplantWithVisites extends SurgeryImplantWithDetails {
+  visites?: Visite[];
+}
 
 interface ImplantCardProps {
-  implant: Implant & { visites?: Visite[] };
+  surgeryImplant: SurgeryImplantWithVisites;
   patientId: string;
 }
 
@@ -26,7 +30,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   ECHEC: { label: "Échec", variant: "destructive" },
 };
 
-export function ImplantCard({ implant, patientId }: ImplantCardProps) {
+export function ImplantCard({ surgeryImplant, patientId }: ImplantCardProps) {
   const [visiteDialogOpen, setVisiteDialogOpen] = useState(false);
 
   const formatDate = (dateString: string) => {
@@ -38,35 +42,35 @@ export function ImplantCard({ implant, patientId }: ImplantCardProps) {
   };
 
   const getLatestISQ = () => {
-    if (implant.isq6m) return { value: implant.isq6m, label: "6M" };
-    if (implant.isq3m) return { value: implant.isq3m, label: "3M" };
-    if (implant.isq2m) return { value: implant.isq2m, label: "2M" };
-    if (implant.isqPose) return { value: implant.isqPose, label: "Pose" };
+    if (surgeryImplant.isq6m) return { value: surgeryImplant.isq6m, label: "6M" };
+    if (surgeryImplant.isq3m) return { value: surgeryImplant.isq3m, label: "3M" };
+    if (surgeryImplant.isq2m) return { value: surgeryImplant.isq2m, label: "2M" };
+    if (surgeryImplant.isqPose) return { value: surgeryImplant.isqPose, label: "Pose" };
     return null;
   };
 
   const latestISQ = getLatestISQ();
-  const status = statusConfig[implant.statut] || statusConfig.EN_SUIVI;
+  const status = statusConfig[surgeryImplant.statut] || statusConfig.EN_SUIVI;
 
   return (
-    <Card data-testid={`card-implant-${implant.id}`}>
+    <Card data-testid={`card-implant-${surgeryImplant.id}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center w-10 h-10 rounded-md bg-muted font-mono text-sm font-medium">
-              {implant.siteFdi}
+              {surgeryImplant.siteFdi}
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <CardTitle className="text-sm">{implant.marque}</CardTitle>
-                {(implant as any).typeImplant === "MINI_IMPLANT" && (
+                <CardTitle className="text-sm">{surgeryImplant.implant.marque}</CardTitle>
+                {surgeryImplant.implant.typeImplant === "MINI_IMPLANT" && (
                   <Badge variant="outline" className="text-xs h-5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                     Mini
                   </Badge>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {implant.diametre}mm x {implant.longueur}mm
+                {surgeryImplant.implant.diametre}mm x {surgeryImplant.implant.longueur}mm
               </p>
             </div>
           </div>
@@ -77,13 +81,13 @@ export function ImplantCard({ implant, patientId }: ImplantCardProps) {
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            {formatDate(implant.datePose)}
+            {formatDate(surgeryImplant.datePose)}
           </span>
-          {implant.typeOs && (
-            <span className="font-mono">{implant.typeOs}</span>
+          {surgeryImplant.typeOs && (
+            <span className="font-mono">{surgeryImplant.typeOs}</span>
           )}
-          {implant.positionImplant && (
-            <span>{implant.positionImplant.replace("_", "-").toLowerCase()}</span>
+          {surgeryImplant.positionImplant && (
+            <span>{surgeryImplant.positionImplant.replace("_", "-").toLowerCase()}</span>
           )}
         </div>
 
@@ -98,14 +102,14 @@ export function ImplantCard({ implant, patientId }: ImplantCardProps) {
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            {implant.visites?.length || 0} visite{(implant.visites?.length || 0) !== 1 ? "s" : ""} de contrôle
+            {surgeryImplant.visites?.length || 0} visite{(surgeryImplant.visites?.length || 0) !== 1 ? "s" : ""} de contrôle
           </span>
         </div>
 
         <div className="flex items-center gap-2 pt-2 border-t">
           <Dialog open={visiteDialogOpen} onOpenChange={setVisiteDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" data-testid={`button-add-visite-${implant.id}`}>
+              <Button variant="outline" size="sm" data-testid={`button-add-visite-${surgeryImplant.id}`}>
                 <Plus className="h-3 w-3 mr-1" />
                 Visite
               </Button>
@@ -115,14 +119,14 @@ export function ImplantCard({ implant, patientId }: ImplantCardProps) {
                 <DialogTitle>Nouvelle visite de contrôle</DialogTitle>
               </DialogHeader>
               <VisiteForm
-                implantId={implant.id}
+                implantId={surgeryImplant.id}
                 patientId={patientId}
                 onSuccess={() => setVisiteDialogOpen(false)}
               />
             </DialogContent>
           </Dialog>
-          <Link href={`/patient/${patientId}/implant/${implant.id}`}>
-            <Button variant="ghost" size="sm" data-testid={`button-view-implant-${implant.id}`}>
+          <Link href={`/patient/${patientId}/implant/${surgeryImplant.id}`}>
+            <Button variant="ghost" size="sm" data-testid={`button-view-implant-${surgeryImplant.id}`}>
               Détails
               <ChevronRight className="h-3 w-3 ml-1" />
             </Button>

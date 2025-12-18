@@ -482,3 +482,14 @@ export type RendezVous = typeof rendezVous.$inferSelect;
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+// Extended types for API responses
+export interface SurgeryImplantWithDetails extends SurgeryImplant {
+  implant: Implant;
+  surgery?: Operation;
+  patient?: Patient;
+}
+
+export interface OperationWithImplants extends Operation {
+  surgeryImplants: SurgeryImplantWithDetails[];
+}

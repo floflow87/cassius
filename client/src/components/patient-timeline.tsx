@@ -2,15 +2,19 @@ import { Activity, Calendar, FileImage, ClipboardList, Stethoscope, Eye } from "
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { Patient, Operation, Implant, Radio, Visite } from "@shared/schema";
+import type { Patient, Operation, Implant, Radio, Visite, SurgeryImplantWithDetails, OperationWithImplants } from "@shared/schema";
 
 interface RadioWithSignedUrl extends Radio {
   signedUrl?: string | null;
 }
 
+interface SurgeryImplantWithVisites extends SurgeryImplantWithDetails {
+  visites?: Visite[];
+}
+
 interface PatientWithDetails extends Patient {
-  operations: (Operation & { implants: Implant[] })[];
-  implants: (Implant & { visites: Visite[] })[];
+  operations: OperationWithImplants[];
+  surgeryImplants: SurgeryImplantWithVisites[];
   radios: RadioWithSignedUrl[];
 }
 
@@ -69,27 +73,27 @@ export function PatientTimeline({ patient, onViewRadio }: PatientTimelineProps) 
       title: interventionLabels[op.typeIntervention] || op.typeIntervention,
       description: op.notesPerop || undefined,
       metadata: {
-        implants: op.implants?.length || 0,
+        implants: op.surgeryImplants?.length || 0,
       },
     });
   });
 
-  patient.implants?.forEach((imp) => {
+  patient.surgeryImplants?.forEach((surgeryImp) => {
     events.push({
-      id: `imp-${imp.id}`,
-      date: imp.datePose,
+      id: `imp-${surgeryImp.id}`,
+      date: surgeryImp.datePose,
       type: "implant",
-      title: `Implant ${imp.siteFdi}`,
-      description: `${imp.marque} - ${imp.diametre}mm x ${imp.longueur}mm`,
-      metadata: imp.isqPose ? { isq: imp.isqPose } : undefined,
+      title: `Implant ${surgeryImp.siteFdi}`,
+      description: `${surgeryImp.implant.marque} - ${surgeryImp.implant.diametre}mm x ${surgeryImp.implant.longueur}mm`,
+      metadata: surgeryImp.isqPose ? { isq: surgeryImp.isqPose } : undefined,
     });
 
-    imp.visites?.forEach((visite) => {
+    surgeryImp.visites?.forEach((visite) => {
       events.push({
         id: `visite-${visite.id}`,
         date: visite.date,
         type: "visite",
-        title: `Contrôle implant ${imp.siteFdi}`,
+        title: `Contrôle implant ${surgeryImp.siteFdi}`,
         description: visite.notes || undefined,
         metadata: visite.isq ? { isq: visite.isq } : undefined,
       });
