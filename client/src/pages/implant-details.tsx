@@ -52,14 +52,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Implant, Visite, Radio, Operation, Patient } from "@shared/schema";
-
-interface ImplantWithDetails extends Implant {
-  visites: Visite[];
-  radios: Radio[];
-  patient?: Patient;
-  operation?: Operation;
-}
+import type { ImplantDetail } from "@shared/types";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   EN_SUIVI: { label: "En suivi", variant: "secondary" },
@@ -86,8 +79,8 @@ export default function ImplantDetailsPage() {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesContent, setNotesContent] = useState("");
 
-  const { data: implant, isLoading } = useQuery<ImplantWithDetails>({
-    queryKey: ["/api/implants", implantId],
+  const { data: implantData, isLoading } = useQuery<ImplantDetail>({
+    queryKey: ["/api/surgery-implants", implantId],
     enabled: !!implantId,
   });
 
@@ -116,52 +109,52 @@ export default function ImplantDetailsPage() {
       delta?: number;
     }[] = [];
 
-    if (implant?.isqPose && implant?.datePose) {
+    if (implantData?.isqPose && implantData?.datePose) {
       points.push({ 
         label: "Pose", 
         sublabel: "Jour de la pose",
-        value: implant.isqPose, 
-        date: implant.datePose 
+        value: implantData.isqPose, 
+        date: implantData.datePose 
       });
     }
-    if (implant?.isq2m && implant?.datePose) {
-      const date2m = new Date(implant.datePose);
+    if (implantData?.isq2m && implantData?.datePose) {
+      const date2m = new Date(implantData.datePose);
       date2m.setMonth(date2m.getMonth() + 2);
-      const delta = implant.isqPose ? implant.isq2m - implant.isqPose : undefined;
+      const delta = implantData.isqPose ? implantData.isq2m - implantData.isqPose : undefined;
       points.push({ 
         label: "2 mois", 
         sublabel: "Contrôle à 2 mois",
-        value: implant.isq2m, 
+        value: implantData.isq2m, 
         date: date2m.toISOString().split('T')[0],
         delta 
       });
     }
-    if (implant?.isq3m && implant?.datePose) {
-      const date3m = new Date(implant.datePose);
+    if (implantData?.isq3m && implantData?.datePose) {
+      const date3m = new Date(implantData.datePose);
       date3m.setMonth(date3m.getMonth() + 3);
-      const delta = implant.isq2m ? implant.isq3m - implant.isq2m : undefined;
+      const delta = implantData.isq2m ? implantData.isq3m - implantData.isq2m : undefined;
       points.push({ 
         label: "3 mois", 
         sublabel: "Contrôle à 3 mois",
-        value: implant.isq3m, 
+        value: implantData.isq3m, 
         date: date3m.toISOString().split('T')[0],
         delta 
       });
     }
-    if (implant?.isq6m && implant?.datePose) {
-      const date6m = new Date(implant.datePose);
+    if (implantData?.isq6m && implantData?.datePose) {
+      const date6m = new Date(implantData.datePose);
       date6m.setMonth(date6m.getMonth() + 6);
-      const delta = implant.isq3m ? implant.isq6m - implant.isq3m : undefined;
+      const delta = implantData.isq3m ? implantData.isq6m - implantData.isq3m : undefined;
       points.push({ 
         label: "6 mois", 
         sublabel: "Contrôle à 6 mois",
-        value: implant.isq6m, 
+        value: implantData.isq6m, 
         date: date6m.toISOString().split('T')[0],
         delta 
       });
     }
 
-    implant?.visites
+    implantData?.visites
       ?.filter(v => v.isq)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .forEach((visite, index, arr) => {
@@ -179,9 +172,9 @@ export default function ImplantDetailsPage() {
   };
 
   const getSuccessRate = () => {
-    if (!implant) return 100;
-    if (implant.statut === "ECHEC") return 0;
-    if (implant.statut === "COMPLICATION") return 50;
+    if (!implantData) return 100;
+    if (implantData.statut === "ECHEC") return 0;
+    if (implantData.statut === "COMPLICATION") return 50;
     return 100;
   };
 
@@ -202,7 +195,7 @@ export default function ImplantDetailsPage() {
     );
   }
 
-  if (!implant) {
+  if (!implantData) {
     return (
       <div className="p-6">
         <Card>
@@ -218,12 +211,12 @@ export default function ImplantDetailsPage() {
     );
   }
 
-  const status = statusConfig[implant.statut] || statusConfig.EN_SUIVI;
+  const status = statusConfig[implantData.statut] || statusConfig.EN_SUIVI;
   const isqTimeline = getISQTimeline();
   const successRate = getSuccessRate();
   const boneLoss = getBoneLossScore();
-  const implantType = (implant as any).typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant";
-  const typeLabel = implant.referenceFabricant ? implant.referenceFabricant.split("-")[0] : implant.marque;
+  const implantType = implantData.implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant";
+  const typeLabel = implantData.implant.referenceFabricant ? implantData.implant.referenceFabricant.split("-")[0] : implantData.implant.marque;
 
   return (
     <div className="p-6 space-y-6">
@@ -236,16 +229,16 @@ export default function ImplantDetailsPage() {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold" data-testid="text-implant-title">
-              {implantType} {implant.marque} {typeLabel}
+              {implantType} {implantData.implant.marque} {typeLabel}
             </h1>
-            {(implant as any).typeImplant === "MINI_IMPLANT" && (
+            {implantData.implant.typeImplant === "MINI_IMPLANT" && (
               <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                 Mini
               </Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            Ø {implant.diametre}mm × {implant.longueur}mm
+            Ø {implantData.implant.diametre}mm × {implantData.implant.longueur}mm
           </p>
         </div>
         <Badge variant={status.variant} className="text-sm" data-testid="badge-implant-status">
@@ -270,11 +263,11 @@ export default function ImplantDetailsPage() {
                 <div className="py-6 space-y-4">
                   <div className="space-y-2">
                     <Label>Marque</Label>
-                    <Input defaultValue={implant.marque} data-testid="input-edit-marque" />
+                    <Input defaultValue={implantData.implant.marque} data-testid="input-edit-marque" />
                   </div>
                   <div className="space-y-2">
                     <Label>Type</Label>
-                    <Select defaultValue={(implant as any).typeImplant || "IMPLANT"}>
+                    <Select defaultValue={implantData.implant.typeImplant || "IMPLANT"}>
                       <SelectTrigger data-testid="select-edit-type">
                         <SelectValue />
                       </SelectTrigger>
@@ -286,16 +279,16 @@ export default function ImplantDetailsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Référence fabricant</Label>
-                    <Input defaultValue={implant.referenceFabricant || ""} data-testid="input-edit-reference" />
+                    <Input defaultValue={implantData.implant.referenceFabricant || ""} data-testid="input-edit-reference" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Diamètre (mm)</Label>
-                      <Input type="number" step="0.1" defaultValue={implant.diametre} data-testid="input-edit-diametre" />
+                      <Input type="number" step="0.1" defaultValue={implantData.implant.diametre} data-testid="input-edit-diametre" />
                     </div>
                     <div className="space-y-2">
                       <Label>Longueur (mm)</Label>
-                      <Input type="number" step="0.5" defaultValue={implant.longueur} data-testid="input-edit-longueur" />
+                      <Input type="number" step="0.5" defaultValue={implantData.implant.longueur} data-testid="input-edit-longueur" />
                     </div>
                   </div>
                   <div className="pt-4">
@@ -311,7 +304,7 @@ export default function ImplantDetailsPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
                 <span className="text-sm text-muted-foreground">Marque</span>
-                <p className="font-medium" data-testid="text-implant-marque">{implant.marque}</p>
+                <p className="font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
               </div>
               <div>
                 <span className="text-sm text-muted-foreground">Type</span>
@@ -320,16 +313,16 @@ export default function ImplantDetailsPage() {
               <div>
                 <span className="text-sm text-muted-foreground">Référence fabricant</span>
                 <p className="font-medium font-mono" data-testid="text-implant-reference">
-                  {implant.referenceFabricant || "-"}
+                  {implantData.implant.referenceFabricant || "-"}
                 </p>
               </div>
               <div>
                 <span className="text-sm text-muted-foreground">Diamètre</span>
-                <p className="font-medium font-mono" data-testid="text-implant-diametre">{implant.diametre} mm</p>
+                <p className="font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
               </div>
               <div>
                 <span className="text-sm text-muted-foreground">Longueur</span>
-                <p className="font-medium font-mono" data-testid="text-implant-longueur">{implant.longueur} mm</p>
+                <p className="font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
               </div>
             </div>
           </CardContent>
@@ -534,21 +527,21 @@ export default function ImplantDetailsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {implant.operation ? (
-                <TableRow data-testid={`operation-row-${implant.operationId}`}>
+              {implantData.surgery ? (
+                <TableRow data-testid={`operation-row-${implantData.surgeryId}`}>
                   <TableCell>
-                    <Checkbox data-testid={`checkbox-operation-${implant.operationId}`} />
+                    <Checkbox data-testid={`checkbox-operation-${implantData.surgeryId}`} />
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{formatShortDate(implant.datePose)}</p>
+                      <p className="font-medium">{formatShortDate(implantData.datePose)}</p>
                       <p className="text-xs text-muted-foreground">14:30</p>
                     </div>
                   </TableCell>
                   <TableCell>
-                    {implant.patient ? (
+                    {implantData.patient ? (
                       <div>
-                        <p className="font-medium">{implant.patient.prenom} {implant.patient.nom}</p>
+                        <p className="font-medium">{implantData.patient.prenom} {implantData.patient.nom}</p>
                         <p className="text-xs text-muted-foreground font-mono">PAT-2024-0156</p>
                       </div>
                     ) : "-"}
@@ -561,17 +554,17 @@ export default function ImplantDetailsPage() {
                   </TableCell>
                   <TableCell>
                     <span className="font-medium">1</span>
-                    <span className="text-muted-foreground text-sm ml-1">({implant.siteFdi})</span>
+                    <span className="text-muted-foreground text-sm ml-1">({implantData.siteFdi})</span>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-primary">
-                      {implant.operation?.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : "2 temps"}
+                      {implantData.surgery?.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : "2 temps"}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {implant.operation?.greffeOsseuse ? (
+                    {implantData.surgery?.greffeOsseuse ? (
                       <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                        {implant.operation.typeGreffe || "Oui"}
+                        {implantData.surgery.typeGreffe || "Oui"}
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground">Non</span>
