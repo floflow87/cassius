@@ -47,7 +47,7 @@ import type {
   CreateUserInput,
 } from "@shared/types";
 import { db } from "./db";
-import { eq, desc, ilike, or, and } from "drizzle-orm";
+import { eq, desc, ilike, or, and, lte } from "drizzle-orm";
 
 export interface IStorage {
   // Patient methods - all require organisationId for multi-tenant isolation
@@ -766,10 +766,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; titre: string | null }>> {
+    const today = new Date().toISOString().split('T')[0];
     const allRendezVous = await db
       .select()
       .from(rendezVous)
-      .where(eq(rendezVous.organisationId, organisationId))
+      .where(and(
+        eq(rendezVous.organisationId, organisationId),
+        lte(rendezVous.date, today)
+      ))
       .orderBy(desc(rendezVous.date));
 
     const lastVisitByPatient: Record<string, { date: string; titre: string | null }> = {};
