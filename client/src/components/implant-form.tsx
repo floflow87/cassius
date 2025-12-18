@@ -30,11 +30,6 @@ const implantFormSchema = z.object({
   referenceFabricant: z.string().optional(),
   diametre: z.coerce.number().min(1, "Diametre requis"),
   longueur: z.coerce.number().min(1, "Longueur requise"),
-  siteFdi: z.string().min(1, "Site FDI requis"),
-  typeOs: z.string().optional(),
-  positionImplant: z.string().optional(),
-  isqPose: z.coerce.number().optional(),
-  datePose: z.string().min(1, "Date de pose requise"),
 });
 
 type ImplantFormData = z.infer<typeof implantFormSchema>;
@@ -43,8 +38,6 @@ interface ImplantFormProps {
   onSuccess?: () => void;
 }
 
-const boneTypes = ["D1", "D2", "D3", "D4"];
-const positions = ["CRESTAL", "SOUS_CRESTAL", "SUPRA_CRESTAL"];
 const commonBrands = [
   "Straumann",
   "Nobel Biocare",
@@ -72,11 +65,6 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
       referenceFabricant: "",
       diametre: 4,
       longueur: 10,
-      siteFdi: "",
-      typeOs: "",
-      positionImplant: "CRESTAL",
-      isqPose: undefined,
-      datePose: new Date().toISOString().split("T")[0],
     },
   });
 
@@ -84,7 +72,7 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
     mutationFn: async (data: ImplantFormData) => {
       const operationData = {
         patientId: data.patientId,
-        dateOperation: data.datePose,
+        dateOperation: new Date().toISOString().split("T")[0],
         typeIntervention: "POSE_IMPLANT",
         typeChirurgieTemps: "UN_TEMPS",
         typeChirurgieApproche: "FLAPLESS",
@@ -97,10 +85,10 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
         referenceFabricant: data.referenceFabricant || null,
         diametre: data.diametre,
         longueur: data.longueur,
-        siteFdi: data.siteFdi,
-        typeOs: data.typeOs || null,
-        positionImplant: data.positionImplant || "CRESTAL",
-        isqPose: data.isqPose || null,
+        siteFdi: "00",
+        typeOs: null,
+        positionImplant: "CRESTAL",
+        isqPose: null,
       }];
 
       const res = await apiRequest("POST", "/api/operations", {
@@ -156,20 +144,6 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
                   ))}
                 </SelectContent>
               </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="datePose"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Date de pose</FormLabel>
-              <FormControl>
-                <Input type="date" {...field} data-testid="input-date-pose" />
-              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -275,96 +249,6 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
             )}
           />
         </div>
-
-        <FormField
-          control={form.control}
-          name="siteFdi"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Site FDI</FormLabel>
-              <FormControl>
-                <Input 
-                  placeholder="ex: 36" 
-                  {...field} 
-                  data-testid="input-site-fdi"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="typeOs"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Type d'os</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger data-testid="select-type-os">
-                      <SelectValue placeholder="Selectionner" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {boneTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="positionImplant"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Position</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger data-testid="select-position">
-                      <SelectValue placeholder="Selectionner" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {positions.map((pos) => (
-                      <SelectItem key={pos} value={pos}>
-                        {pos.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
-          control={form.control}
-          name="isqPose"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>ISQ a la pose</FormLabel>
-              <FormControl>
-                <Input 
-                  type="number" 
-                  placeholder="ex: 68" 
-                  {...field} 
-                  value={field.value || ""}
-                  data-testid="input-isq-pose"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <div className="flex justify-end gap-3 pt-4">
           <Button 

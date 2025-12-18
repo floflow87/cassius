@@ -533,12 +533,13 @@ export default function PatientDetailsPage() {
   interface TimelineEvent {
     id: string;
     date: Date;
-    type: "operation" | "radio" | "visite" | "rdv";
+    type: "operation" | "radio" | "visite" | "rdv" | "document";
     title: string;
     description?: string;
     badges?: string[];
     badgeClassName?: string;
     radioId?: string;
+    documentId?: string;
   }
 
   const timelineEvents: TimelineEvent[] = [];
@@ -575,6 +576,28 @@ export default function PatientDetailsPage() {
         description: visite.notes || `ISQ: ${visite.isq || "-"}`,
         badges: visite.isq ? [`ISQ: ${visite.isq}`] : undefined,
       });
+    });
+  });
+
+  // Ajouter les documents à la timeline
+  const TAG_LABELS_DOC: Record<string, string> = {
+    DEVIS: "Devis",
+    CONSENTEMENT: "Consentement",
+    COMPTE_RENDU: "Compte-rendu",
+    ASSURANCE: "Assurance",
+    AUTRE: "Autre",
+  };
+  
+  documents?.forEach((doc) => {
+    const primaryTag = doc.tags?.[0];
+    timelineEvents.push({
+      id: `doc-${doc.id}`,
+      date: new Date(doc.createdAt),
+      type: "document",
+      title: doc.title || "Document",
+      description: "Voir le document",
+      badges: primaryTag ? [TAG_LABELS_DOC[primaryTag] || primaryTag] : undefined,
+      documentId: doc.id,
     });
   });
 
@@ -1165,6 +1188,8 @@ export default function PatientDetailsPage() {
                               return <Stethoscope className="h-4 w-4 text-green-500" />;
                             case "rdv":
                               return <Calendar className="h-4 w-4 text-primary" />;
+                            case "document":
+                              return <FileText className="h-4 w-4 text-purple-500" />;
                           }
                         };
                         const getEventBgColor = () => {
@@ -1177,6 +1202,8 @@ export default function PatientDetailsPage() {
                               return "bg-green-100 dark:bg-green-900/30";
                             case "rdv":
                               return "bg-primary/10";
+                            case "document":
+                              return "bg-purple-100 dark:bg-purple-900/30";
                           }
                         };
                         return (
@@ -1198,6 +1225,16 @@ export default function PatientDetailsPage() {
                                       className="text-xs text-primary hover:underline mt-0.5 text-left"
                                       onClick={() => setTimelineRadioViewerId(event.radioId!)}
                                       data-testid={`button-view-radio-${event.radioId}`}
+                                    >
+                                      {event.description}
+                                    </button>
+                                  ) : event.description && event.documentId ? (
+                                    <button 
+                                      className="text-xs text-primary hover:underline mt-0.5 text-left"
+                                      onClick={() => {
+                                        setActiveTab("documents");
+                                      }}
+                                      data-testid={`button-view-document-${event.documentId}`}
                                     >
                                       {event.description}
                                     </button>
