@@ -28,14 +28,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -77,10 +69,12 @@ export default function ImplantDetailsPage() {
   const [, setLocation] = useLocation();
 
   const [editSheetOpen, setEditSheetOpen] = useState(false);
-  const [addISQDialogOpen, setAddISQDialogOpen] = useState(false);
+  const [addISQSheetOpen, setAddISQSheetOpen] = useState(false);
+  const [editPoseInfoSheetOpen, setEditPoseInfoSheetOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesContent, setNotesContent] = useState("");
   const [selectedActs, setSelectedActs] = useState<string[]>([]);
+  const [boneLossScore, setBoneLossScore] = useState<number>(0);
 
   const { data: implantData, isLoading } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
@@ -197,15 +191,14 @@ export default function ImplantDetailsPage() {
     return points;
   };
 
-  const getSuccessRate = () => {
-    if (!implantData) return 100;
-    if (implantData.statut === "ECHEC") return 0;
-    if (implantData.statut === "COMPLICATION") return 50;
-    return 100;
+  const getSuccessRateFromBoneLoss = (score: number): number => {
+    const rates = [100, 80, 60, 40, 20, 0];
+    return rates[score] ?? 100;
   };
 
-  const getBoneLossScore = () => {
-    return { score: 5, label: "Excellente" };
+  const getBoneLossLabel = (score: number): string => {
+    const labels = ["Excellente", "Très bonne", "Bonne", "Modérée", "Faible", "Critique"];
+    return labels[score] ?? "—";
   };
 
   if (isLoading) {
@@ -239,10 +232,21 @@ export default function ImplantDetailsPage() {
 
   const status = statusConfig[implantData.statut] || statusConfig.EN_SUIVI;
   const isqTimeline = getISQTimeline();
-  const successRate = getSuccessRate();
-  const boneLoss = getBoneLossScore();
+  const successRate = getSuccessRateFromBoneLoss(boneLossScore);
   const implantType = implantData.implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant";
   const typeLabel = implantData.implant.referenceFabricant ? implantData.implant.referenceFabricant.split("-")[0] : implantData.implant.marque;
+
+  const getSuccessRateColor = () => {
+    if (successRate >= 80) return "text-emerald-600 dark:text-emerald-400";
+    if (successRate >= 60) return "text-amber-600 dark:text-amber-400";
+    return "text-red-600 dark:text-red-400";
+  };
+
+  const getSuccessRateCardStyle = () => {
+    if (successRate >= 80) return "border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20";
+    if (successRate >= 60) return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20";
+    return "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20";
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -354,7 +358,7 @@ export default function ImplantDetailsPage() {
             <div className="flex justify-end mt-4 pt-4 border-t">
               <Link href={`/implants/${implantData.implant.id}`}>
                 <span className="text-sm text-primary flex items-center cursor-pointer hover:underline" data-testid="link-view-catalog-implant">
-                  Voir l'implant
+                  Voir l'implant catalogue
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </span>
               </Link>
@@ -362,9 +366,120 @@ export default function ImplantDetailsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={getSuccessRateCardStyle()}>
           <CardHeader className="pb-2">
+            <CardTitle className={`text-base flex items-center gap-2 ${successRate >= 80 ? "text-emerald-700 dark:text-emerald-400" : successRate >= 60 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400"}`}>
+              Taux de réussite
+              {successRate >= 80 && <CheckCircle2 className="h-5 w-5" />}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-center">
+              <span className={`text-5xl font-bold ${getSuccessRateColor()}`} data-testid="text-success-rate">
+                {successRate}%
+              </span>
+              <p className="text-sm text-muted-foreground mt-1">
+                {successRate === 100 ? "Aucune perte osseuse" : successRate >= 80 ? "Perte osseuse minimale" : successRate >= 60 ? "Perte osseuse modérée" : "Perte osseuse importante"}
+              </p>
+            </div>
+            <div className="pt-2 border-t">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm text-muted-foreground">Score de perte osseuse</Label>
+                </div>
+                <Select value={boneLossScore.toString()} onValueChange={(val) => setBoneLossScore(parseInt(val))}>
+                  <SelectTrigger data-testid="select-bone-loss">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0 - Excellente (100%)</SelectItem>
+                    <SelectItem value="1">1 - Très bonne (80%)</SelectItem>
+                    <SelectItem value="2">2 - Bonne (60%)</SelectItem>
+                    <SelectItem value="3">3 - Modérée (40%)</SelectItem>
+                    <SelectItem value="4">4 - Faible (20%)</SelectItem>
+                    <SelectItem value="5">5 - Critique (0%)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground text-center">
+                  {getBoneLossLabel(boneLossScore)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
             <CardTitle className="text-base">Informations de pose</CardTitle>
+            <Sheet open={editPoseInfoSheetOpen} onOpenChange={setEditPoseInfoSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid="button-edit-pose-info">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Modifier les informations de pose</SheetTitle>
+                </SheetHeader>
+                <div className="py-6 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Position de l'implant</Label>
+                    <Select defaultValue={implantData.positionImplant || ""}>
+                      <SelectTrigger data-testid="select-edit-position">
+                        <SelectValue placeholder="Sélectionner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ANTERIEUR">Antérieur</SelectItem>
+                        <SelectItem value="POSTERIEUR">Postérieur</SelectItem>
+                        <SelectItem value="MAXILLAIRE">Maxillaire</SelectItem>
+                        <SelectItem value="MANDIBULAIRE">Mandibulaire</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Site FDI</Label>
+                    <Input defaultValue={implantData.siteFdi} data-testid="input-edit-site-fdi" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type d'os</Label>
+                    <Select defaultValue={implantData.typeOs || ""}>
+                      <SelectTrigger data-testid="select-edit-type-os">
+                        <SelectValue placeholder="Sélectionner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="D1">D1 - Très dense</SelectItem>
+                        <SelectItem value="D2">D2 - Dense</SelectItem>
+                        <SelectItem value="D3">D3 - Spongieux</SelectItem>
+                        <SelectItem value="D4">D4 - Très spongieux</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Greffe osseuse</Label>
+                    <Select defaultValue={implantData.greffeOsseuse ? "oui" : "non"}>
+                      <SelectTrigger data-testid="select-edit-greffe">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="non">Non</SelectItem>
+                        <SelectItem value="oui">Oui</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type de greffe</Label>
+                    <Input defaultValue={implantData.typeGreffe || ""} placeholder="Ex: Autogène" data-testid="input-edit-type-greffe" />
+                  </div>
+                  <div className="pt-4">
+                    <Button className="w-full" data-testid="button-save-pose-info">
+                      Enregistrer
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
@@ -389,133 +504,6 @@ export default function ImplantDetailsPage() {
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-              Taux de réussite moyen
-              <CheckCircle2 className="h-5 w-5" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center">
-              <span className="text-5xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-success-rate">
-                {successRate}%
-              </span>
-              <p className="text-sm text-muted-foreground mt-1">
-                {successRate === 100 ? "Aucune complication détectée" : ""}
-              </p>
-            </div>
-            <div className="pt-2 border-t border-emerald-200 dark:border-emerald-800">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Score de perte osseuse</span>
-                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400" data-testid="text-bone-loss">
-                  {boneLoss.score}/5 - {boneLoss.label}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
-            <CardTitle className="text-base">Suivi ISQ (Stabilité)</CardTitle>
-            <Dialog open={addISQDialogOpen} onOpenChange={setAddISQDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-primary" data-testid="button-add-isq">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Ajouter mesure
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Ajouter une mesure ISQ</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Date</Label>
-                    <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} data-testid="input-isq-date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Valeur ISQ</Label>
-                    <Input type="number" min="0" max="100" placeholder="Ex: 75" data-testid="input-isq-value" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Notes (optionnel)</Label>
-                    <Textarea placeholder="Observations..." data-testid="input-isq-notes" />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setAddISQDialogOpen(false)}>
-                    Annuler
-                  </Button>
-                  <Button data-testid="button-save-isq">Enregistrer</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </CardHeader>
-          <CardContent>
-            {isqTimeline.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <TrendingUp className="h-8 w-8 mb-2" />
-                <p className="text-sm">Aucune mesure ISQ enregistrée</p>
-              </div>
-            ) : (
-              <div className="relative">
-                <div className="absolute left-8 top-4 bottom-4 w-0.5 bg-border" />
-                <div className="space-y-4">
-                  {isqTimeline.map((point, index) => {
-                    const badge = getISQBadge(point.value);
-                    return (
-                      <div key={index} className="relative flex items-start gap-4 pl-4" data-testid={`isq-entry-${index}`}>
-                        <div className="absolute left-6 w-4 h-4 rounded-full bg-primary border-2 border-background z-10" />
-                        <div className="ml-10 flex-1">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-xs text-muted-foreground uppercase">{point.label}</span>
-                              <span className="text-3xl font-bold text-primary">{point.value}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm">{formatShortDate(point.date)}</span>
-                            <span className="text-xs text-muted-foreground">{point.sublabel}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge className={badge.className}>{badge.label}</Badge>
-                          {point.delta !== undefined && point.delta !== 0 && (
-                            <span className={`text-xs font-medium flex items-center gap-0.5 ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                              <TrendingUp className={`h-3 w-3 ${point.delta < 0 ? "rotate-180" : ""}`} />
-                              {point.delta > 0 ? "+" : ""}{point.delta}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  
-                  <div className="relative flex items-start gap-4 pl-4 opacity-60" data-testid="isq-next-control">
-                    <div className="absolute left-6 w-4 h-4 rounded-full bg-muted border-2 border-background z-10" />
-                    <div className="ml-10 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">6 mois</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-sm">{formatShortDate(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString())}</span>
-                        <span className="text-xs text-muted-foreground">Prochain contrôle prévu</span>
-                      </div>
-                    </div>
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                      À venir
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -565,6 +553,103 @@ export default function ImplantDetailsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+          <CardTitle className="text-base">Suivi ISQ (Stabilité)</CardTitle>
+          <Sheet open={addISQSheetOpen} onOpenChange={setAddISQSheetOpen}>
+            <SheetTrigger asChild>
+              <Button data-testid="button-add-isq">
+                <Plus className="h-4 w-4 mr-1" />
+                Ajouter mesure
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <SheetHeader>
+                <SheetTitle>Ajouter une mesure ISQ</SheetTitle>
+              </SheetHeader>
+              <div className="py-6 space-y-4">
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} data-testid="input-isq-date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Valeur ISQ</Label>
+                  <Input type="number" min="0" max="100" placeholder="Ex: 75" data-testid="input-isq-value" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Notes (optionnel)</Label>
+                  <Textarea placeholder="Observations..." data-testid="input-isq-notes" />
+                </div>
+                <div className="pt-4">
+                  <Button className="w-full" onClick={() => setAddISQSheetOpen(false)} data-testid="button-save-isq">
+                    Enregistrer
+                  </Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </CardHeader>
+        <CardContent>
+          {isqTimeline.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+              <TrendingUp className="h-8 w-8 mb-2" />
+              <p className="text-sm">Aucune mesure ISQ enregistrée</p>
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="absolute left-8 top-4 bottom-4 w-0.5 bg-border" />
+              <div className="space-y-4">
+                {isqTimeline.map((point, index) => {
+                  const badge = getISQBadge(point.value);
+                  return (
+                    <div key={index} className="relative flex items-start gap-4 pl-4" data-testid={`isq-entry-${index}`}>
+                      <div className="absolute left-6 w-4 h-4 rounded-full bg-primary border-2 border-background z-10" />
+                      <div className="ml-10 flex-1">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-xs text-muted-foreground uppercase">{point.label}</span>
+                            <span className="text-3xl font-bold text-primary">{point.value}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-sm">{formatShortDate(point.date)}</span>
+                          <span className="text-xs text-muted-foreground">{point.sublabel}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={badge.className}>{badge.label}</Badge>
+                        {point.delta !== undefined && point.delta !== 0 && (
+                          <span className={`text-xs font-medium flex items-center gap-0.5 ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                            <TrendingUp className={`h-3 w-3 ${point.delta < 0 ? "rotate-180" : ""}`} />
+                            {point.delta > 0 ? "+" : ""}{point.delta}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                <div className="relative flex items-start gap-4 pl-4 opacity-60" data-testid="isq-next-control">
+                  <div className="absolute left-6 w-4 h-4 rounded-full bg-muted border-2 border-background z-10" />
+                  <div className="ml-10 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">6 mois</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-sm">{formatShortDate(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString())}</span>
+                      <span className="text-xs text-muted-foreground">Prochain contrôle prévu</span>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    À venir
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">
