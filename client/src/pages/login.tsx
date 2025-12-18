@@ -129,16 +129,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel className="text-sm text-muted-foreground">Mot de passe</FormLabel>
-                        <button 
-                          type="button"
-                          className="text-sm text-primary hover:underline"
-                          data-testid="link-forgot-password"
-                        >
-                          Mot de passe oublié ?
-                        </button>
-                      </div>
+                      <FormLabel className="text-sm text-muted-foreground">Mot de passe</FormLabel>
                       <FormControl>
                         <Input 
                           type="password" 
@@ -148,6 +139,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                           data-testid="input-password" 
                         />
                       </FormControl>
+                      <div className="flex justify-end">
+                        <button 
+                          type="button"
+                          className="text-sm text-primary hover:underline"
+                          data-testid="link-forgot-password"
+                        >
+                          Mot de passe oublié ?
+                        </button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
