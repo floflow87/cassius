@@ -2,6 +2,7 @@ import {
   patients,
   operations,
   implants,
+  surgeryImplants,
   radios,
   visites,
   protheses,
@@ -16,6 +17,8 @@ import {
   type InsertOperation,
   type Implant,
   type InsertImplant,
+  type SurgeryImplant,
+  type InsertSurgeryImplant,
   type Radio,
   type InsertRadio,
   type Visite,
@@ -36,6 +39,7 @@ import type {
   PatientDetail,
   ImplantDetail,
   ImplantWithPatient,
+  SurgeryImplantWithDetails,
   DashboardStats,
   AdvancedStats,
   ImplantFilters,
@@ -59,17 +63,37 @@ export interface IStorage {
   createOperationWithImplants(
     organisationId: string,
     operationData: InsertOperation,
-    implantsData: Array<Omit<InsertImplant, 'operationId' | 'patientId' | 'datePose' | 'statut'>>
-  ): Promise<{ operation: Operation; implants: Implant[] }>;
+    implantsData: Array<{
+      typeImplant?: "IMPLANT" | "MINI_IMPLANT";
+      marque: string;
+      referenceFabricant?: string | null;
+      diametre: number;
+      longueur: number;
+      lot?: string | null;
+      siteFdi: string;
+      positionImplant?: string | null;
+      typeOs?: string | null;
+      miseEnCharge?: string | null;
+      greffeOsseuse?: boolean | null;
+      typeGreffe?: string | null;
+      typeChirurgieTemps?: string | null;
+      isqPose?: number | null;
+      notes?: string | null;
+    }>
+  ): Promise<{ operation: Operation; surgeryImplants: SurgeryImplant[] }>;
 
-  // Implant methods
+  // Implant catalog methods
   getImplant(organisationId: string, id: string): Promise<Implant | undefined>;
-  getImplantWithDetails(organisationId: string, id: string): Promise<ImplantDetail | undefined>;
-  getPatientImplants(organisationId: string, patientId: string): Promise<Implant[]>;
   createImplant(organisationId: string, implant: InsertImplant): Promise<Implant>;
   getAllImplants(organisationId: string): Promise<Implant[]>;
-  filterImplants(organisationId: string, filters: ImplantFilters): Promise<ImplantWithPatient[]>;
   getImplantBrands(organisationId: string): Promise<string[]>;
+
+  // Surgery implant methods (implants posés)
+  getSurgeryImplant(organisationId: string, id: string): Promise<SurgeryImplant | undefined>;
+  getSurgeryImplantWithDetails(organisationId: string, id: string): Promise<ImplantDetail | undefined>;
+  getPatientSurgeryImplants(organisationId: string, patientId: string): Promise<SurgeryImplantWithDetails[]>;
+  getAllSurgeryImplants(organisationId: string): Promise<SurgeryImplantWithDetails[]>;
+  filterSurgeryImplants(organisationId: string, filters: ImplantFilters): Promise<ImplantWithPatient[]>;
 
   // Radio methods
   getRadio(organisationId: string, id: string): Promise<Radio | undefined>;
@@ -149,41 +173,39 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(desc(operations.dateOperation));
 
-    const operationsWithImplants = await Promise.all(
+    const operationsWithSurgeryImplants = await Promise.all(
       patientOperations.map(async (op) => {
-        const opImplants = await db
+        const opSurgeryImplants = await db
           .select()
-          .from(implants)
+          .from(surgeryImplants)
           .where(and(
-            eq(implants.operationId, op.id),
-            eq(implants.organisationId, organisationId)
+            eq(surgeryImplants.surgeryId, op.id),
+            eq(surgeryImplants.organisationId, organisationId)
           ));
-        return { ...op, implants: opImplants };
+
+        const surgeryImplantsWithDetails: SurgeryImplantWithDetails[] = await Promise.all(
+          opSurgeryImplants.map(async (si) => {
+            const [implant] = await db
+              .select()
+              .from(implants)
+              .where(eq(implants.id, si.implantId));
+            return {
+              ...si,
+              implant: implant!,
+              surgery: op,
+              patient,
+            };
+          })
+        );
+
+        return { ...op, surgeryImplants: surgeryImplantsWithDetails };
       })
     );
 
-    const patientImplants = await db
-      .select()
-      .from(implants)
-      .where(and(
-        eq(implants.patientId, id),
-        eq(implants.organisationId, organisationId)
-      ))
-      .orderBy(desc(implants.datePose));
-
-    const implantsWithVisites = await Promise.all(
-      patientImplants.map(async (imp) => {
-        const impVisites = await db
-          .select()
-          .from(visites)
-          .where(and(
-            eq(visites.implantId, imp.id),
-            eq(visites.organisationId, organisationId)
-          ))
-          .orderBy(desc(visites.date));
-        return { ...imp, visites: impVisites };
-      })
-    );
+    const allSurgeryImplants: SurgeryImplantWithDetails[] = [];
+    for (const op of operationsWithSurgeryImplants) {
+      allSurgeryImplants.push(...op.surgeryImplants);
+    }
 
     const patientRadios = await db
       .select()
@@ -196,8 +218,8 @@ export class DatabaseStorage implements IStorage {
 
     return {
       ...patient,
-      operations: operationsWithImplants,
-      implants: implantsWithVisites,
+      operations: operationsWithSurgeryImplants,
+      surgeryImplants: allSurgeryImplants,
       radios: patientRadios,
     };
   }
@@ -260,30 +282,62 @@ export class DatabaseStorage implements IStorage {
   async createOperationWithImplants(
     organisationId: string,
     operationData: InsertOperation,
-    implantsData: Array<Omit<InsertImplant, 'operationId' | 'patientId' | 'datePose' | 'statut'>>
-  ): Promise<{ operation: Operation; implants: Implant[] }> {
+    implantsData: Array<{
+      typeImplant?: "IMPLANT" | "MINI_IMPLANT";
+      marque: string;
+      referenceFabricant?: string | null;
+      diametre: number;
+      longueur: number;
+      lot?: string | null;
+      siteFdi: string;
+      positionImplant?: string | null;
+      typeOs?: string | null;
+      miseEnCharge?: string | null;
+      greffeOsseuse?: boolean | null;
+      typeGreffe?: string | null;
+      typeChirurgieTemps?: string | null;
+      isqPose?: number | null;
+      notes?: string | null;
+    }>
+  ): Promise<{ operation: Operation; surgeryImplants: SurgeryImplant[] }> {
     return await db.transaction(async (tx) => {
-      // 1. Créer l'opération
       const [operation] = await tx.insert(operations).values({
         ...operationData,
         organisationId,
       }).returning();
 
-      // 2. Créer tous les implants associés
-      const createdImplants: Implant[] = [];
+      const createdSurgeryImplants: SurgeryImplant[] = [];
       for (const implantData of implantsData) {
         const [implant] = await tx.insert(implants).values({
-          ...implantData,
           organisationId,
-          operationId: operation.id,
-          patientId: operationData.patientId,
-          datePose: operationData.dateOperation,
-          statut: "EN_SUIVI",
+          typeImplant: implantData.typeImplant || "IMPLANT",
+          marque: implantData.marque,
+          referenceFabricant: implantData.referenceFabricant || null,
+          diametre: implantData.diametre,
+          longueur: implantData.longueur,
+          lot: implantData.lot || null,
         }).returning();
-        createdImplants.push(implant);
+
+        const [surgeryImplant] = await tx.insert(surgeryImplants).values({
+          organisationId,
+          surgeryId: operation.id,
+          implantId: implant.id,
+          siteFdi: implantData.siteFdi,
+          positionImplant: implantData.positionImplant as any || null,
+          typeOs: implantData.typeOs as any || null,
+          miseEnCharge: implantData.miseEnCharge as any || null,
+          greffeOsseuse: implantData.greffeOsseuse || false,
+          typeGreffe: implantData.typeGreffe || null,
+          typeChirurgieTemps: implantData.typeChirurgieTemps as any || null,
+          isqPose: implantData.isqPose || null,
+          statut: "EN_SUIVI",
+          datePose: operationData.dateOperation,
+          notes: implantData.notes || null,
+        }).returning();
+        createdSurgeryImplants.push(surgeryImplant);
       }
 
-      return { operation, implants: createdImplants };
+      return { operation, surgeryImplants: createdSurgeryImplants };
     });
   }
 
@@ -297,58 +351,6 @@ export class DatabaseStorage implements IStorage {
     return implant || undefined;
   }
 
-  async getImplantWithDetails(organisationId: string, id: string): Promise<ImplantDetail | undefined> {
-    const implant = await this.getImplant(organisationId, id);
-    if (!implant) return undefined;
-
-    const implantVisites = await db
-      .select()
-      .from(visites)
-      .where(and(
-        eq(visites.implantId, id),
-        eq(visites.organisationId, organisationId)
-      ))
-      .orderBy(desc(visites.date));
-
-    const implantRadios = await db
-      .select()
-      .from(radios)
-      .where(and(
-        eq(radios.implantId, id),
-        eq(radios.organisationId, organisationId)
-      ))
-      .orderBy(desc(radios.date));
-
-    const [patient] = await db
-      .select()
-      .from(patients)
-      .where(eq(patients.id, implant.patientId));
-
-    const [operation] = await db
-      .select()
-      .from(operations)
-      .where(eq(operations.id, implant.operationId));
-
-    return {
-      ...implant,
-      visites: implantVisites,
-      radios: implantRadios,
-      patient: patient || undefined,
-      operation: operation || undefined,
-    } as ImplantDetail;
-  }
-
-  async getPatientImplants(organisationId: string, patientId: string): Promise<Implant[]> {
-    return db
-      .select()
-      .from(implants)
-      .where(and(
-        eq(implants.patientId, patientId),
-        eq(implants.organisationId, organisationId)
-      ))
-      .orderBy(desc(implants.datePose));
-  }
-
   async createImplant(organisationId: string, implant: InsertImplant): Promise<Implant> {
     const [newImplant] = await db.insert(implants).values({
       ...implant,
@@ -359,40 +361,7 @@ export class DatabaseStorage implements IStorage {
 
   async getAllImplants(organisationId: string): Promise<Implant[]> {
     return db.select().from(implants)
-      .where(eq(implants.organisationId, organisationId))
-      .orderBy(desc(implants.datePose));
-  }
-
-  async filterImplants(organisationId: string, filters: ImplantFilters): Promise<ImplantWithPatient[]> {
-    const conditions = [eq(implants.organisationId, organisationId)];
-
-    if (filters.marque) {
-      conditions.push(ilike(implants.marque, `%${filters.marque}%`));
-    }
-    if (filters.siteFdi) {
-      conditions.push(eq(implants.siteFdi, filters.siteFdi));
-    }
-    if (filters.typeOs) {
-      conditions.push(eq(implants.typeOs, filters.typeOs as any));
-    }
-    if (filters.statut) {
-      conditions.push(eq(implants.statut, filters.statut as any));
-    }
-
-    const results = await db
-      .select()
-      .from(implants)
-      .where(and(...conditions))
-      .orderBy(desc(implants.datePose));
-
-    const implantsWithPatients = await Promise.all(
-      results.map(async (implant) => {
-        const patient = await this.getPatient(organisationId, implant.patientId);
-        return { ...implant, patient };
-      })
-    );
-
-    return implantsWithPatients;
+      .where(eq(implants.organisationId, organisationId));
   }
 
   async getImplantBrands(organisationId: string): Promise<string[]> {
@@ -402,6 +371,197 @@ export class DatabaseStorage implements IStorage {
       .where(eq(implants.organisationId, organisationId))
       .orderBy(implants.marque);
     return results.map((r) => r.marque);
+  }
+
+  // ========== SURGERY IMPLANTS ==========
+  async getSurgeryImplant(organisationId: string, id: string): Promise<SurgeryImplant | undefined> {
+    const [surgeryImplant] = await db.select().from(surgeryImplants)
+      .where(and(
+        eq(surgeryImplants.id, id),
+        eq(surgeryImplants.organisationId, organisationId)
+      ));
+    return surgeryImplant || undefined;
+  }
+
+  async getSurgeryImplantWithDetails(organisationId: string, id: string): Promise<ImplantDetail | undefined> {
+    const surgeryImplant = await this.getSurgeryImplant(organisationId, id);
+    if (!surgeryImplant) return undefined;
+
+    const [implant] = await db
+      .select()
+      .from(implants)
+      .where(eq(implants.id, surgeryImplant.implantId));
+    if (!implant) return undefined;
+
+    const [surgery] = await db
+      .select()
+      .from(operations)
+      .where(eq(operations.id, surgeryImplant.surgeryId));
+
+    let patient: Patient | undefined;
+    if (surgery) {
+      const [p] = await db
+        .select()
+        .from(patients)
+        .where(eq(patients.id, surgery.patientId));
+      patient = p || undefined;
+    }
+
+    const implantVisites = await db
+      .select()
+      .from(visites)
+      .where(and(
+        eq(visites.implantId, implant.id),
+        eq(visites.organisationId, organisationId)
+      ))
+      .orderBy(desc(visites.date));
+
+    const implantRadios = await db
+      .select()
+      .from(radios)
+      .where(and(
+        eq(radios.implantId, implant.id),
+        eq(radios.organisationId, organisationId)
+      ))
+      .orderBy(desc(radios.date));
+
+    return {
+      ...surgeryImplant,
+      implant,
+      patient,
+      surgery: surgery || undefined,
+      visites: implantVisites,
+      radios: implantRadios,
+    };
+  }
+
+  async getPatientSurgeryImplants(organisationId: string, patientId: string): Promise<SurgeryImplantWithDetails[]> {
+    const patientOperations = await db
+      .select()
+      .from(operations)
+      .where(and(
+        eq(operations.patientId, patientId),
+        eq(operations.organisationId, organisationId)
+      ));
+
+    const [patient] = await db
+      .select()
+      .from(patients)
+      .where(eq(patients.id, patientId));
+
+    const result: SurgeryImplantWithDetails[] = [];
+    for (const op of patientOperations) {
+      const opSurgeryImplants = await db
+        .select()
+        .from(surgeryImplants)
+        .where(and(
+          eq(surgeryImplants.surgeryId, op.id),
+          eq(surgeryImplants.organisationId, organisationId)
+        ));
+
+      for (const si of opSurgeryImplants) {
+        const [implant] = await db
+          .select()
+          .from(implants)
+          .where(eq(implants.id, si.implantId));
+        if (implant) {
+          result.push({
+            ...si,
+            implant,
+            surgery: op,
+            patient: patient || undefined,
+          });
+        }
+      }
+    }
+
+    return result.sort((a, b) => new Date(b.datePose).getTime() - new Date(a.datePose).getTime());
+  }
+
+  async getAllSurgeryImplants(organisationId: string): Promise<SurgeryImplantWithDetails[]> {
+    const allSurgeryImplants = await db
+      .select()
+      .from(surgeryImplants)
+      .where(eq(surgeryImplants.organisationId, organisationId))
+      .orderBy(desc(surgeryImplants.datePose));
+
+    const result: SurgeryImplantWithDetails[] = [];
+    for (const si of allSurgeryImplants) {
+      const [implant] = await db
+        .select()
+        .from(implants)
+        .where(eq(implants.id, si.implantId));
+
+      const [surgery] = await db
+        .select()
+        .from(operations)
+        .where(eq(operations.id, si.surgeryId));
+
+      let patient: Patient | undefined;
+      if (surgery) {
+        const [p] = await db
+          .select()
+          .from(patients)
+          .where(eq(patients.id, surgery.patientId));
+        patient = p || undefined;
+      }
+
+      if (implant) {
+        result.push({
+          ...si,
+          implant,
+          surgery: surgery || undefined,
+          patient,
+        });
+      }
+    }
+
+    return result;
+  }
+
+  async filterSurgeryImplants(organisationId: string, filters: ImplantFilters): Promise<ImplantWithPatient[]> {
+    const allSurgeryImplants = await db
+      .select()
+      .from(surgeryImplants)
+      .where(eq(surgeryImplants.organisationId, organisationId))
+      .orderBy(desc(surgeryImplants.datePose));
+
+    const result: ImplantWithPatient[] = [];
+    for (const si of allSurgeryImplants) {
+      if (filters.siteFdi && si.siteFdi !== filters.siteFdi) continue;
+      if (filters.typeOs && si.typeOs !== filters.typeOs) continue;
+      if (filters.statut && si.statut !== filters.statut) continue;
+
+      const [implant] = await db
+        .select()
+        .from(implants)
+        .where(eq(implants.id, si.implantId));
+
+      if (!implant) continue;
+      if (filters.marque && !implant.marque.toLowerCase().includes(filters.marque.toLowerCase())) continue;
+
+      const [surgery] = await db
+        .select()
+        .from(operations)
+        .where(eq(operations.id, si.surgeryId));
+
+      let patient: Patient | undefined;
+      if (surgery) {
+        const [p] = await db
+          .select()
+          .from(patients)
+          .where(eq(patients.id, surgery.patientId));
+        patient = p || undefined;
+      }
+
+      result.push({
+        ...si,
+        implant,
+        patient,
+      });
+    }
+
+    return result;
   }
 
   // ========== RADIOS ==========
@@ -508,21 +668,21 @@ export class DatabaseStorage implements IStorage {
     const allOperations = await db.select().from(operations)
       .where(eq(operations.organisationId, organisationId))
       .orderBy(desc(operations.dateOperation));
-    const allImplants = await db.select().from(implants)
-      .where(eq(implants.organisationId, organisationId));
+    const allSurgeryImplants = await db.select().from(surgeryImplants)
+      .where(eq(surgeryImplants.organisationId, organisationId));
     const allRadios = await db.select().from(radios)
       .where(eq(radios.organisationId, organisationId));
 
     const implantsByStatus: Record<string, number> = {};
-    allImplants.forEach((implant) => {
-      const status = implant.statut || "EN_SUIVI";
+    allSurgeryImplants.forEach((si) => {
+      const status = si.statut || "EN_SUIVI";
       implantsByStatus[status] = (implantsByStatus[status] || 0) + 1;
     });
 
     return {
       totalPatients: allPatients.length,
       totalOperations: allOperations.length,
-      totalImplants: allImplants.length,
+      totalImplants: allSurgeryImplants.length,
       totalRadios: allRadios.length,
       implantsByStatus,
       recentOperations: allOperations.slice(0, 10),
@@ -530,9 +690,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAdvancedStats(organisationId: string): Promise<AdvancedStats> {
-    const allImplants = await db.select().from(implants)
-      .where(eq(implants.organisationId, organisationId));
-    const total = allImplants.length;
+    const allSurgeryImplants = await db.select().from(surgeryImplants)
+      .where(eq(surgeryImplants.organisationId, organisationId));
+    const total = allSurgeryImplants.length;
 
     const statusCounts = {
       SUCCES: 0,
@@ -547,26 +707,33 @@ export class DatabaseStorage implements IStorage {
     let isq3mSum = 0, isq3mCount = 0;
     let isq6mSum = 0, isq6mCount = 0;
 
-    allImplants.forEach((imp) => {
-      const status = imp.statut || "EN_SUIVI";
+    for (const si of allSurgeryImplants) {
+      const status = si.statut || "EN_SUIVI";
       statusCounts[status as keyof typeof statusCounts]++;
 
-      brandCounts[imp.marque] = (brandCounts[imp.marque] || 0) + 1;
-      siteCounts[imp.siteFdi] = (siteCounts[imp.siteFdi] || 0) + 1;
+      const [implant] = await db
+        .select()
+        .from(implants)
+        .where(eq(implants.id, si.implantId));
+      if (implant) {
+        brandCounts[implant.marque] = (brandCounts[implant.marque] || 0) + 1;
+      }
 
-      if (imp.isqPose) { isqPoseSum += imp.isqPose; isqPoseCount++; }
-      if (imp.isq3m) { isq3mSum += imp.isq3m; isq3mCount++; }
-      if (imp.isq6m) { isq6mSum += imp.isq6m; isq6mCount++; }
-    });
+      siteCounts[si.siteFdi] = (siteCounts[si.siteFdi] || 0) + 1;
+
+      if (si.isqPose) { isqPoseSum += si.isqPose; isqPoseCount++; }
+      if (si.isq3m) { isq3mSum += si.isq3m; isq3mCount++; }
+      if (si.isq6m) { isq6mSum += si.isq6m; isq6mCount++; }
+    }
 
     const isqTrends: { month: string; avgIsq: number }[] = [];
     const monthlyIsq: Record<string, { sum: number; count: number }> = {};
 
-    allImplants.forEach((imp) => {
-      const month = imp.datePose.substring(0, 7);
-      if (imp.isqPose) {
+    allSurgeryImplants.forEach((si) => {
+      const month = si.datePose.substring(0, 7);
+      if (si.isqPose) {
         if (!monthlyIsq[month]) monthlyIsq[month] = { sum: 0, count: 0 };
-        monthlyIsq[month].sum += imp.isqPose;
+        monthlyIsq[month].sum += si.isqPose;
         monthlyIsq[month].count++;
       }
     });
