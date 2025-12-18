@@ -10,7 +10,7 @@ const { Pool } = pg;
 const APP_ENV = process.env.APP_ENV || "development";
 const isProduction = APP_ENV === "production";
 
-const DB_SSL = process.env.DB_SSL !== "false";
+let DB_SSL = process.env.DB_SSL !== "false";
 const DB_POOL_MAX = parseInt(process.env.DB_POOL_MAX || "5", 10);
 const DB_CONN_TIMEOUT_MS = parseInt(process.env.DB_CONN_TIMEOUT_MS || "60000", 10);
 
@@ -22,11 +22,15 @@ if (isProduction) {
   }
   databaseUrl = process.env.SUPABASE_DB_URL_PROD;
 } else {
-  if (!process.env.SUPABASE_DB_URL_DEV) {
-    console.error("SUPABASE_DB_URL_DEV must be set for development.");
+  if (process.env.DATABASE_URL) {
+    databaseUrl = process.env.DATABASE_URL;
+    DB_SSL = false;
+  } else if (process.env.SUPABASE_DB_URL_DEV) {
+    databaseUrl = process.env.SUPABASE_DB_URL_DEV;
+  } else {
+    console.error("DATABASE_URL or SUPABASE_DB_URL_DEV must be set for development.");
     process.exit(1);
   }
-  databaseUrl = process.env.SUPABASE_DB_URL_DEV;
 }
 
 const urlWithoutSslMode = databaseUrl.replace(/[?&]sslmode=[^&]*/g, '');
