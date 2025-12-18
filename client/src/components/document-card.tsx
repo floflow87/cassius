@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Calendar, FileText, MoreVertical, Pencil, Download, Trash2, ExternalLink } from "lucide-react";
+import { Calendar, FileText, MoreVertical, Pencil, Download, Trash2, ExternalLink, X, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -62,8 +63,17 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
   const [newTitle, setNewTitle] = useState(document.title || "");
   const [renameError, setRenameError] = useState("");
   const [freshSignedUrl, setFreshSignedUrl] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
   const [urlError, setUrlError] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [blobUrl]);
 
   const refreshSignedUrl = async (): Promise<string | null> => {
     if (!document.filePath) return null;
@@ -87,6 +97,20 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
     return null;
   };
 
+  const loadPdfAsBlob = async (url: string): Promise<string | null> => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch PDF");
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      setBlobUrl(objectUrl);
+      return objectUrl;
+    } catch (err) {
+      console.error("Failed to load PDF as blob:", err);
+      return null;
+    }
+  };
+
   const formatDate = (dateString: string | Date) => {
     const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
     return date.toLocaleDateString("fr-FR", {
@@ -108,8 +132,27 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
 
   const handleOpenViewer = async () => {
     setViewerOpen(true);
+    setBlobUrl(null);
+    setUrlError(false);
+    
     if (document.filePath) {
-      await refreshSignedUrl();
+      setIsLoadingUrl(true);
+      const signedUrl = await refreshSignedUrl();
+      if (signedUrl) {
+        const blob = await loadPdfAsBlob(signedUrl);
+        if (!blob) {
+          setUrlError(true);
+        }
+      }
+      setIsLoadingUrl(false);
+    }
+  };
+
+  const handleCloseViewer = () => {
+    setViewerOpen(false);
+    if (blobUrl) {
+      URL.revokeObjectURL(blobUrl);
+      setBlobUrl(null);
     }
   };
 
@@ -274,13 +317,13 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
         </CardContent>
       </Card>
 
-      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
-          <DialogHeader className="p-4 border-b">
+      <Dialog open={viewerOpen} onOpenChange={handleCloseViewer}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 flex flex-col [&>button]:hidden">
+          <DialogHeader className="flex-shrink-0 p-4 border-b relative z-10">
             <div className="flex items-center justify-between gap-4">
-              <div>
-                <DialogTitle className="flex items-center gap-2">
-                  <span>{document.title}</span>
+              <div className="flex-1 min-w-0">
+                <DialogTitle className="flex items-center gap-2 flex-wrap">
+                  <span className="truncate">{document.title}</span>
                   {document.tags && document.tags.map((tag) => (
                     <Badge key={tag} variant="secondary" className={TAG_COLORS[tag] || TAG_COLORS.AUTRE}>
                       {TAG_LABELS[tag] || tag}
@@ -292,7 +335,7 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
                   {document.sizeBytes && ` - ${formatFileSize(document.sizeBytes)}`}
                 </DialogDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -306,7 +349,7 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
                   variant="outline" 
                   size="sm" 
                   onClick={() => {
-                    const url = getDocumentUrl(true) || document.signedUrl;
+                    const url = freshSignedUrl || document.signedUrl;
                     if (url) window.open(url, "_blank");
                   }}
                   data-testid="button-open-new-tab"
@@ -314,24 +357,33 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Ouvrir
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCloseViewer}
+                  data-testid="button-close-viewer"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           </DialogHeader>
-          <div className="flex-1 overflow-auto bg-muted min-h-[60vh]">
+          <div className="flex-1 overflow-hidden bg-muted min-h-[60vh]">
             {isLoadingUrl ? (
               <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Chargement...</p>
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-muted-foreground ml-2">Chargement du document...</p>
               </div>
             ) : urlError ? (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <FileText className="h-24 w-24 text-muted-foreground" />
                 <p className="text-muted-foreground">Impossible de charger le document</p>
-                <Button onClick={refreshSignedUrl} variant="outline">Reessayer</Button>
+                <Button onClick={handleOpenViewer} variant="outline">Reessayer</Button>
               </div>
-            ) : (freshSignedUrl || document.signedUrl) ? (
+            ) : blobUrl ? (
               <iframe
-                src={freshSignedUrl || document.signedUrl || ""}
-                className="w-full h-[70vh]"
+                src={blobUrl}
+                className="w-full h-[70vh] border-0"
                 title={document.title}
               />
             ) : (
