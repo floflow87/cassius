@@ -57,24 +57,47 @@ export interface Operation {
   observationsPostop: string | null;
 }
 
+export type TypeImplant = "IMPLANT" | "MINI_IMPLANT";
+
+// Implant = informations produit uniquement (catalogue/référentiel)
 export interface Implant {
   id: string;
-  operationId: string;
-  patientId: string;
+  organisationId: string;
+  typeImplant: TypeImplant;
   marque: string;
   referenceFabricant: string | null;
   diametre: number;
   longueur: number;
+  lot: string | null;
+}
+
+// SurgeryImplant = implant posé lors d'une chirurgie (avec contexte de pose)
+export interface SurgeryImplant {
+  id: string;
+  organisationId: string;
+  surgeryId: string;
+  implantId: string;
   siteFdi: string;
   positionImplant: PositionImplant | null;
   typeOs: TypeOs | null;
-  miseEnChargePrevue: TypeMiseEnCharge | null;
+  miseEnCharge: TypeMiseEnCharge | null;
+  greffeOsseuse: boolean | null;
+  typeGreffe: string | null;
+  typeChirurgieTemps: TypeChirurgieTemps | null;
   isqPose: number | null;
   isq2m: number | null;
   isq3m: number | null;
   isq6m: number | null;
   statut: StatutImplant;
   datePose: string;
+  notes: string | null;
+}
+
+// SurgeryImplant enrichi avec les infos de l'implant et de la chirurgie
+export interface SurgeryImplantWithDetails extends SurgeryImplant {
+  implant: Implant;
+  surgery?: Operation;
+  patient?: Patient;
 }
 
 export interface Radio {
@@ -137,24 +160,29 @@ export interface ImplantWithVisites extends Implant {
   visites: Visite[];
 }
 
+// Opération avec ses implants posés (via surgery_implants)
 export interface OperationWithImplants extends Operation {
-  implants: Implant[];
+  surgeryImplants: SurgeryImplantWithDetails[];
 }
 
+// Détails d'un patient avec toutes ses données
 export interface PatientDetail extends Patient {
   operations: OperationWithImplants[];
-  implants: ImplantWithVisites[];
+  surgeryImplants: SurgeryImplantWithDetails[]; // Tous les implants posés via surgeries
   radios: Radio[];
 }
 
-export interface ImplantDetail extends Implant {
+// Détails complets d'un implant posé (surgery_implant)
+export interface ImplantDetail extends SurgeryImplant {
+  implant: Implant;
   patient?: Patient;
-  operation?: Operation;
+  surgery?: Operation;
   visites: Visite[];
   radios: Radio[];
 }
 
-export interface ImplantWithPatient extends Implant {
+export interface ImplantWithPatient extends SurgeryImplant {
+  implant: Implant;
   patient?: Patient;
 }
 
@@ -217,23 +245,55 @@ export interface CreateOperationInput {
   observationsPostop?: string | null;
 }
 
+// Création d'un implant (catalogue/produit)
 export interface CreateImplantInput {
-  operationId: string;
-  patientId: string;
+  typeImplant?: TypeImplant;
   marque: string;
   referenceFabricant?: string | null;
   diametre: number;
   longueur: number;
+  lot?: string | null;
+}
+
+// Création d'un implant posé lors d'une chirurgie
+export interface CreateSurgeryImplantInput {
+  surgeryId: string;
+  implantId: string;
   siteFdi: string;
   positionImplant?: PositionImplant | null;
   typeOs?: TypeOs | null;
-  miseEnChargePrevue?: TypeMiseEnCharge | null;
+  miseEnCharge?: TypeMiseEnCharge | null;
+  greffeOsseuse?: boolean | null;
+  typeGreffe?: string | null;
+  typeChirurgieTemps?: TypeChirurgieTemps | null;
   isqPose?: number | null;
-  isq2m?: number | null;
-  isq3m?: number | null;
-  isq6m?: number | null;
   statut?: StatutImplant;
   datePose: string;
+  notes?: string | null;
+}
+
+// Création combinée: implant + pose en une seule opération
+export interface CreateImplantWithPoseInput {
+  surgeryId: string;
+  // Infos implant produit
+  typeImplant?: TypeImplant;
+  marque: string;
+  referenceFabricant?: string | null;
+  diametre: number;
+  longueur: number;
+  lot?: string | null;
+  // Infos pose
+  siteFdi: string;
+  positionImplant?: PositionImplant | null;
+  typeOs?: TypeOs | null;
+  miseEnCharge?: TypeMiseEnCharge | null;
+  greffeOsseuse?: boolean | null;
+  typeGreffe?: string | null;
+  typeChirurgieTemps?: TypeChirurgieTemps | null;
+  isqPose?: number | null;
+  statut?: StatutImplant;
+  datePose: string;
+  notes?: string | null;
 }
 
 export interface CreateRadioInput {

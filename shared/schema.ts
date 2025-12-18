@@ -15,6 +15,7 @@ export const organisationsRelations = relations(organisations, ({ many }) => ({
   patients: many(patients),
   operations: many(operations),
   implants: many(implants),
+  surgeryImplants: many(surgeryImplants),
   visites: many(visites),
   radios: many(radios),
   protheses: many(protheses),
@@ -77,7 +78,6 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
     references: [organisations.id],
   }),
   operations: many(operations),
-  implants: many(implants),
   radios: many(radios),
   visites: many(visites),
   documents: many(documents),
@@ -110,30 +110,20 @@ export const operationsRelations = relations(operations, ({ one, many }) => ({
     fields: [operations.patientId],
     references: [patients.id],
   }),
-  implants: many(implants),
+  surgeryImplants: many(surgeryImplants),
   radios: many(radios),
 }));
 
+// Table implants - référentiel/catalogue d'implants (informations produit uniquement)
 export const implants = pgTable("implants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
-  operationId: varchar("operation_id").notNull().references(() => operations.id, { onDelete: "cascade" }),
-  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
   typeImplant: typeImplantEnum("type_implant").default("IMPLANT").notNull(),
   marque: text("marque").notNull(),
   referenceFabricant: text("reference_fabricant"),
   diametre: real("diametre").notNull(),
   longueur: real("longueur").notNull(),
-  siteFdi: text("site_fdi").notNull(),
-  positionImplant: positionImplantEnum("position_implant"),
-  typeOs: typeOsEnum("type_os"),
-  miseEnChargePrevue: typeMiseEnChargeEnum("mise_en_charge_prevue"),
-  isqPose: real("isq_pose"),
-  isq2m: real("isq_2m"),
-  isq3m: real("isq_3m"),
-  isq6m: real("isq_6m"),
-  statut: statutImplantEnum("statut").default("EN_SUIVI").notNull(),
-  datePose: date("date_pose").notNull(),
+  lot: text("lot"), // Numéro de lot fabricant
 });
 
 export const implantsRelations = relations(implants, ({ one, many }) => ({
@@ -141,17 +131,52 @@ export const implantsRelations = relations(implants, ({ one, many }) => ({
     fields: [implants.organisationId],
     references: [organisations.id],
   }),
-  operation: one(operations, {
-    fields: [implants.operationId],
-    references: [operations.id],
-  }),
-  patient: one(patients, {
-    fields: [implants.patientId],
-    references: [patients.id],
-  }),
+  surgeryImplants: many(surgeryImplants),
   radios: many(radios),
   visites: many(visites),
   protheses: many(protheses),
+}));
+
+// Table de liaison surgery_implants - représente un implant posé lors d'une chirurgie
+export const surgeryImplants = pgTable("surgery_implants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  surgeryId: varchar("surgery_id").notNull().references(() => operations.id, { onDelete: "cascade" }),
+  implantId: varchar("implant_id").notNull().references(() => implants.id, { onDelete: "cascade" }),
+  // Champs de pose
+  siteFdi: text("site_fdi").notNull(),
+  positionImplant: positionImplantEnum("position_implant"),
+  typeOs: typeOsEnum("type_os"),
+  miseEnCharge: typeMiseEnChargeEnum("mise_en_charge"),
+  // Informations greffe spécifique à cet implant
+  greffeOsseuse: boolean("greffe_osseuse").default(false),
+  typeGreffe: text("type_greffe"),
+  // Temps chirurgical
+  typeChirurgieTemps: typeChirurgieTempsEnum("type_chirurgie_temps"),
+  // Mesures ISQ
+  isqPose: real("isq_pose"),
+  isq2m: real("isq_2m"),
+  isq3m: real("isq_3m"),
+  isq6m: real("isq_6m"),
+  // Statut et dates
+  statut: statutImplantEnum("statut").default("EN_SUIVI").notNull(),
+  datePose: date("date_pose").notNull(),
+  notes: text("notes"),
+});
+
+export const surgeryImplantsRelations = relations(surgeryImplants, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [surgeryImplants.organisationId],
+    references: [organisations.id],
+  }),
+  surgery: one(operations, {
+    fields: [surgeryImplants.surgeryId],
+    references: [operations.id],
+  }),
+  implant: one(implants, {
+    fields: [surgeryImplants.implantId],
+    references: [implants.id],
+  }),
 }));
 
 export const radios = pgTable("radios", {
@@ -359,6 +384,11 @@ export const insertImplantSchema = createInsertSchema(implants).omit({
   organisationId: true,
 });
 
+export const insertSurgeryImplantSchema = createInsertSchema(surgeryImplants).omit({
+  id: true,
+  organisationId: true,
+});
+
 export const insertRadioSchema = createInsertSchema(radios).omit({
   id: true,
   organisationId: true,
@@ -428,6 +458,9 @@ export type Operation = typeof operations.$inferSelect;
 
 export type InsertImplant = z.infer<typeof insertImplantSchema>;
 export type Implant = typeof implants.$inferSelect;
+
+export type InsertSurgeryImplant = z.infer<typeof insertSurgeryImplantSchema>;
+export type SurgeryImplant = typeof surgeryImplants.$inferSelect;
 
 export type InsertRadio = z.infer<typeof insertRadioSchema>;
 export type Radio = typeof radios.$inferSelect;
