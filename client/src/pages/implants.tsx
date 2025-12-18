@@ -36,6 +36,13 @@ interface ColumnConfig {
   sortable: boolean;
 }
 
+const columnWidths: Record<ColumnId, string> = {
+  marqueRef: "w-[30%]",
+  dimensions: "w-[25%]",
+  poseCount: "w-[22%]",
+  successRate: "w-[23%]",
+};
+
 const defaultColumns: ColumnConfig[] = [
   { id: "marqueRef", label: "Marque & Référence", sortable: true },
   { id: "dimensions", label: "Diamètre × Longueur", sortable: true },
@@ -53,6 +60,8 @@ interface ImplantsPageProps {
 
 export default function ImplantsPage({ searchQuery: externalSearchQuery, setSearchQuery: externalSetSearchQuery }: ImplantsPageProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [selectedImplant, setSelectedImplant] = useState<ImplantWithStats | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [implantType, setImplantType] = useState<"implants" | "mini">("implants");
@@ -378,7 +387,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
 
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed">
+          <table className="w-full">
             <thead>
               <tr className="border-b border-border-gray bg-border-gray">
                 <th className="w-12 px-4 py-2">
@@ -387,7 +396,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
                 {columns.map((column) => (
                   <th
                     key={column.id}
-                    className={`text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider ${dragOverColumn === column.id ? "bg-primary/10" : ""}`}
+                    className={`text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider ${columnWidths[column.id]} ${dragOverColumn === column.id ? "bg-primary/10" : ""}`}
                     draggable
                     onDragStart={(e) => handleDragStart(e, column.id)}
                     onDragOver={(e) => handleDragOver(e, column.id)}
@@ -434,7 +443,11 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
                 paginatedImplants.map((implant) => (
                   <tr 
                     key={implant.id} 
-                    className="border-b border-border-gray hover-elevate"
+                    className="border-b border-border-gray hover-elevate cursor-pointer"
+                    onClick={() => {
+                      setSelectedImplant(implant);
+                      setDetailSheetOpen(true);
+                    }}
                     data-testid={`row-implant-${implant.id}`}
                   >
                     <td className="px-4 py-3">
@@ -445,7 +458,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
                       />
                     </td>
                     {columns.map((column) => (
-                      <td key={column.id} className="px-4 py-3">
+                      <td key={column.id} className={`px-4 py-3 ${columnWidths[column.id]}`}>
                         {renderCellContent(column.id, implant)}
                       </td>
                     ))}
@@ -456,6 +469,63 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           </table>
         </div>
       </div>
+
+      <Sheet open={detailSheetOpen} onOpenChange={setDetailSheetOpen}>
+        <SheetContent className="sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Détails de l'implant</SheetTitle>
+          </SheetHeader>
+          {selectedImplant && (
+            <div className="mt-6 space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Marque</h3>
+                  <p className="text-base font-medium">{selectedImplant.marque || "Non spécifiée"}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Référence fabricant</h3>
+                  <p className="text-base">{selectedImplant.referenceFabricant || "Non spécifiée"}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Diamètre</h3>
+                    <p className="text-base">{selectedImplant.diametre ? `${selectedImplant.diametre} mm` : "—"}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Longueur</h3>
+                    <p className="text-base">{selectedImplant.longueur ? `${selectedImplant.longueur} mm` : "—"}</p>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Numéro de lot</h3>
+                  <p className="text-base">{selectedImplant.lot || "Non spécifié"}</p>
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-4">
+                <h3 className="text-sm font-semibold">Statistiques d'utilisation</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-muted/50 rounded-md p-3">
+                    <p className="text-sm text-muted-foreground">Nombre de poses</p>
+                    <p className="text-xl font-semibold">{selectedImplant.poseCount || 0}</p>
+                    {selectedImplant.lastPoseDate && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Dernière: {new Date(selectedImplant.lastPoseDate).toLocaleDateString("fr-FR")}
+                      </p>
+                    )}
+                  </div>
+                  <div className="bg-muted/50 rounded-md p-3">
+                    <p className="text-sm text-muted-foreground">Taux de réussite</p>
+                    <p className="text-xl font-semibold">
+                      {selectedImplant.successRate != null ? `${selectedImplant.successRate}%` : "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
