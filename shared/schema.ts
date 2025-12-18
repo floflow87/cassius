@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum, bigint, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -158,6 +158,8 @@ export const surgeryImplants = pgTable("surgery_implants", {
   isq2m: real("isq_2m"),
   isq3m: real("isq_3m"),
   isq6m: real("isq_6m"),
+  // Score de perte osseuse (0-5, où 0=excellent, 5=critique)
+  boneLossScore: integer("bone_loss_score"),
   // Statut et dates
   statut: statutImplantEnum("statut").default("EN_SUIVI").notNull(),
   datePose: date("date_pose").notNull(),

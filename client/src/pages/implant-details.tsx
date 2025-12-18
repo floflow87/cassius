@@ -89,6 +89,19 @@ export default function ImplantDetailsPage() {
     enabled: !!implantId,
   });
 
+  // Initialize boneLossScore from implantData when loaded
+  const [hasInitializedBoneLoss, setHasInitializedBoneLoss] = useState(false);
+  if (implantData && !hasInitializedBoneLoss) {
+    setBoneLossScore(implantData.boneLossScore ?? 0);
+    setHasInitializedBoneLoss(true);
+  }
+
+  const handleBoneLossChange = (value: string) => {
+    const score = parseInt(value);
+    setBoneLossScore(score);
+    updatePoseInfoMutation.mutate({ boneLossScore: score });
+  };
+
   const handleOpenPoseInfoSheet = (open: boolean) => {
     if (open && implantData) {
       setPoseFormData({
@@ -136,11 +149,13 @@ export default function ImplantDetailsPage() {
       typeOs?: string;
       greffeOsseuse?: boolean;
       typeGreffe?: string;
+      boneLossScore?: number;
     }) => {
       return apiRequest("PATCH", `/api/surgery-implants/${implantId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/catalog-implants"] });
       setEditPoseInfoSheetOpen(false);
       toast({
         title: "Modifications enregistrées",
@@ -439,7 +454,11 @@ export default function ImplantDetailsPage() {
                 <div className="flex items-center justify-between">
                   <Label className="text-sm text-muted-foreground">Score de perte osseuse</Label>
                 </div>
-                <Select value={boneLossScore.toString()} onValueChange={(val) => setBoneLossScore(parseInt(val))}>
+                <Select 
+                  value={boneLossScore.toString()} 
+                  onValueChange={handleBoneLossChange}
+                  disabled={updatePoseInfoMutation.isPending}
+                >
                   <SelectTrigger data-testid="select-bone-loss">
                     <SelectValue />
                   </SelectTrigger>

@@ -88,6 +88,7 @@ export interface SurgeryImplant {
   isq2m: number | null;
   isq3m: number | null;
   isq6m: number | null;
+  boneLossScore: number | null;
   statut: StatutImplant;
   datePose: string;
   notes: string | null;

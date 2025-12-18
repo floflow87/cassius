@@ -394,6 +394,13 @@ export class DatabaseStorage implements IStorage {
     const allSurgeryImplants = await db.select().from(surgeryImplants)
       .where(eq(surgeryImplants.organisationId, organisationId));
     
+    // Helper: convert bone loss score (0-5) to success rate (100-0%)
+    const boneLossToSuccessRate = (score: number | null): number | null => {
+      if (score === null || score === undefined) return null;
+      const rates = [100, 80, 60, 40, 20, 0];
+      return rates[score] ?? null;
+    };
+    
     return allImplants.map(implant => {
       const poses = allSurgeryImplants.filter(si => si.implantId === implant.id);
       const poseCount = poses.length;
@@ -404,12 +411,17 @@ export class DatabaseStorage implements IStorage {
         return pose.datePose > latest ? pose.datePose : latest;
       }, null as string | null);
       
-      const successPoses = poses.filter(p => p.statut === "SUCCES");
-      const failedPoses = poses.filter(p => p.statut === "ECHEC");
-      const totalWithStatus = successPoses.length + failedPoses.length;
-      const successRate = totalWithStatus > 0 
-        ? Math.round((successPoses.length / totalWithStatus) * 1000) / 10
-        : null;
+      // Calculate average success rate from boneLossScore
+      const posesWithScore = poses.filter(p => p.boneLossScore !== null && p.boneLossScore !== undefined);
+      let successRate: number | null = null;
+      
+      if (posesWithScore.length > 0) {
+        const totalRate = posesWithScore.reduce((sum, p) => {
+          const rate = boneLossToSuccessRate(p.boneLossScore);
+          return sum + (rate ?? 0);
+        }, 0);
+        successRate = Math.round((totalRate / posesWithScore.length) * 10) / 10;
+      }
       
       return {
         ...implant,
