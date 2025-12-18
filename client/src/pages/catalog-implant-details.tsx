@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRoute, useLocation, Link } from "wouter";
-import { ArrowLeft, Pencil, Plus, CheckCircle2, ChevronRight, AlertCircle } from "lucide-react";
+import { useRoute, useLocation } from "wouter";
+import { ArrowLeft, Pencil, CheckCircle2, ChevronRight, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,18 +24,6 @@ const greffeConfig: Record<string, { label: string; className: string }> = {
   allogene: { label: "Allogène", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
   xenogene: { label: "Xénogène", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
 };
-
-function getISQBadge(value: number): { label: string; className: string } {
-  if (value >= 70) return { label: "Excellent", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" };
-  if (value >= 60) return { label: "Bon", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" };
-  if (value >= 50) return { label: "Acceptable", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" };
-  return { label: "Critique", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" };
-}
-
-function getISQDelta(current: number, previous: number): { value: number; isPositive: boolean } {
-  const delta = current - previous;
-  return { value: Math.abs(delta), isPositive: delta >= 0 };
-}
 
 export default function CatalogImplantDetailsPage() {
   const [, params] = useRoute("/implants/:id");
@@ -103,56 +91,6 @@ export default function CatalogImplantDetailsPage() {
     : successRate >= 70 ? "text-amber-500" 
     : "text-red-500";
 
-  const aggregatedISQ = surgeries?.reduce((acc, s) => {
-    const measurements: { label: string; value: number; date: string; periodLabel: string }[] = [];
-    
-    if (s.isqPose != null) {
-      measurements.push({ label: "Pose", value: s.isqPose, date: s.datePose, periodLabel: "Pose" });
-    }
-    if (s.isq2m != null) {
-      const date2m = new Date(s.datePose);
-      date2m.setMonth(date2m.getMonth() + 2);
-      measurements.push({ label: "2 mois", value: s.isq2m, date: date2m.toISOString(), periodLabel: "2 mois" });
-    }
-    if (s.isq3m != null) {
-      const date3m = new Date(s.datePose);
-      date3m.setMonth(date3m.getMonth() + 3);
-      measurements.push({ label: "3 mois", value: s.isq3m, date: date3m.toISOString(), periodLabel: "3 mois" });
-    }
-    if (s.isq6m != null) {
-      const date6m = new Date(s.datePose);
-      date6m.setMonth(date6m.getMonth() + 6);
-      measurements.push({ label: "6 mois", value: s.isq6m, date: date6m.toISOString(), periodLabel: "6 mois" });
-    }
-
-    return [...acc, ...measurements];
-  }, [] as { label: string; value: number; date: string; periodLabel: string }[]) ?? [];
-
-  const latestISQMeasurements = surgeries?.flatMap(s => {
-    const measurements: { surgeryImplant: SurgeryImplantWithDetails; label: string; value: number; date: string; previous?: number }[] = [];
-    
-    if (s.isqPose != null) {
-      measurements.push({ surgeryImplant: s, label: "Pose", value: s.isqPose, date: s.datePose });
-    }
-    if (s.isq2m != null) {
-      const date2m = new Date(s.datePose);
-      date2m.setMonth(date2m.getMonth() + 2);
-      measurements.push({ surgeryImplant: s, label: "2 mois", value: s.isq2m, date: date2m.toISOString(), previous: s.isqPose ?? undefined });
-    }
-    if (s.isq3m != null) {
-      const date3m = new Date(s.datePose);
-      date3m.setMonth(date3m.getMonth() + 3);
-      measurements.push({ surgeryImplant: s, label: "3 mois", value: s.isq3m, date: date3m.toISOString(), previous: s.isq2m ?? s.isqPose ?? undefined });
-    }
-    if (s.isq6m != null) {
-      const date6m = new Date(s.datePose);
-      date6m.setMonth(date6m.getMonth() + 6);
-      measurements.push({ surgeryImplant: s, label: "6 mois", value: s.isq6m, date: date6m.toISOString(), previous: s.isq3m ?? s.isq2m ?? s.isqPose ?? undefined });
-    }
-
-    return measurements;
-  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5) ?? [];
-
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center gap-4">
@@ -207,55 +145,6 @@ export default function CatalogImplantDetailsPage() {
               </div>
             </CardContent>
           </Card>
-
-          {latestISQMeasurements.length > 0 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
-                <CardTitle className="text-base">Suivi ISQ (Stabilité)</CardTitle>
-                <Button variant="ghost" size="sm" className="text-primary" data-testid="button-add-isq">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Ajouter mesure
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {latestISQMeasurements.map((m, idx) => {
-                  const isqBadge = getISQBadge(m.value);
-                  const delta = m.previous != null ? getISQDelta(m.value, m.previous) : null;
-                  
-                  return (
-                    <div 
-                      key={idx} 
-                      className="flex items-center gap-4 p-3 rounded-md bg-muted/30"
-                      data-testid={`isq-measurement-${idx}`}
-                    >
-                      <div className="text-center min-w-[60px]">
-                        <p className="text-xs text-muted-foreground">{m.label}</p>
-                        <p className="text-2xl font-bold text-primary">{m.value}</p>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">
-                          {new Date(m.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {m.surgeryImplant.patient 
-                            ? `${m.surgeryImplant.patient.prenom} ${m.surgeryImplant.patient.nom}` 
-                            : "Patient"}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={isqBadge.className}>{isqBadge.label}</Badge>
-                        {delta && (
-                          <span className={`text-xs font-medium ${delta.isPositive ? "text-emerald-500" : "text-red-500"}`}>
-                            {delta.isPositive ? "+" : "-"}{delta.value}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          )}
 
           <div className="space-y-4">
             <h2 className="text-base font-semibold">Actes chirurgicaux avec cet implant</h2>
