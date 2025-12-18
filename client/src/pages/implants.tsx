@@ -38,9 +38,9 @@ interface ColumnConfig {
 
 const defaultColumns: ColumnConfig[] = [
   { id: "marqueRef", label: "Marque & Référence", sortable: true },
-  { id: "dimensions", label: "Diamètre × Longueur", width: "w-48", sortable: true },
-  { id: "poseCount", label: "Nb de poses", width: "w-44", sortable: true },
-  { id: "successRate", label: "Réussite moyenne", width: "w-44", sortable: true },
+  { id: "dimensions", label: "Diamètre × Longueur", sortable: true },
+  { id: "poseCount", label: "Nb de poses", sortable: true },
+  { id: "successRate", label: "Réussite moyenne", sortable: true },
 ];
 
 const STORAGE_KEY_COLUMNS = "cassius_implants_columns_order";
@@ -378,7 +378,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
 
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-border-gray bg-border-gray">
                 <th className="w-12 px-4 py-2">
@@ -387,7 +387,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
                 {columns.map((column) => (
                   <th
                     key={column.id}
-                    className={`text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider ${column.width || ""} ${dragOverColumn === column.id ? "bg-primary/10" : ""}`}
+                    className={`text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider ${dragOverColumn === column.id ? "bg-primary/10" : ""}`}
                     draggable
                     onDragStart={(e) => handleDragStart(e, column.id)}
                     onDragOver={(e) => handleDragOver(e, column.id)}
