@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Plus, 
@@ -53,7 +52,6 @@ interface ImplantsPageProps {
 }
 
 export default function ImplantsPage({ searchQuery: externalSearchQuery, setSearchQuery: externalSetSearchQuery }: ImplantsPageProps) {
-  const [, setLocation] = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -436,8 +434,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
                 paginatedImplants.map((implant) => (
                   <tr 
                     key={implant.id} 
-                    className="border-b border-border-gray hover-elevate cursor-pointer"
-                    onClick={() => setLocation(`/implants/${implant.id}`)}
+                    className="border-b border-border-gray hover-elevate"
                     data-testid={`row-implant-${implant.id}`}
                   >
                     <td className="px-4 py-3">
