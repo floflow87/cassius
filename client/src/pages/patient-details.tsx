@@ -69,6 +69,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { OperationForm } from "@/components/operation-form";
 import { ImplantCard } from "@/components/implant-card";
 import { RadioCard } from "@/components/radio-card";
@@ -94,10 +99,28 @@ export default function PatientDetailsPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { toast } = useToast();
+  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
 
   const { data: patient, isLoading } = useQuery<PatientWithDetails>({
     queryKey: ["/api/patients", patientId],
     enabled: !!patientId,
+  });
+
+  // Mutation pour mettre à jour le statut patient
+  const updateStatusMutation = useMutation({
+    mutationFn: async (statut: string) => {
+      const res = await apiRequest("PATCH", `/api/patients/${patientId}`, { statut });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      toast({ title: "Statut mis a jour", description: "Le statut du patient a ete modifie." });
+      setStatusPopoverOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le statut.", variant: "destructive" });
+    },
   });
 
   // Documents query
@@ -596,9 +619,60 @@ export default function PatientDetailsPage() {
             <h1 className="text-2xl font-semibold" data-testid="text-patient-name">
               {patient.prenom} {patient.nom}
             </h1>
-            <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" data-testid="badge-patient-status">
-              Actif
-            </Badge>
+            <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Badge 
+                  variant="default" 
+                  className={`cursor-pointer ${
+                    patient.statut === "ARCHIVE" 
+                      ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" 
+                      : patient.statut === "INACTIF"
+                      ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                      : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  }`}
+                  data-testid="badge-patient-status"
+                >
+                  {patient.statut === "ARCHIVE" ? "Archive" : patient.statut === "INACTIF" ? "Inactif" : "Actif"}
+                </Badge>
+              </PopoverTrigger>
+              <PopoverContent className="w-40 p-2" align="start">
+                <div className="space-y-1">
+                  <Button
+                    variant={patient.statut === "ACTIF" || !patient.statut ? "secondary" : "ghost"}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => updateStatusMutation.mutate("ACTIF")}
+                    disabled={updateStatusMutation.isPending}
+                    data-testid="status-option-actif"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-green-500 mr-2" />
+                    Actif
+                  </Button>
+                  <Button
+                    variant={patient.statut === "INACTIF" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => updateStatusMutation.mutate("INACTIF")}
+                    disabled={updateStatusMutation.isPending}
+                    data-testid="status-option-inactif"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-orange-500 mr-2" />
+                    Inactif
+                  </Button>
+                  <Button
+                    variant={patient.statut === "ARCHIVE" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => updateStatusMutation.mutate("ARCHIVE")}
+                    disabled={updateStatusMutation.isPending}
+                    data-testid="status-option-archive"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-gray-500 mr-2" />
+                    Archive
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <p className="text-sm text-muted-foreground">
             {calculateAge(patient.dateNaissance)} ans - Depuis {new Date(patient.createdAt).getFullYear()}

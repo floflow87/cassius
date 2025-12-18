@@ -99,7 +99,7 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
 
   const loadPdfAsBlob = async (url: string): Promise<string | null> => {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch PDF");
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
@@ -137,12 +137,11 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
     
     if (document.filePath) {
       setIsLoadingUrl(true);
-      const signedUrl = await refreshSignedUrl();
-      if (signedUrl) {
-        const blob = await loadPdfAsBlob(signedUrl);
-        if (!blob) {
-          setUrlError(true);
-        }
+      // Use proxy endpoint to bypass CORS/CSP restrictions
+      const proxyUrl = `/api/documents/${document.id}/file`;
+      const blob = await loadPdfAsBlob(proxyUrl);
+      if (!blob) {
+        setUrlError(true);
       }
       setIsLoadingUrl(false);
     }
