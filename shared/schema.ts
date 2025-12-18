@@ -48,6 +48,7 @@ export const typeNoteTagEnum = pgEnum("type_note_tag", ["CONSULTATION", "CHIRURG
 export const typeRendezVousTagEnum = pgEnum("type_rdv_tag", ["CONSULTATION", "SUIVI", "CHIRURGIE"]);
 export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
 export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
+export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"]);
 
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -118,6 +119,7 @@ export const implants = pgTable("implants", {
   organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
   operationId: varchar("operation_id").notNull().references(() => operations.id, { onDelete: "cascade" }),
   patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  typeImplant: typeImplantEnum("type_implant").default("IMPLANT").notNull(),
   marque: text("marque").notNull(),
   referenceFabricant: text("reference_fabricant"),
   diametre: real("diametre").notNull(),
