@@ -134,7 +134,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     queryKey: ["/api/patients/implant-counts"],
   });
 
-  const { data: lastVisits } = useQuery<Record<string, { date: string; notes: string | null }>>({
+  const { data: lastVisits } = useQuery<Record<string, { date: string; titre: string | null }>>({
     queryKey: ["/api/patients/last-visits"],
   });
 

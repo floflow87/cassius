@@ -112,7 +112,7 @@ export interface IStorage {
   getVisite(organisationId: string, id: string): Promise<Visite | undefined>;
   getImplantVisites(organisationId: string, implantId: string): Promise<Visite[]>;
   createVisite(organisationId: string, visite: InsertVisite): Promise<Visite>;
-  getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; notes: string | null }>>;
+  getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; titre: string | null }>>;
 
   // Prothese methods
   createProthese(organisationId: string, prothese: InsertProthese): Promise<Prothese>;
@@ -765,19 +765,19 @@ export class DatabaseStorage implements IStorage {
     return newVisite;
   }
 
-  async getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; notes: string | null }>> {
-    const allVisites = await db
+  async getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; titre: string | null }>> {
+    const allRendezVous = await db
       .select()
-      .from(visites)
-      .where(eq(visites.organisationId, organisationId))
-      .orderBy(desc(visites.date));
+      .from(rendezVous)
+      .where(eq(rendezVous.organisationId, organisationId))
+      .orderBy(desc(rendezVous.date));
 
-    const lastVisitByPatient: Record<string, { date: string; notes: string | null }> = {};
-    for (const visite of allVisites) {
-      if (!lastVisitByPatient[visite.patientId]) {
-        lastVisitByPatient[visite.patientId] = {
-          date: visite.date,
-          notes: visite.notes,
+    const lastVisitByPatient: Record<string, { date: string; titre: string | null }> = {};
+    for (const rdv of allRendezVous) {
+      if (!lastVisitByPatient[rdv.patientId]) {
+        lastVisitByPatient[rdv.patientId] = {
+          date: rdv.date,
+          titre: rdv.titre,
         };
       }
     }
