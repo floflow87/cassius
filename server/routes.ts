@@ -234,14 +234,14 @@ export async function registerRoutes(
       const data = operationWithImplantsSchema.parse(req.body);
       const { implants: implantData, ...operationData } = data;
 
-      // Création transactionnelle : opération + implants (atomique)
-      const { operation, implants: createdImplants } = await storage.createOperationWithImplants(
+      // Création transactionnelle : opération + surgery_implants (atomique)
+      const { operation, surgeryImplants: createdSurgeryImplants } = await storage.createOperationWithImplants(
         organisationId,
         operationData,
         implantData
       );
 
-      res.status(201).json({ ...operation, implants: createdImplants });
+      res.status(201).json({ ...operation, surgeryImplants: createdSurgeryImplants });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors });
@@ -265,16 +265,34 @@ export async function registerRoutes(
     }
   });
 
+  // Get surgery implant with details (implant posé avec patient, surgery, visites, radios)
+  app.get("/api/surgery-implants/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const surgeryImplant = await storage.getSurgeryImplantWithDetails(organisationId, req.params.id);
+      if (!surgeryImplant) {
+        return res.status(404).json({ error: "Implant not found" });
+      }
+      res.json(surgeryImplant);
+    } catch (error) {
+      console.error("Error fetching surgery implant:", error);
+      res.status(500).json({ error: "Failed to fetch surgery implant" });
+    }
+  });
+
+  // Legacy route for backward compatibility - redirects to surgery-implants
   app.get("/api/implants/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
     try {
-      const implant = await storage.getImplantWithDetails(organisationId, req.params.id);
-      if (!implant) {
+      const surgeryImplant = await storage.getSurgeryImplantWithDetails(organisationId, req.params.id);
+      if (!surgeryImplant) {
         return res.status(404).json({ error: "Implant not found" });
       }
-      res.json(implant);
+      res.json(surgeryImplant);
     } catch (error) {
       console.error("Error fetching implant:", error);
       res.status(500).json({ error: "Failed to fetch implant" });
@@ -286,8 +304,8 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const implants = await storage.getPatientImplants(organisationId, req.params.id);
-      res.json(implants);
+      const surgeryImplants = await storage.getPatientSurgeryImplants(organisationId, req.params.id);
+      res.json(surgeryImplants);
     } catch (error) {
       console.error("Error fetching patient implants:", error);
       res.status(500).json({ error: "Failed to fetch implants" });
@@ -311,14 +329,15 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/implants", requireJwtOrSession, async (req, res) => {
+  // Liste tous les surgery_implants avec filtrage optionnel
+  app.get("/api/surgery-implants", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
     try {
       const { marque, siteFdi, typeOs, statut } = req.query;
       if (marque || siteFdi || typeOs || statut) {
-        const filtered = await storage.filterImplants(organisationId, {
+        const filtered = await storage.filterSurgeryImplants(organisationId, {
           marque: marque as string,
           siteFdi: siteFdi as string,
           typeOs: typeOs as string,
@@ -326,8 +345,33 @@ export async function registerRoutes(
         });
         return res.json(filtered);
       }
-      const implants = await storage.getAllImplants(organisationId);
-      res.json(implants);
+      const surgeryImplants = await storage.getAllSurgeryImplants(organisationId);
+      res.json(surgeryImplants);
+    } catch (error) {
+      console.error("Error fetching surgery implants:", error);
+      res.status(500).json({ error: "Failed to fetch surgery implants" });
+    }
+  });
+
+  // Legacy route - retourne les implants catalogue
+  app.get("/api/implants", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { marque, siteFdi, typeOs, statut } = req.query;
+      if (marque || siteFdi || typeOs || statut) {
+        const filtered = await storage.filterSurgeryImplants(organisationId, {
+          marque: marque as string,
+          siteFdi: siteFdi as string,
+          typeOs: typeOs as string,
+          statut: statut as string,
+        });
+        return res.json(filtered);
+      }
+      // Retourne tous les surgery_implants enrichis (comportement équivalent à l'ancien)
+      const surgeryImplants = await storage.getAllSurgeryImplants(organisationId);
+      res.json(surgeryImplants);
     } catch (error) {
       console.error("Error fetching implants:", error);
       res.status(500).json({ error: "Failed to fetch implants" });
