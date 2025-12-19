@@ -1,0 +1,129 @@
+Nous concevons la page de détail d’un implant dans une application CRM médicale.
+Chaque implant peut avoir plusieurs mesures ISQ dans le temps, saisies lors de différentes étapes cliniques (pose, contrôles, suivi, mise en charge, etc.).
+
+L’ISQ (Implant Stability Quotient) est une échelle de 1 à 99 :
+
+ISQ < 60 : stabilité faible
+
+ISQ 60–69 : stabilité moyenne
+
+ISQ ≥ 70 : stabilité élevée
+
+L’objectif est de proposer une visualisation claire, pédagogique et clinique, permettant au praticien de comprendre à la fois :
+
+la stabilité actuelle,
+
+et son évolution dans le temps.
+
+Objectif UI
+
+Fournir une lecture instantanée et une lecture longitudinale de la stabilité de l’implant, sans surcharge cognitive.
+
+A) Jauge ISQ instantanée (valeur actuelle)
+Description
+
+Afficher une jauge visuelle ISQ représentant la dernière mesure disponible de l’implant.
+
+Spécifications
+
+Échelle : 1 → 99
+
+Dégradé de couleur continu :
+
+rouge (< 60)
+
+orange (60–69)
+
+vert (≥ 70)
+
+Un curseur ou marqueur indique la valeur actuelle (ex. ISQ = 72)
+
+Afficher :
+
+la valeur numérique (ISQ 72)
+
+un badge de statut :
+
+“Stabilité faible”
+
+“Stabilité moyenne”
+
+“Stabilité élevée”
+
+Usage
+
+Affichage en haut de la page implant
+
+Sert de photo clinique à l’instant T
+
+B) Frise d’évolution ISQ dans le temps
+Description
+
+Afficher une frise temporelle représentant l’évolution des mesures ISQ de l’implant.
+
+Spécifications
+
+Axe horizontal (X) : le temps (dates des mesures)
+
+Axe vertical (Y) : ISQ (1 → 99)
+
+Ligne ou courbe reliant les points de mesure
+
+La couleur de la ligne évolue selon la valeur ISQ (rouge → orange → vert)
+
+Chaque point correspond à une mesure ISQ saisie
+
+Interaction
+
+Chaque point est cliquable / hoverable
+
+Afficher :
+
+date de la mesure,
+
+valeur ISQ,
+
+contexte clinique (pose, contrôle, suivi, etc.),
+
+commentaire optionnel du praticien
+
+Cas attendus
+
+ISQ stable → courbe plate
+
+ISQ en progression → courbe ascendante
+
+ISQ en diminution → signal visuel immédiat
+
+C) ISQ moyen (information secondaire)
+Description
+
+Calculer et afficher l’ISQ moyen de l’implant à partir de toutes les mesures disponibles.
+
+Spécifications
+
+Affichage discret (badge ou petit encart)
+
+Exemple :
+
+ISQ moyen : 68 — stabilité moyenne
+
+Ne jamais remplacer la valeur actuelle par la moyenne
+
+D) Texte explicatif (tooltip ou encart info)
+
+Afficher un texte informatif accessible via une icône ℹ️ :
+
+L’ISQ (Implant Stability Quotient) est une échelle de 1 à 99 mesurant la stabilité d’un implant.
+Une stabilité est considérée comme élevée au-delà de 70, modérée entre 60 et 69, et faible en dessous de 60.
+L’évolution de l’ISQ dans le temps est un indicateur clé du processus d’ostéo-intégration.
+
+Critères d’acceptation
+
+Le praticien comprend la stabilité actuelle en moins de 2 secondes
+
+L’évolution temporelle est immédiatement lisible
+
+Les seuils cliniques (60 / 70) sont visuellement évidents
+
+Aucune interprétation clinique n’est imposée (information, pas recommandation)

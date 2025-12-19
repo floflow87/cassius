@@ -160,6 +160,7 @@ export default function ImplantDetailsPage() {
       toast({
         title: "Modifications enregistrées",
         description: "Les informations de pose ont été mises à jour",
+        className: "bg-green-600 text-white border-green-600",
       });
     },
     onError: () => {
@@ -459,16 +460,16 @@ export default function ImplantDetailsPage() {
                   onValueChange={handleBoneLossChange}
                   disabled={updatePoseInfoMutation.isPending}
                 >
-                  <SelectTrigger data-testid="select-bone-loss">
+                  <SelectTrigger data-testid="select-bone-loss" className="bg-white dark:bg-white dark:text-black">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">0 - Excellente (100%)</SelectItem>
-                    <SelectItem value="1">1 - Très bonne (80%)</SelectItem>
-                    <SelectItem value="2">2 - Bonne (60%)</SelectItem>
-                    <SelectItem value="3">3 - Modérée (40%)</SelectItem>
-                    <SelectItem value="4">4 - Faible (20%)</SelectItem>
-                    <SelectItem value="5">5 - Critique (0%)</SelectItem>
+                  <SelectContent className="bg-white dark:bg-white">
+                    <SelectItem value="0" className="cursor-pointer dark:text-black">0 - Excellente (100%)</SelectItem>
+                    <SelectItem value="1" className="cursor-pointer dark:text-black">1 - Très bonne (80%)</SelectItem>
+                    <SelectItem value="2" className="cursor-pointer dark:text-black">2 - Bonne (60%)</SelectItem>
+                    <SelectItem value="3" className="cursor-pointer dark:text-black">3 - Modérée (40%)</SelectItem>
+                    <SelectItem value="4" className="cursor-pointer dark:text-black">4 - Faible (20%)</SelectItem>
+                    <SelectItem value="5" className="cursor-pointer dark:text-black">5 - Critique (0%)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground text-center">
