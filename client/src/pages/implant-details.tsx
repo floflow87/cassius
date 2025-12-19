@@ -830,33 +830,17 @@ export default function ImplantDetailsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge className={badge.className}>{badge.label}</Badge>
                         {point.delta !== undefined && point.delta !== 0 && (
                           <span className={`text-xs font-medium flex items-center gap-0.5 ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
                             <TrendingUp className={`h-3 w-3 ${point.delta < 0 ? "rotate-180" : ""}`} />
                             {point.delta > 0 ? "+" : ""}{point.delta}
                           </span>
                         )}
+                        <Badge className={badge.className}>{badge.label}</Badge>
                       </div>
                     </div>
                   );
                 })}
-                
-                <div className="relative flex items-start gap-4 pl-4 opacity-60" data-testid="isq-next-control">
-                  <div className="absolute left-6 w-4 h-4 rounded-full bg-muted border-2 border-background z-10" />
-                  <div className="ml-10 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">6 mois</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-sm">{formatShortDate(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString())}</span>
-                      <span className="text-xs text-muted-foreground">Prochain contrôle prévu</span>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                    À venir
-                  </Badge>
-                </div>
               </div>
             </div>
           )}
