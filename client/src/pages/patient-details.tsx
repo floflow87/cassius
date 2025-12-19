@@ -1849,61 +1849,57 @@ export default function PatientDetailsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
-              {patient.operations?.map((operation) => (
-                <Card key={operation.id} data-testid={`card-operation-${operation.id}`}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <CardTitle className="text-base">
-                          {getInterventionLabel(operation.typeIntervention)}
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground">
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type d'intervention</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Implants</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Chirurgie</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Greffe</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Mise en charge</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {patient.operations?.map((operation) => (
+                      <tr
+                        key={operation.id}
+                        className="border-b last:border-b-0 hover-elevate cursor-pointer"
+                        data-testid={`row-operation-${operation.id}`}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap">
                           {formatDate(operation.dateOperation)}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="font-mono">
-                        {operation.surgeryImplants?.length || 0} implant{(operation.surgeryImplants?.length || 0) !== 1 ? "s" : ""}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-2">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      {operation.typeChirurgieTemps && (
-                        <div>
-                          <span className="text-muted-foreground">Temps: </span>
-                          {operation.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : "2 temps"}
-                        </div>
-                      )}
-                      {operation.typeChirurgieApproche && (
-                        <div>
-                          <span className="text-muted-foreground">Approche: </span>
-                          {operation.typeChirurgieApproche === "LAMBEAU" ? "Lambeau" : "Flapless"}
-                        </div>
-                      )}
-                      {operation.typeMiseEnCharge && (
-                        <div>
-                          <span className="text-muted-foreground">Mise en charge: </span>
-                          {operation.typeMiseEnCharge.charAt(0) + operation.typeMiseEnCharge.slice(1).toLowerCase()}
-                        </div>
-                      )}
-                      {operation.greffeOsseuse && (
-                        <div>
-                          <span className="text-muted-foreground">Greffe: </span>
-                          {operation.typeGreffe || "Oui"}
-                        </div>
-                      )}
-                    </div>
-                    {operation.notesPerop && (
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-xs text-muted-foreground uppercase mb-1">Notes per-op</p>
-                        <p className="text-sm">{operation.notesPerop}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {getInterventionLabel(operation.typeIntervention)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant="secondary" className="font-mono">
+                            {operation.surgeryImplants?.length || 0}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {operation.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : operation.typeChirurgieTemps === "DEUX_TEMPS" ? "2 temps" : "-"}
+                          {operation.typeChirurgieApproche && (
+                            <span className="text-muted-foreground ml-1">
+                              ({operation.typeChirurgieApproche === "LAMBEAU" ? "Lambeau" : "Flapless"})
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {operation.greffeOsseuse ? (operation.typeGreffe || "Oui") : "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          {operation.typeMiseEnCharge ? operation.typeMiseEnCharge.charAt(0) + operation.typeMiseEnCharge.slice(1).toLowerCase() : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           )}
         </TabsContent>
 
