@@ -100,3 +100,36 @@ END $$;
 -- ALTER TABLE implants DROP COLUMN IF EXISTS isq_6m;
 -- ALTER TABLE implants DROP COLUMN IF EXISTS statut;
 -- ALTER TABLE implants DROP COLUMN IF EXISTS date_pose;
+
+-- ============================================
+-- Performance Indexes (added December 2025)
+-- ============================================
+-- Multi-column indexes for optimized JOIN queries
+
+-- Index on surgery_implants for queries by organisation and surgery
+CREATE INDEX IF NOT EXISTS idx_surgery_implants_org_surgery 
+ON surgery_implants(organisation_id, surgery_id);
+
+-- Index on surgery_implants for queries by organisation and implant
+CREATE INDEX IF NOT EXISTS idx_surgery_implants_org_implant 
+ON surgery_implants(organisation_id, implant_id);
+
+-- Index on operations for queries by organisation and patient
+CREATE INDEX IF NOT EXISTS idx_operations_org_patient 
+ON operations(organisation_id, patient_id);
+
+-- Index on radios for queries by organisation and patient
+CREATE INDEX IF NOT EXISTS idx_radios_org_patient 
+ON radios(organisation_id, patient_id);
+
+-- Index on patients for queries by organisation
+CREATE INDEX IF NOT EXISTS idx_patients_org 
+ON patients(organisation_id);
+
+-- Index on visites for queries by organisation and implant
+CREATE INDEX IF NOT EXISTS idx_visites_org_implant 
+ON visites(organisation_id, implant_id);
+
+-- Index on documents for queries by organisation and patient
+CREATE INDEX IF NOT EXISTS idx_documents_org_patient 
+ON documents(organisation_id, patient_id);

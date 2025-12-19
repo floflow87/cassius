@@ -165,6 +165,20 @@ export async function registerRoutes(
     }
   });
 
+  // OPTIMIZATION: Combined summary endpoint - reduces 3 API calls to 1 for patient list view
+  app.get("/api/patients/summary", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const summary = await storage.getPatientsWithSummary(organisationId);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching patient summary:", error);
+      res.status(500).json({ error: "Failed to fetch patient summary" });
+    }
+  });
+
   app.get("/api/patients/implant-counts", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -201,19 +215,15 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Patient not found" });
       }
       
-      // Add signed URLs to radios
-      if (supabaseStorage.isStorageConfigured() && patient.radios && patient.radios.length > 0) {
-        const filePaths = patient.radios.map(r => r.filePath).filter(Boolean) as string[];
-        if (filePaths.length > 0) {
-          const signedUrls = await supabaseStorage.getSignedUrls(filePaths);
-          patient.radios = patient.radios.map(radio => ({
-            ...radio,
-            signedUrl: radio.filePath ? signedUrls.get(radio.filePath) || null : null,
-          }));
-        }
-      }
+      // OPTIMIZATION: Don't generate signed URLs upfront
+      // Frontend fetches them on-demand via /api/radios/:id/url endpoint
+      // This removes expensive batch URL generation from initial page load
+      const radiosWithNullUrls = patient.radios?.map(radio => ({
+        ...radio,
+        signedUrl: null,
+      })) || [];
       
-      res.json(patient);
+      res.json({ ...patient, radios: radiosWithNullUrls });
     } catch (error) {
       console.error("Error fetching patient:", error);
       res.status(500).json({ error: "Failed to fetch patient" });
@@ -642,7 +652,7 @@ export async function registerRoutes(
     }
   });
 
-  // Get all radios for a patient with signed URLs
+  // Get all radios for a patient (signed URLs fetched on-demand)
   app.get("/api/patients/:patientId/radios", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -650,19 +660,8 @@ export async function registerRoutes(
     try {
       const radios = await storage.getPatientRadios(organisationId, req.params.patientId);
       
-      // Generate signed URLs for all radios
-      if (supabaseStorage.isStorageConfigured() && radios.length > 0) {
-        const filePaths = radios.map(r => r.filePath).filter(Boolean) as string[];
-        const signedUrls = await supabaseStorage.getSignedUrls(filePaths);
-        
-        const radiosWithUrls = radios.map(radio => ({
-          ...radio,
-          signedUrl: radio.filePath ? signedUrls.get(radio.filePath) || null : null,
-        }));
-        
-        return res.json(radiosWithUrls);
-      }
-      
+      // OPTIMIZATION: Don't generate signed URLs upfront
+      // Frontend fetches them on-demand via /api/radios/:id/url endpoint
       res.json(radios.map(r => ({ ...r, signedUrl: null })));
     } catch (error) {
       console.error("Error fetching patient radios:", error);
@@ -780,7 +779,7 @@ export async function registerRoutes(
     }
   });
 
-  // Get all documents for a patient with signed URLs
+  // Get all documents for a patient (signed URLs fetched on-demand)
   app.get("/api/patients/:patientId/documents", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -788,20 +787,9 @@ export async function registerRoutes(
     try {
       const docs = await storage.getPatientDocuments(organisationId, req.params.patientId);
       
-      // Generate signed URLs for all documents
-      const docsWithUrls = await Promise.all(docs.map(async (doc) => {
-        let signedUrl: string | null = null;
-        if (doc.filePath && supabaseStorage.isStorageConfigured()) {
-          try {
-            signedUrl = await supabaseStorage.getSignedUrl(doc.filePath);
-          } catch (err) {
-            console.error("Failed to get signed URL for document:", err);
-          }
-        }
-        return { ...doc, signedUrl };
-      }));
-      
-      res.json(docsWithUrls);
+      // OPTIMIZATION: Don't generate signed URLs upfront
+      // Frontend fetches them on-demand via /api/documents/:id/signed-url endpoint
+      res.json(docs.map(doc => ({ ...doc, signedUrl: null })));
     } catch (error) {
       console.error("Error fetching documents:", error);
       res.status(500).json({ error: "Failed to fetch documents" });

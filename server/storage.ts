@@ -47,7 +47,13 @@ import type {
   CreateUserInput,
 } from "@shared/types";
 import { db } from "./db";
-import { eq, desc, ilike, or, and, lte } from "drizzle-orm";
+import { eq, desc, ilike, or, and, lte, inArray } from "drizzle-orm";
+
+export type PatientSummary = {
+  patients: Patient[];
+  implantCounts: Record<string, number>;
+  lastVisits: Record<string, { date: string; titre: string | null }>;
+};
 
 export interface IStorage {
   // Patient methods - all require organisationId for multi-tenant isolation
@@ -58,6 +64,7 @@ export interface IStorage {
   updatePatient(organisationId: string, id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined>;
   searchPatients(organisationId: string, query: string): Promise<Patient[]>;
   getPatientImplantCounts(organisationId: string): Promise<Record<string, number>>;
+  getPatientsWithSummary(organisationId: string): Promise<PatientSummary>;
 
   // Operation methods
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
@@ -169,9 +176,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPatientWithDetails(organisationId: string, id: string): Promise<PatientDetail | undefined> {
+    // Optimized: Uses batch queries instead of N+1 pattern
+    // 4 queries total instead of 1 + N + N*M queries
+    
     const patient = await this.getPatient(organisationId, id);
     if (!patient) return undefined;
 
+    // Query 2: Get all operations for patient
     const patientOperations = await db
       .select()
       .from(operations)
@@ -181,40 +192,61 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(desc(operations.dateOperation));
 
-    const operationsWithSurgeryImplants = await Promise.all(
-      patientOperations.map(async (op) => {
-        const opSurgeryImplants = await db
-          .select()
-          .from(surgeryImplants)
-          .where(and(
-            eq(surgeryImplants.surgeryId, op.id),
-            eq(surgeryImplants.organisationId, organisationId)
-          ));
-
-        const surgeryImplantsWithDetails: SurgeryImplantWithDetails[] = await Promise.all(
-          opSurgeryImplants.map(async (si) => {
-            const [implant] = await db
-              .select()
-              .from(implants)
-              .where(eq(implants.id, si.implantId));
-            return {
-              ...si,
-              implant: implant!,
-              surgery: op,
-              patient,
-            };
-          })
-        );
-
-        return { ...op, surgeryImplants: surgeryImplantsWithDetails };
-      })
-    );
-
-    const allSurgeryImplants: SurgeryImplantWithDetails[] = [];
-    for (const op of operationsWithSurgeryImplants) {
-      allSurgeryImplants.push(...op.surgeryImplants);
+    // Query 3: Get all surgery_implants with their catalog implants in one batch query
+    const operationIds = patientOperations.map(op => op.id);
+    let allSurgeryImplantsData: Array<{
+      surgeryImplant: SurgeryImplant;
+      implant: Implant;
+    }> = [];
+    
+    if (operationIds.length > 0) {
+      const joinedData = await db
+        .select({
+          surgeryImplant: surgeryImplants,
+          implant: implants,
+        })
+        .from(surgeryImplants)
+        .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
+        .where(and(
+          inArray(surgeryImplants.surgeryId, operationIds),
+          eq(surgeryImplants.organisationId, organisationId)
+        ));
+      allSurgeryImplantsData = joinedData;
     }
 
+    // Build a map of surgeryId -> surgery_implants with details
+    const surgeryImplantsMap = new Map<string, SurgeryImplantWithDetails[]>();
+    const allSurgeryImplants: SurgeryImplantWithDetails[] = [];
+    
+    // Create a map of operationId -> operation for quick lookups
+    const operationsMap = new Map<string, Operation>();
+    for (const op of patientOperations) {
+      operationsMap.set(op.id, op);
+      surgeryImplantsMap.set(op.id, []);
+    }
+
+    // Group surgery implants by surgery
+    for (const { surgeryImplant, implant } of allSurgeryImplantsData) {
+      const surgery = operationsMap.get(surgeryImplant.surgeryId);
+      if (surgery) {
+        const withDetails: SurgeryImplantWithDetails = {
+          ...surgeryImplant,
+          implant,
+          surgery,
+          patient,
+        };
+        surgeryImplantsMap.get(surgeryImplant.surgeryId)?.push(withDetails);
+        allSurgeryImplants.push(withDetails);
+      }
+    }
+
+    // Build operations with their surgery implants
+    const operationsWithSurgeryImplants = patientOperations.map(op => ({
+      ...op,
+      surgeryImplants: surgeryImplantsMap.get(op.id) || [],
+    }));
+
+    // Query 4: Get all radios for patient
     const patientRadios = await db
       .select()
       .from(radios)
@@ -283,6 +315,22 @@ export class DatabaseStorage implements IStorage {
       counts[row.patientId] = (counts[row.patientId] || 0) + 1;
     }
     return counts;
+  }
+
+  async getPatientsWithSummary(organisationId: string): Promise<PatientSummary> {
+    // OPTIMIZATION: Combines 3 separate API calls into 1 for the patient list view
+    // Runs 3 queries in parallel for better performance
+    const [patientsList, implantCounts, lastVisits] = await Promise.all([
+      this.getPatients(organisationId),
+      this.getPatientImplantCounts(organisationId),
+      this.getPatientLastVisits(organisationId),
+    ]);
+    
+    return {
+      patients: patientsList,
+      implantCounts,
+      lastVisits,
+    };
   }
 
   // ========== OPERATIONS ==========
@@ -500,170 +548,137 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPatientSurgeryImplants(organisationId: string, patientId: string): Promise<SurgeryImplantWithDetails[]> {
-    const patientOperations = await db
-      .select()
-      .from(operations)
-      .where(and(
-        eq(operations.patientId, patientId),
-        eq(operations.organisationId, organisationId)
-      ));
-
+    // Optimized: Single JOIN query instead of N+1 pattern
     const [patient] = await db
       .select()
       .from(patients)
-      .where(eq(patients.id, patientId));
-
-    const result: SurgeryImplantWithDetails[] = [];
-    for (const op of patientOperations) {
-      const opSurgeryImplants = await db
-        .select()
-        .from(surgeryImplants)
-        .where(and(
-          eq(surgeryImplants.surgeryId, op.id),
-          eq(surgeryImplants.organisationId, organisationId)
-        ));
-
-      for (const si of opSurgeryImplants) {
-        const [implant] = await db
-          .select()
-          .from(implants)
-          .where(eq(implants.id, si.implantId));
-        if (implant) {
-          result.push({
-            ...si,
-            implant,
-            surgery: op,
-            patient: patient || undefined,
-          });
-        }
-      }
-    }
-
-    return result.sort((a, b) => new Date(b.datePose).getTime() - new Date(a.datePose).getTime());
-  }
-
-  async getSurgeryImplantsByCatalogImplant(organisationId: string, implantId: string): Promise<SurgeryImplantWithDetails[]> {
-    const allSurgeryImplants = await db
-      .select()
-      .from(surgeryImplants)
       .where(and(
-        eq(surgeryImplants.organisationId, organisationId),
-        eq(surgeryImplants.implantId, implantId)
+        eq(patients.id, patientId),
+        eq(patients.organisationId, organisationId)
+      ));
+
+    if (!patient) return [];
+
+    // Single query with all JOINs
+    const joinedData = await db
+      .select({
+        surgeryImplant: surgeryImplants,
+        implant: implants,
+        surgery: operations,
+      })
+      .from(surgeryImplants)
+      .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
+      .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+      .where(and(
+        eq(operations.patientId, patientId),
+        eq(surgeryImplants.organisationId, organisationId)
       ))
       .orderBy(desc(surgeryImplants.datePose));
 
+    return joinedData.map(({ surgeryImplant, implant, surgery }) => ({
+      ...surgeryImplant,
+      implant,
+      surgery,
+      patient,
+    }));
+  }
+
+  async getSurgeryImplantsByCatalogImplant(organisationId: string, implantId: string): Promise<SurgeryImplantWithDetails[]> {
+    // Optimized: Single JOIN query instead of N+1 pattern
     const [implant] = await db
       .select()
       .from(implants)
-      .where(eq(implants.id, implantId));
+      .where(and(
+        eq(implants.id, implantId),
+        eq(implants.organisationId, organisationId)
+      ));
 
     if (!implant) return [];
 
-    const result: SurgeryImplantWithDetails[] = [];
-    for (const si of allSurgeryImplants) {
-      const [surgery] = await db
-        .select()
-        .from(operations)
-        .where(eq(operations.id, si.surgeryId));
+    // Single query with all JOINs
+    const joinedData = await db
+      .select({
+        surgeryImplant: surgeryImplants,
+        surgery: operations,
+        patient: patients,
+      })
+      .from(surgeryImplants)
+      .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+      .innerJoin(patients, eq(operations.patientId, patients.id))
+      .where(and(
+        eq(surgeryImplants.implantId, implantId),
+        eq(surgeryImplants.organisationId, organisationId)
+      ))
+      .orderBy(desc(surgeryImplants.datePose));
 
-      let patient: Patient | undefined;
-      if (surgery) {
-        const [p] = await db
-          .select()
-          .from(patients)
-          .where(eq(patients.id, surgery.patientId));
-        patient = p || undefined;
-      }
-
-      result.push({
-        ...si,
-        implant,
-        surgery: surgery || undefined,
-        patient,
-      });
-    }
-
-    return result;
+    return joinedData.map(({ surgeryImplant, surgery, patient }) => ({
+      ...surgeryImplant,
+      implant,
+      surgery,
+      patient,
+    }));
   }
 
   async getAllSurgeryImplants(organisationId: string): Promise<SurgeryImplantWithDetails[]> {
-    const allSurgeryImplants = await db
-      .select()
+    // Optimized: Single 4-table JOIN query instead of N+1 pattern
+    const joinedData = await db
+      .select({
+        surgeryImplant: surgeryImplants,
+        implant: implants,
+        surgery: operations,
+        patient: patients,
+      })
       .from(surgeryImplants)
+      .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
+      .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+      .innerJoin(patients, eq(operations.patientId, patients.id))
       .where(eq(surgeryImplants.organisationId, organisationId))
       .orderBy(desc(surgeryImplants.datePose));
 
-    const result: SurgeryImplantWithDetails[] = [];
-    for (const si of allSurgeryImplants) {
-      const [implant] = await db
-        .select()
-        .from(implants)
-        .where(eq(implants.id, si.implantId));
-
-      const [surgery] = await db
-        .select()
-        .from(operations)
-        .where(eq(operations.id, si.surgeryId));
-
-      let patient: Patient | undefined;
-      if (surgery) {
-        const [p] = await db
-          .select()
-          .from(patients)
-          .where(eq(patients.id, surgery.patientId));
-        patient = p || undefined;
-      }
-
-      if (implant) {
-        result.push({
-          ...si,
-          implant,
-          surgery: surgery || undefined,
-          patient,
-        });
-      }
-    }
-
-    return result;
+    return joinedData.map(({ surgeryImplant, implant, surgery, patient }) => ({
+      ...surgeryImplant,
+      implant,
+      surgery,
+      patient,
+    }));
   }
 
   async filterSurgeryImplants(organisationId: string, filters: ImplantFilters): Promise<ImplantWithPatient[]> {
-    const allSurgeryImplants = await db
-      .select()
+    // Optimized: Single JOIN query with in-memory filtering for complex conditions
+    // Build WHERE conditions based on filters
+    const conditions = [eq(surgeryImplants.organisationId, organisationId)];
+    
+    if (filters.siteFdi) {
+      conditions.push(eq(surgeryImplants.siteFdi, filters.siteFdi));
+    }
+    if (filters.typeOs) {
+      conditions.push(eq(surgeryImplants.typeOs, filters.typeOs as any));
+    }
+    if (filters.statut) {
+      conditions.push(eq(surgeryImplants.statut, filters.statut as any));
+    }
+
+    const joinedData = await db
+      .select({
+        surgeryImplant: surgeryImplants,
+        implant: implants,
+        patient: patients,
+      })
       .from(surgeryImplants)
-      .where(eq(surgeryImplants.organisationId, organisationId))
+      .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
+      .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+      .innerJoin(patients, eq(operations.patientId, patients.id))
+      .where(and(...conditions))
       .orderBy(desc(surgeryImplants.datePose));
 
+    // Apply marque filter in memory (case-insensitive partial match)
     const result: ImplantWithPatient[] = [];
-    for (const si of allSurgeryImplants) {
-      if (filters.siteFdi && si.siteFdi !== filters.siteFdi) continue;
-      if (filters.typeOs && si.typeOs !== filters.typeOs) continue;
-      if (filters.statut && si.statut !== filters.statut) continue;
-
-      const [implant] = await db
-        .select()
-        .from(implants)
-        .where(eq(implants.id, si.implantId));
-
-      if (!implant) continue;
-      if (filters.marque && !implant.marque.toLowerCase().includes(filters.marque.toLowerCase())) continue;
-
-      const [surgery] = await db
-        .select()
-        .from(operations)
-        .where(eq(operations.id, si.surgeryId));
-
-      let patient: Patient | undefined;
-      if (surgery) {
-        const [p] = await db
-          .select()
-          .from(patients)
-          .where(eq(patients.id, surgery.patientId));
-        patient = p || undefined;
+    for (const { surgeryImplant, implant, patient } of joinedData) {
+      if (filters.marque && !implant.marque.toLowerCase().includes(filters.marque.toLowerCase())) {
+        continue;
       }
-
       result.push({
-        ...si,
+        ...surgeryImplant,
         implant,
         patient,
       });

@@ -126,17 +126,18 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     localStorage.setItem(STORAGE_KEY_SORT, JSON.stringify({ column: sortColumn, direction: sortDirection }));
   }, [sortColumn, sortDirection]);
 
-  const { data: patients, isLoading } = useQuery<Patient[]>({
-    queryKey: ["/api/patients"],
+  // OPTIMIZATION: Combined summary endpoint - reduces 3 API calls to 1
+  const { data: summaryData, isLoading } = useQuery<{
+    patients: Patient[];
+    implantCounts: Record<string, number>;
+    lastVisits: Record<string, { date: string; titre: string | null }>;
+  }>({
+    queryKey: ["/api/patients/summary"],
   });
-
-  const { data: implantCounts } = useQuery<Record<string, number>>({
-    queryKey: ["/api/patients/implant-counts"],
-  });
-
-  const { data: lastVisits } = useQuery<Record<string, { date: string; titre: string | null }>>({
-    queryKey: ["/api/patients/last-visits"],
-  });
+  
+  const patients = summaryData?.patients;
+  const implantCounts = summaryData?.implantCounts;
+  const lastVisits = summaryData?.lastVisits;
 
   useEffect(() => {
     setCurrentPage(1);
