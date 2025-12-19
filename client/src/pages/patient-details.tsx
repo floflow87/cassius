@@ -212,7 +212,7 @@ export default function PatientDetailsPage() {
       const saved = localStorage.getItem(IMPLANT_VIEW_MODE_KEY);
       if (saved === "table" || saved === "cards") return saved;
     } catch {}
-    return "cards";
+    return "table";
   });
 
   const [implantColumns, setImplantColumns] = useState<ImplantColumnConfig[]>(() => {
@@ -1703,12 +1703,11 @@ export default function PatientDetailsPage() {
           ) : (
             <>
               <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
                     {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
-                    {implantTypeFilter !== "all" && ` (${implantTypeFilter === "IMPLANT" ? "implants" : "mini-implants"})`}
                   </span>
-                  <div className="flex items-center gap-1 border rounded-md p-0.5">
+                  <div className="flex items-center border rounded-md p-0.5">
                     <Button
                       variant={implantTypeFilter === "all" ? "secondary" : "ghost"}
                       size="sm"
