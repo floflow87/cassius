@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import {
@@ -23,6 +23,12 @@ import {
   MoreVertical,
   Trash2,
   Loader2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
+  LayoutGrid,
+  LayoutList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,6 +99,29 @@ interface PatientWithDetails extends Patient {
   surgeryImplants: SurgeryImplantWithVisites[];
   radios: Radio[];
 }
+
+type ImplantSortDirection = "asc" | "desc" | null;
+type ImplantColumnId = "site" | "marque" | "dimensions" | "datePose" | "isq" | "statut";
+
+interface ImplantColumnConfig {
+  id: ImplantColumnId;
+  label: string;
+  width?: string;
+  sortable: boolean;
+}
+
+const defaultImplantColumns: ImplantColumnConfig[] = [
+  { id: "site", label: "Site", width: "w-24", sortable: true },
+  { id: "marque", label: "Marque / Référence", width: "w-48", sortable: true },
+  { id: "dimensions", label: "Dimensions", width: "w-32", sortable: true },
+  { id: "datePose", label: "Date pose", width: "w-32", sortable: true },
+  { id: "isq", label: "ISQ actuel", width: "w-28", sortable: true },
+  { id: "statut", label: "Statut", width: "w-28", sortable: true },
+];
+
+const IMPLANT_VIEW_MODE_KEY = "cassius_patient_implants_view_mode";
+const IMPLANT_COLUMNS_KEY = "cassius_patient_implants_columns";
+const IMPLANT_SORT_KEY = "cassius_patient_implants_sort";
 
 export default function PatientDetailsPage() {
   const [, params] = useRoute("/patients/:id");
@@ -169,6 +198,129 @@ export default function PatientDetailsPage() {
     queryKey: ["/api/patients", patientId, "notes"],
     enabled: !!patientId,
   });
+
+  // Implants table view state
+  const [implantViewMode, setImplantViewMode] = useState<"table" | "cards">(() => {
+    try {
+      const saved = localStorage.getItem(IMPLANT_VIEW_MODE_KEY);
+      if (saved === "table" || saved === "cards") return saved;
+    } catch {}
+    return "cards";
+  });
+
+  const [implantColumns, setImplantColumns] = useState<ImplantColumnConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(IMPLANT_COLUMNS_KEY);
+      if (saved) {
+        const savedOrder = JSON.parse(saved) as ImplantColumnId[];
+        return savedOrder.map(id => defaultImplantColumns.find(c => c.id === id)!).filter(Boolean);
+      }
+    } catch {}
+    return defaultImplantColumns;
+  });
+
+  const [implantSortColumn, setImplantSortColumn] = useState<ImplantColumnId | null>(() => {
+    try {
+      const saved = localStorage.getItem(IMPLANT_SORT_KEY);
+      if (saved) {
+        const { column } = JSON.parse(saved);
+        return column;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [implantSortDirection, setImplantSortDirection] = useState<ImplantSortDirection>(() => {
+    try {
+      const saved = localStorage.getItem(IMPLANT_SORT_KEY);
+      if (saved) {
+        const { direction } = JSON.parse(saved);
+        return direction;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [draggedImplantColumn, setDraggedImplantColumn] = useState<ImplantColumnId | null>(null);
+  const [dragOverImplantColumn, setDragOverImplantColumn] = useState<ImplantColumnId | null>(null);
+
+  // Persist implant view preferences
+  useEffect(() => {
+    try {
+      localStorage.setItem(IMPLANT_VIEW_MODE_KEY, implantViewMode);
+    } catch {}
+  }, [implantViewMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(IMPLANT_COLUMNS_KEY, JSON.stringify(implantColumns.map(c => c.id)));
+    } catch {}
+  }, [implantColumns]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(IMPLANT_SORT_KEY, JSON.stringify({ column: implantSortColumn, direction: implantSortDirection }));
+    } catch {}
+  }, [implantSortColumn, implantSortDirection]);
+
+  // Implant table handlers
+  const handleImplantSort = useCallback((columnId: ImplantColumnId) => {
+    if (implantSortColumn === columnId) {
+      if (implantSortDirection === "asc") {
+        setImplantSortDirection("desc");
+      } else if (implantSortDirection === "desc") {
+        setImplantSortColumn(null);
+        setImplantSortDirection(null);
+      }
+    } else {
+      setImplantSortColumn(columnId);
+      setImplantSortDirection("asc");
+    }
+  }, [implantSortColumn, implantSortDirection]);
+
+  const handleImplantDragStart = useCallback((e: React.DragEvent, columnId: ImplantColumnId) => {
+    setDraggedImplantColumn(columnId);
+    e.dataTransfer.effectAllowed = "move";
+  }, []);
+
+  const handleImplantDragOver = useCallback((e: React.DragEvent, columnId: ImplantColumnId) => {
+    e.preventDefault();
+    if (draggedImplantColumn && draggedImplantColumn !== columnId) {
+      setDragOverImplantColumn(columnId);
+    }
+  }, [draggedImplantColumn]);
+
+  const handleImplantDrop = useCallback((e: React.DragEvent, targetColumnId: ImplantColumnId) => {
+    e.preventDefault();
+    if (draggedImplantColumn && draggedImplantColumn !== targetColumnId) {
+      const newColumns = [...implantColumns];
+      const draggedIndex = newColumns.findIndex(c => c.id === draggedImplantColumn);
+      const dropIndex = newColumns.findIndex(c => c.id === targetColumnId);
+      
+      if (draggedIndex !== -1 && dropIndex !== -1) {
+        const [removed] = newColumns.splice(draggedIndex, 1);
+        newColumns.splice(dropIndex, 0, removed);
+        setImplantColumns(newColumns);
+      }
+    }
+    setDraggedImplantColumn(null);
+    setDragOverImplantColumn(null);
+  }, [draggedImplantColumn, implantColumns]);
+
+  const handleImplantDragEnd = useCallback(() => {
+    setDraggedImplantColumn(null);
+    setDragOverImplantColumn(null);
+  }, []);
+
+  const renderImplantSortIcon = useCallback((columnId: ImplantColumnId) => {
+    if (implantSortColumn !== columnId) {
+      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
+    }
+    if (implantSortDirection === "asc") {
+      return <ArrowUp className="h-3 w-3 ml-1" />;
+    }
+    return <ArrowDown className="h-3 w-3 ml-1" />;
+  }, [implantSortColumn, implantSortDirection]);
 
   // Rendez-vous state
   type RdvTag = "CONSULTATION" | "SUIVI" | "CHIRURGIE";
@@ -498,6 +650,85 @@ export default function PatientDetailsPage() {
     };
     return labels[type] || type;
   };
+
+  // Sort implants for table view
+  const sortImplants = useCallback((implantsToSort: SurgeryImplantWithVisites[]) => {
+    if (!implantSortColumn || !implantSortDirection) return implantsToSort;
+
+    return [...implantsToSort].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (implantSortColumn) {
+        case "site":
+          comparison = (a.siteFdi || "").localeCompare(b.siteFdi || "");
+          break;
+        case "marque":
+          comparison = (a.implant?.marque || "").localeCompare(b.implant?.marque || "");
+          break;
+        case "dimensions":
+          const dimA = (a.implant?.diametre || 0) * 100 + (a.implant?.longueur || 0);
+          const dimB = (b.implant?.diametre || 0) * 100 + (b.implant?.longueur || 0);
+          comparison = dimA - dimB;
+          break;
+        case "datePose":
+          comparison = new Date(a.datePose || 0).getTime() - new Date(b.datePose || 0).getTime();
+          break;
+        case "isq":
+          const isqA = a.isq6m || a.isq3m || a.isq2m || a.isqPose || 0;
+          const isqB = b.isq6m || b.isq3m || b.isq2m || b.isqPose || 0;
+          comparison = isqA - isqB;
+          break;
+        case "statut":
+          comparison = (a.statut || "").localeCompare(b.statut || "");
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      return implantSortDirection === "desc" ? -comparison : comparison;
+    });
+  }, [implantSortColumn, implantSortDirection]);
+
+  // Render implant table cell content
+  const renderImplantCellContent = useCallback((columnId: ImplantColumnId, surgeryImplant: SurgeryImplantWithVisites) => {
+    const currentIsq = surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose;
+    
+    switch (columnId) {
+      case "site":
+        return (
+          <span className="font-mono font-medium">{surgeryImplant.siteFdi || "-"}</span>
+        );
+      case "marque":
+        return (
+          <div>
+            <div className="text-sm font-medium">{surgeryImplant.implant?.marque || "-"}</div>
+            <div className="text-xs text-muted-foreground">{surgeryImplant.implant?.referenceFabricant || "-"}</div>
+          </div>
+        );
+      case "dimensions":
+        return (
+          <span className="text-sm">
+            {surgeryImplant.implant?.diametre} x {surgeryImplant.implant?.longueur}mm
+          </span>
+        );
+      case "datePose":
+        return (
+          <span className="text-sm text-muted-foreground">
+            {surgeryImplant.datePose ? formatDateShort(surgeryImplant.datePose) : "-"}
+          </span>
+        );
+      case "isq":
+        return (
+          <span className={`font-medium ${currentIsq && currentIsq >= 70 ? "text-green-600" : currentIsq && currentIsq >= 60 ? "text-yellow-600" : currentIsq ? "text-red-600" : ""}`}>
+            {currentIsq || "-"}
+          </span>
+        );
+      case "statut":
+        return getStatusBadge(surgeryImplant.statut || "EN_SUIVI");
+      default:
+        return null;
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -1363,11 +1594,93 @@ export default function PatientDetailsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {patient.surgeryImplants?.map((surgeryImplant) => (
-                <ImplantCard key={surgeryImplant.id} surgeryImplant={surgeryImplant} patientId={patient.id} />
-              ))}
-            </div>
+            <>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm text-muted-foreground">
+                  {implantCount} implant{implantCount !== 1 ? "s" : ""}
+                </span>
+                <div className="flex items-center gap-1 border rounded-md p-0.5">
+                  <Button
+                    variant={implantViewMode === "table" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setImplantViewMode("table")}
+                    data-testid="button-view-table"
+                  >
+                    <LayoutList className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={implantViewMode === "cards" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setImplantViewMode("cards")}
+                    data-testid="button-view-cards"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {implantViewMode === "table" ? (
+                <Card>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          {implantColumns.map((column) => (
+                            <th
+                              key={column.id}
+                              draggable
+                              onDragStart={(e) => handleImplantDragStart(e, column.id)}
+                              onDragOver={(e) => handleImplantDragOver(e, column.id)}
+                              onDrop={(e) => handleImplantDrop(e, column.id)}
+                              onDragEnd={handleImplantDragEnd}
+                              className={`px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-move select-none ${column.width || ""} ${dragOverImplantColumn === column.id ? "bg-muted" : ""}`}
+                            >
+                              <div className="flex items-center gap-1">
+                                <GripVertical className="h-3 w-3 opacity-40" />
+                                {column.sortable ? (
+                                  <button
+                                    onClick={() => handleImplantSort(column.id)}
+                                    className="flex items-center hover:text-foreground transition-colors"
+                                    data-testid={`button-sort-${column.id}`}
+                                  >
+                                    {column.label}
+                                    {renderImplantSortIcon(column.id)}
+                                  </button>
+                                ) : (
+                                  <span>{column.label}</span>
+                                )}
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortImplants(patient.surgeryImplants || []).map((surgeryImplant) => (
+                          <tr
+                            key={surgeryImplant.id}
+                            className="border-b last:border-b-0 hover-elevate cursor-pointer"
+                            onClick={() => window.location.href = `/patients/${patient.id}/implants/${surgeryImplant.id}`}
+                            data-testid={`row-implant-${surgeryImplant.id}`}
+                          >
+                            {implantColumns.map((column) => (
+                              <td key={column.id} className={`px-4 py-3 ${column.width || ""}`}>
+                                {renderImplantCellContent(column.id, surgeryImplant)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {patient.surgeryImplants?.map((surgeryImplant) => (
+                    <ImplantCard key={surgeryImplant.id} surgeryImplant={surgeryImplant} patientId={patient.id} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
 
