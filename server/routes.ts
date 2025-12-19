@@ -312,6 +312,31 @@ export async function registerRoutes(
     }
   });
 
+  // Update catalog implant
+  app.patch("/api/catalog-implants/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const updateSchema = insertImplantSchema.partial();
+      const validatedUpdates = updateSchema.parse(req.body);
+      
+      const updated = await storage.updateCatalogImplant(organisationId, req.params.id, validatedUpdates);
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Implant not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error updating catalog implant:", error);
+      res.status(500).json({ error: "Failed to update catalog implant" });
+    }
+  });
+
   // Get surgeries using a catalog implant
   app.get("/api/catalog-implants/:id/surgeries", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

@@ -124,6 +124,7 @@ export const implants = pgTable("implants", {
   diametre: real("diametre").notNull(),
   longueur: real("longueur").notNull(),
   lot: text("lot"), // Numéro de lot fabricant
+  notes: text("notes"), // Notes générales sur ce type d'implant
 });
 
 export const implantsRelations = relations(implants, ({ one, many }) => ({

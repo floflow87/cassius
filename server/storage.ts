@@ -87,6 +87,7 @@ export interface IStorage {
   // Implant catalog methods
   getImplant(organisationId: string, id: string): Promise<Implant | undefined>;
   createImplant(organisationId: string, implant: InsertImplant): Promise<Implant>;
+  updateCatalogImplant(organisationId: string, id: string, updates: Partial<InsertImplant>): Promise<Implant | undefined>;
   getAllImplants(organisationId: string): Promise<Implant[]>;
   getAllImplantsWithStats(organisationId: string): Promise<ImplantWithStats[]>;
   getImplantBrands(organisationId: string): Promise<string[]>;
@@ -380,6 +381,17 @@ export class DatabaseStorage implements IStorage {
       organisationId,
     }).returning();
     return newImplant;
+  }
+
+  async updateCatalogImplant(organisationId: string, id: string, updates: Partial<InsertImplant>): Promise<Implant | undefined> {
+    const [updated] = await db.update(implants)
+      .set(updates)
+      .where(and(
+        eq(implants.id, id),
+        eq(implants.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
   }
 
   async getAllImplants(organisationId: string): Promise<Implant[]> {

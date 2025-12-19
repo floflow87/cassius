@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowLeft,
   Activity,
@@ -62,6 +62,13 @@ export default function CatalogImplantDetailsPage() {
   const [notesContent, setNotesContent] = useState("");
   const [selectedActs, setSelectedActs] = useState<string[]>([]);
 
+  // Form state for editing implant
+  const [editMarque, setEditMarque] = useState("");
+  const [editTypeImplant, setEditTypeImplant] = useState<"IMPLANT" | "MINI_IMPLANT">("IMPLANT");
+  const [editReferenceFabricant, setEditReferenceFabricant] = useState("");
+  const [editDiametre, setEditDiametre] = useState<number>(0);
+  const [editLongueur, setEditLongueur] = useState<number>(0);
+
   const { data: implant, isLoading: implantLoading } = useQuery<ImplantWithStats>({
     queryKey: ["/api/catalog-implants", implantId],
     queryFn: async () => {
@@ -104,6 +111,67 @@ export default function CatalogImplantDetailsPage() {
       });
     },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async (updates: {
+      marque?: string;
+      typeImplant?: "IMPLANT" | "MINI_IMPLANT";
+      referenceFabricant?: string | null;
+      diametre?: number;
+      longueur?: number;
+    }) => {
+      return apiRequest("PATCH", `/api/catalog-implants/${implantId}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/catalog-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/catalog-implants"] });
+      setEditSheetOpen(false);
+      toast({
+        title: "Modifications enregistrées",
+        description: "Les informations de l'implant ont été mises à jour",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la sauvegarde",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Sync form state when implant data loads or edit sheet opens
+  useEffect(() => {
+    if (implant && editSheetOpen) {
+      setEditMarque(implant.marque);
+      setEditTypeImplant(implant.typeImplant || "IMPLANT");
+      setEditReferenceFabricant(implant.referenceFabricant || "");
+      setEditDiametre(implant.diametre);
+      setEditLongueur(implant.longueur);
+    }
+  }, [implant, editSheetOpen]);
+
+  // Sync notes content when implant data loads or notes editing starts
+  useEffect(() => {
+    if (implant && editingNotes) {
+      setNotesContent(implant.notes || "");
+    }
+  }, [implant, editingNotes]);
+
+  const handleSaveNotes = () => {
+    updateMutation.mutate({ notes: notesContent || null } as any);
+    setEditingNotes(false);
+  };
+
+  const handleSaveImplant = () => {
+    updateMutation.mutate({
+      marque: editMarque,
+      typeImplant: editTypeImplant,
+      referenceFabricant: editReferenceFabricant || null,
+      diametre: editDiametre,
+      longueur: editLongueur,
+    });
+  };
 
   const isLoading = implantLoading || surgeriesLoading;
 
@@ -211,11 +279,15 @@ export default function CatalogImplantDetailsPage() {
                 <div className="py-6 space-y-4">
                   <div className="space-y-2">
                     <Label>Marque</Label>
-                    <Input defaultValue={implant.marque} data-testid="input-edit-marque" />
+                    <Input 
+                      value={editMarque} 
+                      onChange={(e) => setEditMarque(e.target.value)} 
+                      data-testid="input-edit-marque" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Type</Label>
-                    <Select defaultValue={implant.typeImplant || "IMPLANT"}>
+                    <Select value={editTypeImplant} onValueChange={(v) => setEditTypeImplant(v as "IMPLANT" | "MINI_IMPLANT")}>
                       <SelectTrigger data-testid="select-edit-type">
                         <SelectValue />
                       </SelectTrigger>
@@ -227,21 +299,42 @@ export default function CatalogImplantDetailsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Référence fabricant</Label>
-                    <Input defaultValue={implant.referenceFabricant || ""} data-testid="input-edit-reference" />
+                    <Input 
+                      value={editReferenceFabricant} 
+                      onChange={(e) => setEditReferenceFabricant(e.target.value)} 
+                      data-testid="input-edit-reference" 
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Diamètre (mm)</Label>
-                      <Input type="number" step="0.1" defaultValue={implant.diametre} data-testid="input-edit-diametre" />
+                      <Input 
+                        type="number" 
+                        step="0.1" 
+                        value={editDiametre} 
+                        onChange={(e) => setEditDiametre(parseFloat(e.target.value) || 0)} 
+                        data-testid="input-edit-diametre" 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Longueur (mm)</Label>
-                      <Input type="number" step="0.5" defaultValue={implant.longueur} data-testid="input-edit-longueur" />
+                      <Input 
+                        type="number" 
+                        step="0.5" 
+                        value={editLongueur} 
+                        onChange={(e) => setEditLongueur(parseFloat(e.target.value) || 0)} 
+                        data-testid="input-edit-longueur" 
+                      />
                     </div>
                   </div>
                   <div className="pt-4">
-                    <Button className="w-full" data-testid="button-save-implant">
-                      Enregistrer
+                    <Button 
+                      className="w-full" 
+                      onClick={handleSaveImplant}
+                      disabled={updateMutation.isPending}
+                      data-testid="button-save-implant"
+                    >
+                      {updateMutation.isPending ? "Enregistrement..." : "Enregistrer"}
                     </Button>
                   </div>
                 </div>
@@ -484,26 +577,29 @@ export default function CatalogImplantDetailsPage() {
                   <Button variant="outline" size="sm" onClick={() => setEditingNotes(false)}>
                     Annuler
                   </Button>
-                  <Button size="sm" onClick={() => setEditingNotes(false)} data-testid="button-save-notes">
-                    Enregistrer
+                  <Button size="sm" onClick={handleSaveNotes} disabled={updateMutation.isPending} data-testid="button-save-notes">
+                    {updateMutation.isPending ? "Enregistrement..." : "Enregistrer"}
                   </Button>
                 </div>
               </div>
             ) : (
-              <div className="text-sm">
+              <div className="text-sm space-y-3">
+                {implant.notes && (
+                  <p>{implant.notes}</p>
+                )}
                 {implant.lastPoseDate ? (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">
+                  <div className="text-muted-foreground">
+                    <p className="text-xs mb-1">
                       Dernière pose: {formatDate(implant.lastPoseDate)}
                     </p>
-                    <p>
-                      Cet implant a été utilisé {implant.poseCount} fois
-                      {successRate !== null && ` avec un taux de réussite de ${successRate}%`}.
+                    <p className="text-xs">
+                      Utilisé {implant.poseCount} fois
+                      {successRate !== null && ` - Taux de réussite: ${successRate}%`}
                     </p>
                   </div>
-                ) : (
+                ) : !implant.notes ? (
                   <p className="text-muted-foreground italic">Aucune note pour le moment</p>
-                )}
+                ) : null}
               </div>
             )}
           </CardContent>
