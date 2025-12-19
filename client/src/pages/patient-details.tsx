@@ -34,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PatientDetailsSkeleton } from "@/components/page-skeletons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -1098,13 +1099,7 @@ export default function PatientDetailsPage() {
   }, []);
 
   if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+    return <PatientDetailsSkeleton />;
   }
 
   if (!patient) {

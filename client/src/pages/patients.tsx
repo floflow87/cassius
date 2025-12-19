@@ -18,7 +18,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PatientsListSkeleton } from "@/components/page-skeletons";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Sheet,
@@ -375,12 +375,8 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-11 w-full max-w-2xl" />
-        <Skeleton className="h-10 w-full" />
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
+      <div className="p-6">
+        <PatientsListSkeleton />
       </div>
     );
   }

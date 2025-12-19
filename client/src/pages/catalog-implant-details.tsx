@@ -15,7 +15,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { CatalogImplantDetailsSkeleton } from "@/components/page-skeletons";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -194,16 +194,7 @@ export default function CatalogImplantDetailsPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Skeleton className="h-48 lg:col-span-2" />
-          <Skeleton className="h-48" />
-        </div>
-        <Skeleton className="h-64" />
-      </div>
-    );
+    return <CatalogImplantDetailsSkeleton />;
   }
 
   if (!implant) {
