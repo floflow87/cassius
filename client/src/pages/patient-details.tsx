@@ -1697,10 +1697,7 @@ export default function PatientDetailsPage() {
           ) : (
             <>
               <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
-                  </span>
+                <div className="flex items-center gap-3">
                   <div className="flex items-center border rounded-md p-0.5">
                     <Button
                       variant={implantTypeFilter === "all" ? "secondary" : "ghost"}
@@ -1727,6 +1724,9 @@ export default function PatientDetailsPage() {
                       Mini-implants
                     </Button>
                   </div>
+                  <span className="text-sm text-muted-foreground">
+                    {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1 border rounded-md p-0.5">
                   <Button
