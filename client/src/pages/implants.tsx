@@ -12,8 +12,8 @@ import {
   GripVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { CatalogImplantsListSkeleton } from "@/components/page-skeletons";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Sheet,
@@ -296,15 +296,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   };
 
   if (isLoading) {
-    return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-11 w-full max-w-2xl" />
-        <Skeleton className="h-10 w-full" />
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
-      </div>
-    );
+    return <CatalogImplantsListSkeleton />;
   }
 
   return (

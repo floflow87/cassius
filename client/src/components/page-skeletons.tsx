@@ -135,7 +135,7 @@ export function PatientDetailsSkeleton() {
 
 export function PatientsListSkeleton() {
   return (
-    <div className="space-y-4">
+    <div className="p-6 space-y-4">
       <div className="flex items-center justify-between gap-4">
         <Skeleton className="h-9 w-64 rounded-md" />
         <Skeleton className="h-9 w-32 rounded-md" />
@@ -170,7 +170,7 @@ export function PatientsListSkeleton() {
 
 export function CatalogImplantsListSkeleton() {
   return (
-    <div className="space-y-4">
+    <div className="p-6 space-y-4">
       <div className="flex items-center justify-between gap-4">
         <Skeleton className="h-9 w-64 rounded-md" />
         <Skeleton className="h-9 w-40 rounded-md" />
