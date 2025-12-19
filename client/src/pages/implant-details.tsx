@@ -1015,6 +1015,38 @@ export default function ImplantDetailsPage() {
                   })}
                 </div>
               </div>
+
+              {/* ISQ Gradient Scale/Frise */}
+              <div className="mt-6 pt-4 border-t">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase">Échelle ISQ</span>
+                </div>
+                <div className="relative h-6 rounded-md overflow-hidden">
+                  <div 
+                    className="absolute inset-0"
+                    style={{
+                      background: "linear-gradient(to right, #ef4444 0%, #ef4444 55%, #f59e0b 55%, #f59e0b 65%, #22c55e 65%, #22c55e 100%)"
+                    }}
+                  />
+                  <div className="absolute inset-0 flex">
+                    <div className="flex-1 flex items-center justify-center border-r border-white/30">
+                      <span className="text-xs font-medium text-white drop-shadow-sm">Instable (0-55)</span>
+                    </div>
+                    <div className="w-24 flex items-center justify-center border-r border-white/30">
+                      <span className="text-xs font-medium text-white drop-shadow-sm">Moyen (55-65)</span>
+                    </div>
+                    <div className="flex-1 flex items-center justify-center">
+                      <span className="text-xs font-medium text-white drop-shadow-sm">Stable (65+)</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-xs text-muted-foreground">0</span>
+                  <span className="text-xs text-muted-foreground">55</span>
+                  <span className="text-xs text-muted-foreground">65</span>
+                  <span className="text-xs text-muted-foreground">100</span>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>

@@ -17,6 +17,7 @@ import {
   Pill,
   Heart,
   CheckCircle,
+  Check,
   Image as ImageIcon,
   Stethoscope,
   MapPin,
@@ -101,7 +102,7 @@ interface PatientWithDetails extends Patient {
 }
 
 type ImplantSortDirection = "asc" | "desc" | null;
-type ImplantColumnId = "site" | "marque" | "dimensions" | "datePose" | "isq" | "statut";
+type ImplantColumnId = "marque" | "dimensions" | "position" | "site" | "typeOs" | "greffe" | "chirurgie" | "miseEnCharge" | "isq" | "situation" | "operation" | "statut" | "datePose";
 
 interface ImplantColumnConfig {
   id: ImplantColumnId;
@@ -111,12 +112,18 @@ interface ImplantColumnConfig {
 }
 
 const defaultImplantColumns: ImplantColumnConfig[] = [
-  { id: "site", label: "Site", width: "w-24", sortable: true },
-  { id: "marque", label: "Marque / Référence", width: "w-48", sortable: true },
-  { id: "dimensions", label: "Dimensions", width: "w-32", sortable: true },
-  { id: "datePose", label: "Date pose", width: "w-32", sortable: true },
-  { id: "isq", label: "ISQ actuel", width: "w-28", sortable: true },
-  { id: "statut", label: "Statut", width: "w-28", sortable: true },
+  { id: "marque", label: "Marque / Réf.", width: "min-w-40", sortable: true },
+  { id: "dimensions", label: "Dimensions", width: "min-w-24", sortable: true },
+  { id: "position", label: "Position", width: "min-w-28", sortable: true },
+  { id: "site", label: "Site(s)", width: "min-w-20", sortable: true },
+  { id: "typeOs", label: "Type d'os", width: "min-w-24", sortable: true },
+  { id: "greffe", label: "Greffe", width: "min-w-16", sortable: true },
+  { id: "chirurgie", label: "Chirurgie", width: "min-w-20", sortable: true },
+  { id: "miseEnCharge", label: "Mise en charge", width: "min-w-28", sortable: true },
+  { id: "isq", label: "ISQ", width: "min-w-20", sortable: true },
+  { id: "situation", label: "Situation", width: "min-w-28", sortable: true },
+  { id: "operation", label: "Opération", width: "min-w-32", sortable: true },
+  { id: "statut", label: "Statut", width: "min-w-24", sortable: true },
 ];
 
 const IMPLANT_VIEW_MODE_KEY = "cassius_patient_implants_view_mode";
@@ -244,6 +251,17 @@ export default function PatientDetailsPage() {
   const [draggedImplantColumn, setDraggedImplantColumn] = useState<ImplantColumnId | null>(null);
   const [dragOverImplantColumn, setDragOverImplantColumn] = useState<ImplantColumnId | null>(null);
 
+  // Implant type filter state
+  type ImplantTypeFilter = "all" | "IMPLANT" | "MINI_IMPLANT";
+  const IMPLANT_TYPE_FILTER_KEY = "cassius_implant_type_filter";
+  const [implantTypeFilter, setImplantTypeFilter] = useState<ImplantTypeFilter>(() => {
+    try {
+      const saved = localStorage.getItem(IMPLANT_TYPE_FILTER_KEY);
+      if (saved === "all" || saved === "IMPLANT" || saved === "MINI_IMPLANT") return saved;
+    } catch {}
+    return "all";
+  });
+
   // Persist implant view preferences
   useEffect(() => {
     try {
@@ -262,6 +280,18 @@ export default function PatientDetailsPage() {
       localStorage.setItem(IMPLANT_SORT_KEY, JSON.stringify({ column: implantSortColumn, direction: implantSortDirection }));
     } catch {}
   }, [implantSortColumn, implantSortDirection]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(IMPLANT_TYPE_FILTER_KEY, implantTypeFilter);
+    } catch {}
+  }, [implantTypeFilter]);
+
+  // Filter implants by type
+  const filteredSurgeryImplants = (patient?.surgeryImplants || []).filter((si) => {
+    if (implantTypeFilter === "all") return true;
+    return si.implant?.typeImplant === implantTypeFilter;
+  });
 
   // Implant table handlers
   const handleImplantSort = useCallback((columnId: ImplantColumnId) => {
@@ -651,6 +681,40 @@ export default function PatientDetailsPage() {
     return labels[type] || type;
   };
 
+  const getSituationFromSiteFdi = (siteFdi: string | null) => {
+    if (!siteFdi) return "-";
+    const firstDigit = siteFdi.charAt(0);
+    if (firstDigit === "1" || firstDigit === "2") return "Maxillaire";
+    if (firstDigit === "3" || firstDigit === "4") return "Mandibulaire";
+    return "-";
+  };
+
+  const getPositionLabel = (position: string | null) => {
+    const labels: Record<string, string> = {
+      CRESTAL: "Crestal",
+      SOUS_CRESTAL: "Sous-crestal",
+      SUPRA_CRESTAL: "Supra-crestal",
+    };
+    return position ? labels[position] || position : "-";
+  };
+
+  const getMiseEnChargeLabel = (miseEnCharge: string | null) => {
+    const labels: Record<string, string> = {
+      IMMEDIATE: "Immédiate",
+      PRECOCE: "Précoce",
+      DIFFEREE: "Différée",
+    };
+    return miseEnCharge ? labels[miseEnCharge] || miseEnCharge : "-";
+  };
+
+  const getChirurgieTempsLabel = (type: string | null) => {
+    const labels: Record<string, string> = {
+      UN_TEMPS: "1T",
+      DEUX_TEMPS: "2T",
+    };
+    return type ? labels[type] || type : "-";
+  };
+
   // Sort implants for table view
   const sortImplants = useCallback((implantsToSort: SurgeryImplantWithVisites[]) => {
     if (!implantSortColumn || !implantSortDirection) return implantsToSort;
@@ -680,6 +744,27 @@ export default function PatientDetailsPage() {
           break;
         case "statut":
           comparison = (a.statut || "").localeCompare(b.statut || "");
+          break;
+        case "position":
+          comparison = (a.positionImplant || "").localeCompare(b.positionImplant || "");
+          break;
+        case "typeOs":
+          comparison = (a.typeOs || "").localeCompare(b.typeOs || "");
+          break;
+        case "greffe":
+          comparison = (a.greffeOsseuse ? 1 : 0) - (b.greffeOsseuse ? 1 : 0);
+          break;
+        case "chirurgie":
+          comparison = (a.typeChirurgieTemps || "").localeCompare(b.typeChirurgieTemps || "");
+          break;
+        case "miseEnCharge":
+          comparison = (a.miseEnCharge || "").localeCompare(b.miseEnCharge || "");
+          break;
+        case "situation":
+          comparison = getSituationFromSiteFdi(a.siteFdi).localeCompare(getSituationFromSiteFdi(b.siteFdi));
+          break;
+        case "operation":
+          comparison = new Date(a.datePose || 0).getTime() - new Date(b.datePose || 0).getTime();
           break;
         default:
           comparison = 0;
@@ -722,6 +807,28 @@ export default function PatientDetailsPage() {
           <span className={`font-medium ${currentIsq && currentIsq >= 70 ? "text-green-600" : currentIsq && currentIsq >= 60 ? "text-yellow-600" : currentIsq ? "text-red-600" : ""}`}>
             {currentIsq || "-"}
           </span>
+        );
+      case "position":
+        return <span className="text-sm">{getPositionLabel(surgeryImplant.positionImplant)}</span>;
+      case "typeOs":
+        return <span className="text-sm font-mono">{surgeryImplant.typeOs || "-"}</span>;
+      case "greffe":
+        return surgeryImplant.greffeOsseuse ? (
+          <Check className="h-4 w-4 text-green-600" />
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      case "chirurgie":
+        return <span className="text-sm">{getChirurgieTempsLabel(surgeryImplant.typeChirurgieTemps)}</span>;
+      case "miseEnCharge":
+        return <span className="text-sm">{getMiseEnChargeLabel(surgeryImplant.miseEnCharge)}</span>;
+      case "situation":
+        return <span className="text-sm">{getSituationFromSiteFdi(surgeryImplant.siteFdi)}</span>;
+      case "operation":
+        return (
+          <div className="text-sm">
+            <div>{formatDateShort(surgeryImplant.datePose)}</div>
+          </div>
         );
       case "statut":
         return getStatusBadge(surgeryImplant.statut || "EN_SUIVI");
@@ -1595,10 +1702,39 @@ export default function PatientDetailsPage() {
             </Card>
           ) : (
             <>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-muted-foreground">
-                  {implantCount} implant{implantCount !== 1 ? "s" : ""}
-                </span>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-muted-foreground">
+                    {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
+                    {implantTypeFilter !== "all" && ` (${implantTypeFilter === "IMPLANT" ? "implants" : "mini-implants"})`}
+                  </span>
+                  <div className="flex items-center gap-1 border rounded-md p-0.5">
+                    <Button
+                      variant={implantTypeFilter === "all" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setImplantTypeFilter("all")}
+                      data-testid="button-filter-all"
+                    >
+                      Tous
+                    </Button>
+                    <Button
+                      variant={implantTypeFilter === "IMPLANT" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setImplantTypeFilter("IMPLANT")}
+                      data-testid="button-filter-implants"
+                    >
+                      Implants
+                    </Button>
+                    <Button
+                      variant={implantTypeFilter === "MINI_IMPLANT" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setImplantTypeFilter("MINI_IMPLANT")}
+                      data-testid="button-filter-mini-implants"
+                    >
+                      Mini-implants
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex items-center gap-1 border rounded-md p-0.5">
                   <Button
                     variant={implantViewMode === "table" ? "secondary" : "ghost"}
@@ -1655,7 +1791,7 @@ export default function PatientDetailsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortImplants(patient.surgeryImplants || []).map((surgeryImplant) => (
+                        {sortImplants(filteredSurgeryImplants).map((surgeryImplant) => (
                           <tr
                             key={surgeryImplant.id}
                             className="border-b last:border-b-0 hover-elevate cursor-pointer"
@@ -1675,7 +1811,7 @@ export default function PatientDetailsPage() {
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {patient.surgeryImplants?.map((surgeryImplant) => (
+                  {filteredSurgeryImplants.map((surgeryImplant) => (
                     <ImplantCard key={surgeryImplant.id} surgeryImplant={surgeryImplant} patientId={patient.id} />
                   ))}
                 </div>
