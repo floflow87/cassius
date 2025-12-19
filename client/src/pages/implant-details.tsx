@@ -809,38 +809,58 @@ export default function ImplantDetailsPage() {
               <p className="text-sm">Aucune mesure ISQ enregistrée</p>
             </div>
           ) : (
-            <div className="relative">
-              <div className="absolute left-8 top-4 bottom-4 w-0.5 bg-border" />
-              <div className="space-y-4">
-                {isqTimeline.map((point, index) => {
-                  const badge = getISQBadge(point.value);
-                  return (
-                    <div key={index} className="relative flex items-start gap-4 pl-4" data-testid={`isq-entry-${index}`}>
-                      <div className={`absolute left-6 w-4 h-4 rounded-full ${badge.pointColor} border-2 border-background z-10`} />
-                      <div className="ml-10 flex-1">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-xs text-muted-foreground uppercase">{point.label}</span>
-                            <span className="text-3xl font-bold text-primary">{point.value}</span>
+            <div className="space-y-6">
+              {/* Horizontal ISQ Timeline/Frieze */}
+              <div className="relative pt-8 pb-4">
+                {/* Horizontal line */}
+                <div className="absolute left-0 right-0 top-1/2 h-1 bg-border rounded-full" />
+                
+                {/* Timeline points */}
+                <div className="relative flex justify-between items-center">
+                  {isqTimeline.map((point, index) => {
+                    const badge = getISQBadge(point.value);
+                    const barHeight = Math.min(Math.max((point.value / 100) * 80, 20), 80);
+                    
+                    return (
+                      <div 
+                        key={index} 
+                        className="flex flex-col items-center flex-1"
+                        data-testid={`isq-entry-${index}`}
+                      >
+                        {/* Value and delta above */}
+                        <div className="flex flex-col items-center mb-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-2xl font-bold" style={{ color: badge.pointColor.replace('bg-', 'var(--') === badge.pointColor ? undefined : undefined }}>
+                              <span className={badge.pointColor.replace('bg-', 'text-')}>{point.value}</span>
+                            </span>
+                            {point.delta !== undefined && point.delta !== 0 && (
+                              <span className={`text-xs font-medium flex items-center ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                <TrendingUp className={`h-3 w-3 ${point.delta < 0 ? "rotate-180" : ""}`} />
+                                {point.delta > 0 ? "+" : ""}{point.delta}
+                              </span>
+                            )}
                           </div>
+                          <Badge className={`${badge.className} text-[10px] px-1.5 py-0`}>{badge.label}</Badge>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-sm">{formatShortDate(point.date)}</span>
-                          <span className="text-xs text-muted-foreground">{point.sublabel}</span>
+                        
+                        {/* Bar */}
+                        <div 
+                          className={`w-8 rounded-t-md ${badge.pointColor}`}
+                          style={{ height: `${barHeight}px` }}
+                        />
+                        
+                        {/* Point on timeline */}
+                        <div className={`w-4 h-4 rounded-full ${badge.pointColor} border-4 border-background z-10 -mt-2`} />
+                        
+                        {/* Date and label below */}
+                        <div className="flex flex-col items-center mt-2 text-center">
+                          <span className="text-xs font-medium text-muted-foreground uppercase">{point.label}</span>
+                          <span className="text-xs text-muted-foreground">{formatShortDate(point.date)}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {point.delta !== undefined && point.delta !== 0 && (
-                          <span className={`text-xs font-medium flex items-center gap-0.5 ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                            <TrendingUp className={`h-3 w-3 ${point.delta < 0 ? "rotate-180" : ""}`} />
-                            {point.delta > 0 ? "+" : ""}{point.delta}
-                          </span>
-                        )}
-                        <Badge className={badge.className}>{badge.label}</Badge>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
