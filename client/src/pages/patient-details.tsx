@@ -102,7 +102,7 @@ interface PatientWithDetails extends Patient {
 }
 
 type ImplantSortDirection = "asc" | "desc" | null;
-type ImplantColumnId = "marque" | "dimensions" | "position" | "site" | "typeOs" | "greffe" | "chirurgie" | "miseEnCharge" | "isq" | "situation" | "operation" | "statut" | "datePose";
+type ImplantColumnId = "marque" | "dimensions" | "position" | "site" | "typeOs" | "greffe" | "chirurgie" | "miseEnCharge" | "isq" | "situation" | "operation" | "datePose";
 
 interface ImplantColumnConfig {
   id: ImplantColumnId;
@@ -123,7 +123,6 @@ const defaultImplantColumns: ImplantColumnConfig[] = [
   { id: "isq", label: "ISQ", width: "min-w-20", sortable: true },
   { id: "situation", label: "Situation", width: "min-w-28", sortable: true },
   { id: "operation", label: "Opération", width: "min-w-32", sortable: true },
-  { id: "statut", label: "Statut", width: "min-w-24", sortable: true },
 ];
 
 const IMPLANT_VIEW_MODE_KEY = "cassius_patient_implants_view_mode";
@@ -742,9 +741,6 @@ export default function PatientDetailsPage() {
           const isqB = b.isq6m || b.isq3m || b.isq2m || b.isqPose || 0;
           comparison = isqA - isqB;
           break;
-        case "statut":
-          comparison = (a.statut || "").localeCompare(b.statut || "");
-          break;
         case "position":
           comparison = (a.positionImplant || "").localeCompare(b.positionImplant || "");
           break;
@@ -830,8 +826,6 @@ export default function PatientDetailsPage() {
             <div>{formatDateShort(surgeryImplant.datePose)}</div>
           </div>
         );
-      case "statut":
-        return getStatusBadge(surgeryImplant.statut || "EN_SUIVI");
       default:
         return null;
     }

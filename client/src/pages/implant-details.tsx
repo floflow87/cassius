@@ -70,6 +70,7 @@ interface ISQPoint {
   delta?: number;
   source: ISQSource;
   visiteId?: string;
+  notes?: string;
 }
 
 function getISQBadge(value: number): { label: string; className: string; pointColor: string } {
@@ -451,6 +452,7 @@ export default function ImplantDetailsPage() {
           delta: prevValue ? visite.isq! - prevValue : undefined,
           source: "visite",
           visiteId: visite.id,
+          notes: visite.notes || undefined,
         });
       });
 
@@ -940,75 +942,74 @@ export default function ImplantDetailsPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Horizontal ISQ Timeline/Frieze */}
-              <div className="relative pt-8 pb-4">
-                {/* Horizontal line */}
-                <div className="absolute left-0 right-0 top-1/2 h-1 bg-border rounded-full" />
+              {/* Vertical ISQ Timeline */}
+              <div className="relative pl-6">
+                {/* Vertical line connecting dots */}
+                <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-blue-200" />
                 
-                {/* Timeline points */}
-                <div className="relative flex justify-between items-center">
+                {/* Timeline entries */}
+                <div className="space-y-6">
                   {isqTimeline.map((point, index) => {
                     const badge = getISQBadge(point.value);
-                    const barHeight = Math.min(Math.max((point.value / 100) * 80, 20), 80);
                     
                     return (
                       <div 
                         key={index} 
-                        className="flex flex-col items-center flex-1 group relative"
+                        className="relative group py-2 -my-2 rounded-md"
                         data-testid={`isq-entry-${index}`}
                       >
-                        {/* Edit/Delete buttons - visible on hover */}
-                        <div className="absolute -top-2 right-0 flex gap-1 invisible group-hover:visible z-20">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 bg-background/80 backdrop-blur-sm"
-                            onClick={() => handleEditIsq(point)}
-                            data-testid={`button-edit-isq-${index}`}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 bg-background/80 backdrop-blur-sm text-destructive"
-                            onClick={() => handleDeleteIsq(point)}
-                            disabled={deleteIsqMutation.isPending}
-                            data-testid={`button-delete-isq-${index}`}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        {/* Dot on vertical line */}
+                        <div className="absolute -left-6 top-3 w-3 h-3 rounded-full bg-blue-500 border-2 border-background z-10" />
                         
-                        {/* Value and delta above */}
-                        <div className="flex flex-col items-center mb-2">
-                          <div className="flex items-center gap-1">
-                            <span className="text-2xl font-bold" style={{ color: badge.pointColor.replace('bg-', 'var(--') === badge.pointColor ? undefined : undefined }}>
-                              <span className={badge.pointColor.replace('bg-', 'text-')}>{point.value}</span>
-                            </span>
-                            {point.delta !== undefined && point.delta !== 0 && (
-                              <span className={`text-xs font-medium flex items-center ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                                <TrendingUp className={`h-3 w-3 ${point.delta < 0 ? "rotate-180" : ""}`} />
-                                {point.delta > 0 ? "+" : ""}{point.delta}
-                              </span>
+                        {/* Content */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            {/* Label and ISQ value */}
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className="text-sm font-semibold text-blue-600 uppercase">{point.label}</span>
+                              <span className="text-2xl font-bold">{point.value}</span>
+                              {point.delta !== undefined && point.delta !== 0 && (
+                                <span className={`text-sm font-medium flex items-center ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                  <TrendingUp className={`h-4 w-4 ${point.delta < 0 ? "rotate-180" : ""}`} />
+                                  {point.delta > 0 ? "+" : ""}{point.delta}
+                                </span>
+                              )}
+                              <Badge className={`${badge.className} text-xs`}>{badge.label}</Badge>
+                            </div>
+                            
+                            {/* Date */}
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {formatShortDate(point.date)}
+                            </div>
+                            
+                            {/* Notes if any */}
+                            {point.notes && (
+                              <p className="text-sm text-muted-foreground mt-1">{point.notes}</p>
                             )}
                           </div>
-                          <Badge className={`${badge.className} text-[10px] px-1.5 py-0`}>{badge.label}</Badge>
-                        </div>
-                        
-                        {/* Bar */}
-                        <div 
-                          className={`w-8 rounded-t-md ${badge.pointColor}`}
-                          style={{ height: `${barHeight}px` }}
-                        />
-                        
-                        {/* Point on timeline */}
-                        <div className={`w-4 h-4 rounded-full ${badge.pointColor} border-4 border-background z-10 -mt-2`} />
-                        
-                        {/* Date and label below */}
-                        <div className="flex flex-col items-center mt-2 text-center">
-                          <span className="text-xs font-medium text-muted-foreground uppercase">{point.label}</span>
-                          <span className="text-xs text-muted-foreground">{formatShortDate(point.date)}</span>
+                          
+                          {/* Edit/Delete buttons - visible on hover */}
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleEditIsq(point)}
+                              data-testid={`button-edit-isq-${index}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive"
+                              onClick={() => handleDeleteIsq(point)}
+                              disabled={deleteIsqMutation.isPending}
+                              data-testid={`button-delete-isq-${index}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     );
