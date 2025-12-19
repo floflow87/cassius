@@ -845,11 +845,23 @@ export class DatabaseStorage implements IStorage {
       implantsByStatus[status] = (implantsByStatus[status] || 0) + 1;
     });
 
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const monthlyImplants = allSurgeryImplants.filter(si => 
+      si.datePose.startsWith(currentMonth)
+    ).length;
+
+    const monthlyOperations = allOperations.filter(op => 
+      op.dateOperation.startsWith(currentMonth)
+    ).length;
+
     return {
       totalPatients: allPatients.length,
       totalOperations: allOperations.length,
       totalImplants: allSurgeryImplants.length,
       totalRadios: allRadios.length,
+      monthlyImplants,
+      monthlyOperations,
       implantsByStatus,
       recentOperations: allOperations.slice(0, 10),
     };

@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Users,
   CheckCircle2,
@@ -14,13 +15,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { Operation, Visite, User } from "@shared/schema";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Operation, Visite, User, Patient, SurgeryImplant } from "@shared/schema";
 
 interface BasicStats {
   totalPatients: number;
   totalImplants: number;
   totalRadios: number;
   totalOperations: number;
+  monthlyImplants: number;
+  monthlyOperations: number;
   implantsByStatus: Record<string, number>;
   recentOperations: Operation[];
 }
@@ -160,6 +177,16 @@ function AppointmentItem({ date, title, description, type, time }: AppointmentIt
 }
 
 export default function DashboardPage() {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [newVisiteData, setNewVisiteData] = useState({
+    patientId: "",
+    implantId: "",
+    date: new Date().toISOString().split("T")[0],
+    isq: "",
+    notes: "",
+  });
+  const { toast } = useToast();
+
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/user"],
   });
@@ -175,6 +202,63 @@ export default function DashboardPage() {
   const { data: visites } = useQuery<Visite[]>({
     queryKey: ["/api/visites"],
   });
+
+  const { data: patients } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
+  });
+
+  const { data: surgeryImplants } = useQuery<SurgeryImplant[]>({
+    queryKey: ["/api/surgery-implants"],
+  });
+
+  const createVisiteMutation = useMutation({
+    mutationFn: async (data: { patientId: string; implantId: string; date: string; isq?: number; notes?: string }) => {
+      return apiRequest("/api/visites", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visites"] });
+      setSheetOpen(false);
+      setNewVisiteData({
+        patientId: "",
+        implantId: "",
+        date: new Date().toISOString().split("T")[0],
+        isq: "",
+        notes: "",
+      });
+      toast({
+        title: "Visite créée",
+        description: "La nouvelle visite a été enregistrée.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer la visite.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateVisite = () => {
+    if (!newVisiteData.patientId || !newVisiteData.date) {
+      toast({
+        title: "Champs requis",
+        description: "Veuillez remplir le patient et la date.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createVisiteMutation.mutate({
+      patientId: newVisiteData.patientId,
+      implantId: newVisiteData.implantId || undefined,
+      date: newVisiteData.date,
+      isq: newVisiteData.isq ? parseFloat(newVisiteData.isq) : undefined,
+      notes: newVisiteData.notes || undefined,
+    });
+  };
 
   const isLoading = loadingStats || loadingAdvanced;
 
@@ -235,15 +319,22 @@ export default function DashboardPage() {
           change={{ value: "+12% vs mois dernier", positive: true }}
         />
         <StatCard
-          title="Implants posés"
-          value={stats?.totalImplants?.toLocaleString("fr-FR") || 0}
+          title="Implants posés ce mois"
+          value={stats?.monthlyImplants?.toLocaleString("fr-FR") || 0}
           icon={
             <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
             </svg>
           }
           iconBgColor="bg-amber-100 dark:bg-amber-900/30"
-          change={{ value: "+8% cette année", positive: true }}
+          change={{ value: "+8% vs mois dernier", positive: true }}
+        />
+        <StatCard
+          title="Actes ce mois"
+          value={stats?.monthlyOperations || 0}
+          icon={<ClipboardList className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
+          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+          change={{ value: "+15% vs mois dernier", positive: true }}
         />
         <StatCard
           title="Taux de succès"
@@ -251,13 +342,6 @@ export default function DashboardPage() {
           icon={<CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
           iconBgColor="bg-green-100 dark:bg-green-900/30"
           change={{ value: "+0.5% vs année dernière", positive: true }}
-        />
-        <StatCard
-          title="Actes ce mois"
-          value={stats?.totalOperations || 0}
-          icon={<ClipboardList className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
-          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-          change={{ value: "+15% vs mois dernier", positive: true }}
         />
       </div>
 
@@ -302,10 +386,99 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <CardTitle className="text-base">Rendez-vous à venir</CardTitle>
-            <Button size="sm" data-testid="button-new-visite">
-              <Plus className="h-4 w-4 mr-1" />
-              Nouvelle visite
-            </Button>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+              <SheetTrigger asChild>
+                <Button size="sm" data-testid="button-new-visite">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Nouvelle visite
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="sm:max-w-md">
+                <SheetHeader>
+                  <SheetTitle>Nouvelle visite</SheetTitle>
+                  <SheetDescription>
+                    Planifiez une nouvelle visite de suivi pour un patient.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="patient">Patient *</Label>
+                    <Select 
+                      value={newVisiteData.patientId} 
+                      onValueChange={(value) => setNewVisiteData(prev => ({ ...prev, patientId: value }))}
+                    >
+                      <SelectTrigger data-testid="select-patient">
+                        <SelectValue placeholder="Sélectionner un patient" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {patients?.map((patient) => (
+                          <SelectItem key={patient.id} value={patient.id}>
+                            {patient.prenom} {patient.nom}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="implant">Implant (optionnel)</Label>
+                    <Select 
+                      value={newVisiteData.implantId} 
+                      onValueChange={(value) => setNewVisiteData(prev => ({ ...prev, implantId: value }))}
+                    >
+                      <SelectTrigger data-testid="select-implant">
+                        <SelectValue placeholder="Sélectionner un implant" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {surgeryImplants?.map((si) => (
+                          <SelectItem key={si.id} value={si.id}>
+                            Site {si.siteFdi} - {si.statut}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="date">Date *</Label>
+                    <Input 
+                      id="date"
+                      type="date" 
+                      value={newVisiteData.date}
+                      onChange={(e) => setNewVisiteData(prev => ({ ...prev, date: e.target.value }))}
+                      data-testid="input-date"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="isq">ISQ (optionnel)</Label>
+                    <Input 
+                      id="isq"
+                      type="number" 
+                      placeholder="Ex: 65"
+                      value={newVisiteData.isq}
+                      onChange={(e) => setNewVisiteData(prev => ({ ...prev, isq: e.target.value }))}
+                      data-testid="input-isq"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Notes (optionnel)</Label>
+                    <Textarea 
+                      id="notes"
+                      placeholder="Notes de la visite..."
+                      value={newVisiteData.notes}
+                      onChange={(e) => setNewVisiteData(prev => ({ ...prev, notes: e.target.value }))}
+                      data-testid="input-notes"
+                    />
+                  </div>
+                  <Button 
+                    className="w-full" 
+                    onClick={handleCreateVisite}
+                    disabled={createVisiteMutation.isPending}
+                    data-testid="button-submit-visite"
+                  >
+                    {createVisiteMutation.isPending ? "Création..." : "Créer la visite"}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </CardHeader>
           <CardContent className="space-y-3">
             {upcomingVisites.length > 0 ? (
