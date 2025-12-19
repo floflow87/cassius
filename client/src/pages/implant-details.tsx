@@ -60,6 +60,18 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   ECHEC: { label: "Échec", variant: "destructive" },
 };
 
+type ISQSource = "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite";
+
+interface ISQPoint {
+  label: string; 
+  sublabel: string;
+  value: number; 
+  date: string;
+  delta?: number;
+  source: ISQSource;
+  visiteId?: string;
+}
+
 function getISQBadge(value: number): { label: string; className: string; pointColor: string } {
   if (value >= 70) return { 
     label: "Stabilité élevée", 
@@ -106,6 +118,15 @@ export default function ImplantDetailsPage() {
     value: "",
     notes: "",
   });
+
+  const [editingIsqPoint, setEditingIsqPoint] = useState<{
+    source: "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite";
+    visiteId?: string;
+    value: string;
+    date: string;
+    notes: string;
+  } | null>(null);
+  const [editIsqSheetOpen, setEditIsqSheetOpen] = useState(false);
 
   const { data: implantData, isLoading } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
@@ -224,6 +245,79 @@ export default function ImplantDetailsPage() {
     },
   });
 
+  const updateIsqMutation = useMutation({
+    mutationFn: async (data: { 
+      source: "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite";
+      visiteId?: string;
+      value: number;
+    }) => {
+      if (data.source === "visite" && data.visiteId) {
+        return apiRequest("PATCH", `/api/visites/${data.visiteId}`, { isq: data.value });
+      } else {
+        const fieldMap = {
+          isqPose: "isqPose",
+          isq2m: "isq2m", 
+          isq3m: "isq3m",
+          isq6m: "isq6m",
+        };
+        const field = fieldMap[data.source as keyof typeof fieldMap];
+        return apiRequest("PATCH", `/api/surgery-implants/${implantId}`, { [field]: data.value });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      setEditIsqSheetOpen(false);
+      setEditingIsqPoint(null);
+      toast({
+        title: "Mesure mise à jour",
+        description: "La valeur ISQ a été modifiée",
+        className: "bg-green-50 border-green-200 text-green-900",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la mise à jour",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteIsqMutation = useMutation({
+    mutationFn: async (data: { 
+      source: "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite";
+      visiteId?: string;
+    }) => {
+      if (data.source === "visite" && data.visiteId) {
+        return apiRequest("PATCH", `/api/visites/${data.visiteId}`, { isq: null });
+      } else {
+        const fieldMap = {
+          isqPose: "isqPose",
+          isq2m: "isq2m",
+          isq3m: "isq3m",
+          isq6m: "isq6m",
+        };
+        const field = fieldMap[data.source as keyof typeof fieldMap];
+        return apiRequest("PATCH", `/api/surgery-implants/${implantId}`, { [field]: null });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      toast({
+        title: "Mesure supprimée",
+        description: "La valeur ISQ a été supprimée",
+        className: "bg-green-50 border-green-200 text-green-900",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la suppression",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSaveIsq = () => {
     if (!isqFormData.value) {
       toast({
@@ -238,6 +332,42 @@ export default function ImplantDetailsPage() {
       isq: parseInt(isqFormData.value),
       notes: isqFormData.notes,
     });
+  };
+
+  const handleEditIsq = (point: ISQPoint) => {
+    setEditingIsqPoint({
+      source: point.source,
+      visiteId: point.visiteId,
+      value: point.value.toString(),
+      date: point.date,
+      notes: point.sublabel !== "Visite de contrôle" ? point.sublabel : "",
+    });
+    setEditIsqSheetOpen(true);
+  };
+
+  const handleSaveEditIsq = () => {
+    if (!editingIsqPoint || !editingIsqPoint.value) {
+      toast({
+        title: "Valeur requise",
+        description: "Veuillez saisir une valeur ISQ",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateIsqMutation.mutate({
+      source: editingIsqPoint.source,
+      visiteId: editingIsqPoint.visiteId,
+      value: parseInt(editingIsqPoint.value),
+    });
+  };
+
+  const handleDeleteIsq = (point: ISQPoint) => {
+    if (window.confirm("Êtes-vous sûr de vouloir supprimer cette mesure ISQ ?")) {
+      deleteIsqMutation.mutate({
+        source: point.source,
+        visiteId: point.visiteId,
+      });
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -256,21 +386,16 @@ export default function ImplantDetailsPage() {
     });
   };
 
-  const getISQTimeline = () => {
-    const points: { 
-      label: string; 
-      sublabel: string;
-      value: number; 
-      date: string;
-      delta?: number;
-    }[] = [];
+  const getISQTimeline = (): ISQPoint[] => {
+    const points: ISQPoint[] = [];
 
     if (implantData?.isqPose && implantData?.datePose) {
       points.push({ 
         label: "Pose", 
         sublabel: "Jour de la pose",
         value: implantData.isqPose, 
-        date: implantData.datePose 
+        date: implantData.datePose,
+        source: "isqPose"
       });
     }
     if (implantData?.isq2m && implantData?.datePose) {
@@ -282,7 +407,8 @@ export default function ImplantDetailsPage() {
         sublabel: "Contrôle à 2 mois",
         value: implantData.isq2m, 
         date: date2m.toISOString().split('T')[0],
-        delta 
+        delta,
+        source: "isq2m"
       });
     }
     if (implantData?.isq3m && implantData?.datePose) {
@@ -294,7 +420,8 @@ export default function ImplantDetailsPage() {
         sublabel: "Contrôle à 3 mois",
         value: implantData.isq3m, 
         date: date3m.toISOString().split('T')[0],
-        delta 
+        delta,
+        source: "isq3m"
       });
     }
     if (implantData?.isq6m && implantData?.datePose) {
@@ -306,7 +433,8 @@ export default function ImplantDetailsPage() {
         sublabel: "Contrôle à 6 mois",
         value: implantData.isq6m, 
         date: date6m.toISOString().split('T')[0],
-        delta 
+        delta,
+        source: "isq6m"
       });
     }
 
@@ -321,6 +449,8 @@ export default function ImplantDetailsPage() {
           value: visite.isq!,
           date: visite.date,
           delta: prevValue ? visite.isq! - prevValue : undefined,
+          source: "visite",
+          visiteId: visite.id,
         });
       });
 
@@ -824,9 +954,32 @@ export default function ImplantDetailsPage() {
                     return (
                       <div 
                         key={index} 
-                        className="flex flex-col items-center flex-1"
+                        className="flex flex-col items-center flex-1 group relative"
                         data-testid={`isq-entry-${index}`}
                       >
+                        {/* Edit/Delete buttons - visible on hover */}
+                        <div className="absolute -top-2 right-0 flex gap-1 invisible group-hover:visible z-20">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 bg-background/80 backdrop-blur-sm"
+                            onClick={() => handleEditIsq(point)}
+                            data-testid={`button-edit-isq-${index}`}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 bg-background/80 backdrop-blur-sm text-destructive"
+                            onClick={() => handleDeleteIsq(point)}
+                            disabled={deleteIsqMutation.isPending}
+                            data-testid={`button-delete-isq-${index}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        
                         {/* Value and delta above */}
                         <div className="flex flex-col items-center mb-2">
                           <div className="flex items-center gap-1">
@@ -866,6 +1019,50 @@ export default function ImplantDetailsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit ISQ Sheet */}
+      <Sheet open={editIsqSheetOpen} onOpenChange={setEditIsqSheetOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Modifier la mesure ISQ</SheetTitle>
+          </SheetHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input 
+                type="date" 
+                value={editingIsqPoint?.date || ""}
+                disabled
+                className="bg-muted"
+                data-testid="input-edit-isq-date" 
+              />
+              <p className="text-xs text-muted-foreground">La date ne peut pas être modifiée</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Valeur ISQ</Label>
+              <Input 
+                type="number" 
+                min="0" 
+                max="100" 
+                placeholder="Ex: 75" 
+                value={editingIsqPoint?.value || ""}
+                onChange={(e) => setEditingIsqPoint(prev => prev ? { ...prev, value: e.target.value } : null)}
+                data-testid="input-edit-isq-value" 
+              />
+            </div>
+            <div className="pt-4">
+              <Button 
+                className="w-full" 
+                onClick={handleSaveEditIsq}
+                disabled={updateIsqMutation.isPending}
+                data-testid="button-save-edit-isq"
+              >
+                {updateIsqMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">
