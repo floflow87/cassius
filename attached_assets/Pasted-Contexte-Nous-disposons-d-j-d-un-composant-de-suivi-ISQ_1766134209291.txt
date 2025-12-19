@@ -1,0 +1,105 @@
+Contexte
+
+Nous disposons déjà d’un composant de suivi ISQ sur la fiche d’un implant, présenté sous forme de timeline chronologique avec :
+
+date,
+
+valeur ISQ,
+
+contexte clinique,
+
+badge qualitatif (Bon / Excellent),
+
+indicateur d’évolution (+X).
+
+L’objectif n’est pas de refondre le composant, mais d’en améliorer la lisibilité clinique et la compréhension immédiate de la stabilité.
+
+A) Renforcer la lecture visuelle de la stabilité (code couleur)
+Objectif
+
+Permettre une compréhension immédiate du niveau de stabilité avant même la lecture du texte.
+
+Modifications attendues
+
+Appliquer un code couleur cohérent avec les seuils ISQ sur :
+
+le point de la timeline,
+
+et/ou le chiffre ISQ.
+
+Règles de couleur
+
+ISQ < 60 → rouge (stabilité faible)
+
+ISQ 60–69 → orange (stabilité modérée)
+
+ISQ ≥ 70 → vert (stabilité élevée)
+
+Contraintes
+
+Couleurs subtiles, non agressives.
+
+Le badge qualitatif reste présent (complément, pas remplacement).
+
+Aucune surcharge visuelle.
+
+B) Ajouter une référence explicite aux seuils ISQ
+Objectif
+
+Ancrer la lecture de l’ISQ dans son contexte scientifique, sans alourdir l’interface.
+
+Modifications attendues
+
+Ajouter une référence visuelle discrète aux seuils ISQ, sous l’une des formes suivantes :
+
+une ligne de texte légère sous le titre ou en bas du composant,
+
+ou un tooltip accessible via une icône ℹ️.
+
+Contenu attendu
+
+Seuils ISQ :
+• < 60 : stabilité faible
+• 60–69 : stabilité modérée
+• ≥ 70 : stabilité élevée
+
+Contraintes
+
+Ne pas détourner l’attention de la timeline.
+
+Cette information est contextuelle, pas centrale.
+
+C) Clarifier la distinction entre valeur ISQ et interprétation
+Objectif
+
+Distinguer clairement :
+
+la donnée mesurée (ISQ),
+
+de son interprétation clinique (stabilité).
+
+Modifications attendues
+
+La valeur ISQ reste la donnée principale, affichée en priorité (ex : ISQ 72).
+
+Le badge qualitatif est présenté explicitement comme une interprétation :
+
+ex : “Stabilité élevée”
+
+et non comme une valeur brute.
+
+Contraintes
+
+Le badge ne doit jamais remplacer la valeur ISQ.
+
+Aucune recommandation clinique implicite (information uniquement).
+
+Critères d’acceptation
+
+En un coup d’œil, le praticien identifie le niveau de stabilité.
+
+Les seuils ISQ sont compréhensibles sans connaissance préalable.
+
+La valeur ISQ reste la référence centrale.
+
+L’interface reste sobre, clinique et non interprétative.

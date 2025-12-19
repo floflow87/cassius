@@ -1,9 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import type { Implant } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,10 +50,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const implantSchema = z.object({
-  marque: z.string().min(1, "La marque est requise"),
-  referenceFabricant: z.string().optional(),
-  diametre: z.number().min(0.1, "Le diamètre doit être positif"),
-  longueur: z.number().min(0.1, "La longueur doit être positive"),
+  catalogImplantId: z.string().min(1, "Sélectionnez un implant du catalogue"),
   siteFdi: z.string().min(1, "Le site FDI est requis"),
   positionImplant: z.enum(["CRESTAL", "SOUS_CRESTAL", "SUPRA_CRESTAL"]).optional(),
   typeOs: z.enum(["D1", "D2", "D3", "D4"]).optional(),
@@ -79,6 +91,21 @@ interface OperationFormProps {
 export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
   const { toast } = useToast();
   const [accordionValue, setAccordionValue] = useState<string[]>(["procedure"]);
+  const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
+
+  const { data: catalogImplants = [], isLoading: isCatalogLoading, isError: isCatalogError } = useQuery<Implant[]>({
+    queryKey: ["/api/implants"],
+  });
+
+  useEffect(() => {
+    if (isCatalogError) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger le catalogue d'implants. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    }
+  }, [isCatalogError, toast]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -128,10 +155,7 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
 
   const addImplant = () => {
     append({
-      marque: "",
-      referenceFabricant: "",
-      diametre: 4.0,
-      longueur: 10,
+      catalogImplantId: "",
       siteFdi: "",
       positionImplant: undefined,
       typeOs: undefined,
@@ -139,6 +163,10 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
       isqPose: undefined,
     });
     setAccordionValue([...accordionValue, "implants"]);
+  };
+
+  const getImplantLabel = (implant: Implant) => {
+    return `${implant.marque} ${implant.referenceFabricant || ""} - Ø${implant.diametre}mm x ${implant.longueur}mm`.trim();
   };
 
   return (
@@ -436,40 +464,107 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name={`implants.${index}.marque`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Marque</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Straumann, Nobel..."
-                                {...field}
-                                data-testid={`input-implant-marque-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`implants.${index}.referenceFabricant`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Référence</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Réf. fabricant"
-                                {...field}
-                                value={field.value || ""}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        name={`implants.${index}.catalogImplantId`}
+                        render={({ field }) => {
+                          const selectedImplant = catalogImplants.find(
+                            (impl) => impl.id === field.value
+                          );
+                          return (
+                            <FormItem className="flex flex-col">
+                              <FormLabel>Implant du catalogue</FormLabel>
+                              <Popover
+                                open={openPopoverIndex === index}
+                                onOpenChange={(open) =>
+                                  setOpenPopoverIndex(open ? index : null)
+                                }
+                              >
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      disabled={isCatalogLoading}
+                                      className={cn(
+                                        "justify-between",
+                                        !field.value && "text-muted-foreground"
+                                      )}
+                                      data-testid={`button-select-implant-${index}`}
+                                    >
+                                      {isCatalogLoading ? (
+                                        <>
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          Chargement...
+                                        </>
+                                      ) : selectedImplant ? (
+                                        getImplantLabel(selectedImplant)
+                                      ) : (
+                                        "Sélectionner un implant"
+                                      )}
+                                      {!isCatalogLoading && (
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      )}
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[400px] p-0" align="start">
+                                  <Command>
+                                    <CommandInput placeholder="Rechercher un implant..." />
+                                    <CommandList>
+                                      {isCatalogError ? (
+                                        <div className="p-4 text-sm text-destructive text-center">
+                                          Erreur lors du chargement du catalogue
+                                        </div>
+                                      ) : catalogImplants.length === 0 ? (
+                                        <div className="p-4 text-sm text-muted-foreground text-center">
+                                          Aucun implant dans le catalogue. Ajoutez des implants dans la section Catalogue.
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <CommandEmpty>Aucun implant trouvé</CommandEmpty>
+                                          <CommandGroup>
+                                            {catalogImplants.map((implant) => (
+                                              <CommandItem
+                                                key={implant.id}
+                                                value={getImplantLabel(implant)}
+                                                onSelect={() => {
+                                                  field.onChange(implant.id);
+                                                  setOpenPopoverIndex(null);
+                                                }}
+                                                data-testid={`option-implant-${implant.id}`}
+                                              >
+                                                <Check
+                                                  className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    field.value === implant.id
+                                                      ? "opacity-100"
+                                                      : "opacity-0"
+                                                  )}
+                                                />
+                                                <div className="flex flex-col">
+                                                  <span className="font-medium">
+                                                    {implant.marque} {implant.referenceFabricant}
+                                                  </span>
+                                                  <span className="text-sm text-muted-foreground">
+                                                    Ø{implant.diametre}mm x {implant.longueur}mm
+                                                    {implant.lot && ` - Lot: ${implant.lot}`}
+                                                  </span>
+                                                </div>
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                        </>
+                                      )}
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
                       <FormField
                         control={form.control}
@@ -491,44 +586,6 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
                     </div>
 
                     <div className="grid grid-cols-4 gap-4">
-                      <FormField
-                        control={form.control}
-                        name={`implants.${index}.diametre`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Diamètre (mm)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.1"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                                data-testid={`input-implant-diametre-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`implants.${index}.longueur`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Longueur (mm)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.5"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                                data-testid={`input-implant-longueur-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                       <FormField
                         control={form.control}
                         name={`implants.${index}.positionImplant`}
