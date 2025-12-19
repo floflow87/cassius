@@ -585,7 +585,7 @@ export default function PatientDetailsPage() {
       case "chirurgie":
         if (!operation.typeChirurgieTemps) return "-";
         return (
-          <Badge variant="outline">
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-0">
             {operation.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : "2 temps"}
           </Badge>
         );
@@ -594,7 +594,7 @@ export default function PatientDetailsPage() {
       case "miseEnCharge":
         if (!operation.typeMiseEnCharge) return "-";
         return (
-          <Badge variant="outline">
+          <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 border-0">
             {operation.typeMiseEnCharge.charAt(0) + operation.typeMiseEnCharge.slice(1).toLowerCase()}
           </Badge>
         );
@@ -1059,10 +1059,16 @@ export default function PatientDetailsPage() {
           </span>
         );
       case "isq":
+        if (!currentIsq) return "-";
+        const isqClassName = currentIsq >= 70 
+          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-0" 
+          : currentIsq >= 60 
+            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-0" 
+            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-0";
         return (
-          <span className={`font-medium ${currentIsq && currentIsq >= 70 ? "text-green-600" : currentIsq && currentIsq >= 60 ? "text-yellow-600" : currentIsq ? "text-red-600" : ""}`}>
-            {currentIsq || "-"}
-          </span>
+          <Badge className={`font-mono ${isqClassName}`}>
+            {currentIsq}
+          </Badge>
         );
       case "position":
         return <span className="text-sm">{getPositionLabel(surgeryImplant.positionImplant)}</span>;
@@ -1313,7 +1319,7 @@ export default function PatientDetailsPage() {
             className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
             data-testid="tab-implants"
           >
-            Implants ({implantCount})
+            Implants <span className="text-xs italic ml-1">({implantCount})</span>
           </TabsTrigger>
           <TabsTrigger 
             value="operations" 
@@ -2013,7 +2019,7 @@ export default function PatientDetailsPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b bg-muted/50">
+                        <tr className="border-b border-border-gray bg-border-gray">
                           {implantColumns.map((column) => (
                             <th
                               key={column.id}
@@ -2022,7 +2028,7 @@ export default function PatientDetailsPage() {
                               onDragOver={(e) => handleImplantDragOver(e, column.id)}
                               onDrop={(e) => handleImplantDrop(e, column.id)}
                               onDragEnd={handleImplantDragEnd}
-                              className={`px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-move select-none ${column.width || ""} ${dragOverImplantColumn === column.id ? "bg-muted" : ""}`}
+                              className={`px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-move select-none ${column.width || ""} ${dragOverImplantColumn === column.id ? "bg-primary/10" : ""}`}
                             >
                               <div className="flex items-center gap-1">
                                 <GripVertical className="h-3 w-3 opacity-40" />
@@ -2144,10 +2150,7 @@ export default function PatientDetailsPage() {
                         className="border-b border-border-gray/50 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer"
                         data-testid={`row-operation-${operation.id}`}
                         onClick={() => {
-                          const firstImplant = operation.surgeryImplants?.[0];
-                          if (firstImplant) {
-                            window.location.href = `/patients/${patient.id}/implants/${firstImplant.id}`;
-                          }
+                          window.location.href = `/patients/${patient.id}/operations/${operation.id}`;
                         }}
                       >
                         {operationColumns.map((column) => (
