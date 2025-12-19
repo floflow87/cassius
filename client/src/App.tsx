@@ -83,7 +83,7 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
   return (
     <header className="flex items-center justify-between gap-4 px-6 h-16 bg-white dark:bg-gray-950 sticky top-0 z-50 border-b shrink-0">
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
+        <h1 className="text-base font-semibold text-foreground" data-testid="text-page-title">
           {title}
         </h1>
         {subtitle && (
