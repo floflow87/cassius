@@ -129,6 +129,30 @@ const IMPLANT_VIEW_MODE_KEY = "cassius_patient_implants_view_mode";
 const IMPLANT_COLUMNS_KEY = "cassius_patient_implants_columns";
 const IMPLANT_SORT_KEY = "cassius_patient_implants_sort";
 
+// Operation table columns
+type OperationSortDirection = "asc" | "desc" | null;
+type OperationColumnId = "date" | "typeIntervention" | "implants" | "chirurgie" | "greffe" | "miseEnCharge" | "reussite";
+
+interface OperationColumnConfig {
+  id: OperationColumnId;
+  label: string;
+  width?: string;
+  sortable: boolean;
+}
+
+const defaultOperationColumns: OperationColumnConfig[] = [
+  { id: "date", label: "Date", width: "min-w-28", sortable: true },
+  { id: "typeIntervention", label: "Type d'intervention", width: "min-w-40", sortable: true },
+  { id: "implants", label: "Implants", width: "min-w-20", sortable: true },
+  { id: "chirurgie", label: "Chirurgie", width: "min-w-32", sortable: true },
+  { id: "greffe", label: "Greffe", width: "min-w-24", sortable: true },
+  { id: "miseEnCharge", label: "Mise en charge", width: "min-w-28", sortable: true },
+  { id: "reussite", label: "Réussite", width: "min-w-24", sortable: true },
+];
+
+const OPERATION_COLUMNS_KEY = "cassius_patient_operations_columns";
+const OPERATION_SORT_KEY = "cassius_patient_operations_sort";
+
 export default function PatientDetailsPage() {
   const [, params] = useRoute("/patients/:id");
   const patientId = params?.id;
@@ -352,6 +376,220 @@ export default function PatientDetailsPage() {
     }
     return <ArrowDown className="h-3 w-3 ml-1" />;
   }, [implantSortColumn, implantSortDirection]);
+
+  // Operation table state
+  const [operationColumns, setOperationColumns] = useState<OperationColumnConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(OPERATION_COLUMNS_KEY);
+      if (saved) {
+        const savedOrder = JSON.parse(saved) as OperationColumnId[];
+        const orderedColumns = savedOrder.map(id => defaultOperationColumns.find(c => c.id === id)!).filter(Boolean);
+        const missingColumns = defaultOperationColumns.filter(c => !savedOrder.includes(c.id));
+        return [...orderedColumns, ...missingColumns];
+      }
+    } catch {}
+    return defaultOperationColumns;
+  });
+
+  const [operationSortColumn, setOperationSortColumn] = useState<OperationColumnId | null>(() => {
+    try {
+      const saved = localStorage.getItem(OPERATION_SORT_KEY);
+      if (saved) {
+        const { column } = JSON.parse(saved);
+        return column;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [operationSortDirection, setOperationSortDirection] = useState<OperationSortDirection>(() => {
+    try {
+      const saved = localStorage.getItem(OPERATION_SORT_KEY);
+      if (saved) {
+        const { direction } = JSON.parse(saved);
+        return direction;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [draggedOperationColumn, setDraggedOperationColumn] = useState<OperationColumnId | null>(null);
+  const [dragOverOperationColumn, setDragOverOperationColumn] = useState<OperationColumnId | null>(null);
+
+  // Persist operation preferences
+  useEffect(() => {
+    try {
+      localStorage.setItem(OPERATION_COLUMNS_KEY, JSON.stringify(operationColumns.map(c => c.id)));
+    } catch {}
+  }, [operationColumns]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(OPERATION_SORT_KEY, JSON.stringify({ column: operationSortColumn, direction: operationSortDirection }));
+    } catch {}
+  }, [operationSortColumn, operationSortDirection]);
+
+  // Operation table handlers
+  const handleOperationSort = useCallback((columnId: OperationColumnId) => {
+    if (operationSortColumn === columnId) {
+      if (operationSortDirection === "asc") {
+        setOperationSortDirection("desc");
+      } else if (operationSortDirection === "desc") {
+        setOperationSortColumn(null);
+        setOperationSortDirection(null);
+      }
+    } else {
+      setOperationSortColumn(columnId);
+      setOperationSortDirection("asc");
+    }
+  }, [operationSortColumn, operationSortDirection]);
+
+  const handleOperationDragStart = useCallback((e: React.DragEvent, columnId: OperationColumnId) => {
+    setDraggedOperationColumn(columnId);
+    e.dataTransfer.effectAllowed = "move";
+  }, []);
+
+  const handleOperationDragOver = useCallback((e: React.DragEvent, columnId: OperationColumnId) => {
+    e.preventDefault();
+    if (draggedOperationColumn && draggedOperationColumn !== columnId) {
+      setDragOverOperationColumn(columnId);
+    }
+  }, [draggedOperationColumn]);
+
+  const handleOperationDrop = useCallback((e: React.DragEvent, targetColumnId: OperationColumnId) => {
+    e.preventDefault();
+    if (draggedOperationColumn && draggedOperationColumn !== targetColumnId) {
+      const newColumns = [...operationColumns];
+      const draggedIndex = newColumns.findIndex(c => c.id === draggedOperationColumn);
+      const dropIndex = newColumns.findIndex(c => c.id === targetColumnId);
+      
+      if (draggedIndex !== -1 && dropIndex !== -1) {
+        const [removed] = newColumns.splice(draggedIndex, 1);
+        newColumns.splice(dropIndex, 0, removed);
+        setOperationColumns(newColumns);
+      }
+    }
+    setDraggedOperationColumn(null);
+    setDragOverOperationColumn(null);
+  }, [draggedOperationColumn, operationColumns]);
+
+  const handleOperationDragEnd = useCallback(() => {
+    setDraggedOperationColumn(null);
+    setDragOverOperationColumn(null);
+  }, []);
+
+  const renderOperationSortIcon = useCallback((columnId: OperationColumnId) => {
+    if (operationSortColumn !== columnId) {
+      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
+    }
+    if (operationSortDirection === "asc") {
+      return <ArrowUp className="h-3 w-3 ml-1" />;
+    }
+    return <ArrowDown className="h-3 w-3 ml-1" />;
+  }, [operationSortColumn, operationSortDirection]);
+
+  // Calculate success rate for an operation
+  const getOperationSuccessRate = useCallback((operation: OperationWithImplants) => {
+    const implants = operation.surgeryImplants || [];
+    if (implants.length === 0) return null;
+    
+    const successfulImplants = implants.filter(si => 
+      si.statut === "SUCCES" || si.statut === "EN_SUIVI"
+    ).length;
+    
+    return Math.round((successfulImplants / implants.length) * 100);
+  }, []);
+
+  // Get success rate badge styling
+  const getSuccessRateBadge = useCallback((rate: number | null) => {
+    if (rate === null) return { className: "bg-gray-100 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400", label: "-" };
+    
+    if (rate >= 80) {
+      return { className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400", label: `${rate}%` };
+    } else if (rate >= 60) {
+      return { className: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400", label: `${rate}%` };
+    } else {
+      return { className: "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400", label: `${rate}%` };
+    }
+  }, []);
+
+  // Sort operations for table
+  const getSortedOperations = useCallback((operations: OperationWithImplants[]) => {
+    if (!operationSortColumn || !operationSortDirection) return operations;
+
+    return [...operations].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (operationSortColumn) {
+        case "date":
+          comparison = new Date(a.dateOperation || 0).getTime() - new Date(b.dateOperation || 0).getTime();
+          break;
+        case "typeIntervention":
+          comparison = (a.typeIntervention || "").localeCompare(b.typeIntervention || "");
+          break;
+        case "implants":
+          comparison = (a.surgeryImplants?.length || 0) - (b.surgeryImplants?.length || 0);
+          break;
+        case "chirurgie":
+          comparison = (a.typeChirurgieTemps || "").localeCompare(b.typeChirurgieTemps || "");
+          break;
+        case "greffe":
+          comparison = (a.greffeOsseuse ? 1 : 0) - (b.greffeOsseuse ? 1 : 0);
+          break;
+        case "miseEnCharge":
+          comparison = (a.typeMiseEnCharge || "").localeCompare(b.typeMiseEnCharge || "");
+          break;
+        case "reussite":
+          const rateA = getOperationSuccessRate(a) ?? -1;
+          const rateB = getOperationSuccessRate(b) ?? -1;
+          comparison = rateA - rateB;
+          break;
+      }
+      
+      return operationSortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [operationSortColumn, operationSortDirection, getOperationSuccessRate]);
+
+  // Render operation cell content
+  const renderOperationCellContent = useCallback((columnId: OperationColumnId, operation: OperationWithImplants) => {
+    switch (columnId) {
+      case "date":
+        return formatDate(operation.dateOperation);
+      case "typeIntervention":
+        return getInterventionLabel(operation.typeIntervention);
+      case "implants":
+        return (
+          <Badge variant="secondary" className="font-mono">
+            {operation.surgeryImplants?.length || 0}
+          </Badge>
+        );
+      case "chirurgie":
+        return (
+          <>
+            {operation.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : operation.typeChirurgieTemps === "DEUX_TEMPS" ? "2 temps" : "-"}
+            {operation.typeChirurgieApproche && (
+              <span className="text-muted-foreground ml-1">
+                ({operation.typeChirurgieApproche === "LAMBEAU" ? "Lambeau" : "Flapless"})
+              </span>
+            )}
+          </>
+        );
+      case "greffe":
+        return operation.greffeOsseuse ? (operation.typeGreffe || "Oui") : "-";
+      case "miseEnCharge":
+        return operation.typeMiseEnCharge ? operation.typeMiseEnCharge.charAt(0) + operation.typeMiseEnCharge.slice(1).toLowerCase() : "-";
+      case "reussite":
+        const rate = getOperationSuccessRate(operation);
+        const badge = getSuccessRateBadge(rate);
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${badge.className}`}>
+            {badge.label}
+          </span>
+        );
+      default:
+        return "-";
+    }
+  }, [getOperationSuccessRate, getSuccessRateBadge]);
 
   // Rendez-vous state
   type RdvTag = "CONSULTATION" | "SUIVI" | "CHIRURGIE";
@@ -1849,57 +2087,54 @@ export default function PatientDetailsPage() {
               </CardContent>
             </Card>
           ) : (
-            <Card>
+            <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full">
                   <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type d'intervention</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Implants</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Chirurgie</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Greffe</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Mise en charge</th>
+                    <tr className="border-b border-border-gray bg-border-gray">
+                      {operationColumns.map((column) => (
+                        <th
+                          key={column.id}
+                          className={`text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider ${column.width || ""} ${dragOverOperationColumn === column.id ? "bg-primary/10" : ""}`}
+                          draggable
+                          onDragStart={(e) => handleOperationDragStart(e, column.id)}
+                          onDragOver={(e) => handleOperationDragOver(e, column.id)}
+                          onDragEnd={handleOperationDragEnd}
+                          onDrop={(e) => handleOperationDrop(e, column.id)}
+                        >
+                          <div className="flex items-center gap-1 cursor-grab active:cursor-grabbing">
+                            <GripVertical className="h-3 w-3 opacity-40" />
+                            <button
+                              onClick={() => column.sortable && handleOperationSort(column.id)}
+                              className="flex items-center hover:text-foreground transition-colors"
+                              data-testid={`sort-operation-${column.id}`}
+                            >
+                              {column.label}
+                              {column.sortable && renderOperationSortIcon(column.id)}
+                            </button>
+                          </div>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {patient.operations?.map((operation) => (
+                    {getSortedOperations(patient.operations || []).map((operation) => (
                       <tr
                         key={operation.id}
-                        className="border-b last:border-b-0 hover-elevate cursor-pointer"
+                        className="border-b border-border-gray/50 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer"
                         data-testid={`row-operation-${operation.id}`}
                       >
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {formatDate(operation.dateOperation)}
-                        </td>
-                        <td className="px-4 py-3">
-                          {getInterventionLabel(operation.typeIntervention)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="secondary" className="font-mono">
-                            {operation.surgeryImplants?.length || 0}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {operation.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : operation.typeChirurgieTemps === "DEUX_TEMPS" ? "2 temps" : "-"}
-                          {operation.typeChirurgieApproche && (
-                            <span className="text-muted-foreground ml-1">
-                              ({operation.typeChirurgieApproche === "LAMBEAU" ? "Lambeau" : "Flapless"})
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {operation.greffeOsseuse ? (operation.typeGreffe || "Oui") : "-"}
-                        </td>
-                        <td className="px-4 py-3">
-                          {operation.typeMiseEnCharge ? operation.typeMiseEnCharge.charAt(0) + operation.typeMiseEnCharge.slice(1).toLowerCase() : "-"}
-                        </td>
+                        {operationColumns.map((column) => (
+                          <td key={column.id} className="px-4 py-3">
+                            {renderOperationCellContent(column.id, operation)}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </Card>
+            </div>
           )}
         </TabsContent>
 
