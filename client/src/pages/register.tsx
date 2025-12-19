@@ -65,6 +65,7 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
       toast({
         title: "Compte créé",
         description: "Bienvenue sur Cassius",
+        variant: "success",
       });
       onRegisterSuccess();
     },

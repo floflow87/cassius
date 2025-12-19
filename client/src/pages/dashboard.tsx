@@ -10,6 +10,8 @@ import {
   TrendingUp,
   TrendingDown,
   Plus,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,8 +29,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 import type { Operation, Visite, User, Patient, SurgeryImplant } from "@shared/schema";
 
 interface BasicStats {
@@ -178,7 +183,10 @@ function AppointmentItem({ date, title, description, type, time }: AppointmentIt
 
 export default function DashboardPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [patientPopoverOpen, setPatientPopoverOpen] = useState(false);
+  const [patientSearch, setPatientSearch] = useState("");
   const [newRdvData, setNewRdvData] = useState({
+    patientId: "",
     titre: "",
     date: new Date().toISOString().split("T")[0],
     heureDebut: "09:00",
@@ -212,6 +220,12 @@ export default function DashboardPage() {
     queryKey: ["/api/surgery-implants"],
   });
 
+  const filteredPatients = patients?.filter(p => 
+    `${p.prenom} ${p.nom}`.toLowerCase().includes(patientSearch.toLowerCase())
+  ) || [];
+
+  const selectedPatient = patients?.find(p => p.id === newRdvData.patientId);
+
   const handleCreateRdv = () => {
     if (!newRdvData.titre || !newRdvData.date) {
       toast({
@@ -222,7 +236,10 @@ export default function DashboardPage() {
       return;
     }
     setSheetOpen(false);
+    setPatientPopoverOpen(false);
+    setPatientSearch("");
     setNewRdvData({
+      patientId: "",
       titre: "",
       date: new Date().toISOString().split("T")[0],
       heureDebut: "09:00",
@@ -233,6 +250,7 @@ export default function DashboardPage() {
     toast({
       title: "Rendez-vous créé",
       description: "Le nouveau rendez-vous a été enregistré.",
+      variant: "success",
     });
   };
 
@@ -370,6 +388,60 @@ export default function DashboardPage() {
                 </SheetHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
+                    <Label>Patient</Label>
+                    <Popover open={patientPopoverOpen} onOpenChange={setPatientPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={patientPopoverOpen}
+                          className="w-full justify-between"
+                          data-testid="button-select-patient"
+                        >
+                          {selectedPatient
+                            ? `${selectedPatient.prenom} ${selectedPatient.nom}`
+                            : "Sélectionner un patient..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Rechercher un patient..." 
+                            value={patientSearch}
+                            onValueChange={setPatientSearch}
+                            data-testid="input-patient-search"
+                          />
+                          <CommandList>
+                            <CommandEmpty>Aucun patient trouvé.</CommandEmpty>
+                            <CommandGroup>
+                              {filteredPatients.slice(0, 10).map((patient) => (
+                                <CommandItem
+                                  key={patient.id}
+                                  value={`${patient.prenom} ${patient.nom}`}
+                                  onSelect={() => {
+                                    setNewRdvData(prev => ({ ...prev, patientId: patient.id }));
+                                    setPatientPopoverOpen(false);
+                                    setPatientSearch("");
+                                  }}
+                                  data-testid={`patient-option-${patient.id}`}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      newRdvData.patientId === patient.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {patient.prenom} {patient.nom}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="titre">Titre</Label>
                     <Input 
                       id="titre"
@@ -417,7 +489,10 @@ export default function DashboardPage() {
                       <Button
                         type="button"
                         size="sm"
-                        variant={newRdvData.type === "consultation" ? "default" : "outline"}
+                        variant="outline"
+                        className={cn(
+                          newRdvData.type === "consultation" && "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700"
+                        )}
                         onClick={() => setNewRdvData(prev => ({ ...prev, type: "consultation" }))}
                         data-testid="button-type-consultation"
                       >
@@ -426,7 +501,10 @@ export default function DashboardPage() {
                       <Button
                         type="button"
                         size="sm"
-                        variant={newRdvData.type === "suivi" ? "default" : "outline"}
+                        variant="outline"
+                        className={cn(
+                          newRdvData.type === "suivi" && "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700"
+                        )}
                         onClick={() => setNewRdvData(prev => ({ ...prev, type: "suivi" }))}
                         data-testid="button-type-suivi"
                       >
@@ -435,7 +513,10 @@ export default function DashboardPage() {
                       <Button
                         type="button"
                         size="sm"
-                        variant={newRdvData.type === "chirurgie" ? "default" : "outline"}
+                        variant="outline"
+                        className={cn(
+                          newRdvData.type === "chirurgie" && "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700"
+                        )}
                         onClick={() => setNewRdvData(prev => ({ ...prev, type: "chirurgie" }))}
                         data-testid="button-type-chirurgie"
                       >

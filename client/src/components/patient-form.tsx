@@ -63,6 +63,7 @@ export function PatientForm({ onSuccess }: PatientFormProps) {
       toast({
         title: "Patient créé",
         description: "Le patient a été ajouté avec succès.",
+        variant: "success",
       });
       onSuccess?.(data.id);
     },

@@ -182,7 +182,7 @@ export default function ImplantDetailsPage() {
       toast({
         title: "Suppression effectuée",
         description: "Les actes sélectionnés ont été supprimés",
-        className: "bg-green-50 border-green-200 text-green-900",
+        variant: "success",
       });
     },
     onError: () => {
@@ -212,7 +212,7 @@ export default function ImplantDetailsPage() {
       toast({
         title: "Modifications enregistrées",
         description: "Les informations de pose ont été mises à jour",
-        className: "bg-green-50 border-green-200 text-green-900",
+        variant: "success",
       });
     },
     onError: () => {
@@ -241,7 +241,7 @@ export default function ImplantDetailsPage() {
       toast({
         title: "Mesure enregistrée",
         description: "La mesure ISQ a été ajoutée avec succès",
-        className: "bg-green-50 border-green-200 text-green-900",
+        variant: "success",
       });
     },
     onError: () => {
@@ -279,7 +279,7 @@ export default function ImplantDetailsPage() {
       toast({
         title: "Mesure mise à jour",
         description: "La valeur ISQ a été modifiée",
-        className: "bg-green-50 border-green-200 text-green-900",
+        variant: "success",
       });
     },
     onError: () => {
@@ -314,7 +314,7 @@ export default function ImplantDetailsPage() {
       toast({
         title: "Mesure supprimée",
         description: "La valeur ISQ a été supprimée",
-        className: "bg-green-50 border-green-200 text-green-900",
+        variant: "success",
       });
     },
     onError: () => {
@@ -336,7 +336,7 @@ export default function ImplantDetailsPage() {
       toast({
         title: "Notes enregistrées",
         description: "Les notes ont été mises à jour",
-        className: "bg-green-50 border-green-200 text-green-900",
+        variant: "success",
       });
     },
     onError: () => {

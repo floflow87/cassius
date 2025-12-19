@@ -56,6 +56,7 @@ export function VisiteForm({ implantId, patientId, onSuccess }: VisiteFormProps)
       toast({
         title: "Visite enregistrée",
         description: "La visite de contrôle a été ajoutée.",
+        variant: "success",
       });
       onSuccess?.();
     },

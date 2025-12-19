@@ -157,6 +157,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
       toast({
         title: "Opération créée",
         description: "L'opération a été enregistrée avec succès.",
+        variant: "success",
       });
       onSuccess?.();
     },

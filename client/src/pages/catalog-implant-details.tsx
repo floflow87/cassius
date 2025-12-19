@@ -101,6 +101,7 @@ export default function CatalogImplantDetailsPage() {
       toast({
         title: "Suppression effectuée",
         description: "Les actes sélectionnés ont été supprimés",
+        variant: "success",
       });
     },
     onError: () => {
@@ -129,6 +130,7 @@ export default function CatalogImplantDetailsPage() {
       toast({
         title: "Modifications enregistrées",
         description: "Les informations de l'implant ont été mises à jour",
+        variant: "success",
       });
     },
     onError: () => {
