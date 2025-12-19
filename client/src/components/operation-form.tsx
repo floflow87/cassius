@@ -83,12 +83,18 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+interface DefaultImplant {
+  catalogImplantId: string;
+  siteFdi: string;
+}
+
 interface OperationFormProps {
   patientId: string;
   onSuccess?: () => void;
+  defaultImplant?: DefaultImplant;
 }
 
-export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
+export function OperationForm({ patientId, onSuccess, defaultImplant }: OperationFormProps) {
   const { toast } = useToast();
   const [accordionValue, setAccordionValue] = useState<string[]>(["procedure"]);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
@@ -121,6 +127,20 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
     control: form.control,
     name: "implants",
   });
+
+  useEffect(() => {
+    if (defaultImplant && defaultImplant.catalogImplantId && fields.length === 0) {
+      append({
+        catalogImplantId: defaultImplant.catalogImplantId,
+        siteFdi: defaultImplant.siteFdi,
+        positionImplant: undefined,
+        typeOs: undefined,
+        miseEnChargePrevue: undefined,
+        isqPose: undefined,
+      });
+      setAccordionValue(["procedure", "implants"]);
+    }
+  }, [defaultImplant, append, fields.length]);
 
   const watchGreffeOsseuse = form.watch("greffeOsseuse");
 

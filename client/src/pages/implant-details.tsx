@@ -1117,7 +1117,11 @@ export default function ImplantDetailsPage() {
                     onSuccess={() => {
                       setNewOperationSheetOpen(false);
                       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
-                    }} 
+                    }}
+                    defaultImplant={implantData ? {
+                      catalogImplantId: implantData.implantId,
+                      siteFdi: implantData.siteFdi,
+                    } : undefined}
                   />
                 </div>
               </SheetContent>
@@ -1149,7 +1153,7 @@ export default function ImplantDetailsPage() {
                 <TableHead>Implants posés</TableHead>
                 <TableHead>Chirurgie</TableHead>
                 <TableHead>Greffe</TableHead>
-                <TableHead>Statut</TableHead>
+                <TableHead>Réussite</TableHead>
                 <TableHead className="w-8"></TableHead>
               </TableRow>
             </TableHeader>
@@ -1208,7 +1212,9 @@ export default function ImplantDetailsPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
+                    <Badge variant={status.variant}>
+                      {status.label}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="icon">

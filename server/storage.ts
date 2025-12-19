@@ -467,48 +467,32 @@ export class DatabaseStorage implements IStorage {
     const surgeryImplant = await this.getSurgeryImplant(organisationId, id);
     if (!surgeryImplant) return undefined;
 
-    const [implant] = await db
-      .select()
-      .from(implants)
-      .where(eq(implants.id, surgeryImplant.implantId));
+    const [implantResult, surgeryResult] = await Promise.all([
+      db.select().from(implants).where(eq(implants.id, surgeryImplant.implantId)),
+      db.select().from(operations).where(eq(operations.id, surgeryImplant.surgeryId)),
+    ]);
+
+    const implant = implantResult[0];
     if (!implant) return undefined;
 
-    const [surgery] = await db
-      .select()
-      .from(operations)
-      .where(eq(operations.id, surgeryImplant.surgeryId));
+    const surgery = surgeryResult[0];
 
-    let patient: Patient | undefined;
-    if (surgery) {
-      const [p] = await db
-        .select()
-        .from(patients)
-        .where(eq(patients.id, surgery.patientId));
-      patient = p || undefined;
-    }
-
-    const implantVisites = await db
-      .select()
-      .from(visites)
-      .where(and(
-        eq(visites.implantId, implant.id),
-        eq(visites.organisationId, organisationId)
-      ))
-      .orderBy(desc(visites.date));
-
-    const implantRadios = await db
-      .select()
-      .from(radios)
-      .where(and(
-        eq(radios.implantId, implant.id),
-        eq(radios.organisationId, organisationId)
-      ))
-      .orderBy(desc(radios.date));
+    const [patientResult, implantVisites, implantRadios] = await Promise.all([
+      surgery 
+        ? db.select().from(patients).where(eq(patients.id, surgery.patientId))
+        : Promise.resolve([]),
+      db.select().from(visites)
+        .where(and(eq(visites.implantId, implant.id), eq(visites.organisationId, organisationId)))
+        .orderBy(desc(visites.date)),
+      db.select().from(radios)
+        .where(and(eq(radios.implantId, implant.id), eq(radios.organisationId, organisationId)))
+        .orderBy(desc(radios.date)),
+    ]);
 
     return {
       ...surgeryImplant,
       implant,
-      patient,
+      patient: patientResult[0] || undefined,
       surgery: surgery || undefined,
       visites: implantVisites,
       radios: implantRadios,
