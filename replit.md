@@ -104,3 +104,38 @@ Frontend components use `SurgeryImplantWithDetails` type which includes the full
 - **Vite**: Powers the frontend development server with Hot Module Replacement (HMR).
 - **esbuild**: Used for fast server-side code bundling.
 - **TypeScript**: Ensures type safety throughout the entire codebase.
+
+## Performance Optimizations (December 2025)
+
+### Request Instrumentation
+- **Timing Middleware**: All requests tracked with X-Response-Time header
+- **Query Counting**: AsyncLocalStorage-based context for monitoring database queries per request
+- **Diagnostic Endpoints**: `/api/perf/stats`, `/api/perf/all`, `/api/perf/reset` for performance analysis
+- **Slow Request Detection**: [SLOW] and [MANY_QUERIES] flags logged for requests exceeding thresholds
+
+### N+1 Query Elimination
+The following methods in `server/storage.ts` were refactored from nested loops to efficient JOIN queries:
+- `getPatientWithDetails`: Uses 4 batched queries instead of 1 + N + N*M queries
+- `getPatientSurgeryImplants`: Single 3-table JOIN (surgeryImplants → implants → operations)
+- `getSurgeryImplantsByCatalogImplant`: Single 3-table JOIN
+- `getAllSurgeryImplants`: Single 4-table JOIN
+- `filterSurgeryImplants`: Single 4-table JOIN with WHERE conditions
+
+### Lazy Signed URL Loading
+- List endpoints (`/api/patients/:id`, `/api/patients/:patientId/radios`, `/api/patients/:patientId/documents`) return `signedUrl: null`
+- Frontend uses `fetchFreshSignedUrl` helper for on-demand URL generation when viewing individual files
+- Reduces Supabase Storage API calls significantly
+
+### Database Indexes
+Multi-column indexes added to `db/migrate-supabase.sql` for query optimization:
+- `idx_surgery_implants_org_surgery`: ON surgery_implants(organisation_id, surgery_id)
+- `idx_surgery_implants_org_implant`: ON surgery_implants(organisation_id, implant_id)
+- `idx_operations_org_patient`: ON operations(organisation_id, patient_id)
+- `idx_radios_org_patient`: ON radios(organisation_id, patient_id)
+- `idx_patients_org`: ON patients(organisation_id)
+- `idx_visites_org_implant`: ON visites(organisation_id, implant_id)
+- `idx_documents_org_patient`: ON documents(organisation_id, patient_id)
+
+### Summary Endpoints
+- `GET /api/patients/summary`: Returns combined patient list with operation counts and last visit dates in 3 parallel queries
+- Frontend patient list uses summary endpoint instead of 3 separate API calls
