@@ -134,11 +134,16 @@ export default function ImplantDetailsPage() {
     enabled: !!implantId,
   });
 
-  // Initialize boneLossScore from implantData when loaded
+  // Initialize boneLossScore and notesContent from implantData when loaded
   const [hasInitializedBoneLoss, setHasInitializedBoneLoss] = useState(false);
+  const [hasInitializedNotes, setHasInitializedNotes] = useState(false);
   if (implantData && !hasInitializedBoneLoss) {
     setBoneLossScore(implantData.boneLossScore ?? 0);
     setHasInitializedBoneLoss(true);
+  }
+  if (implantData && !hasInitializedNotes) {
+    setNotesContent(implantData.notes ?? "");
+    setHasInitializedNotes(true);
   }
 
   const handleBoneLossChange = (value: string) => {
@@ -176,6 +181,7 @@ export default function ImplantDetailsPage() {
       toast({
         title: "Suppression effectuée",
         description: "Les actes sélectionnés ont été supprimés",
+        className: "bg-green-50 border-green-200 text-green-900",
       });
     },
     onError: () => {
@@ -318,6 +324,32 @@ export default function ImplantDetailsPage() {
       });
     },
   });
+
+  const updateNotesMutation = useMutation({
+    mutationFn: async (notes: string) => {
+      return apiRequest("PATCH", `/api/surgery-implants/${implantId}`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      setEditingNotes(false);
+      toast({
+        title: "Notes enregistrées",
+        description: "Les notes ont été mises à jour",
+        className: "bg-green-50 border-green-200 text-green-900",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la sauvegarde",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveNotes = () => {
+    updateNotesMutation.mutate(notesContent);
+  };
 
   const handleSaveIsq = () => {
     if (!isqFormData.value) {
@@ -828,7 +860,7 @@ export default function ImplantDetailsPage() {
                   <Button variant="outline" size="sm" onClick={() => setEditingNotes(false)}>
                     Annuler
                   </Button>
-                  <Button size="sm" onClick={() => setEditingNotes(false)} data-testid="button-save-notes">
+                  <Button size="sm" onClick={handleSaveNotes} data-testid="button-save-notes">
                     Enregistrer
                   </Button>
                 </div>
