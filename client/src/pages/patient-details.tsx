@@ -81,6 +81,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { OperationForm } from "@/components/operation-form";
 import { ImplantCard } from "@/components/implant-card";
 import { RadioCard } from "@/components/radio-card";
@@ -550,34 +555,49 @@ export default function PatientDetailsPage() {
     });
   }, [operationSortColumn, operationSortDirection, getOperationSuccessRate]);
 
+  // Format date as dd/mm/yyyy
+  const formatDateCompact = (date: string) => {
+    const d = new Date(date);
+    return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+  };
+
   // Render operation cell content
   const renderOperationCellContent = useCallback((columnId: OperationColumnId, operation: OperationWithImplants) => {
     switch (columnId) {
       case "date":
-        return formatDate(operation.dateOperation);
+        return formatDateCompact(operation.dateOperation);
       case "typeIntervention":
         return getInterventionLabel(operation.typeIntervention);
       case "implants":
+        const sites = operation.surgeryImplants?.map(si => si.siteFdi).join(", ") || "";
         return (
-          <Badge variant="secondary" className="font-mono">
-            {operation.surgeryImplants?.length || 0}
-          </Badge>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Badge variant="secondary" className="font-mono cursor-help">
+                  {operation.surgeryImplants?.length || 0}
+                </Badge>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{sites || "Aucun implant"}</TooltipContent>
+          </Tooltip>
         );
       case "chirurgie":
+        if (!operation.typeChirurgieTemps) return "-";
         return (
-          <>
-            {operation.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : operation.typeChirurgieTemps === "DEUX_TEMPS" ? "2 temps" : "-"}
-            {operation.typeChirurgieApproche && (
-              <span className="text-muted-foreground ml-1">
-                ({operation.typeChirurgieApproche === "LAMBEAU" ? "Lambeau" : "Flapless"})
-              </span>
-            )}
-          </>
+          <Badge variant="outline">
+            {operation.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : "2 temps"}
+          </Badge>
         );
       case "greffe":
         return operation.greffeOsseuse ? (operation.typeGreffe || "Oui") : "-";
       case "miseEnCharge":
-        return operation.typeMiseEnCharge ? operation.typeMiseEnCharge.charAt(0) + operation.typeMiseEnCharge.slice(1).toLowerCase() : "-";
+        if (!operation.typeMiseEnCharge) return "-";
+        return (
+          <Badge variant="outline">
+            {operation.typeMiseEnCharge.charAt(0) + operation.typeMiseEnCharge.slice(1).toLowerCase()}
+          </Badge>
+        );
       case "reussite":
         const rate = getOperationSuccessRate(operation);
         const badge = getSuccessRateBadge(rate);
@@ -2059,7 +2079,7 @@ export default function PatientDetailsPage() {
               <SheetTrigger asChild>
                 <Button data-testid="button-new-operation">
                   <Plus className="h-4 w-4 mr-2" />
-                  Nouvelle opération
+                  Nouvel acte
                 </Button>
               </SheetTrigger>
               <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
@@ -2089,7 +2109,7 @@ export default function PatientDetailsPage() {
           ) : (
             <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border-gray bg-border-gray">
                       {operationColumns.map((column) => (
@@ -2123,6 +2143,12 @@ export default function PatientDetailsPage() {
                         key={operation.id}
                         className="border-b border-border-gray/50 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer"
                         data-testid={`row-operation-${operation.id}`}
+                        onClick={() => {
+                          const firstImplant = operation.surgeryImplants?.[0];
+                          if (firstImplant) {
+                            window.location.href = `/patients/${patient.id}/implants/${firstImplant.id}`;
+                          }
+                        }}
                       >
                         {operationColumns.map((column) => (
                           <td key={column.id} className="px-4 py-3">
