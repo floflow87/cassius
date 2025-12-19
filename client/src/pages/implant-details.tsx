@@ -98,7 +98,6 @@ export default function ImplantDetailsPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [addISQSheetOpen, setAddISQSheetOpen] = useState(false);
   const [editPoseInfoSheetOpen, setEditPoseInfoSheetOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -578,57 +577,8 @@ export default function ImplantDetailsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+          <CardHeader className="pb-4">
             <CardTitle className="text-base">Informations de l'implant</CardTitle>
-            <Sheet open={editSheetOpen} onOpenChange={setEditSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" data-testid="button-edit-implant">
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>Modifier l'implant</SheetTitle>
-                </SheetHeader>
-                <div className="py-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label>Marque</Label>
-                    <Input defaultValue={implantData.implant.marque} data-testid="input-edit-marque" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select defaultValue={implantData.implant.typeImplant || "IMPLANT"}>
-                      <SelectTrigger data-testid="select-edit-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="IMPLANT">Implant</SelectItem>
-                        <SelectItem value="MINI_IMPLANT">Mini-implant</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Référence fabricant</Label>
-                    <Input defaultValue={implantData.implant.referenceFabricant || ""} data-testid="input-edit-reference" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Diamètre (mm)</Label>
-                      <Input type="number" step="0.1" defaultValue={implantData.implant.diametre} data-testid="input-edit-diametre" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Longueur (mm)</Label>
-                      <Input type="number" step="0.5" defaultValue={implantData.implant.longueur} data-testid="input-edit-longueur" />
-                    </div>
-                  </div>
-                  <div className="pt-4">
-                    <Button className="w-full" data-testid="button-save-implant">
-                      Enregistrer
-                    </Button>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
