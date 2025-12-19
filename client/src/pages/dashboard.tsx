@@ -178,12 +178,13 @@ function AppointmentItem({ date, title, description, type, time }: AppointmentIt
 
 export default function DashboardPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [newVisiteData, setNewVisiteData] = useState({
-    patientId: "",
-    implantId: "",
+  const [newRdvData, setNewRdvData] = useState({
+    titre: "",
     date: new Date().toISOString().split("T")[0],
-    isq: "",
-    notes: "",
+    heureDebut: "09:00",
+    heureFin: "09:30",
+    type: "consultation" as "consultation" | "suivi" | "chirurgie",
+    description: "",
   });
   const { toast } = useToast();
 
@@ -211,52 +212,27 @@ export default function DashboardPage() {
     queryKey: ["/api/surgery-implants"],
   });
 
-  const createVisiteMutation = useMutation({
-    mutationFn: async (data: { patientId: string; implantId: string; date: string; isq?: number; notes?: string }) => {
-      return apiRequest("/api/visites", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/visites"] });
-      setSheetOpen(false);
-      setNewVisiteData({
-        patientId: "",
-        implantId: "",
-        date: new Date().toISOString().split("T")[0],
-        isq: "",
-        notes: "",
-      });
-      toast({
-        title: "Visite créée",
-        description: "La nouvelle visite a été enregistrée.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Erreur",
-        description: "Impossible de créer la visite.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleCreateVisite = () => {
-    if (!newVisiteData.patientId || !newVisiteData.date) {
+  const handleCreateRdv = () => {
+    if (!newRdvData.titre || !newRdvData.date) {
       toast({
         title: "Champs requis",
-        description: "Veuillez remplir le patient et la date.",
+        description: "Veuillez remplir le titre et la date.",
         variant: "destructive",
       });
       return;
     }
-    createVisiteMutation.mutate({
-      patientId: newVisiteData.patientId,
-      implantId: newVisiteData.implantId || undefined,
-      date: newVisiteData.date,
-      isq: newVisiteData.isq ? parseFloat(newVisiteData.isq) : undefined,
-      notes: newVisiteData.notes || undefined,
+    setSheetOpen(false);
+    setNewRdvData({
+      titre: "",
+      date: new Date().toISOString().split("T")[0],
+      heureDebut: "09:00",
+      heureFin: "09:30",
+      type: "consultation",
+      description: "",
+    });
+    toast({
+      title: "Rendez-vous créé",
+      description: "Le nouveau rendez-vous a été enregistré.",
     });
   };
 
@@ -301,14 +277,9 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold" data-testid="text-welcome-title">
-          Bienvenue {getUserFirstName()} !
-        </h1>
-        <p className="text-muted-foreground" data-testid="text-welcome-description">
-          Votre mémoire clinique implantaire centralisée. Tous vos implants, actes et suivis en un seul endroit.
-        </p>
-      </div>
+      <h1 className="text-lg font-medium" data-testid="text-welcome-title">
+        Bienvenue {getUserFirstName()}
+      </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -388,93 +359,106 @@ export default function DashboardPage() {
             <CardTitle className="text-base">Rendez-vous à venir</CardTitle>
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
-                <Button size="sm" data-testid="button-new-visite">
+                <Button size="sm" data-testid="button-new-rdv">
                   <Plus className="h-4 w-4 mr-1" />
-                  Nouvelle visite
+                  Nouveau rdv
                 </Button>
               </SheetTrigger>
               <SheetContent className="sm:max-w-md">
                 <SheetHeader>
-                  <SheetTitle>Nouvelle visite</SheetTitle>
-                  <SheetDescription>
-                    Planifiez une nouvelle visite de suivi pour un patient.
-                  </SheetDescription>
+                  <SheetTitle>Nouveau rendez-vous</SheetTitle>
                 </SheetHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="patient">Patient *</Label>
-                    <Select 
-                      value={newVisiteData.patientId} 
-                      onValueChange={(value) => setNewVisiteData(prev => ({ ...prev, patientId: value }))}
-                    >
-                      <SelectTrigger data-testid="select-patient">
-                        <SelectValue placeholder="Sélectionner un patient" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {patients?.map((patient) => (
-                          <SelectItem key={patient.id} value={patient.id}>
-                            {patient.prenom} {patient.nom}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="titre">Titre</Label>
+                    <Input 
+                      id="titre"
+                      placeholder="Ex: Consultation pré-opératoire"
+                      value={newRdvData.titre}
+                      onChange={(e) => setNewRdvData(prev => ({ ...prev, titre: e.target.value }))}
+                      data-testid="input-titre"
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="implant">Implant (optionnel)</Label>
-                    <Select 
-                      value={newVisiteData.implantId} 
-                      onValueChange={(value) => setNewVisiteData(prev => ({ ...prev, implantId: value }))}
-                    >
-                      <SelectTrigger data-testid="select-implant">
-                        <SelectValue placeholder="Sélectionner un implant" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {surgeryImplants?.map((si) => (
-                          <SelectItem key={si.id} value={si.id}>
-                            Site {si.siteFdi} - {si.statut}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Date *</Label>
+                    <Label htmlFor="date">Date</Label>
                     <Input 
                       id="date"
                       type="date" 
-                      value={newVisiteData.date}
-                      onChange={(e) => setNewVisiteData(prev => ({ ...prev, date: e.target.value }))}
+                      value={newRdvData.date}
+                      onChange={(e) => setNewRdvData(prev => ({ ...prev, date: e.target.value }))}
                       data-testid="input-date"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="isq">ISQ (optionnel)</Label>
-                    <Input 
-                      id="isq"
-                      type="number" 
-                      placeholder="Ex: 65"
-                      value={newVisiteData.isq}
-                      onChange={(e) => setNewVisiteData(prev => ({ ...prev, isq: e.target.value }))}
-                      data-testid="input-isq"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="heureDebut">Heure début</Label>
+                      <Input 
+                        id="heureDebut"
+                        type="time" 
+                        value={newRdvData.heureDebut}
+                        onChange={(e) => setNewRdvData(prev => ({ ...prev, heureDebut: e.target.value }))}
+                        data-testid="input-heure-debut"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="heureFin">Heure fin</Label>
+                      <Input 
+                        id="heureFin"
+                        type="time" 
+                        value={newRdvData.heureFin}
+                        onChange={(e) => setNewRdvData(prev => ({ ...prev, heureFin: e.target.value }))}
+                        data-testid="input-heure-fin"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="notes">Notes (optionnel)</Label>
+                    <Label>Type</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={newRdvData.type === "consultation" ? "default" : "outline"}
+                        onClick={() => setNewRdvData(prev => ({ ...prev, type: "consultation" }))}
+                        data-testid="button-type-consultation"
+                      >
+                        Consultation
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={newRdvData.type === "suivi" ? "default" : "outline"}
+                        onClick={() => setNewRdvData(prev => ({ ...prev, type: "suivi" }))}
+                        data-testid="button-type-suivi"
+                      >
+                        Suivi
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={newRdvData.type === "chirurgie" ? "default" : "outline"}
+                        onClick={() => setNewRdvData(prev => ({ ...prev, type: "chirurgie" }))}
+                        data-testid="button-type-chirurgie"
+                      >
+                        Chirurgie
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description (optionnelle)</Label>
                     <Textarea 
-                      id="notes"
-                      placeholder="Notes de la visite..."
-                      value={newVisiteData.notes}
-                      onChange={(e) => setNewVisiteData(prev => ({ ...prev, notes: e.target.value }))}
-                      data-testid="input-notes"
+                      id="description"
+                      placeholder="Informations complémentaires..."
+                      value={newRdvData.description}
+                      onChange={(e) => setNewRdvData(prev => ({ ...prev, description: e.target.value }))}
+                      data-testid="input-description"
                     />
                   </div>
                   <Button 
                     className="w-full" 
-                    onClick={handleCreateVisite}
-                    disabled={createVisiteMutation.isPending}
-                    data-testid="button-submit-visite"
+                    onClick={handleCreateRdv}
+                    data-testid="button-submit-rdv"
                   >
-                    {createVisiteMutation.isPending ? "Création..." : "Créer la visite"}
+                    Créer le rendez-vous
                   </Button>
                 </div>
               </SheetContent>
