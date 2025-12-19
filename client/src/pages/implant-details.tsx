@@ -84,6 +84,12 @@ export default function ImplantDetailsPage() {
     typeGreffe: "",
   });
 
+  const [isqFormData, setIsqFormData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    value: "",
+    notes: "",
+  });
+
   const { data: implantData, isLoading } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
     enabled: !!implantId,
@@ -171,6 +177,51 @@ export default function ImplantDetailsPage() {
       });
     },
   });
+
+  const createIsqMutation = useMutation({
+    mutationFn: async (data: { date: string; isq: number; notes?: string }) => {
+      return apiRequest("POST", "/api/visites", {
+        implantId: implantData?.implant?.id,
+        patientId: patientId,
+        date: data.date,
+        isq: data.isq,
+        notes: data.notes || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      setAddISQSheetOpen(false);
+      setIsqFormData({ date: new Date().toISOString().split('T')[0], value: "", notes: "" });
+      toast({
+        title: "Mesure enregistrée",
+        description: "La mesure ISQ a été ajoutée avec succès",
+        className: "bg-green-50 border-green-200 text-green-900",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'enregistrement",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveIsq = () => {
+    if (!isqFormData.value) {
+      toast({
+        title: "Valeur requise",
+        description: "Veuillez saisir une valeur ISQ",
+        variant: "destructive",
+      });
+      return;
+    }
+    createIsqMutation.mutate({
+      date: isqFormData.date,
+      isq: parseInt(isqFormData.value),
+      notes: isqFormData.notes,
+    });
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("fr-FR", {
@@ -666,19 +717,42 @@ export default function ImplantDetailsPage() {
               <div className="py-6 space-y-4">
                 <div className="space-y-2">
                   <Label>Date</Label>
-                  <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} data-testid="input-isq-date" />
+                  <Input 
+                    type="date" 
+                    value={isqFormData.date}
+                    onChange={(e) => setIsqFormData(prev => ({ ...prev, date: e.target.value }))}
+                    data-testid="input-isq-date" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Valeur ISQ</Label>
-                  <Input type="number" min="0" max="100" placeholder="Ex: 75" data-testid="input-isq-value" />
+                  <Input 
+                    type="number" 
+                    min="0" 
+                    max="100" 
+                    placeholder="Ex: 75" 
+                    value={isqFormData.value}
+                    onChange={(e) => setIsqFormData(prev => ({ ...prev, value: e.target.value }))}
+                    data-testid="input-isq-value" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Notes (optionnel)</Label>
-                  <Textarea placeholder="Observations..." data-testid="input-isq-notes" />
+                  <Textarea 
+                    placeholder="Observations..." 
+                    value={isqFormData.notes}
+                    onChange={(e) => setIsqFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    data-testid="input-isq-notes" 
+                  />
                 </div>
                 <div className="pt-4">
-                  <Button className="w-full" onClick={() => setAddISQSheetOpen(false)} data-testid="button-save-isq">
-                    Enregistrer
+                  <Button 
+                    className="w-full" 
+                    onClick={handleSaveIsq}
+                    disabled={createIsqMutation.isPending}
+                    data-testid="button-save-isq"
+                  >
+                    {createIsqMutation.isPending ? "Enregistrement..." : "Enregistrer"}
                   </Button>
                 </div>
               </div>
