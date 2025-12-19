@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { requireJwtOrSession } from "./jwtMiddleware";
 import * as supabaseStorage from "./supabaseStorage";
+import { getTopSlowestEndpoints, getTopDbHeavyEndpoints, getAllStats, clearStats } from "./instrumentation";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -82,6 +83,44 @@ export async function registerRoutes(
         dbName,
         error: errorCode,
       });
+    }
+  });
+
+  app.get("/api/perf/stats", requireJwtOrSession, async (_req, res) => {
+    try {
+      const slowest = getTopSlowestEndpoints(10);
+      const dbHeavy = getTopDbHeavyEndpoints(10);
+      
+      res.json({
+        timestamp: new Date().toISOString(),
+        topSlowestEndpoints: slowest,
+        topDbHeavyEndpoints: dbHeavy,
+      });
+    } catch (error) {
+      console.error("Error getting perf stats:", error);
+      res.status(500).json({ error: "Failed to get performance stats" });
+    }
+  });
+
+  app.get("/api/perf/all", requireJwtOrSession, async (_req, res) => {
+    try {
+      res.json({
+        timestamp: new Date().toISOString(),
+        stats: getAllStats(),
+      });
+    } catch (error) {
+      console.error("Error getting all stats:", error);
+      res.status(500).json({ error: "Failed to get stats" });
+    }
+  });
+
+  app.post("/api/perf/reset", requireJwtOrSession, async (_req, res) => {
+    try {
+      clearStats();
+      res.json({ ok: true, message: "Stats cleared" });
+    } catch (error) {
+      console.error("Error resetting stats:", error);
+      res.status(500).json({ error: "Failed to reset stats" });
     }
   });
 
