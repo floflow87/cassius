@@ -219,7 +219,9 @@ export default function PatientDetailsPage() {
       const saved = localStorage.getItem(IMPLANT_COLUMNS_KEY);
       if (saved) {
         const savedOrder = JSON.parse(saved) as ImplantColumnId[];
-        return savedOrder.map(id => defaultImplantColumns.find(c => c.id === id)!).filter(Boolean);
+        const orderedColumns = savedOrder.map(id => defaultImplantColumns.find(c => c.id === id)!).filter(Boolean);
+        const missingColumns = defaultImplantColumns.filter(c => !savedOrder.includes(c.id));
+        return [...orderedColumns, ...missingColumns];
       }
     } catch {}
     return defaultImplantColumns;
