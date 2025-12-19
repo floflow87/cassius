@@ -160,7 +160,7 @@ export default function ImplantDetailsPage() {
       toast({
         title: "Modifications enregistrées",
         description: "Les informations de pose ont été mises à jour",
-        className: "bg-green-600 text-white border-green-600",
+        className: "bg-green-50 border-green-200 text-green-900",
       });
     },
     onError: () => {
