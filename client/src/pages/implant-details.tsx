@@ -12,6 +12,7 @@ import {
   FileText,
   Trash2,
   Plus,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +44,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { ImplantDetail } from "@shared/types";
@@ -54,11 +60,22 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   ECHEC: { label: "Échec", variant: "destructive" },
 };
 
-function getISQBadge(value: number): { label: string; className: string } {
-  if (value >= 70) return { label: "Excellent", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" };
-  if (value >= 60) return { label: "Bon", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" };
-  if (value >= 50) return { label: "Acceptable", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" };
-  return { label: "Critique", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" };
+function getISQBadge(value: number): { label: string; className: string; pointColor: string } {
+  if (value >= 70) return { 
+    label: "Stabilité élevée", 
+    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+    pointColor: "bg-emerald-500"
+  };
+  if (value >= 60) return { 
+    label: "Stabilité modérée", 
+    className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    pointColor: "bg-amber-500"
+  };
+  return { 
+    label: "Stabilité faible", 
+    className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    pointColor: "bg-red-500"
+  };
 }
 
 export default function ImplantDetailsPage() {
@@ -702,7 +719,33 @@ export default function ImplantDetailsPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
-          <CardTitle className="text-base">Suivi ISQ (Stabilité)</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-base">Suivi ISQ (Stabilité)</CardTitle>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="inline-flex items-center justify-center" aria-label="Information sur les seuils ISQ" data-testid="isq-info-tooltip">
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-xs">
+                <div className="space-y-1 text-xs">
+                  <p className="font-medium">Seuils de stabilité ISQ</p>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>70+ : Stabilité élevée</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span>60-69 : Stabilité modérée</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                    <span>&lt;60 : Stabilité faible</span>
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </div>
           <Sheet open={addISQSheetOpen} onOpenChange={setAddISQSheetOpen}>
             <SheetTrigger asChild>
               <Button data-testid="button-add-isq">
@@ -773,7 +816,7 @@ export default function ImplantDetailsPage() {
                   const badge = getISQBadge(point.value);
                   return (
                     <div key={index} className="relative flex items-start gap-4 pl-4" data-testid={`isq-entry-${index}`}>
-                      <div className="absolute left-6 w-4 h-4 rounded-full bg-primary border-2 border-background z-10" />
+                      <div className={`absolute left-6 w-4 h-4 rounded-full ${badge.pointColor} border-2 border-background z-10`} />
                       <div className="ml-10 flex-1">
                         <div className="flex items-center gap-4">
                           <div className="flex items-baseline gap-2">
