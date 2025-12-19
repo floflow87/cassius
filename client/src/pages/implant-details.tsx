@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/tooltip";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { OperationForm } from "@/components/operation-form";
 import type { ImplantDetail } from "@shared/types";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -100,6 +101,7 @@ export default function ImplantDetailsPage() {
 
   const [addISQSheetOpen, setAddISQSheetOpen] = useState(false);
   const [editPoseInfoSheetOpen, setEditPoseInfoSheetOpen] = useState(false);
+  const [newOperationSheetOpen, setNewOperationSheetOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesContent, setNotesContent] = useState("");
   const [selectedActs, setSelectedActs] = useState<string[]>([]);
@@ -1085,18 +1087,42 @@ export default function ImplantDetailsPage() {
             <FileText className="h-4 w-4" />
             Actes chirurgicaux avec cet implant
           </CardTitle>
-          {selectedActs.length > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => deleteMutation.mutate(selectedActs)}
-              disabled={deleteMutation.isPending}
-              data-testid="button-delete-selected"
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              {deleteMutation.isPending ? "Suppression..." : `Supprimer (${selectedActs.length})`}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {selectedActs.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => deleteMutation.mutate(selectedActs)}
+                disabled={deleteMutation.isPending}
+                data-testid="button-delete-selected"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                {deleteMutation.isPending ? "Suppression..." : `Supprimer (${selectedActs.length})`}
+              </Button>
+            )}
+            <Sheet open={newOperationSheetOpen} onOpenChange={setNewOperationSheetOpen}>
+              <SheetTrigger asChild>
+                <Button size="sm" data-testid="button-new-operation">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Nouvel Acte
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Nouvel acte chirurgical</SheetTitle>
+                </SheetHeader>
+                <div className="py-4">
+                  <OperationForm 
+                    patientId={patientId || ""} 
+                    onSuccess={() => {
+                      setNewOperationSheetOpen(false);
+                      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+                    }} 
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
