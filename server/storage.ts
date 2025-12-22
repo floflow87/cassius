@@ -68,6 +68,7 @@ export interface IStorage {
 
   // Operation methods
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
+  getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number })[]>;
   createOperation(organisationId: string, operation: InsertOperation): Promise<Operation>;
   createOperationWithImplants(
     organisationId: string,
@@ -341,6 +342,40 @@ export class DatabaseStorage implements IStorage {
         eq(operations.organisationId, organisationId)
       ));
     return operation || undefined;
+  }
+
+  async getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number })[]> {
+    // Get all operations with patient info
+    const operationsWithPatients = await db
+      .select({
+        operation: operations,
+        patientNom: patients.nom,
+        patientPrenom: patients.prenom,
+      })
+      .from(operations)
+      .innerJoin(patients, eq(operations.patientId, patients.id))
+      .where(eq(operations.organisationId, organisationId))
+      .orderBy(desc(operations.dateOperation));
+    
+    // Get implant counts per operation
+    const implantCounts = await db
+      .select({
+        surgeryId: surgeryImplants.surgeryId,
+      })
+      .from(surgeryImplants)
+      .where(eq(surgeryImplants.organisationId, organisationId));
+    
+    const countMap: Record<string, number> = {};
+    for (const row of implantCounts) {
+      countMap[row.surgeryId] = (countMap[row.surgeryId] || 0) + 1;
+    }
+    
+    return operationsWithPatients.map(({ operation, patientNom, patientPrenom }) => ({
+      ...operation,
+      patientNom,
+      patientPrenom,
+      implantCount: countMap[operation.id] || 0,
+    }));
   }
 
   async createOperation(organisationId: string, operation: InsertOperation): Promise<Operation> {

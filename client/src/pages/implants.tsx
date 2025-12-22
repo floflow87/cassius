@@ -363,18 +363,9 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
         )}
       </div>
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <input type="checkbox" className="h-4 w-4 rounded border-gray-300" data-testid="checkbox-select-all" />
-          <span className="text-sm text-muted-foreground">{totalImplants} implants</span>
-        </div>
-        <CassiusPagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalImplants}
-          itemsPerPage={itemsPerPage}
-          onPageChange={setCurrentPage}
-        />
+      <div className="flex items-center gap-2 mb-4">
+        <input type="checkbox" className="h-4 w-4 rounded border-gray-300" data-testid="checkbox-select-all" />
+        <span className="text-sm text-muted-foreground">{totalImplants} implants</span>
       </div>
 
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
@@ -457,6 +448,16 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="flex items-center justify-end mt-4">
+        <CassiusPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalImplants}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

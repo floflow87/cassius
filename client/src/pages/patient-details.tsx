@@ -1222,9 +1222,12 @@ export default function PatientDetailsPage() {
     ? new Date(sortedOperations[sortedOperations.length - 1].dateOperation).getFullYear()
     : null;
 
-  const successRate = implantCount > 0 
-    ? Math.round((patient.surgeryImplants?.filter(i => i.statut === "SUCCES").length || 0) / implantCount * 100)
-    : 0;
+  // Calculate success rate based on implants with definitive outcomes (SUCCES or ECHEC)
+  const definitiveImplants = patient.surgeryImplants?.filter(i => i.statut === "SUCCES" || i.statut === "ECHEC") || [];
+  const successfulImplants = definitiveImplants.filter(i => i.statut === "SUCCES").length;
+  const successRate = definitiveImplants.length > 0 
+    ? Math.round((successfulImplants / definitiveImplants.length) * 100)
+    : 100; // Default to 100% if no definitive outcomes yet
 
   return (
     <div className="p-6 space-y-4 bg-muted/30 min-h-full">

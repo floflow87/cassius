@@ -268,6 +268,19 @@ export async function registerRoutes(
   });
 
   // ========== OPERATIONS ==========
+  app.get("/api/operations", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const operations = await storage.getAllOperations(organisationId);
+      res.json(operations);
+    } catch (error) {
+      console.error("Error fetching operations:", error);
+      res.status(500).json({ error: "Failed to fetch operations" });
+    }
+  });
+
   app.get("/api/operations/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;

@@ -15,6 +15,7 @@ import CatalogImplantDetailsPage from "@/pages/catalog-implant-details";
 import PatientReportPage from "@/pages/patient-report";
 import DashboardPage from "@/pages/dashboard";
 import ImplantsPage from "@/pages/implants";
+import ActesPage from "@/pages/actes";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import { apiRequest } from "@/lib/queryClient";
@@ -156,9 +157,13 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/patients/:patientId/implants/:implantId" component={ImplantDetailsPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/stats" component={DashboardPage} />
-      <Route path="/implants" component={ImplantsPage} />
+      <Route path="/implants">
+        {() => <ImplantsPage />}
+      </Route>
       <Route path="/implants/:id" component={CatalogImplantDetailsPage} />
-      <Route path="/actes" component={DashboardPage} />
+      <Route path="/actes">
+        {() => <ActesPage />}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
