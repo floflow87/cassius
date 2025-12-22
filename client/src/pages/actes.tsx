@@ -7,9 +7,18 @@ import {
   ArrowDown,
   GripVertical,
   Stethoscope,
+  Plus,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import type { Operation } from "@shared/schema";
 
 type OperationWithDetails = Operation & { 
@@ -290,25 +299,34 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold" data-testid="text-actes-title">Actes chirurgicaux</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Liste de toutes les interventions chirurgicales
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-4">
           <CassiusSearchInput 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Rechercher..."
             data-testid="input-search-actes"
           />
+          <span className="text-xs text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
         </div>
-      </div>
-
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button data-testid="button-new-acte">
+              <Plus className="h-4 w-4 mr-2" />
+              Nouvel acte
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="sm:max-w-lg">
+            <SheetHeader>
+              <SheetTitle>Nouvel acte chirurgical</SheetTitle>
+            </SheetHeader>
+            <div className="py-4">
+              <p className="text-sm text-muted-foreground">
+                Le formulaire de création d'acte sera disponible prochainement.
+              </p>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
@@ -365,7 +383,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                     data-testid={`row-operation-${op.id}`}
                   >
                     {columns.map((column) => (
-                      <td key={column.id} className={`px-4 py-3 ${columnWidths[column.id]}`}>
+                      <td key={column.id} className={`px-4 py-2 text-sm ${columnWidths[column.id]}`}>
                         {renderCellContent(column.id, op)}
                       </td>
                     ))}
