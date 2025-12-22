@@ -233,22 +233,53 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      await Promise.all(ids.map(id => apiRequest("DELETE", `/api/operations/${id}`)));
+      const results: { id: string; success: boolean }[] = [];
+      for (const id of ids) {
+        try {
+          await apiRequest("DELETE", `/api/operations/${id}`);
+          results.push({ id, success: true });
+        } catch {
+          results.push({ id, success: false });
+        }
+      }
+      return results;
     },
-    onSuccess: () => {
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+      const successCount = results.filter(r => r.success).length;
+      const failedCount = results.filter(r => !r.success).length;
+      const successIds = new Set(results.filter(r => r.success).map(r => r.id));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        successIds.forEach(id => next.delete(id));
+        return next;
+      });
+      setShowBulkDeleteDialog(false);
+      if (failedCount === 0) {
+        toast({
+          title: "Actes supprimés",
+          description: `${successCount} acte(s) supprimé(s) avec succès.`,
+          variant: "success",
+        });
+      } else if (successCount === 0) {
+        toast({
+          title: "Erreur",
+          description: "Aucun acte n'a pu être supprimé.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Suppression partielle",
+          description: `${successCount} acte(s) supprimé(s), ${failedCount} échec(s).`,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
       toast({
-        title: "Actes supprimés",
-        description: `${selectedIds.size} acte(s) supprimé(s) avec succès.`,
-        variant: "success",
-      });
-      setSelectedIds(new Set());
-      setShowBulkDeleteDialog(false);
-    },
-    onError: (error: Error) => {
-      toast({
         title: "Erreur",
-        description: error.message,
+        description: "Une erreur inattendue s'est produite.",
         variant: "destructive",
       });
     },
