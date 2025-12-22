@@ -209,7 +209,19 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit, (errors) => console.log("Form validation errors:", errors))} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+        console.log("Form validation errors:", errors);
+        if (errors.implants) {
+          if (!accordionValue.includes("implants")) {
+            setAccordionValue([...accordionValue, "implants"]);
+          }
+          toast({
+            title: "Erreur de validation",
+            description: "Veuillez remplir tous les champs requis pour les implants (Site FDI, sélection d'implant)",
+            variant: "destructive",
+          });
+        }
+      })} className="space-y-4">
         <Accordion
           type="multiple"
           value={accordionValue}
