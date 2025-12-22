@@ -130,10 +130,28 @@ export default function ImplantDetailsPage() {
   } | null>(null);
   const [editIsqSheetOpen, setEditIsqSheetOpen] = useState(false);
 
-  const { data: implantData, isLoading } = useQuery<ImplantDetail>({
+  // Track fetch start for performance debugging
+  const [fetchStarted] = useState(() => {
+    console.log(`[IMPLANT-PAGE] loading implant page id=${implantId}`);
+    return Date.now();
+  });
+
+  const { data: implantData, isLoading, isFetching, dataUpdatedAt } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
     enabled: !!implantId,
   });
+
+  // Log when data is loaded (only once per actual data update)
+  const [lastLoggedUpdate, setLastLoggedUpdate] = useState(0);
+  if (dataUpdatedAt && dataUpdatedAt !== lastLoggedUpdate && implantData) {
+    console.log(`[IMPLANT-PAGE] loaded implant page id=${implantId} in ${Date.now() - fetchStarted}ms`);
+    setLastLoggedUpdate(dataUpdatedAt);
+  }
+
+  // Detect refetch loops
+  if (isFetching && !isLoading) {
+    console.log(`[IMPLANT-PAGE] REFETCHING (possible loop) id=${implantId}`);
+  }
 
   // Initialize boneLossScore and notesContent from implantData when loaded
   const [hasInitializedBoneLoss, setHasInitializedBoneLoss] = useState(false);

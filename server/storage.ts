@@ -512,19 +512,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSurgeryImplantWithDetails(organisationId: string, id: string): Promise<ImplantDetail | undefined> {
+    const start = Date.now();
+    
+    const t1 = Date.now();
     const surgeryImplant = await this.getSurgeryImplant(organisationId, id);
-    if (!surgeryImplant) return undefined;
+    const d1 = Date.now() - t1;
+    
+    if (!surgeryImplant) {
+      console.log(`[IMPLANT-DETAIL] id=${id} surgeryImplant not found after ${d1}ms`);
+      return undefined;
+    }
 
+    const t2 = Date.now();
     const [implantResult, surgeryResult] = await Promise.all([
       db.select().from(implants).where(eq(implants.id, surgeryImplant.implantId)),
       db.select().from(operations).where(eq(operations.id, surgeryImplant.surgeryId)),
     ]);
+    const d2 = Date.now() - t2;
 
     const implant = implantResult[0];
-    if (!implant) return undefined;
+    if (!implant) {
+      console.log(`[IMPLANT-DETAIL] id=${id} catalog implant not found. surgeryImplant=${d1}ms implant+surgery=${d2}ms`);
+      return undefined;
+    }
 
     const surgery = surgeryResult[0];
 
+    const t3 = Date.now();
     const [patientResult, implantVisites, implantRadios] = await Promise.all([
       surgery 
         ? db.select().from(patients).where(eq(patients.id, surgery.patientId))
@@ -536,6 +550,10 @@ export class DatabaseStorage implements IStorage {
         .where(and(eq(radios.implantId, implant.id), eq(radios.organisationId, organisationId)))
         .orderBy(desc(radios.date)),
     ]);
+    const d3 = Date.now() - t3;
+
+    const total = Date.now() - start;
+    console.log(`[IMPLANT-DETAIL] id=${id} total=${total}ms surgeryImplant=${d1}ms implant+surgery=${d2}ms patient+visites+radios=${d3}ms visites=${implantVisites.length} radios=${implantRadios.length}`);
 
     return {
       ...surgeryImplant,
