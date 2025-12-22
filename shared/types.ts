@@ -475,3 +475,46 @@ export interface FilterFieldConfig {
   operators: FilterOperator[];
   options?: { value: string; label: string }[];
 }
+
+// Timeline types for operation detail page
+export type TimelineEventType = "SURGERY" | "VISIT" | "ISQ" | "RADIO";
+
+export interface TimelineEvent {
+  type: TimelineEventType;
+  at: string;
+  title: string;
+  description?: string;
+  status: "done" | "upcoming";
+  
+  // For SURGERY events
+  actId?: string;
+  
+  // For VISIT events
+  visitId?: string;
+  visitType?: string;
+  
+  // For ISQ events
+  surgeryImplantId?: string;
+  implantLabel?: string;
+  siteFdi?: string;
+  value?: number;
+  stability?: "low" | "moderate" | "high";
+  delta?: number;
+  previousValue?: number;
+  
+  // For RADIO events
+  radioId?: string;
+  radioType?: string;
+}
+
+export interface OperationTimeline {
+  operation: {
+    id: string;
+    dateOperation: string;
+    typeIntervention: string;
+    patientId: string;
+    patientNom: string;
+    patientPrenom: string;
+  };
+  events: TimelineEvent[];
+}

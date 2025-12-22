@@ -767,6 +767,23 @@ export async function registerRoutes(
     }
   });
 
+  // Get timeline for a specific operation
+  app.get("/api/operations/:id/timeline", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const timeline = await storage.getOperationTimeline(organisationId, req.params.id);
+      if (!timeline) {
+        return res.status(404).json({ error: "Operation not found" });
+      }
+      res.json(timeline);
+    } catch (error) {
+      console.error("Error fetching operation timeline:", error);
+      res.status(500).json({ error: "Failed to fetch operation timeline" });
+    }
+  });
+
   // ========== IMPLANTS ==========
   app.get("/api/implants/brands", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

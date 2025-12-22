@@ -39,6 +39,7 @@ import {
 import { RadioUploadForm } from "@/components/radio-upload-form";
 import { OperationEditForm } from "@/components/operation-edit-form";
 import { SurgeryImplantEditSheet } from "@/components/surgery-implant-edit-sheet";
+import { SurgeryTimeline } from "@/components/surgery-timeline";
 import type { OperationDetail, SurgeryImplantWithDetails } from "@shared/types";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -436,6 +437,18 @@ export default function ActeDetailsPage() {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-timeline">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Historique
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SurgeryTimeline operationId={operation.id} />
         </CardContent>
       </Card>
 

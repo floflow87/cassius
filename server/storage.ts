@@ -54,6 +54,8 @@ import type {
   PatientSearchResult,
   FilterGroup,
   FilterRule,
+  OperationTimeline,
+  TimelineEvent,
 } from "@shared/types";
 import { db, pool } from "./db";
 import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL } from "drizzle-orm";
@@ -178,6 +180,9 @@ export interface IStorage {
   getSavedFilters(organisationId: string, pageType: SavedFilterPageType): Promise<SavedFilter[]>;
   createSavedFilter(organisationId: string, filter: InsertSavedFilter): Promise<SavedFilter>;
   deleteSavedFilter(organisationId: string, id: string): Promise<boolean>;
+
+  // Timeline methods
+  getOperationTimeline(organisationId: string, operationId: string): Promise<OperationTimeline | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1661,6 +1666,233 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return result.length > 0;
+  }
+
+  // ========== TIMELINE ==========
+  async getOperationTimeline(organisationId: string, operationId: string): Promise<OperationTimeline | null> {
+    // Get operation with patient info
+    const [operationWithPatient] = await db
+      .select({
+        operation: operations,
+        patientNom: patients.nom,
+        patientPrenom: patients.prenom,
+      })
+      .from(operations)
+      .innerJoin(patients, eq(operations.patientId, patients.id))
+      .where(and(
+        eq(operations.id, operationId),
+        eq(operations.organisationId, organisationId)
+      ));
+
+    if (!operationWithPatient) {
+      return null;
+    }
+
+    const { operation, patientNom, patientPrenom } = operationWithPatient;
+    const events: TimelineEvent[] = [];
+    const todayDate = new Date();
+    todayDate.setHours(23, 59, 59, 999);
+
+    const isInPast = (dateStr: string) => new Date(dateStr) <= todayDate;
+
+    // 1. Add the surgery itself as an event
+    events.push({
+      type: "SURGERY",
+      at: operation.dateOperation,
+      title: this.getInterventionLabel(operation.typeIntervention),
+      description: operation.notesPerop || undefined,
+      status: isInPast(operation.dateOperation) ? "done" : "upcoming",
+      actId: operation.id,
+    });
+
+    // 2. Get surgery implants for this operation with their ISQ values
+    const surgeryImplantsData = await db
+      .select({
+        surgeryImplant: surgeryImplants,
+        implant: implants,
+      })
+      .from(surgeryImplants)
+      .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
+      .where(and(
+        eq(surgeryImplants.surgeryId, operationId),
+        eq(surgeryImplants.organisationId, organisationId)
+      ));
+
+    // Collect surgery implant IDs for visit queries
+    const surgeryImplantIds = surgeryImplantsData.map(s => s.surgeryImplant.id);
+
+    // Build maps for implant lookup - use arrays to handle multiple surgery implants with same catalog implant
+    const surgeryImplantMap = new Map<string, { surgeryImplant: typeof surgeryImplantsData[0]["surgeryImplant"], implant: typeof surgeryImplantsData[0]["implant"] }>();
+    const catalogImplantMap = new Map<string, { surgeryImplant: typeof surgeryImplantsData[0]["surgeryImplant"], implant: typeof surgeryImplantsData[0]["implant"] }[]>();
+    
+    for (const { surgeryImplant, implant } of surgeryImplantsData) {
+      surgeryImplantMap.set(surgeryImplant.id, { surgeryImplant, implant });
+      if (!catalogImplantMap.has(implant.id)) {
+        catalogImplantMap.set(implant.id, []);
+      }
+      catalogImplantMap.get(implant.id)!.push({ surgeryImplant, implant });
+    }
+
+    // Track ISQ history per catalog implant for delta calculation
+    const isqHistory = new Map<string, { date: string; value: number }[]>();
+
+    // Add ISQ events from pose (initial measurement)
+    for (const { surgeryImplant, implant } of surgeryImplantsData) {
+      if (surgeryImplant.isqPose !== null) {
+        const stability = this.getIsqStability(surgeryImplant.isqPose);
+        events.push({
+          type: "ISQ",
+          at: surgeryImplant.datePose,
+          title: `Mesure ISQ initiale`,
+          description: `Site ${surgeryImplant.siteFdi} - ${implant.marque}`,
+          status: "done",
+          surgeryImplantId: surgeryImplant.id,
+          implantLabel: `${surgeryImplant.siteFdi} - ${implant.marque} ${implant.diametre}x${implant.longueur}`,
+          siteFdi: surgeryImplant.siteFdi,
+          value: surgeryImplant.isqPose,
+          stability,
+        });
+        
+        // Track initial ISQ for delta calculation
+        if (!isqHistory.has(implant.id)) {
+          isqHistory.set(implant.id, []);
+        }
+        isqHistory.get(implant.id)!.push({ date: surgeryImplant.datePose, value: surgeryImplant.isqPose });
+      }
+    }
+
+    // 3. Get all visites for implants in this surgery (visites link to catalog implant ID)
+    const catalogImplantIds = surgeryImplantsData.map(s => s.implant.id);
+    
+    if (catalogImplantIds.length > 0) {
+      const visitesData = await db
+        .select()
+        .from(visites)
+        .where(and(
+          eq(visites.organisationId, organisationId),
+          inArray(visites.implantId, catalogImplantIds)
+        ))
+        .orderBy(visites.date);
+
+      // Add visite events - show all visits regardless of ISQ presence
+      for (const visite of visitesData) {
+        const implantInfoList = catalogImplantMap.get(visite.implantId);
+        if (implantInfoList && implantInfoList.length > 0) {
+          // Find the best matching surgery implant based on date (use the one closest before or on the visit date)
+          const sortedByDate = implantInfoList
+            .filter(info => info.surgeryImplant.datePose <= visite.date)
+            .sort((a, b) => new Date(b.surgeryImplant.datePose).getTime() - new Date(a.surgeryImplant.datePose).getTime());
+          
+          const implantInfo = sortedByDate[0] || implantInfoList[0];
+          const surgeryImplant = implantInfo.surgeryImplant;
+          const implant = implantInfo.implant;
+          
+          let stability: "low" | "moderate" | "high" | undefined;
+          let delta: number | undefined;
+          let previousValue: number | undefined;
+          
+          if (visite.isq !== null) {
+            stability = this.getIsqStability(visite.isq);
+            
+            // Get previous ISQ value for delta calculation
+            const history = isqHistory.get(visite.implantId) || [];
+            const previousMeasurements = history.filter(h => h.date < visite.date);
+            previousValue = previousMeasurements.length > 0 
+              ? previousMeasurements[previousMeasurements.length - 1].value 
+              : undefined;
+            delta = previousValue !== undefined ? visite.isq - previousValue : undefined;
+            
+            // Track this measurement for future delta calculations
+            if (!isqHistory.has(visite.implantId)) {
+              isqHistory.set(visite.implantId, []);
+            }
+            isqHistory.get(visite.implantId)!.push({ date: visite.date, value: visite.isq });
+          }
+          
+          events.push({
+            type: "VISIT",
+            at: visite.date,
+            title: "Visite de contrôle",
+            description: visite.notes || undefined,
+            status: isInPast(visite.date) ? "done" : "upcoming",
+            visitId: visite.id,
+            visitType: "suivi",
+            surgeryImplantId: surgeryImplant.id,
+            implantLabel: `${surgeryImplant.siteFdi} - ${implant.marque}`,
+            siteFdi: surgeryImplant.siteFdi,
+            value: visite.isq ?? undefined,
+            stability,
+            delta,
+            previousValue,
+          });
+        }
+      }
+    }
+
+    // 4. Get radios linked to this operation
+    const radiosData = await db
+      .select()
+      .from(radios)
+      .where(and(
+        eq(radios.organisationId, organisationId),
+        eq(radios.operationId, operationId)
+      ));
+
+    for (const radio of radiosData) {
+      events.push({
+        type: "RADIO",
+        at: radio.date,
+        title: radio.title || this.getRadioTypeLabel(radio.type),
+        status: isInPast(radio.date) ? "done" : "upcoming",
+        radioId: radio.id,
+        radioType: radio.type,
+      });
+    }
+
+    // Sort events by date descending (most recent first)
+    events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+    // Limit to 50 events as per spec
+    const limitedEvents = events.slice(0, 50);
+
+    return {
+      operation: {
+        id: operation.id,
+        dateOperation: operation.dateOperation,
+        typeIntervention: operation.typeIntervention,
+        patientId: operation.patientId,
+        patientNom,
+        patientPrenom,
+      },
+      events: limitedEvents,
+    };
+  }
+
+  private getIsqStability(isq: number): "low" | "moderate" | "high" {
+    if (isq < 55) return "low";
+    if (isq < 70) return "moderate";
+    return "high";
+  }
+
+  private getInterventionLabel(type: string): string {
+    const labels: Record<string, string> = {
+      POSE_IMPLANT: "Pose d'implant",
+      GREFFE_OSSEUSE: "Greffe osseuse",
+      SINUS_LIFT: "Sinus lift",
+      EXTRACTION_IMPLANT_IMMEDIATE: "Extraction + Implant immédiat",
+      REPRISE_IMPLANT: "Reprise d'implant",
+      CHIRURGIE_GUIDEE: "Chirurgie guidée",
+    };
+    return labels[type] || type;
+  }
+
+  private getRadioTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      PANORAMIQUE: "Panoramique",
+      CBCT: "CBCT",
+      RETROALVEOLAIRE: "Rétro-alvéolaire",
+    };
+    return labels[type] || type;
   }
 }
 
