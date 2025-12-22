@@ -171,6 +171,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
   });
 
   const onSubmit = (data: FormData) => {
+    console.log("Form submitted with data:", data);
     const enrichedData = {
       ...data,
       implants: data.implants.map((implant) => {
@@ -208,7 +209,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit, (errors) => console.log("Form validation errors:", errors))} className="space-y-4">
         <Accordion
           type="multiple"
           value={accordionValue}
@@ -744,7 +745,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-operation">
-            {mutation.isPending ? "Enregistrement..." : "Enregistrer l'opération"}
+            {mutation.isPending ? "Enregistrement..." : "Enregistrer l'acte"}
           </Button>
         </div>
       </form>
