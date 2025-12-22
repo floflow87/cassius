@@ -4,7 +4,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   Plus, 
   Search, 
-  Filter, 
   Activity,
   ArrowUpDown,
   ArrowUp,
@@ -13,6 +12,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { ImplantsAdvancedFilterDrawer, ImplantFilterChips, type ImplantFilterGroup } from "@/components/implants-advanced-filter-drawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,7 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CassiusChip, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
+import { CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import { ImplantForm } from "@/components/implant-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -78,7 +78,6 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [implantType, setImplantType] = useState<"implants" | "mini">("implants");
   const [internalSearchQuery, setInternalSearchQuery] = useState("");
   const searchQuery = externalSearchQuery ?? internalSearchQuery;
@@ -87,6 +86,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<ImplantFilterGroup | null>(null);
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
@@ -142,8 +142,19 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   }, [sortColumn, sortDirection]);
 
   const { data: implants, isLoading } = useQuery<ImplantWithStats[]>({
-    queryKey: ["/api/implants"],
+    queryKey: ["/api/implants", implantType, advancedFilters ? JSON.stringify(advancedFilters) : null],
     queryFn: async () => {
+      if (advancedFilters && advancedFilters.rules.length > 0) {
+        const typeImplantValue = implantType === "implants" ? "IMPLANT" : "MINI_IMPLANT";
+        const res = await fetch("/api/catalog-implants/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ filters: advancedFilters, typeImplant: typeImplantValue }),
+        });
+        if (!res.ok) throw new Error("Failed to search implants");
+        return res.json();
+      }
       const res = await fetch("/api/implants", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch implants");
       return res.json();
@@ -328,10 +339,6 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
     setDragOverColumn(null);
   };
 
-  const removeFilter = (filter: string) => {
-    setActiveFilters(activeFilters.filter(f => f !== filter));
-  };
-
   const renderSortIcon = (columnId: ColumnId) => {
     if (sortColumn !== columnId) {
       return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
@@ -411,10 +418,11 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           data-testid="input-search-implants"
         />
         
-        <Button variant="outline" className="gap-2 shrink-0" data-testid="button-filter">
-          <Filter className="h-4 w-4" />
-          Filtrer
-        </Button>
+        <ImplantsAdvancedFilterDrawer
+          filters={advancedFilters}
+          onFiltersChange={setAdvancedFilters}
+          activeFilterCount={advancedFilters?.rules.length || 0}
+        />
 
         {selectedIds.size > 0 && (
           <>
@@ -476,19 +484,19 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           <span className="text-sm text-muted-foreground">{totalImplants} implant{totalImplants > 1 ? "s" : ""}</span>
         </div>
 
-        {activeFilters.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Filtres actifs:</span>
-            {activeFilters.map((filter) => (
-              <CassiusChip 
-                key={filter} 
-                onRemove={() => removeFilter(filter)}
-              >
-                {filter}
-              </CassiusChip>
-            ))}
-          </div>
-        )}
+        <ImplantFilterChips
+          filters={advancedFilters}
+          onRemoveFilter={(ruleId) => {
+            if (!advancedFilters) return;
+            const updatedRules = advancedFilters.rules.filter(r => r.id !== ruleId);
+            if (updatedRules.length === 0) {
+              setAdvancedFilters(null);
+            } else {
+              setAdvancedFilters({ ...advancedFilters, rules: updatedRules });
+            }
+          }}
+          onClearAll={() => setAdvancedFilters(null)}
+        />
       </div>
 
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">

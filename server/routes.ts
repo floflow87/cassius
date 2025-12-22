@@ -48,6 +48,108 @@ function getOrganisationId(req: Request, res: Response): string | null {
   return organisationId;
 }
 
+type ImplantWithStats = {
+  id: string;
+  marque: string;
+  referenceFabricant: string | null;
+  diametre: number;
+  longueur: number;
+  lot: string | null;
+  poseCount: number;
+  successRate: number | null;
+};
+
+function evaluateImplantFilterRule(implant: ImplantWithStats, rule: {
+  field: string;
+  operator: string;
+  value: string | number | null;
+  value2?: string | number | null;
+}): boolean {
+  const { field, operator, value, value2 } = rule;
+  
+  // Get the implant value for the field
+  let implantValue: string | number | null;
+  switch (field) {
+    case "marque":
+      implantValue = implant.marque;
+      break;
+    case "referenceFabricant":
+      implantValue = implant.referenceFabricant;
+      break;
+    case "diametre":
+      implantValue = implant.diametre;
+      break;
+    case "longueur":
+      implantValue = implant.longueur;
+      break;
+    case "lot":
+      implantValue = implant.lot;
+      break;
+    case "poseCount":
+      implantValue = implant.poseCount;
+      break;
+    case "successRate":
+      implantValue = implant.successRate;
+      break;
+    default:
+      return false;
+  }
+  
+  // Handle null implant values
+  if (implantValue === null || implantValue === undefined) {
+    return false;
+  }
+  
+  // Text operators
+  if (typeof implantValue === "string") {
+    const strValue = String(value || "").toLowerCase();
+    const strImplantValue = implantValue.toLowerCase();
+    
+    switch (operator) {
+      case "contains":
+        return strImplantValue.includes(strValue);
+      case "not_contains":
+        return !strImplantValue.includes(strValue);
+      case "equals":
+        return strImplantValue === strValue;
+      case "not_equals":
+        return strImplantValue !== strValue;
+      default:
+        return false;
+    }
+  }
+  
+  // Number operators
+  if (typeof implantValue === "number") {
+    const numValue = Number(value);
+    if (isNaN(numValue)) return false;
+    const numValue2 = value2 !== undefined && value2 !== null ? Number(value2) : null;
+    if (numValue2 !== null && isNaN(numValue2)) return false;
+    
+    switch (operator) {
+      case "equals":
+        return implantValue === numValue;
+      case "not_equals":
+        return implantValue !== numValue;
+      case "greater_than":
+        return implantValue > numValue;
+      case "greater_than_or_equal":
+        return implantValue >= numValue;
+      case "less_than":
+        return implantValue < numValue;
+      case "less_than_or_equal":
+        return implantValue <= numValue;
+      case "between":
+        if (numValue2 === null) return implantValue >= numValue;
+        return implantValue >= numValue && implantValue <= numValue2;
+      default:
+        return false;
+    }
+  }
+  
+  return false;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -477,6 +579,71 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching catalog implant surgeries:", error);
       res.status(500).json({ error: "Failed to fetch surgeries" });
+    }
+  });
+
+  // Zod schema for implant filter validation
+  const implantFilterRuleSchema = z.object({
+    id: z.string(),
+    field: z.enum(["marque", "referenceFabricant", "diametre", "longueur", "lot", "poseCount", "successRate"]),
+    operator: z.enum(["equals", "not_equals", "contains", "not_contains", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "between"]),
+    value: z.union([z.string(), z.number(), z.null()]),
+    value2: z.union([z.string(), z.number(), z.null()]).optional(),
+  });
+
+  const implantFilterGroupSchema = z.object({
+    id: z.string(),
+    operator: z.enum(["AND", "OR"]),
+    rules: z.array(implantFilterRuleSchema),
+  });
+
+  const catalogImplantSearchSchema = z.object({
+    filters: implantFilterGroupSchema.nullable().optional(),
+    typeImplant: z.enum(["IMPLANT", "MINI_IMPLANT"]).optional(),
+  });
+
+  // Search catalog implants with advanced filters
+  app.post("/api/catalog-implants/search", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const parseResult = catalogImplantSearchSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid filter format", details: parseResult.error.errors });
+      }
+      
+      const { filters, typeImplant } = parseResult.data;
+      
+      // Get all implants with stats first
+      let allImplants = await storage.getAllImplantsWithStats(organisationId);
+      
+      // Filter by implant type if specified
+      if (typeImplant) {
+        allImplants = allImplants.filter(i => i.typeImplant === typeImplant);
+      }
+      
+      // Apply advanced filters if present
+      if (filters && filters.rules && filters.rules.length > 0) {
+        const groupOperator = filters.operator || "AND";
+        
+        allImplants = allImplants.filter(implant => {
+          const results = filters.rules.map((rule) => {
+            return evaluateImplantFilterRule(implant, rule);
+          });
+          
+          if (groupOperator === "AND") {
+            return results.every(r => r);
+          } else {
+            return results.some(r => r);
+          }
+        });
+      }
+      
+      res.json(allImplants);
+    } catch (error) {
+      console.error("Error searching catalog implants:", error);
+      res.status(500).json({ error: "Failed to search catalog implants" });
     }
   });
 
