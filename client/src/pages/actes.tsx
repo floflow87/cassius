@@ -523,7 +523,31 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           />
           <span className="text-xs text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
         </div>
-        <Sheet open={sheetOpen} onOpenChange={(open) => {
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <>
+              <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowBulkDeleteDialog(true)}
+                data-testid="button-bulk-delete"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+                data-testid="button-clear-selection"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Annuler
+              </Button>
+            </>
+          )}
+          <Sheet open={sheetOpen} onOpenChange={(open) => {
           setSheetOpen(open);
           if (!open) {
             setSelectedPatientId(null);
@@ -606,31 +630,8 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             </div>
           </SheetContent>
         </Sheet>
-      </div>
-
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg">
-          <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setShowBulkDeleteDialog(true)}
-            data-testid="button-bulk-delete"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Supprimer
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedIds(new Set())}
-            data-testid="button-clear-selection"
-          >
-            <X className="h-4 w-4 mr-2" />
-            Annuler
-          </Button>
         </div>
-      )}
+      </div>
 
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
         <div className="overflow-x-auto">
@@ -694,7 +695,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                       "border-b border-border-gray hover-elevate cursor-pointer",
                       selectedIds.has(op.id) && "bg-primary/5"
                     )}
-                    onClick={() => setLocation(`/patients/${op.patientId}`)}
+                    onClick={() => setLocation(`/actes/${op.id}`)}
                     data-testid={`row-operation-${op.id}`}
                   >
                     <td className="w-[40px] px-3 py-2" onClick={(e) => e.stopPropagation()}>
@@ -718,7 +719,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-background">
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setLocation(`/patients/${op.patientId}`); }}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setLocation(`/actes/${op.id}`); }}>
                             <Eye className="h-4 w-4 mr-2" />
                             Voir
                           </DropdownMenuItem>

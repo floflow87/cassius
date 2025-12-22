@@ -302,7 +302,7 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const operation = await storage.getOperation(organisationId, req.params.id);
+      const operation = await storage.getOperationWithDetails(organisationId, req.params.id);
       if (!operation) {
         return res.status(404).json({ error: "Operation not found" });
       }

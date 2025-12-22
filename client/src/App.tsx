@@ -16,6 +16,7 @@ import PatientReportPage from "@/pages/patient-report";
 import DashboardPage from "@/pages/dashboard";
 import ImplantsPage from "@/pages/implants";
 import ActesPage from "@/pages/actes";
+import ActeDetailsPage from "@/pages/acte-details";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import { apiRequest } from "@/lib/queryClient";
@@ -164,6 +165,7 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/actes">
         {() => <ActesPage />}
       </Route>
+      <Route path="/actes/:id" component={ActeDetailsPage} />
       <Route component={NotFound} />
     </Switch>
   );

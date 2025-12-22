@@ -182,6 +182,14 @@ export interface ImplantDetail extends SurgeryImplant {
   radios: Radio[];
 }
 
+// Détails complets d'une opération (acte chirurgical)
+export interface OperationDetail extends Operation {
+  patient: Patient;
+  surgeryImplants: SurgeryImplantWithDetails[];
+  radios: Radio[];
+  visites: Visite[];
+}
+
 export interface ImplantWithPatient extends SurgeryImplant {
   implant: Implant;
   patient?: Patient;

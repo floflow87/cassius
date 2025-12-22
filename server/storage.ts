@@ -45,6 +45,7 @@ import type {
   AdvancedStats,
   ImplantFilters,
   CreateUserInput,
+  OperationDetail,
 } from "@shared/types";
 import { db } from "./db";
 import { eq, desc, ilike, or, and, lte, inArray } from "drizzle-orm";
@@ -69,6 +70,7 @@ export interface IStorage {
 
   // Operation methods
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
+  getOperationWithDetails(organisationId: string, id: string): Promise<OperationDetail | undefined>;
   getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; successRate: number | null })[]>;
   createOperation(organisationId: string, operation: InsertOperation): Promise<Operation>;
   deleteOperation(organisationId: string, id: string): Promise<boolean>;
@@ -355,6 +357,79 @@ export class DatabaseStorage implements IStorage {
         eq(operations.organisationId, organisationId)
       ));
     return operation || undefined;
+  }
+
+  async getOperationWithDetails(organisationId: string, id: string): Promise<OperationDetail | undefined> {
+    // Get operation with patient info in one query
+    const operationWithPatient = await db
+      .select({
+        operation: operations,
+        patient: patients,
+      })
+      .from(operations)
+      .innerJoin(patients, eq(operations.patientId, patients.id))
+      .where(and(
+        eq(operations.id, id),
+        eq(operations.organisationId, organisationId)
+      ));
+
+    if (operationWithPatient.length === 0) {
+      return undefined;
+    }
+
+    const { operation, patient } = operationWithPatient[0];
+
+    // Get surgery implants with their catalog implant details
+    const surgeryImplantsData = await db
+      .select({
+        surgeryImplant: surgeryImplants,
+        implant: implants,
+      })
+      .from(surgeryImplants)
+      .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
+      .where(and(
+        eq(surgeryImplants.surgeryId, id),
+        eq(surgeryImplants.organisationId, organisationId)
+      ))
+      .orderBy(surgeryImplants.siteFdi);
+
+    // Get all catalog implant IDs for this surgery
+    const implantIds = surgeryImplantsData.map(d => d.implant.id);
+
+    // Fetch radios and visites in parallel
+    const [operationRadios, operationVisites] = await Promise.all([
+      // Get radios for this patient
+      db.select().from(radios)
+        .where(and(
+          eq(radios.patientId, operation.patientId),
+          eq(radios.organisationId, organisationId)
+        ))
+        .orderBy(desc(radios.date)),
+      // Get visites for all implants in this surgery
+      implantIds.length > 0
+        ? db.select().from(visites)
+            .where(and(
+              inArray(visites.implantId, implantIds),
+              eq(visites.organisationId, organisationId)
+            ))
+            .orderBy(desc(visites.date))
+        : Promise.resolve([]),
+    ]);
+
+    // Map surgery implants with details
+    const surgeryImplantsWithDetails: SurgeryImplantWithDetails[] = surgeryImplantsData.map(({ surgeryImplant, implant }) => ({
+      ...surgeryImplant,
+      implant,
+      surgery: operation,
+    }));
+
+    return {
+      ...operation,
+      patient,
+      surgeryImplants: surgeryImplantsWithDetails,
+      radios: operationRadios,
+      visites: operationVisites,
+    };
   }
 
   async getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; successRate: number | null })[]> {
