@@ -179,6 +179,20 @@ export async function registerRoutes(
     }
   });
 
+  // Advanced patient search with filters, pagination, and sorting
+  app.post("/api/patients/search", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const result = await storage.searchPatientsAdvanced(organisationId, req.body);
+      res.json(result);
+    } catch (error) {
+      console.error("Error in advanced patient search:", error);
+      res.status(500).json({ error: "Failed to search patients" });
+    }
+  });
+
   app.get("/api/patients/implant-counts", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;

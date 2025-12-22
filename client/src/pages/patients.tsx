@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   Plus, 
   Search, 
-  Filter, 
   User,
   X,
   ArrowUpDown,
@@ -40,10 +39,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PatientForm } from "@/components/patient-form";
-import { CassiusBadge, CassiusChip, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
+import { CassiusBadge, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
+import { AdvancedFilterDrawer, FilterChips } from "@/components/advanced-filter-drawer";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Patient } from "@shared/schema";
+import type { FilterGroup, FilterRule, PatientSearchResult } from "@shared/types";
 
 interface PatientsPageProps {
   searchQuery: string;
@@ -77,7 +78,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   const [, setLocation] = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [advancedFilters, setAdvancedFilters] = useState<FilterGroup | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const { toast } = useToast();
@@ -143,22 +144,50 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     localStorage.setItem(STORAGE_KEY_SORT, JSON.stringify({ column: sortColumn, direction: sortDirection }));
   }, [sortColumn, sortDirection]);
 
-  // OPTIMIZATION: Combined summary endpoint - reduces 3 API calls to 1
-  const { data: summaryData, isLoading } = useQuery<{
+  const activeFilterCount = useMemo(() => {
+    if (!advancedFilters) return 0;
+    return advancedFilters.rules.filter(rule => "field" in rule).length;
+  }, [advancedFilters]);
+
+  const hasActiveFilters = advancedFilters && advancedFilters.rules.length > 0;
+
+  // Use search endpoint when filters are active, otherwise use summary endpoint
+  const { data: searchData, isLoading: isSearchLoading } = useQuery<PatientSearchResult>({
+    queryKey: ["/api/patients/search", advancedFilters, currentPage, sortColumn, sortDirection],
+    queryFn: async () => {
+      const response = await apiRequest("POST", "/api/patients/search", {
+        filters: advancedFilters,
+        pagination: { page: currentPage, pageSize: itemsPerPage },
+        sort: sortColumn && sortDirection ? {
+          field: sortColumn === "patient" ? "nom" : sortColumn,
+          direction: sortDirection
+        } : undefined,
+      });
+      return response.json();
+    },
+    enabled: hasActiveFilters,
+  });
+
+  // OPTIMIZATION: Combined summary endpoint - reduces 3 API calls to 1 (when no filters)
+  const { data: summaryData, isLoading: isSummaryLoading } = useQuery<{
     patients: Patient[];
     implantCounts: Record<string, number>;
     lastVisits: Record<string, { date: string; titre: string | null }>;
   }>({
     queryKey: ["/api/patients/summary"],
+    enabled: !hasActiveFilters,
   });
   
-  const patients = summaryData?.patients;
-  const implantCounts = summaryData?.implantCounts;
-  const lastVisits = summaryData?.lastVisits;
+  const isLoading = hasActiveFilters ? isSearchLoading : isSummaryLoading;
+  const patients = hasActiveFilters ? searchData?.patients : summaryData?.patients;
+  const implantCounts = hasActiveFilters ? searchData?.implantCounts : summaryData?.implantCounts;
+  const lastVisits = hasActiveFilters ? searchData?.lastVisits : summaryData?.lastVisits;
+  const serverTotal = hasActiveFilters ? searchData?.total : undefined;
+  const serverTotalPages = hasActiveFilters ? searchData?.totalPages : undefined;
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, advancedFilters]);
 
   useEffect(() => {
     if (patients && currentPage > 1) {
@@ -219,12 +248,14 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     });
   }, [sortColumn, sortDirection, implantCounts, lastVisits]);
 
-  const sortedPatients = sortPatients(filteredPatients);
-  const totalPatients = sortedPatients.length;
-  const totalPages = Math.ceil(totalPatients / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalPatients);
-  const paginatedPatients = sortedPatients.slice(startIndex, endIndex);
+  // When filters are active, server handles sorting and pagination
+  // When no filters, we handle it client-side
+  const sortedPatients = hasActiveFilters ? (patients || []) : sortPatients(filteredPatients);
+  const totalPatients = hasActiveFilters ? (serverTotal || 0) : sortedPatients.length;
+  const totalPages = hasActiveFilters ? (serverTotalPages || 1) : Math.ceil(totalPatients / itemsPerPage);
+  const startIndex = hasActiveFilters ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = hasActiveFilters ? sortedPatients.length : Math.min(startIndex + itemsPerPage, totalPatients);
+  const paginatedPatients = hasActiveFilters ? sortedPatients : sortedPatients.slice(startIndex, endIndex);
 
   const currentPageIds = paginatedPatients.map(p => p.id);
   const allCurrentPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selectedIds.has(id));
@@ -263,6 +294,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     },
     onSuccess: (deletedCount) => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/search"] });
       setSelectedIds(new Set());
       setShowBulkDeleteDialog(false);
       toast({
@@ -345,9 +377,22 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     return `${formatDate(dateString)} (${age} ans)`;
   };
 
-  const removeFilter = (filter: string) => {
-    setActiveFilters(activeFilters.filter(f => f !== filter));
-  };
+  const handleRemoveFilter = useCallback((ruleId: string) => {
+    if (!advancedFilters) return;
+    const newRules = advancedFilters.rules.filter(rule => {
+      if ("id" in rule) return rule.id !== ruleId;
+      return true;
+    });
+    if (newRules.length === 0) {
+      setAdvancedFilters(null);
+    } else {
+      setAdvancedFilters({ ...advancedFilters, rules: newRules });
+    }
+  }, [advancedFilters]);
+
+  const handleClearAllFilters = useCallback(() => {
+    setAdvancedFilters(null);
+  }, []);
 
   const getPatientStatus = (_patient: Patient): "actif" | "en-suivi" | "planifie" | "inactif" => {
     return "actif";
@@ -463,10 +508,11 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           data-testid="input-search-patients"
         />
         
-        <Button variant="outline" className="gap-2 shrink-0" data-testid="button-filter">
-          <Filter className="h-4 w-4" />
-          Filtrer
-        </Button>
+        <AdvancedFilterDrawer
+          filters={advancedFilters}
+          onFiltersChange={setAdvancedFilters}
+          activeFilterCount={activeFilterCount}
+        />
 
         <div className="flex items-center border rounded-md">
           <Button
@@ -532,17 +578,13 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         </Sheet>
       </div>
 
-      {activeFilters.length > 0 && (
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-sm text-muted-foreground">Filtres actifs:</span>
-          {activeFilters.map((filter) => (
-            <CassiusChip 
-              key={filter} 
-              onRemove={() => removeFilter(filter)}
-            >
-              {filter}
-            </CassiusChip>
-          ))}
+      {advancedFilters && advancedFilters.rules.length > 0 && (
+        <div className="mb-5">
+          <FilterChips
+            filters={advancedFilters}
+            onRemoveFilter={handleRemoveFilter}
+            onClearAll={handleClearAllFilters}
+          />
         </div>
       )}
 

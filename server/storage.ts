@@ -46,9 +46,13 @@ import type {
   ImplantFilters,
   CreateUserInput,
   OperationDetail,
+  PatientSearchRequest,
+  PatientSearchResult,
+  FilterGroup,
+  FilterRule,
 } from "@shared/types";
-import { db } from "./db";
-import { eq, desc, ilike, or, and, lte, inArray } from "drizzle-orm";
+import { db, pool } from "./db";
+import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL } from "drizzle-orm";
 
 export type PatientSummary = {
   patients: Patient[];
@@ -67,6 +71,7 @@ export interface IStorage {
   searchPatients(organisationId: string, query: string): Promise<Patient[]>;
   getPatientImplantCounts(organisationId: string): Promise<Record<string, number>>;
   getPatientsWithSummary(organisationId: string): Promise<PatientSummary>;
+  searchPatientsAdvanced(organisationId: string, request: PatientSearchRequest): Promise<PatientSearchResult>;
 
   // Operation methods
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
@@ -347,6 +352,288 @@ export class DatabaseStorage implements IStorage {
       implantCounts,
       lastVisits,
     };
+  }
+
+  async searchPatientsAdvanced(organisationId: string, request: PatientSearchRequest): Promise<PatientSearchResult> {
+    const { pagination, sort, filters } = request;
+    const page = pagination?.page ?? 1;
+    const pageSize = pagination?.pageSize ?? 25;
+    const offset = (page - 1) * pageSize;
+    const sortField = sort?.field ?? "nom";
+    const sortDir = sort?.direction ?? "asc";
+
+    // Build WHERE clause based on filters
+    const { whereClause, params } = this.buildFilterSql(filters, organisationId);
+    
+    // Determine if we need JOINs based on filter fields
+    const needsSurgeryJoin = this.filterUsesField(filters, ["surgery_", "implant_"]);
+    const needsImplantJoin = this.filterUsesField(filters, ["implant_"]);
+    const needsLastVisitJoin = this.filterUsesField(filters, ["patient_derniereVisite"]);
+    
+    // Build FROM clause with necessary JOINs
+    let fromClause = "patients p";
+    if (needsSurgeryJoin) {
+      fromClause += " LEFT JOIN operations o ON o.patient_id = p.id AND o.organisation_id = p.organisation_id";
+    }
+    if (needsImplantJoin) {
+      fromClause += " LEFT JOIN surgery_implants si ON si.surgery_id = o.id AND si.organisation_id = p.organisation_id";
+      fromClause += " LEFT JOIN implants i ON i.id = si.implant_id";
+    }
+    if (needsLastVisitJoin) {
+      fromClause += ` LEFT JOIN LATERAL (
+        SELECT date FROM rendez_vous WHERE patient_id = p.id AND organisation_id = p.organisation_id 
+        ORDER BY date DESC LIMIT 1
+      ) last_rv ON true`;
+    }
+    
+    // Build sort clause
+    const sortColumn = this.getSortColumn(sortField);
+    const sortClause = `${sortColumn} ${sortDir === "desc" ? "DESC" : "ASC"} NULLS LAST`;
+    
+    // Count query (distinct patients)
+    const countSql = `SELECT COUNT(DISTINCT p.id) as total FROM ${fromClause} WHERE ${whereClause}`;
+    
+    // Main query with pagination
+    const mainSql = `
+      SELECT DISTINCT p.* 
+      FROM ${fromClause} 
+      WHERE ${whereClause} 
+      ORDER BY ${sortClause}
+      LIMIT ${pageSize} OFFSET ${offset}
+    `;
+    
+    try {
+      // Execute queries
+      const [countResult, patientsResult] = await Promise.all([
+        pool.query(countSql, params),
+        pool.query(mainSql, params),
+      ]);
+      
+      const total = parseInt(countResult.rows[0]?.total ?? "0", 10);
+      const patientRows = patientsResult.rows;
+      
+      // Map to Patient type
+      const patientList: Patient[] = patientRows.map((row: any) => ({
+        id: row.id,
+        organisationId: row.organisation_id,
+        nom: row.nom,
+        prenom: row.prenom,
+        dateNaissance: row.date_naissance,
+        sexe: row.sexe,
+        telephone: row.telephone,
+        email: row.email,
+        adresse: row.adresse,
+        codePostal: row.code_postal,
+        ville: row.ville,
+        pays: row.pays,
+        allergies: row.allergies,
+        traitement: row.traitement,
+        conditions: row.conditions,
+        contexteMedical: row.contexte_medical,
+        statut: row.statut,
+        createdAt: row.created_at,
+      }));
+      
+      // Get implant counts and last visits for these patients
+      const patientIds = patientList.map(p => p.id);
+      const [implantCounts, lastVisits] = await Promise.all([
+        this.getImplantCountsForPatients(organisationId, patientIds),
+        this.getLastVisitsForPatients(organisationId, patientIds),
+      ]);
+      
+      return {
+        patients: patientList,
+        implantCounts,
+        lastVisits,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      };
+    } catch (error) {
+      console.error("[SEARCH] Advanced patient search failed:", error);
+      throw error;
+    }
+  }
+
+  private filterUsesField(filters: FilterGroup | undefined, prefixes: string[]): boolean {
+    if (!filters) return false;
+    
+    const checkRule = (rule: FilterRule | FilterGroup): boolean => {
+      if ("field" in rule) {
+        return prefixes.some(prefix => rule.field.startsWith(prefix));
+      }
+      return rule.rules.some(checkRule);
+    };
+    
+    return filters.rules.some(checkRule);
+  }
+
+  private getSortColumn(field: string): string {
+    const mapping: Record<string, string> = {
+      nom: "p.nom",
+      prenom: "p.prenom",
+      dateNaissance: "p.date_naissance",
+      statut: "p.statut",
+      createdAt: "p.created_at",
+    };
+    return mapping[field] || "p.nom";
+  }
+
+  private buildFilterSql(filters: FilterGroup | undefined, organisationId: string): { whereClause: string; params: any[] } {
+    const params: any[] = [organisationId];
+    let paramIndex = 2;
+    
+    if (!filters || filters.rules.length === 0) {
+      return { whereClause: "p.organisation_id = $1", params };
+    }
+    
+    const buildCondition = (rule: FilterRule | FilterGroup): string => {
+      if ("operator" in rule && "rules" in rule) {
+        // It's a FilterGroup
+        const group = rule as FilterGroup;
+        if (group.rules.length === 0) return "TRUE";
+        const conditions = group.rules.map(buildCondition);
+        return `(${conditions.join(` ${group.operator} `)})`;
+      }
+      
+      // It's a FilterRule
+      const filterRule = rule as FilterRule;
+      const { field, operator, value, value2 } = filterRule;
+      
+      // Get the SQL column for this field
+      const column = this.getColumnForField(field);
+      if (!column) return "TRUE";
+      
+      // Build the condition based on operator
+      switch (operator) {
+        case "equals":
+          params.push(value);
+          return `${column} = $${paramIndex++}`;
+        case "not_equals":
+          params.push(value);
+          return `${column} != $${paramIndex++}`;
+        case "contains":
+          params.push(`%${value}%`);
+          return `${column} ILIKE $${paramIndex++}`;
+        case "not_contains":
+          params.push(`%${value}%`);
+          return `${column} NOT ILIKE $${paramIndex++}`;
+        case "greater_than":
+          params.push(value);
+          return `${column} > $${paramIndex++}`;
+        case "greater_than_or_equal":
+          params.push(value);
+          return `${column} >= $${paramIndex++}`;
+        case "less_than":
+          params.push(value);
+          return `${column} < $${paramIndex++}`;
+        case "less_than_or_equal":
+          params.push(value);
+          return `${column} <= $${paramIndex++}`;
+        case "between":
+          params.push(value, value2);
+          return `${column} BETWEEN $${paramIndex++} AND $${paramIndex++}`;
+        case "is_true":
+          return `${column} = TRUE`;
+        case "is_false":
+          return `${column} = FALSE OR ${column} IS NULL`;
+        case "after":
+          params.push(value);
+          return `${column} > $${paramIndex++}`;
+        case "before":
+          params.push(value);
+          return `${column} < $${paramIndex++}`;
+        case "last_n_days":
+          params.push(value);
+          return `${column} >= CURRENT_DATE - ($${paramIndex++} || ' days')::interval`;
+        case "last_n_months":
+          params.push(value);
+          return `${column} >= CURRENT_DATE - ($${paramIndex++} || ' months')::interval`;
+        case "last_n_years":
+          params.push(value);
+          return `${column} >= CURRENT_DATE - ($${paramIndex++} || ' years')::interval`;
+        default:
+          return "TRUE";
+      }
+    };
+    
+    const filterCondition = buildCondition(filters);
+    return {
+      whereClause: `p.organisation_id = $1 AND ${filterCondition}`,
+      params,
+    };
+  }
+
+  private getColumnForField(field: string): string | null {
+    const mapping: Record<string, string> = {
+      // Patient fields
+      patient_nom: "p.nom",
+      patient_prenom: "p.prenom",
+      patient_dateNaissance: "p.date_naissance",
+      patient_statut: "p.statut",
+      patient_derniereVisite: "last_rv.date",
+      patient_implantCount: "(SELECT COUNT(*) FROM surgery_implants si2 JOIN operations o2 ON si2.surgery_id = o2.id WHERE o2.patient_id = p.id)",
+      // Surgery fields
+      surgery_hasSurgery: "(SELECT COUNT(*) FROM operations o3 WHERE o3.patient_id = p.id) > 0",
+      surgery_dateOperation: "o.date_operation",
+      surgery_successRate: "CASE WHEN si.statut = 'SUCCES' THEN 100 WHEN si.statut = 'ECHEC' THEN 0 WHEN si.statut = 'COMPLICATION' THEN 50 ELSE NULL END",
+      surgery_typeIntervention: "o.type_intervention",
+      // Implant fields
+      implant_marque: "i.marque",
+      implant_reference: "i.reference_fabricant",
+      implant_siteFdi: "si.site_fdi",
+      implant_successRate: "CASE WHEN si.bone_loss_score IS NULL THEN NULL ELSE (5 - si.bone_loss_score) * 20 END",
+      implant_datePose: "si.date_pose",
+      implant_statut: "si.statut",
+    };
+    return mapping[field] || null;
+  }
+
+  private async getImplantCountsForPatients(organisationId: string, patientIds: string[]): Promise<Record<string, number>> {
+    if (patientIds.length === 0) return {};
+    
+    const result = await db
+      .select({
+        patientId: operations.patientId,
+      })
+      .from(surgeryImplants)
+      .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+      .where(and(
+        eq(surgeryImplants.organisationId, organisationId),
+        inArray(operations.patientId, patientIds)
+      ));
+    
+    const counts: Record<string, number> = {};
+    for (const row of result) {
+      counts[row.patientId] = (counts[row.patientId] || 0) + 1;
+    }
+    return counts;
+  }
+
+  private async getLastVisitsForPatients(organisationId: string, patientIds: string[]): Promise<Record<string, { date: string; titre: string | null }>> {
+    if (patientIds.length === 0) return {};
+    
+    const result = await db
+      .select({
+        patientId: rendezVous.patientId,
+        date: rendezVous.date,
+        titre: rendezVous.titre,
+      })
+      .from(rendezVous)
+      .where(and(
+        eq(rendezVous.organisationId, organisationId),
+        inArray(rendezVous.patientId, patientIds)
+      ))
+      .orderBy(desc(rendezVous.date));
+    
+    const visits: Record<string, { date: string; titre: string | null }> = {};
+    for (const row of result) {
+      if (!visits[row.patientId]) {
+        visits[row.patientId] = { date: row.date, titre: row.titre };
+      }
+    }
+    return visits;
   }
 
   // ========== OPERATIONS ==========
