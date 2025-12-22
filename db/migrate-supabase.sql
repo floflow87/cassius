@@ -133,3 +133,27 @@ ON visites(organisation_id, implant_id);
 -- Index on documents for queries by organisation and patient
 CREATE INDEX IF NOT EXISTS idx_documents_org_patient 
 ON documents(organisation_id, patient_id);
+
+-- ============================================
+-- Saved Filters Table (added December 2025)
+-- ============================================
+-- Create saved_filter_page_type enum if not exists
+DO $$ BEGIN
+    CREATE TYPE saved_filter_page_type AS ENUM ('patients', 'implants', 'actes');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Create saved_filters table if not exists
+CREATE TABLE IF NOT EXISTS saved_filters (
+    id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    page_type saved_filter_page_type NOT NULL,
+    filter_data TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+-- Index on saved_filters for queries by organisation and page_type
+CREATE INDEX IF NOT EXISTS idx_saved_filters_org_page 
+ON saved_filters(organisation_id, page_type);

@@ -113,7 +113,8 @@ export function AdvancedFilterDrawer({ filters, onFiltersChange, activeFilterCou
 
   const saveMutation = useMutation({
     mutationFn: async (data: { name: string; pageType: string; filterData: string }) => {
-      return apiRequest("POST", "/api/saved-filters", data);
+      const res = await apiRequest("POST", "/api/saved-filters", data);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/saved-filters/patients"] });
@@ -121,8 +122,9 @@ export function AdvancedFilterDrawer({ filters, onFiltersChange, activeFilterCou
       setSaveDialogOpen(false);
       setFilterName("");
     },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de sauvegarder le filtre.", variant: "destructive" });
+    onError: (error: Error) => {
+      console.error("Save filter error:", error);
+      toast({ title: "Erreur", description: error.message || "Impossible de sauvegarder le filtre.", variant: "destructive" });
     },
   });
 
