@@ -340,6 +340,22 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/operations/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const deleted = await storage.deleteOperation(organisationId, req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Operation not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting operation:", error);
+      res.status(500).json({ error: "Failed to delete operation" });
+    }
+  });
+
   // ========== IMPLANTS ==========
   app.get("/api/implants/brands", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

@@ -70,6 +70,7 @@ export interface IStorage {
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
   getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; successRate: number | null })[]>;
   createOperation(organisationId: string, operation: InsertOperation): Promise<Operation>;
+  deleteOperation(organisationId: string, id: string): Promise<boolean>;
   createOperationWithImplants(
     organisationId: string,
     operationData: InsertOperation,
@@ -459,6 +460,16 @@ export class DatabaseStorage implements IStorage {
 
       return { operation, surgeryImplants: createdSurgeryImplants };
     });
+  }
+
+  async deleteOperation(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(operations)
+      .where(and(
+        eq(operations.id, id),
+        eq(operations.organisationId, organisationId)
+      ))
+      .returning({ id: operations.id });
+    return result.length > 0;
   }
 
   // ========== IMPLANTS ==========

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
@@ -13,7 +13,9 @@ import {
   MoreHorizontal,
   Eye,
   Trash2,
+  X,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -137,6 +139,8 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [patientPopoverOpen, setPatientPopoverOpen] = useState(false);
   const [operationToDelete, setOperationToDelete] = useState<OperationWithDetails | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const { toast } = useToast();
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
@@ -217,6 +221,29 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         variant: "success",
       });
       setOperationToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map(id => apiRequest("DELETE", `/api/operations/${id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+      toast({
+        title: "Actes supprimés",
+        description: `${selectedIds.size} acte(s) supprimé(s) avec succès.`,
+        variant: "success",
+      });
+      setSelectedIds(new Set());
+      setShowBulkDeleteDialog(false);
     },
     onError: (error: Error) => {
       toast({
@@ -325,6 +352,37 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
     }
     setDraggedColumn(null);
     setDragOverColumn(null);
+  };
+
+  const currentPageIds = useMemo(() => paginatedOperations.map(op => op.id), [paginatedOperations]);
+
+  const allCurrentPageSelected = useMemo(() => {
+    if (currentPageIds.length === 0) return false;
+    return currentPageIds.every(id => selectedIds.has(id));
+  }, [currentPageIds, selectedIds]);
+
+  const someCurrentPageSelected = useMemo(() => {
+    return currentPageIds.some(id => selectedIds.has(id)) && !allCurrentPageSelected;
+  }, [currentPageIds, selectedIds, allCurrentPageSelected]);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set([...Array.from(selectedIds), ...currentPageIds]));
+    } else {
+      const newSet = new Set(selectedIds);
+      currentPageIds.forEach(id => newSet.delete(id));
+      setSelectedIds(newSet);
+    }
+  };
+
+  const handleSelectRow = (id: string, checked: boolean) => {
+    const newSet = new Set(selectedIds);
+    if (checked) {
+      newSet.add(id);
+    } else {
+      newSet.delete(id);
+    }
+    setSelectedIds(newSet);
   };
 
   const renderSortIcon = (columnId: ColumnId) => {
@@ -519,11 +577,43 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         </Sheet>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg">
+          <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowBulkDeleteDialog(true)}
+            data-testid="button-bulk-delete"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Supprimer
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+            data-testid="button-clear-selection"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Annuler
+          </Button>
+        </div>
+      )}
+
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border-gray bg-border-gray">
+                <th className="w-[40px] px-3 py-2">
+                  <Checkbox
+                    checked={allCurrentPageSelected ? true : someCurrentPageSelected ? "indeterminate" : false}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Sélectionner tout"
+                    data-testid="checkbox-select-all"
+                  />
+                </th>
                 {columns.map((column) => (
                   <th
                     key={column.id}
@@ -553,7 +643,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             <tbody>
               {paginatedOperations.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 1} className="px-4 py-16">
+                  <td colSpan={columns.length + 2} className="px-4 py-16">
                     <div className="flex flex-col items-center justify-center">
                       <Stethoscope className="h-12 w-12 text-muted-foreground/50 mb-4" />
                       <h3 className="text-base font-medium mb-2 text-foreground">Aucun acte</h3>
@@ -569,10 +659,21 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                 paginatedOperations.map((op) => (
                   <tr 
                     key={op.id} 
-                    className="border-b border-border-gray hover-elevate cursor-pointer"
+                    className={cn(
+                      "border-b border-border-gray hover-elevate cursor-pointer",
+                      selectedIds.has(op.id) && "bg-primary/5"
+                    )}
                     onClick={() => setLocation(`/patients/${op.patientId}`)}
                     data-testid={`row-operation-${op.id}`}
                   >
+                    <td className="w-[40px] px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(op.id)}
+                        onCheckedChange={(checked) => handleSelectRow(op.id, !!checked)}
+                        aria-label={`Sélectionner ${op.patientPrenom} ${op.patientNom}`}
+                        data-testid={`checkbox-row-${op.id}`}
+                      />
+                    </td>
                     {columns.map((column) => (
                       <td key={column.id} className={`px-4 py-2 text-sm ${columnWidths[column.id]}`}>
                         {renderCellContent(column.id, op)}
@@ -633,6 +734,27 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer {selectedIds.size} acte{selectedIds.size > 1 ? "s" : ""} ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Les {selectedIds.size} acte{selectedIds.size > 1 ? "s" : ""} sélectionné{selectedIds.size > 1 ? "s" : ""} seront définitivement supprimé{selectedIds.size > 1 ? "s" : ""}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={bulkDeleteMutation.isPending}
+            >
+              {bulkDeleteMutation.isPending ? "Suppression..." : "Supprimer"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
