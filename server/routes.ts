@@ -162,7 +162,13 @@ type OperationWithDetails = {
   typeChirurgieTemps: string | null;
   typeChirurgieApproche: string | null;
   greffeOsseuse: boolean | null;
-  notes: string | null;
+  typeGreffe: string | null;
+  greffeQuantite: string | null;
+  greffeLocalisation: string | null;
+  typeMiseEnCharge: string | null;
+  conditionsMedicalesPreop: string | null;
+  notesPerop: string | null;
+  observationsPostop: string | null;
   patientNom: string;
   patientPrenom: string;
   implantCount: number;
@@ -714,6 +720,50 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting operation:", error);
       res.status(500).json({ error: "Failed to delete operation" });
+    }
+  });
+
+  app.patch("/api/operations/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const updateSchema = z.object({
+        dateOperation: z.string().optional(),
+        typeIntervention: z.enum([
+          "POSE_IMPLANT",
+          "GREFFE_OSSEUSE",
+          "SINUS_LIFT",
+          "EXTRACTION_IMPLANT_IMMEDIATE",
+          "REPRISE_IMPLANT",
+          "CHIRURGIE_GUIDEE",
+        ]).optional(),
+        typeChirurgieTemps: z.enum(["UN_TEMPS", "DEUX_TEMPS"]).nullable().optional(),
+        typeChirurgieApproche: z.enum(["LAMBEAU", "FLAPLESS"]).nullable().optional(),
+        greffeOsseuse: z.boolean().nullable().optional(),
+        typeGreffe: z.string().nullable().optional(),
+        greffeQuantite: z.string().nullable().optional(),
+        greffeLocalisation: z.string().nullable().optional(),
+        typeMiseEnCharge: z.enum(["IMMEDIATE", "PRECOCE", "DIFFEREE"]).nullable().optional(),
+        conditionsMedicalesPreop: z.string().nullable().optional(),
+        notesPerop: z.string().nullable().optional(),
+        observationsPostop: z.string().nullable().optional(),
+      });
+
+      const validatedUpdates = updateSchema.parse(req.body);
+      const updated = await storage.updateOperation(organisationId, req.params.id, validatedUpdates);
+
+      if (!updated) {
+        return res.status(404).json({ error: "Operation not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error updating operation:", error);
+      res.status(500).json({ error: "Failed to update operation" });
     }
   });
 

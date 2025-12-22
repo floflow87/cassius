@@ -82,6 +82,7 @@ export interface IStorage {
   getOperationWithDetails(organisationId: string, id: string): Promise<OperationDetail | undefined>;
   getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; successRate: number | null })[]>;
   createOperation(organisationId: string, operation: InsertOperation): Promise<Operation>;
+  updateOperation(organisationId: string, id: string, data: Partial<InsertOperation>): Promise<Operation | undefined>;
   deleteOperation(organisationId: string, id: string): Promise<boolean>;
   createOperationWithImplants(
     organisationId: string,
@@ -854,6 +855,17 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning({ id: operations.id });
     return result.length > 0;
+  }
+
+  async updateOperation(organisationId: string, id: string, data: Partial<InsertOperation>): Promise<Operation | undefined> {
+    const [updated] = await db.update(operations)
+      .set(data)
+      .where(and(
+        eq(operations.id, id),
+        eq(operations.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
   }
 
   // ========== IMPLANTS ==========

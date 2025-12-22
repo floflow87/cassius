@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute, useLocation } from "wouter";
 import {
@@ -9,6 +10,8 @@ import {
   Activity,
   ClipboardList,
   Pencil,
+  Plus,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +24,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { OperationDetail } from "@shared/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { RadioUploadForm } from "@/components/radio-upload-form";
+import { OperationEditForm } from "@/components/operation-edit-form";
+import { SurgeryImplantEditSheet } from "@/components/surgery-implant-edit-sheet";
+import type { OperationDetail, SurgeryImplantWithDetails } from "@shared/types";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   EN_SUIVI: { label: "En suivi", variant: "secondary" },
@@ -59,6 +77,10 @@ export default function ActeDetailsPage() {
   const [, params] = useRoute("/actes/:id");
   const acteId = params?.id;
   const [, setLocation] = useLocation();
+  
+  const [radioDialogOpen, setRadioDialogOpen] = useState(false);
+  const [editInterventionOpen, setEditInterventionOpen] = useState(false);
+  const [editingImplant, setEditingImplant] = useState<SurgeryImplantWithDetails | null>(null);
 
   const { data: operation, isLoading } = useQuery<OperationDetail>({
     queryKey: ["/api/operations", acteId],
@@ -127,14 +149,15 @@ export default function ActeDetailsPage() {
               <User className="h-4 w-4" />
               Patient
             </CardTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setLocation(`/patients/${operation.patient.id}/edit`)}
-              data-testid="button-edit-patient"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
+            <Link href={`/patients/${operation.patient.id}`}>
+              <Button
+                variant="ghost"
+                size="icon"
+                data-testid="link-patient-profile"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
             <Link href={`/patients/${operation.patient.id}`}>
@@ -164,7 +187,7 @@ export default function ActeDetailsPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setLocation(`/actes/${acteId}/edit`)}
+              onClick={() => setEditInterventionOpen(true)}
               data-testid="button-edit-intervention"
             >
               <Pencil className="h-4 w-4" />
@@ -261,7 +284,7 @@ export default function ActeDetailsPage() {
             onClick={() => setLocation(`/actes/${acteId}/implants/add`)}
             data-testid="button-add-implant"
           >
-            <Pencil className="h-4 w-4" />
+            <Plus className="h-4 w-4" />
           </Button>
         </CardHeader>
         <CardContent>
@@ -278,6 +301,7 @@ export default function ActeDetailsPage() {
                   <TableHead>Dimensions</TableHead>
                   <TableHead>ISQ Pose</TableHead>
                   <TableHead>Statut</TableHead>
+                  <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -313,6 +337,19 @@ export default function ActeDetailsPage() {
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingImplant(si);
+                        }}
+                        data-testid={`button-edit-implant-${si.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -361,15 +398,28 @@ export default function ActeDetailsPage() {
         </Card>
       )}
 
-      {operation.radios.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <FileImage className="h-4 w-4" />
-              Radiographies associées ({operation.radios.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <FileImage className="h-4 w-4" />
+            Radiographies associées ({operation.radios.length})
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setRadioDialogOpen(true)}
+            data-testid="button-add-radio"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Nouvelle radio
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {operation.radios.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              Aucune radiographie associée à cette intervention
+            </p>
+          ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {operation.radios.map((radio) => (
                 <div
@@ -385,9 +435,45 @@ export default function ActeDetailsPage() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nouvelle radiographie</DialogTitle>
+          </DialogHeader>
+          <RadioUploadForm
+            patientId={operation.patient.id}
+            operations={[operation]}
+            surgeryImplants={operation.surgeryImplants}
+            defaultOperationId={operation.id}
+            onSuccess={() => setRadioDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Sheet open={editInterventionOpen} onOpenChange={setEditInterventionOpen}>
+        <SheetContent className="sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Modifier l'intervention</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6">
+            <OperationEditForm
+              operation={operation}
+              onSuccess={() => setEditInterventionOpen(false)}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <SurgeryImplantEditSheet
+        surgeryImplant={editingImplant}
+        open={!!editingImplant}
+        onOpenChange={(open) => !open && setEditingImplant(null)}
+        onSuccess={() => setEditingImplant(null)}
+      />
     </div>
   );
 }

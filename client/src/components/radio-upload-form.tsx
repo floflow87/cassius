@@ -46,6 +46,7 @@ interface RadioUploadFormProps {
   patientId: string;
   operations: Operation[];
   surgeryImplants: SurgeryImplantWithDetails[];
+  defaultOperationId?: string;
   onSuccess?: () => void;
 }
 
@@ -53,6 +54,7 @@ export function RadioUploadForm({
   patientId,
   operations,
   surgeryImplants,
+  defaultOperationId,
   onSuccess,
 }: RadioUploadFormProps) {
   const { toast } = useToast();
@@ -67,6 +69,7 @@ export function RadioUploadForm({
       title: "",
       type: "PANORAMIQUE",
       date: new Date().toISOString().split("T")[0],
+      operationId: defaultOperationId || "",
       filePath: "",
       fileName: "",
       mimeType: "",
@@ -86,12 +89,22 @@ export function RadioUploadForm({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
       toast({
         title: "Radio ajoutée",
         description: "La radiographie a été enregistrée.",
         variant: "success",
       });
-      form.reset();
+      form.reset({
+        title: "",
+        type: "PANORAMIQUE",
+        date: new Date().toISOString().split("T")[0],
+        operationId: defaultOperationId || "",
+        filePath: "",
+        fileName: "",
+        mimeType: "",
+        sizeBytes: 0,
+      });
       setUploadedFile(null);
       onSuccess?.();
     },
