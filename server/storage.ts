@@ -68,7 +68,7 @@ export interface IStorage {
 
   // Operation methods
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
-  getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number })[]>;
+  getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; successRate: number | null })[]>;
   createOperation(organisationId: string, operation: InsertOperation): Promise<Operation>;
   createOperationWithImplants(
     organisationId: string,
@@ -344,7 +344,7 @@ export class DatabaseStorage implements IStorage {
     return operation || undefined;
   }
 
-  async getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number })[]> {
+  async getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; successRate: number | null })[]> {
     // Get all operations with patient info
     const operationsWithPatients = await db
       .select({
@@ -357,25 +357,38 @@ export class DatabaseStorage implements IStorage {
       .where(eq(operations.organisationId, organisationId))
       .orderBy(desc(operations.dateOperation));
     
-    // Get implant counts per operation
-    const implantCounts = await db
+    // Get implant counts and statuses per operation for success rate calculation
+    const implantData = await db
       .select({
         surgeryId: surgeryImplants.surgeryId,
+        statut: surgeryImplants.statut,
       })
       .from(surgeryImplants)
       .where(eq(surgeryImplants.organisationId, organisationId));
     
+    // Build maps for count and success rate
     const countMap: Record<string, number> = {};
-    for (const row of implantCounts) {
+    const successCountMap: Record<string, number> = {};
+    for (const row of implantData) {
       countMap[row.surgeryId] = (countMap[row.surgeryId] || 0) + 1;
+      if (row.statut === "SUCCES" || row.statut === "EN_SUIVI") {
+        successCountMap[row.surgeryId] = (successCountMap[row.surgeryId] || 0) + 1;
+      }
     }
     
-    return operationsWithPatients.map(({ operation, patientNom, patientPrenom }) => ({
-      ...operation,
-      patientNom,
-      patientPrenom,
-      implantCount: countMap[operation.id] || 0,
-    }));
+    return operationsWithPatients.map(({ operation, patientNom, patientPrenom }) => {
+      const implantCount = countMap[operation.id] || 0;
+      const successCount = successCountMap[operation.id] || 0;
+      const successRate = implantCount > 0 ? Math.round((successCount / implantCount) * 100) : null;
+      
+      return {
+        ...operation,
+        patientNom,
+        patientPrenom,
+        implantCount,
+        successRate,
+      };
+    });
   }
 
   async createOperation(organisationId: string, operation: InsertOperation): Promise<Operation> {

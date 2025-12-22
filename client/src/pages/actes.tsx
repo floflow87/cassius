@@ -8,6 +8,8 @@ import {
   GripVertical,
   Stethoscope,
   Plus,
+  ChevronsUpDown,
+  Check,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,16 +21,34 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import type { Operation } from "@shared/schema";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { OperationForm } from "@/components/operation-form";
+import { queryClient } from "@/lib/queryClient";
+import type { Operation, Patient } from "@shared/schema";
 
 type OperationWithDetails = Operation & { 
   patientNom: string; 
   patientPrenom: string; 
   implantCount: number;
+  successRate: number | null;
 };
 
 type SortDirection = "asc" | "desc" | null;
-type ColumnId = "dateOperation" | "patient" | "typeIntervention" | "implantCount" | "greffe";
+type ColumnId = "dateOperation" | "patient" | "typeIntervention" | "chirurgie" | "implantCount" | "greffe" | "reussite";
 
 interface ColumnConfig {
   id: ColumnId;
@@ -38,19 +58,23 @@ interface ColumnConfig {
 }
 
 const columnWidths: Record<ColumnId, string> = {
-  dateOperation: "w-[18%]",
-  patient: "w-[22%]",
-  typeIntervention: "w-[25%]",
-  implantCount: "w-[18%]",
-  greffe: "w-[17%]",
+  dateOperation: "w-[12%]",
+  patient: "w-[18%]",
+  typeIntervention: "w-[20%]",
+  chirurgie: "w-[15%]",
+  implantCount: "w-[12%]",
+  greffe: "w-[11%]",
+  reussite: "w-[12%]",
 };
 
 const defaultColumns: ColumnConfig[] = [
   { id: "dateOperation", label: "Date", sortable: true },
   { id: "patient", label: "Patient", sortable: true },
   { id: "typeIntervention", label: "Type d'intervention", sortable: true },
+  { id: "chirurgie", label: "Chirurgie", sortable: true },
   { id: "implantCount", label: "Implants posés", sortable: true },
   { id: "greffe", label: "Greffe", sortable: true },
+  { id: "reussite", label: "Réussite", sortable: true },
 ];
 
 const STORAGE_KEY_COLUMNS = "cassius_actes_columns_order";
@@ -63,6 +87,16 @@ const TYPE_INTERVENTION_LABELS: Record<string, string> = {
   EXTRACTION_IMPLANT_IMMEDIATE: "Extraction + Implant immédiat",
   REPRISE_IMPLANT: "Reprise d'implant",
   CHIRURGIE_GUIDEE: "Chirurgie guidée",
+};
+
+const CHIRURGIE_TEMPS_LABELS: Record<string, string> = {
+  UN_TEMPS: "1 temps",
+  DEUX_TEMPS: "2 temps",
+};
+
+const CHIRURGIE_APPROCHE_LABELS: Record<string, string> = {
+  LAMBEAU: "Lambeau",
+  FLAPLESS: "Flapless",
 };
 
 interface ActesPageProps {
@@ -170,11 +204,17 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         case "typeIntervention":
           comparison = a.typeIntervention.localeCompare(b.typeIntervention);
           break;
+        case "chirurgie":
+          comparison = (a.typeChirurgieTemps || "").localeCompare(b.typeChirurgieTemps || "");
+          break;
         case "implantCount":
           comparison = a.implantCount - b.implantCount;
           break;
         case "greffe":
           comparison = (a.greffeOsseuse ? 1 : 0) - (b.greffeOsseuse ? 1 : 0);
+          break;
+        case "reussite":
+          comparison = (a.successRate ?? -1) - (b.successRate ?? -1);
           break;
         default:
           return 0;
@@ -252,10 +292,22 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
     });
   };
 
+  const getSuccessRateBadge = (rate: number | null) => {
+    if (rate === null) return { className: "bg-gray-100 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400", label: "-" };
+    
+    if (rate >= 80) {
+      return { className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400", label: `${rate}%` };
+    } else if (rate >= 60) {
+      return { className: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400", label: `${rate}%` };
+    } else {
+      return { className: "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400", label: `${rate}%` };
+    }
+  };
+
   const renderCellContent = (columnId: ColumnId, op: OperationWithDetails) => {
     switch (columnId) {
       case "dateOperation":
-        return <span className="font-medium">{formatDate(op.dateOperation)}</span>;
+        return <span className="text-muted-foreground">{formatDate(op.dateOperation)}</span>;
       case "patient":
         return (
           <span className="font-medium">
@@ -268,6 +320,18 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             {TYPE_INTERVENTION_LABELS[op.typeIntervention] || op.typeIntervention}
           </Badge>
         );
+      case "chirurgie": {
+        const temps = op.typeChirurgieTemps ? CHIRURGIE_TEMPS_LABELS[op.typeChirurgieTemps] : null;
+        const approche = op.typeChirurgieApproche ? CHIRURGIE_APPROCHE_LABELS[op.typeChirurgieApproche] : null;
+        if (!temps && !approche) {
+          return <span className="text-muted-foreground/50">-</span>;
+        }
+        return (
+          <span className="text-muted-foreground">
+            {[temps, approche].filter(Boolean).join(" / ")}
+          </span>
+        );
+      }
       case "implantCount":
         return op.implantCount > 0 ? (
           <span className="text-muted-foreground">{op.implantCount} implant{op.implantCount > 1 ? "s" : ""}</span>
@@ -282,6 +346,14 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         ) : (
           <span className="text-muted-foreground/50">-</span>
         );
+      case "reussite": {
+        const badge = getSuccessRateBadge(op.successRate);
+        return (
+          <Badge variant="outline" className={`text-xs border-0 ${badge.className}`}>
+            {badge.label}
+          </Badge>
+        );
+      }
       default:
         return null;
     }
