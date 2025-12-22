@@ -535,50 +535,47 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <div className="flex items-center gap-4">
-          <CassiusSearchInput 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher..."
-            icon={<Search className="h-4 w-4" />}
-            className="max-w-2xl"
-            data-testid="input-search-actes"
-          />
-          
-          <ActesAdvancedFilterDrawer
-            filters={advancedFilters}
-            onFiltersChange={setAdvancedFilters}
-            activeFilterCount={advancedFilters?.rules.length || 0}
-          />
-          
-          <span className="text-xs text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {selectedIds.size > 0 && (
-            <>
-              <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowBulkDeleteDialog(true)}
-                data-testid="button-bulk-delete"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedIds(new Set())}
-                data-testid="button-clear-selection"
-              >
-                <X className="h-4 w-4 mr-2" />
-                Annuler
-              </Button>
-            </>
-          )}
-          <Sheet open={sheetOpen} onOpenChange={(open) => {
+      <div className="flex items-center gap-4 mb-5">
+        <CassiusSearchInput 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Rechercher..."
+          icon={<Search className="h-4 w-4" />}
+          className="max-w-2xl"
+          data-testid="input-search-actes"
+        />
+        
+        <ActesAdvancedFilterDrawer
+          filters={advancedFilters}
+          onFiltersChange={setAdvancedFilters}
+          activeFilterCount={advancedFilters?.rules.length || 0}
+        />
+        
+        {selectedIds.size > 0 && (
+          <>
+            <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowBulkDeleteDialog(true)}
+              data-testid="button-bulk-delete"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Supprimer
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedIds(new Set())}
+              data-testid="button-clear-selection"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Annuler
+            </Button>
+          </>
+        )}
+        
+        <Sheet open={sheetOpen} onOpenChange={(open) => {
           setSheetOpen(open);
           if (!open) {
             setSelectedPatientId(null);
@@ -661,22 +658,24 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             </div>
           </SheetContent>
         </Sheet>
-        </div>
       </div>
 
-      <ActeFilterChips
-        filters={advancedFilters}
-        onRemoveFilter={(ruleId) => {
-          if (!advancedFilters) return;
-          const updatedRules = advancedFilters.rules.filter(r => r.id !== ruleId);
-          if (updatedRules.length === 0) {
-            setAdvancedFilters(null);
-          } else {
-            setAdvancedFilters({ ...advancedFilters, rules: updatedRules });
-          }
-        }}
-        onClearAll={() => setAdvancedFilters(null)}
-      />
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
+        <ActeFilterChips
+          filters={advancedFilters}
+          onRemoveFilter={(ruleId) => {
+            if (!advancedFilters) return;
+            const updatedRules = advancedFilters.rules.filter(r => r.id !== ruleId);
+            if (updatedRules.length === 0) {
+              setAdvancedFilters(null);
+            } else {
+              setAdvancedFilters({ ...advancedFilters, rules: updatedRules });
+            }
+          }}
+          onClearAll={() => setAdvancedFilters(null)}
+        />
+      </div>
 
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
         <div className="overflow-x-auto">

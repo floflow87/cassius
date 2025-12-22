@@ -51,6 +51,8 @@ export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSEN
 export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
 export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"]);
 
+export const savedFilterPageTypeEnum = pgEnum("saved_filter_page_type", ["patients", "implants", "actes"]);
+
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
@@ -371,6 +373,23 @@ export const documentsRelations = relations(documents, ({ one }) => ({
   }),
 }));
 
+// Table savedFilters - filtres avancés sauvegardés par page
+export const savedFilters = pgTable("saved_filters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  pageType: savedFilterPageTypeEnum("page_type").notNull(),
+  filterData: text("filter_data").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const savedFiltersRelations = relations(savedFilters, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [savedFilters.organisationId],
+    references: [organisations.id],
+  }),
+}));
+
 export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
   createdAt: true,
@@ -437,6 +456,15 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
   createdAt: true,
 });
 
+export const insertSavedFilterSchema = createInsertSchema(savedFilters).omit({
+  id: true,
+  organisationId: true,
+  createdAt: true,
+});
+
+export const savedFilterPageTypeValues = ["patients", "implants", "actes"] as const;
+export type SavedFilterPageType = typeof savedFilterPageTypeValues[number];
+
 export const documentTagValues = ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"] as const;
 export type DocumentTag = typeof documentTagValues[number];
 
@@ -491,6 +519,9 @@ export type RendezVous = typeof rendezVous.$inferSelect;
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+export type InsertSavedFilter = z.infer<typeof insertSavedFilterSchema>;
+export type SavedFilter = typeof savedFilters.$inferSelect;
 
 // Extended types for API responses
 export interface SurgeryImplantWithDetails extends SurgeryImplant {

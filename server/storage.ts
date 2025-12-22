@@ -11,6 +11,7 @@ import {
   notes,
   rendezVous,
   documents,
+  savedFilters,
   type Patient,
   type InsertPatient,
   type Operation,
@@ -35,6 +36,9 @@ import {
   type Document,
   type InsertDocument,
   type ImplantWithStats,
+  type SavedFilter,
+  type InsertSavedFilter,
+  type SavedFilterPageType,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -168,6 +172,11 @@ export interface IStorage {
   createDocument(organisationId: string, doc: InsertDocument & { createdBy?: string | null }): Promise<Document>;
   updateDocument(organisationId: string, id: string, updates: { title?: string; tags?: string[] }): Promise<Document | undefined>;
   deleteDocument(organisationId: string, id: string): Promise<boolean>;
+
+  // SavedFilter methods
+  getSavedFilters(organisationId: string, pageType: SavedFilterPageType): Promise<SavedFilter[]>;
+  createSavedFilter(organisationId: string, filter: InsertSavedFilter): Promise<SavedFilter>;
+  deleteSavedFilter(organisationId: string, id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1609,6 +1618,34 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(documents.id, id),
         eq(documents.organisationId, organisationId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ========== SAVED FILTERS ==========
+  async getSavedFilters(organisationId: string, pageType: SavedFilterPageType): Promise<SavedFilter[]> {
+    return db.select().from(savedFilters)
+      .where(and(
+        eq(savedFilters.organisationId, organisationId),
+        eq(savedFilters.pageType, pageType)
+      ))
+      .orderBy(desc(savedFilters.createdAt));
+  }
+
+  async createSavedFilter(organisationId: string, filter: InsertSavedFilter): Promise<SavedFilter> {
+    const [created] = await db.insert(savedFilters).values({
+      ...filter,
+      organisationId,
+    }).returning();
+    return created;
+  }
+
+  async deleteSavedFilter(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(savedFilters)
+      .where(and(
+        eq(savedFilters.id, id),
+        eq(savedFilters.organisationId, organisationId)
       ))
       .returning();
     return result.length > 0;
