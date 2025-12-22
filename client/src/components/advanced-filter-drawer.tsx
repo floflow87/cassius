@@ -49,6 +49,7 @@ const FILTER_FIELD_CONFIGS: FilterFieldConfig[] = [
     { value: "ECHEC", label: "Échec" },
   ]},
   { field: "implant_datePose", label: "Date de pose", category: "implant", type: "date", operators: ["after", "before", "last_n_days", "last_n_months", "last_n_years", "between"] },
+  { field: "implant_successRate", label: "Taux de réussite (%)", category: "implant", type: "number", operators: ["equals", "greater_than", "less_than", "greater_than_or_equal", "less_than_or_equal", "between"] },
 ];
 
 const OPERATOR_LABELS: Record<FilterOperator, string> = {
@@ -323,7 +324,7 @@ export function AdvancedFilterDrawer({ filters, onFiltersChange, activeFilterCou
                             <SelectTrigger data-testid={`select-field-${index}`}>
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="max-h-[300px]">
                               <SelectItem value="_header_patient" disabled className="font-semibold text-muted-foreground">
                                 Patient
                               </SelectItem>

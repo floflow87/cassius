@@ -81,6 +81,8 @@ const SelectContent = React.forwardRef<
         className
       )}
       position={position}
+      onWheel={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
       {...props}
     >
       <SelectScrollUpButton />
