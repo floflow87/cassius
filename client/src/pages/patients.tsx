@@ -489,6 +489,30 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           </Button>
         </div>
         
+        {selectedIds.size > 0 && (
+          <>
+            <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowBulkDeleteDialog(true)}
+              data-testid="button-bulk-delete-patients"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Supprimer
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedIds(new Set())}
+              data-testid="button-clear-selection-patients"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Annuler
+            </Button>
+          </>
+        )}
+
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button className="gap-2 shrink-0" data-testid="button-new-patient">
@@ -519,33 +543,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
               {filter}
             </CassiusChip>
           ))}
-        </div>
-      )}
-
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-4 mb-4 p-3 bg-muted/50 rounded-lg border">
-          <span className="text-sm font-medium">
-            {selectedIds.size} patient{selectedIds.size > 1 ? "s" : ""} sélectionné{selectedIds.size > 1 ? "s" : ""}
-          </span>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="gap-2"
-            onClick={() => setShowBulkDeleteDialog(true)}
-            data-testid="button-bulk-delete-patients"
-          >
-            <Trash2 className="h-4 w-4" />
-            Supprimer
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedIds(new Set())}
-            data-testid="button-clear-selection-patients"
-          >
-            <X className="h-4 w-4 mr-1" />
-            Annuler
-          </Button>
         </div>
       )}
 

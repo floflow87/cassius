@@ -415,6 +415,31 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           <Filter className="h-4 w-4" />
           Filtrer
         </Button>
+
+        {selectedIds.size > 0 && (
+          <>
+            <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowBulkDeleteDialog(true)}
+              disabled={bulkDeleteMutation.isPending}
+              data-testid="button-bulk-delete"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Supprimer
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedIds(new Set())}
+              data-testid="button-clear-selection"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Annuler
+            </Button>
+          </>
+        )}
         
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
@@ -441,12 +466,15 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <Tabs value={implantType} onValueChange={(v) => setImplantType(v as "implants" | "mini")}>
-          <TabsList>
-            <TabsTrigger value="implants" data-testid="tab-implants">Implants</TabsTrigger>
-            <TabsTrigger value="mini" data-testid="tab-mini-implants">Mini-implants</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-4">
+          <Tabs value={implantType} onValueChange={(v) => setImplantType(v as "implants" | "mini")}>
+            <TabsList>
+              <TabsTrigger value="implants" data-testid="tab-implants">Implants</TabsTrigger>
+              <TabsTrigger value="mini" data-testid="tab-mini-implants">Mini-implants</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <span className="text-sm text-muted-foreground">{totalImplants} implant{totalImplants > 1 ? "s" : ""}</span>
+        </div>
 
         {activeFilters.length > 0 && (
           <div className="flex items-center gap-2">
@@ -462,36 +490,6 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           </div>
         )}
       </div>
-
-      {selectedIds.size > 0 ? (
-        <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{selectedIds.size} sélectionné(s)</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSelectedIds(new Set())}
-              data-testid="button-clear-selection"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setShowBulkDeleteDialog(true)}
-            disabled={bulkDeleteMutation.isPending}
-            data-testid="button-bulk-delete"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Supprimer
-          </Button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-sm text-muted-foreground">{totalImplants} implants</span>
-        </div>
-      )}
 
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
         <div className="overflow-x-auto">
