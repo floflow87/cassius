@@ -14,6 +14,7 @@ import {
   Eye,
   Trash2,
   X,
+  Search,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -469,9 +470,18 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           return <span className="text-muted-foreground/50">-</span>;
         }
         return (
-          <span className="text-muted-foreground">
-            {[temps, approche].filter(Boolean).join(" / ")}
-          </span>
+          <div className="flex flex-wrap gap-1">
+            {temps && (
+              <Badge variant="outline" className="text-xs">
+                {temps}
+              </Badge>
+            )}
+            {approche && (
+              <Badge variant="outline" className="text-xs">
+                {approche}
+              </Badge>
+            )}
+          </div>
         );
       }
       case "implantCount":
@@ -519,6 +529,8 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Rechercher..."
+            icon={<Search className="h-4 w-4" />}
+            className="max-w-2xl"
             data-testid="input-search-actes"
           />
           <span className="text-xs text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
@@ -718,7 +730,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-background">
+                        <DropdownMenuContent align="end" className="bg-card">
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setLocation(`/actes/${op.id}`); }}>
                             <Eye className="h-4 w-4 mr-2" />
                             Voir
