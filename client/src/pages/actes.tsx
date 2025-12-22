@@ -63,7 +63,6 @@ import { cn } from "@/lib/utils";
 import { OperationForm } from "@/components/operation-form";
 import { queryClient } from "@/lib/queryClient";
 import { ActesAdvancedFilterDrawer, ActeFilterChips, type ActeFilterGroup } from "@/components/actes-advanced-filter-drawer";
-import { SavedFiltersManager } from "@/components/saved-filters-manager";
 import type { Operation, Patient } from "@shared/schema";
 
 type OperationWithDetails = Operation & { 
@@ -550,13 +549,6 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           filters={advancedFilters}
           onFiltersChange={setAdvancedFilters}
           activeFilterCount={advancedFilters?.rules.length || 0}
-        />
-        
-        <SavedFiltersManager
-          pageType="actes"
-          currentFilters={advancedFilters}
-          onLoadFilter={setAdvancedFilters}
-          hasActiveFilters={!!advancedFilters && advancedFilters.rules.length > 0}
         />
         
         {selectedIds.size > 0 && (

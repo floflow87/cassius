@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,7 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Filter, Plus, Trash2, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Filter, Plus, Trash2, X, Save, Star } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { SavedFilter } from "@shared/schema";
 
 export type ActeFilterField = 
   | "dateOperation"
@@ -119,10 +126,69 @@ function createEmptyGroup(): ActeFilterGroup {
 }
 
 export function ActesAdvancedFilterDrawer({ filters, onFiltersChange, activeFilterCount }: ActesAdvancedFilterDrawerProps) {
+  const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<ActeFilterGroup>(() => 
     filters || createEmptyGroup()
   );
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [filterName, setFilterName] = useState("");
+
+  const { data: savedFilters = [], isLoading: isLoadingFilters } = useQuery<SavedFilter[]>({
+    queryKey: ["/api/saved-filters", "actes"],
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: { name: string; pageType: string; filterData: string }) => {
+      return apiRequest("POST", "/api/saved-filters", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-filters", "actes"] });
+      toast({ title: "Favori enregistré", description: "Le filtre a été ajouté à vos favoris." });
+      setSaveDialogOpen(false);
+      setFilterName("");
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de sauvegarder le filtre.", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/saved-filters/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-filters", "actes"] });
+      toast({ title: "Favori supprimé", description: "Le filtre a été retiré de vos favoris." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de supprimer le filtre.", variant: "destructive" });
+    },
+  });
+
+  const handleSaveFilter = () => {
+    if (!filterName.trim()) return;
+    saveMutation.mutate({
+      name: filterName.trim(),
+      pageType: "actes",
+      filterData: JSON.stringify(localFilters),
+    });
+  };
+
+  const handleLoadFilter = (filter: SavedFilter) => {
+    try {
+      const parsedFilters = JSON.parse(filter.filterData) as ActeFilterGroup;
+      setLocalFilters(parsedFilters);
+      toast({ title: "Favori chargé", description: `"${filter.name}" a été appliqué.` });
+    } catch {
+      toast({ title: "Erreur", description: "Format de filtre invalide.", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteFilter = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    deleteMutation.mutate(id);
+  };
 
   const handleOpen = useCallback((open: boolean) => {
     if (open) {
@@ -243,7 +309,47 @@ export function ActesAdvancedFilterDrawer({ filters, onFiltersChange, activeFilt
           </SheetDescription>
         </SheetHeader>
 
-        <div className="py-6 space-y-4">
+        <div className="py-6 space-y-6">
+          {/* Section Favoris */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Star className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm font-medium">Favoris</Label>
+            </div>
+            {isLoadingFilters ? (
+              <p className="text-sm text-muted-foreground">Chargement...</p>
+            ) : savedFilters.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucun favori enregistré</p>
+            ) : (
+              <ScrollArea className="max-h-32">
+                <div className="space-y-1">
+                  {savedFilters.map((filter) => (
+                    <div 
+                      key={filter.id}
+                      className="flex items-center justify-between gap-2 p-2 rounded-md hover-elevate cursor-pointer"
+                      onClick={() => handleLoadFilter(filter)}
+                      data-testid={`favorite-filter-${filter.id}`}
+                    >
+                      <span className="text-sm truncate">{filter.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={(e) => handleDeleteFilter(e, filter.id)}
+                        data-testid={`button-delete-favorite-${filter.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          <div className="border-t" />
+
+          {/* Section création de filtres */}
           <div className="flex items-center gap-2">
             <Label className="text-sm text-muted-foreground">Combiner les filtres avec :</Label>
             <Button
@@ -408,6 +514,21 @@ export function ActesAdvancedFilterDrawer({ filters, onFiltersChange, activeFilt
         </div>
 
         <SheetFooter className="flex gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => setSaveDialogOpen(true)}
+                data-testid="button-save-filter-favorite"
+              >
+                <Save className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Sauvegarder ce filtre en favoris</p>
+            </TooltipContent>
+          </Tooltip>
           <Button variant="outline" onClick={handleClear} data-testid="button-acte-reset-filters">
             Réinitialiser
           </Button>
@@ -415,6 +536,37 @@ export function ActesAdvancedFilterDrawer({ filters, onFiltersChange, activeFilt
             Appliquer
           </Button>
         </SheetFooter>
+
+        <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Ajouter aux favoris</DialogTitle>
+              <DialogDescription>
+                Donnez un nom à ce filtre pour le retrouver facilement.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                placeholder="Nom du favori"
+                value={filterName}
+                onChange={(e) => setFilterName(e.target.value)}
+                data-testid="input-favorite-name"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button
+                onClick={handleSaveFilter}
+                disabled={!filterName.trim() || saveMutation.isPending}
+                data-testid="button-confirm-save-favorite"
+              >
+                {saveMutation.isPending ? "Enregistrement..." : "Sauvegarder"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );

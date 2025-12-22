@@ -45,10 +45,7 @@ export function SavedFiltersManager<T>({
 
   const saveMutation = useMutation({
     mutationFn: async (data: { name: string; pageType: SavedFilterPageType; filterData: string }) => {
-      return apiRequest("/api/saved-filters", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/saved-filters", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/saved-filters", pageType] });
@@ -63,7 +60,7 @@ export function SavedFiltersManager<T>({
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/saved-filters/${id}`, { method: "DELETE" });
+      return apiRequest("DELETE", `/api/saved-filters/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/saved-filters", pageType] });
