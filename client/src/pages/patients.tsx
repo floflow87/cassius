@@ -149,7 +149,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     return advancedFilters.rules.filter(rule => "field" in rule).length;
   }, [advancedFilters]);
 
-  const hasActiveFilters = advancedFilters && advancedFilters.rules.length > 0;
+  const hasActiveFilters = Boolean(advancedFilters && advancedFilters.rules.length > 0);
 
   // Use search endpoint when filters are active, otherwise use summary endpoint
   const { data: searchData, isLoading: isSearchLoading } = useQuery<PatientSearchResult>({
