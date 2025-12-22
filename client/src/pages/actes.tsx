@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   ArrowUpDown,
   ArrowUp,
@@ -10,7 +10,28 @@ import {
   Plus,
   ChevronsUpDown,
   Check,
+  MoreHorizontal,
+  Eye,
+  Trash2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
@@ -115,6 +136,8 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [patientPopoverOpen, setPatientPopoverOpen] = useState(false);
+  const [operationToDelete, setOperationToDelete] = useState<OperationWithDetails | null>(null);
+  const { toast } = useToast();
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
@@ -180,6 +203,28 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
 
   const { data: patients } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (operationId: string) => {
+      await apiRequest("DELETE", `/api/operations/${operationId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+      toast({
+        title: "Acte supprimé",
+        description: "L'acte a été supprimé avec succès.",
+        variant: "success",
+      });
+      setOperationToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -502,12 +547,13 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                     </div>
                   </th>
                 ))}
+                <th className="w-[50px] px-2 py-2"></th>
               </tr>
             </thead>
             <tbody>
               {paginatedOperations.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-16">
+                  <td colSpan={columns.length + 1} className="px-4 py-16">
                     <div className="flex flex-col items-center justify-center">
                       <Stethoscope className="h-12 w-12 text-muted-foreground/50 mb-4" />
                       <h3 className="text-base font-medium mb-2 text-foreground">Aucun acte</h3>
@@ -532,6 +578,28 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                         {renderCellContent(column.id, op)}
                       </td>
                     ))}
+                    <td className="w-[50px] px-2 py-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" data-testid={`button-actions-${op.id}`}>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-background">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setLocation(`/patients/${op.patientId}`); }}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Voir
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={(e) => { e.stopPropagation(); setOperationToDelete(op); }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Supprimer
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
                   </tr>
                 ))
               )}
@@ -549,6 +617,26 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           onPageChange={setCurrentPage}
         />
       </div>
+
+      <AlertDialog open={!!operationToDelete} onOpenChange={(open) => !open && setOperationToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cet acte ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. L'acte du {operationToDelete && new Date(operationToDelete.dateOperation).toLocaleDateString("fr-FR")} pour {operationToDelete?.patientPrenom} {operationToDelete?.patientNom} sera définitivement supprimé.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => operationToDelete && deleteMutation.mutate(operationToDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
