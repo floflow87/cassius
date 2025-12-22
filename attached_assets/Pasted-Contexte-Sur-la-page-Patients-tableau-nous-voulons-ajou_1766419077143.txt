@@ -1,0 +1,208 @@
+Contexte
+
+Sur la page Patients (tableau), nous voulons ajouter un menu de filtre avancé permettant de filtrer sur les valeurs des colonnes ET sur des attributs liés (actes, implants, succès, dates), avec possibilité de combiner plusieurs règles (AND/OR).
+
+Le praticien doit pouvoir répondre à des questions du type :
+
+“Quels sont les patients qui ont eu une opération avec un taux de succès > 80% ?”
+
+“Ressors les implants avec un taux de succès compris entre 70 et 90% des patients ayant subi une opération ces deux dernières années.”
+
+Objectifs
+
+UI de filtre avancé (builder de règles combinables)
+
+Backend performant (pas de filtrage lourd côté client)
+
+Support des filtres basés sur : patients + actes + implants + taux de succès + date range
+
+Optionnel : sauvegarder un filtre (preset)
+
+1) UI — Advanced Filter Builder (Drawer)
+
+Ajouter un bouton “Filtre avancé” sur la page patients.
+
+Le drawer contient :
+
+Un système de règles :
+
+Champ (field)
+
+Opérateur (operator)
+
+Valeur (value)
+
+Possibilité d’ajouter :
+
+une règle
+
+un groupe (AND/OR)
+
+Un bloc “Période” global (optionnel) : ex “2 dernières années”
+
+Boutons :
+
+“Appliquer”
+
+“Réinitialiser”
+
+“Sauvegarder ce filtre” (optionnel)
+
+Afficher un résumé du filtre actif au-dessus du tableau (chips)
+
+Champs disponibles (v1)
+
+Patient
+
+Nom / prénom (contains)
+
+Date de naissance (between)
+
+Statut (equals)
+
+Dernière visite (after/before/between)
+
+Nombre d’implants posés (>=, <=, between)
+
+Actes (surgeries)
+
+A eu au moins 1 acte (boolean)
+
+Date d’acte performed_at (after/before/between)
+
+Taux de succès de l’acte surgery_success_rate (>, >=, <, between)
+
+Implants (instances posées)
+
+Marque / référence (equals/contains)
+
+Position (equals)
+
+Taux de succès implant implant_success_rate (between, >, <)
+
+Date de pose (after/before/between)
+
+2) Backend — Endpoint de recherche filtrée
+
+Créer / étendre un endpoint unique qui accepte un payload de filtres structurés :
+
+POST /api/patients/search
+
+Body:
+
+{
+  "pagination": { "page": 1, "pageSize": 25 },
+  "sort": { "field": "lastName", "direction": "asc" },
+  "filters": {
+    "op": "AND",
+    "rules": [
+      { "field": "surgery_success_rate", "operator": ">", "value": 0.8 },
+      { "field": "surgery_performed_at", "operator": "LAST_N_YEARS", "value": 2 }
+    ]
+  }
+}
+
+
+Le backend doit :
+
+valider le schema (Zod)
+
+traduire en requête SQL optimisée (joins + conditions)
+
+retourner :
+
+liste patients paginée
+
+total count
+
+éventuellement des agrégats simples (ex: nb résultats)
+
+3) Modèle data / calculs (nécessaires)
+3.1 Success rate
+
+Définir/implémenter :
+
+surgery_success_rate (par acte)
+
+implant_success_rate (par implant posé)
+
+Ces valeurs doivent être :
+
+stockées (si déjà calculées) OU calculées via vue SQL / subquery,
+
+filtrables côté DB.
+
+3.2 Vues SQL recommandées (performance)
+
+Créer une vue ou CTE réutilisable :
+
+patient_stats (per patient)
+
+implants_count
+
+last_visit_at
+
+surgery_stats (per surgery)
+
+success_rate
+
+implant_stats (per implant instance)
+
+success_rate
+
+4) Exemples à supporter (acceptance)
+Exemple A
+
+“Patients ayant eu une opération avec un taux de succès > 80%”
+
+filters:
+
+surgery_success_rate > 0.8
+
+has_surgery = true
+
+Exemple B
+
+“Implants succès 70–90% des patients ayant subi une opération ces 2 dernières années”
+
+filters:
+
+has_surgery = true
+
+surgery_performed_at last 2 years
+
+implant_success_rate between 0.7 and 0.9
+
+Résultat attendu :
+
+afficher patients + (optionnel) un aperçu “implants correspondants”
+
+ou ajouter un mode “Résultats implants” (v2). En v1, on peut filtrer patients via existence d’implants matchants.
+
+5) UX — garder ça simple
+
+Afficher uniquement les champs pertinents selon le type (patient / acte / implant)
+
+Aider via placeholders (%, dates)
+
+Prévenir si la requête est lourde (sans bloquer)
+
+Ne jamais filtrer en client sur tout le dataset
+
+6) Definition of Done
+
+Drawer filtre avancé opérationnel
+
+Règles AND/OR combinables
+
+Backend search performant avec pagination
+
+Les 2 exemples passent
+
+Temps de réponse acceptable (< 500–800ms sur dataset réaliste)
+
+Petite note produit (important)
+
+Pour l’exemple “ressors les implants…” :
+en V1, on peut filtrer les patients “ayant au moins un implant matchant”.
+Si tu veux une vraie liste d’implants en sortie, on fera un mode résultats implants plus tard (page stats / page implants filtrée).

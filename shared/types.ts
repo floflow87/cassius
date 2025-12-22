@@ -389,3 +389,89 @@ export interface UploadUrlResponse {
   publicUrl: string;
   radioId: string;
 }
+
+// === Advanced Filter Types ===
+
+export type FilterField = 
+  // Patient fields
+  | "patient_nom"
+  | "patient_prenom"
+  | "patient_dateNaissance"
+  | "patient_statut"
+  | "patient_derniereVisite"
+  | "patient_implantCount"
+  // Surgery fields
+  | "surgery_hasSurgery"
+  | "surgery_dateOperation"
+  | "surgery_successRate"
+  | "surgery_typeIntervention"
+  // Implant fields
+  | "implant_marque"
+  | "implant_reference"
+  | "implant_siteFdi"
+  | "implant_successRate"
+  | "implant_datePose"
+  | "implant_statut";
+
+export type FilterOperator = 
+  | "equals"
+  | "not_equals"
+  | "contains"
+  | "not_contains"
+  | "greater_than"
+  | "greater_than_or_equal"
+  | "less_than"
+  | "less_than_or_equal"
+  | "between"
+  | "is_true"
+  | "is_false"
+  | "after"
+  | "before"
+  | "last_n_days"
+  | "last_n_months"
+  | "last_n_years";
+
+export interface FilterRule {
+  id: string;
+  field: FilterField;
+  operator: FilterOperator;
+  value: string | number | boolean | null;
+  value2?: string | number | null; // For "between" operator
+}
+
+export interface FilterGroup {
+  id: string;
+  operator: "AND" | "OR";
+  rules: (FilterRule | FilterGroup)[];
+}
+
+export interface PatientSearchRequest {
+  pagination?: {
+    page: number;
+    pageSize: number;
+  };
+  sort?: {
+    field: string;
+    direction: "asc" | "desc";
+  };
+  filters?: FilterGroup;
+}
+
+export interface PatientSearchResult {
+  patients: Patient[];
+  implantCounts: Record<string, number>;
+  lastVisits: Record<string, { date: string; titre: string | null }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface FilterFieldConfig {
+  field: FilterField;
+  label: string;
+  category: "patient" | "surgery" | "implant";
+  type: "text" | "number" | "date" | "boolean" | "select";
+  operators: FilterOperator[];
+  options?: { value: string; label: string }[];
+}
