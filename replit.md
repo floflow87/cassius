@@ -141,3 +141,25 @@ Multi-column indexes added to `db/migrate-supabase.sql` for query optimization:
 ### Summary Endpoints
 - `GET /api/patients/summary`: Returns combined patient list with operation counts and last visit dates in 3 parallel queries
 - Frontend patient list uses summary endpoint instead of 3 separate API calls
+
+## Timeline Features (December 2025)
+
+### Surgery Timeline
+- **Endpoint**: `GET /api/operations/:id/timeline` - Returns chronological events for a surgery
+- **Component**: `SurgeryTimeline` in `client/src/components/surgery-timeline.tsx`
+- **Types**: `OperationTimeline`, `TimelineEvent` in `shared/types.ts`
+
+Event types aggregated:
+- **SURGERY**: The operation itself with intervention type and notes
+- **ISQ**: Initial ISQ measurements from surgery implants (isqPose)
+- **VISIT**: Follow-up visits linked to catalog implants used in the surgery
+- **RADIO**: Radiographs linked to the operation
+
+ISQ Delta Calculation:
+- Delta is calculated from the previous ISQ measurement (not just initial isqPose)
+- ISQ history is tracked per catalog implant to compute accurate deltas
+- Stability indicators: low (<55), moderate (55-70), high (>70)
+
+Visit-to-SurgeryImplant Mapping:
+- Visits are linked to catalog implants (via `visites.implantId`)
+- When multiple surgery implants share the same catalog implant, the best match is selected based on date (closest surgery before or on the visit date)
