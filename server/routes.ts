@@ -150,6 +150,146 @@ function evaluateImplantFilterRule(implant: ImplantWithStats, rule: {
   return false;
 }
 
+// Type for operation with stats (from getAllOperations)
+type OperationWithDetails = {
+  id: string;
+  organisationId: string;
+  patientId: string;
+  dateOperation: string;
+  typeIntervention: string | null;
+  typeChirurgieTemps: string | null;
+  typeChirurgieApproche: string | null;
+  greffeOsseuse: boolean | null;
+  notes: string | null;
+  patientNom: string;
+  patientPrenom: string;
+  implantCount: number;
+  successRate: number | null;
+};
+
+function evaluateActeFilterRule(operation: OperationWithDetails, rule: {
+  field: string;
+  operator: string;
+  value: string | number | boolean | null;
+  value2?: string | number | null;
+}): boolean {
+  const { field, operator, value, value2 } = rule;
+  
+  // Get the operation value for the field
+  let opValue: string | number | boolean | null;
+  switch (field) {
+    case "dateOperation":
+      opValue = operation.dateOperation;
+      break;
+    case "typeIntervention":
+      opValue = operation.typeIntervention;
+      break;
+    case "typeChirurgieTemps":
+      opValue = operation.typeChirurgieTemps;
+      break;
+    case "typeChirurgieApproche":
+      opValue = operation.typeChirurgieApproche;
+      break;
+    case "greffeOsseuse":
+      opValue = operation.greffeOsseuse;
+      break;
+    case "implantCount":
+      opValue = operation.implantCount;
+      break;
+    case "successRate":
+      opValue = operation.successRate;
+      break;
+    default:
+      return false;
+  }
+  
+  // Boolean operators
+  if (operator === "is_true") {
+    return opValue === true;
+  }
+  if (operator === "is_false") {
+    return opValue === false || opValue === null;
+  }
+  
+  // Handle null operation values
+  if (opValue === null || opValue === undefined) {
+    return false;
+  }
+  
+  // Date operators
+  if (field === "dateOperation" && typeof opValue === "string") {
+    const opDate = new Date(opValue).getTime();
+    const filterDate = new Date(String(value)).getTime();
+    
+    if (isNaN(opDate) || isNaN(filterDate)) return false;
+    
+    switch (operator) {
+      case "equals":
+        return opDate === filterDate;
+      case "greater_than":
+        return opDate > filterDate;
+      case "greater_than_or_equal":
+        return opDate >= filterDate;
+      case "less_than":
+        return opDate < filterDate;
+      case "less_than_or_equal":
+        return opDate <= filterDate;
+      case "between":
+        if (!value2) return false;
+        const filterDate2 = new Date(String(value2)).getTime();
+        if (isNaN(filterDate2)) return false;
+        return opDate >= filterDate && opDate <= filterDate2;
+      default:
+        return false;
+    }
+  }
+  
+  // Enum/text operators (typeIntervention, typeChirurgieTemps, typeChirurgieApproche)
+  if (typeof opValue === "string") {
+    const strValue = String(value || "").toUpperCase();
+    const strOpValue = opValue.toUpperCase();
+    
+    switch (operator) {
+      case "equals":
+        return strOpValue === strValue;
+      case "not_equals":
+        return strOpValue !== strValue;
+      default:
+        return false;
+    }
+  }
+  
+  // Number operators (implantCount, successRate)
+  if (typeof opValue === "number") {
+    const numValue = Number(value);
+    if (isNaN(numValue)) return false;
+    const numValue2 = value2 !== undefined && value2 !== null ? Number(value2) : null;
+    if (numValue2 !== null && isNaN(numValue2)) return false;
+    
+    switch (operator) {
+      case "equals":
+        return opValue === numValue;
+      case "not_equals":
+        return opValue !== numValue;
+      case "greater_than":
+        return opValue > numValue;
+      case "greater_than_or_equal":
+        return opValue >= numValue;
+      case "less_than":
+        return opValue < numValue;
+      case "less_than_or_equal":
+        return opValue <= numValue;
+      case "between":
+        if (numValue2 === null) return false;
+        return opValue >= numValue && opValue <= numValue2;
+      default:
+        return false;
+    }
+  }
+  
+  return false;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -414,6 +554,89 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching operations:", error);
       res.status(500).json({ error: "Failed to fetch operations" });
+    }
+  });
+
+  // Zod schema for acte (operation) filter validation
+  const acteFilterRuleSchema = z.object({
+    id: z.string(),
+    field: z.enum(["dateOperation", "typeIntervention", "typeChirurgieTemps", "typeChirurgieApproche", "greffeOsseuse", "implantCount", "successRate"]),
+    operator: z.enum(["equals", "not_equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "between", "is_true", "is_false"]),
+    value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+    value2: z.union([z.string(), z.number(), z.null()]).optional(),
+  });
+
+  const acteFilterGroupSchema = z.object({
+    id: z.string(),
+    operator: z.enum(["AND", "OR"]),
+    rules: z.array(acteFilterRuleSchema),
+  });
+
+  const operationSearchSchema = z.object({
+    filters: acteFilterGroupSchema.nullable().optional(),
+  });
+
+  // Valid operator/field combinations for acte filters
+  const validActeFieldOperators: Record<string, string[]> = {
+    dateOperation: ["equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "between"],
+    typeIntervention: ["equals", "not_equals"],
+    typeChirurgieTemps: ["equals", "not_equals"],
+    typeChirurgieApproche: ["equals", "not_equals"],
+    greffeOsseuse: ["is_true", "is_false"],
+    implantCount: ["equals", "not_equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "between"],
+    successRate: ["equals", "not_equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "between"],
+  };
+
+  // Search operations with advanced filters
+  app.post("/api/operations/search", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const parseResult = operationSearchSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid filter format", details: parseResult.error.errors });
+      }
+      
+      const { filters } = parseResult.data;
+      
+      // Validate operator/field combinations
+      if (filters && filters.rules) {
+        for (const rule of filters.rules) {
+          const validOps = validActeFieldOperators[rule.field];
+          if (!validOps || !validOps.includes(rule.operator)) {
+            return res.status(400).json({ 
+              error: "Invalid operator for field", 
+              details: `Operator '${rule.operator}' is not valid for field '${rule.field}'` 
+            });
+          }
+        }
+      }
+      
+      // Get all operations first
+      let allOperations = await storage.getAllOperations(organisationId);
+      
+      // Apply advanced filters if present
+      if (filters && filters.rules && filters.rules.length > 0) {
+        const groupOperator = filters.operator || "AND";
+        
+        allOperations = allOperations.filter(operation => {
+          const results = filters.rules.map((rule) => {
+            return evaluateActeFilterRule(operation, rule);
+          });
+          
+          if (groupOperator === "AND") {
+            return results.every(r => r);
+          } else {
+            return results.some(r => r);
+          }
+        });
+      }
+      
+      res.json(allOperations);
+    } catch (error) {
+      console.error("Error searching operations:", error);
+      res.status(500).json({ error: "Failed to search operations" });
     }
   });
 

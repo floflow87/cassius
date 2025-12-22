@@ -62,6 +62,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { OperationForm } from "@/components/operation-form";
 import { queryClient } from "@/lib/queryClient";
+import { ActesAdvancedFilterDrawer, ActeFilterChips, type ActeFilterGroup } from "@/components/actes-advanced-filter-drawer";
 import type { Operation, Patient } from "@shared/schema";
 
 type OperationWithDetails = Operation & { 
@@ -142,6 +143,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   const [operationToDelete, setOperationToDelete] = useState<OperationWithDetails | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<ActeFilterGroup | null>(null);
   const { toast } = useToast();
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
@@ -198,8 +200,18 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   }, [sortColumn, sortDirection]);
 
   const { data: operations, isLoading } = useQuery<OperationWithDetails[]>({
-    queryKey: ["/api/operations"],
+    queryKey: ["/api/operations", advancedFilters ? JSON.stringify(advancedFilters) : null],
     queryFn: async () => {
+      if (advancedFilters && advancedFilters.rules.length > 0) {
+        const res = await fetch("/api/operations/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ filters: advancedFilters }),
+        });
+        if (!res.ok) throw new Error("Failed to search operations");
+        return res.json();
+      }
       const res = await fetch("/api/operations", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch operations");
       return res.json();
@@ -533,6 +545,13 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             className="max-w-2xl"
             data-testid="input-search-actes"
           />
+          
+          <ActesAdvancedFilterDrawer
+            filters={advancedFilters}
+            onFiltersChange={setAdvancedFilters}
+            activeFilterCount={advancedFilters?.rules.length || 0}
+          />
+          
           <span className="text-xs text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -644,6 +663,20 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         </Sheet>
         </div>
       </div>
+
+      <ActeFilterChips
+        filters={advancedFilters}
+        onRemoveFilter={(ruleId) => {
+          if (!advancedFilters) return;
+          const updatedRules = advancedFilters.rules.filter(r => r.id !== ruleId);
+          if (updatedRules.length === 0) {
+            setAdvancedFilters(null);
+          } else {
+            setAdvancedFilters({ ...advancedFilters, rules: updatedRules });
+          }
+        }}
+        onClearAll={() => setAdvancedFilters(null)}
+      />
 
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
         <div className="overflow-x-auto">

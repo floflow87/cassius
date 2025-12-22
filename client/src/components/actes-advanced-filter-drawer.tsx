@@ -20,8 +20,6 @@ export type ActeFilterField =
 export type ActeFilterOperator = 
   | "equals"
   | "not_equals"
-  | "contains"
-  | "not_contains"
   | "greater_than"
   | "greater_than_or_equal"
   | "less_than"
@@ -84,8 +82,6 @@ const ACTE_FILTER_CONFIGS: ActeFilterFieldConfig[] = [
 const OPERATOR_LABELS: Record<ActeFilterOperator, string> = {
   equals: "est égal à",
   not_equals: "n'est pas égal à",
-  contains: "contient",
-  not_contains: "ne contient pas",
   greater_than: "après" ,
   greater_than_or_equal: "à partir de",
   less_than: "avant",
@@ -152,6 +148,11 @@ export function ActesAdvancedFilterDrawer({ filters, onFiltersChange, activeFilt
           return false;
         }
       }
+      
+      if (fieldConfig?.type === "date" && rule.operator === "between") {
+        if (rule.value2 === "" || rule.value2 === null) return false;
+      }
+      
       return true;
     }).map(rule => {
       const fieldConfig = ACTE_FILTER_CONFIGS.find(c => c.field === rule.field);
