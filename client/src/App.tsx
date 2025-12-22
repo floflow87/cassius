@@ -171,8 +171,18 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
   );
 }
 
+// Read initial sidebar state from localStorage (default to expanded)
+const getInitialSidebarState = () => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('cassius.sidebarCollapsed');
+    return stored !== 'true'; // true = expanded (default), false = collapsed
+  }
+  return true;
+};
+
 function AuthenticatedApp() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarState);
 
   const { data: user, isLoading, refetch } = useQuery<UserInfo>({
     queryKey: ["/api/auth/user"],
@@ -215,17 +225,6 @@ function AuthenticatedApp() {
       </Switch>
     );
   }
-
-  // Read initial sidebar state from localStorage (default to expanded)
-  const getInitialSidebarState = () => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('cassius.sidebarCollapsed');
-      return stored !== 'true'; // true = expanded (default), false = collapsed
-    }
-    return true;
-  };
-
-  const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarState);
 
   // Persist sidebar state to localStorage when changed
   const handleSidebarOpenChange = (open: boolean) => {
