@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   Plus, 
   Search, 
@@ -16,6 +16,7 @@ import {
   Phone,
   Mail,
   Calendar,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PatientsListSkeleton } from "@/components/page-skeletons";
@@ -27,8 +28,21 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { PatientForm } from "@/components/patient-form";
 import { CassiusBadge, CassiusChip, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Patient } from "@shared/schema";
 
 interface PatientsPageProps {
@@ -64,6 +78,9 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   const [sheetOpen, setSheetOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const { toast } = useToast();
   const [viewMode, setViewMode] = useState<"table" | "cards">(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_VIEW_MODE);
@@ -208,6 +225,59 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalPatients);
   const paginatedPatients = sortedPatients.slice(startIndex, endIndex);
+
+  const currentPageIds = paginatedPatients.map(p => p.id);
+  const allCurrentPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selectedIds.has(id));
+  const someCurrentPageSelected = currentPageIds.some(id => selectedIds.has(id));
+
+  const handleSelectRow = (id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) {
+        currentPageIds.forEach(id => next.add(id));
+      } else {
+        currentPageIds.forEach(id => next.delete(id));
+      }
+      return next;
+    });
+  };
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) {
+        await apiRequest("DELETE", `/api/patients/${id}`);
+      }
+      return ids.length;
+    },
+    onSuccess: (deletedCount) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      setSelectedIds(new Set());
+      setShowBulkDeleteDialog(false);
+      toast({
+        title: "Patients supprimés",
+        description: `${deletedCount} patient(s) supprimé(s) avec succès.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Erreur lors de la suppression",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleSort = (columnId: ColumnId) => {
     if (sortColumn === columnId) {
@@ -452,12 +522,46 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         </div>
       )}
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-4 mb-4 p-3 bg-muted/50 rounded-lg border">
+          <span className="text-sm font-medium">
+            {selectedIds.size} patient{selectedIds.size > 1 ? "s" : ""} sélectionné{selectedIds.size > 1 ? "s" : ""}
+          </span>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="gap-2"
+            onClick={() => setShowBulkDeleteDialog(true)}
+            data-testid="button-bulk-delete-patients"
+          >
+            <Trash2 className="h-4 w-4" />
+            Supprimer
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+            data-testid="button-clear-selection-patients"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Annuler
+          </Button>
+        </div>
+      )}
+
       {viewMode === "table" ? (
         <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border-gray bg-border-gray">
+                  <th className="w-10 px-4 py-2">
+                    <Checkbox
+                      checked={allCurrentPageSelected ? true : someCurrentPageSelected ? "indeterminate" : false}
+                      onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                      data-testid="checkbox-select-all-patients"
+                    />
+                  </th>
                   {columns.map((column) => (
                     <th
                       key={column.id}
@@ -509,9 +613,17 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                     <tr 
                       key={patient.id} 
                       onClick={() => navigateToPatient(patient.id)}
-                      className="border-b border-border-gray/50 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer group"
+                      className={`border-b border-border-gray/50 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer group ${selectedIds.has(patient.id) ? "bg-primary/5" : ""}`}
                       data-testid={`row-patient-${patient.id}`}
                     >
+                      <td className="px-4 py-3">
+                        <Checkbox
+                          checked={selectedIds.has(patient.id)}
+                          onCheckedChange={(checked) => handleSelectRow(patient.id, !!checked)}
+                          onClick={(e) => e.stopPropagation()}
+                          data-testid={`checkbox-patient-${patient.id}`}
+                        />
+                      </td>
                       {columns.map((column) => (
                         <td key={column.id} className="px-4 py-3">
                           {renderCellContent(column.id, patient)}
@@ -607,6 +719,29 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           />
         </div>
       )}
+
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer {selectedIds.size} patient{selectedIds.size > 1 ? "s" : ""} ? 
+              Cette action est irréversible et supprimera également toutes les données associées 
+              (opérations, implants, radiographies, visites, documents et notes).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-delete-patients">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-bulk-delete-patients"
+            >
+              {bulkDeleteMutation.isPending ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

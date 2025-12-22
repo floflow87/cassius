@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   Plus, 
   Search, 
@@ -10,9 +10,12 @@ import {
   ArrowUp,
   ArrowDown,
   GripVertical,
+  Trash2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CatalogImplantsListSkeleton } from "@/components/page-skeletons";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -22,9 +25,20 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { CassiusChip, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import { ImplantForm } from "@/components/implant-form";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { ImplantWithStats } from "@shared/schema";
 
 type SortDirection = "asc" | "desc" | null;
@@ -61,6 +75,7 @@ interface ImplantsPageProps {
 
 export default function ImplantsPage({ searchQuery: externalSearchQuery, setSearchQuery: externalSetSearchQuery }: ImplantsPageProps) {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -69,6 +84,9 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   const searchQuery = externalSearchQuery ?? internalSearchQuery;
   const setSearchQuery = externalSetSearchQuery ?? setInternalSearchQuery;
   const itemsPerPage = 20;
+  
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
@@ -132,6 +150,60 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
     },
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results: { id: string; success: boolean }[] = [];
+      for (const id of ids) {
+        try {
+          await apiRequest("DELETE", `/api/catalog-implants/${id}`);
+          results.push({ id, success: true });
+        } catch {
+          results.push({ id, success: false });
+        }
+      }
+      return results;
+    },
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
+      const successCount = results.filter(r => r.success).length;
+      const failedCount = results.filter(r => !r.success).length;
+      const successIds = new Set(results.filter(r => r.success).map(r => r.id));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        successIds.forEach(id => next.delete(id));
+        return next;
+      });
+      setShowBulkDeleteDialog(false);
+      if (failedCount === 0) {
+        toast({
+          title: "Implants supprimés",
+          description: `${successCount} implant(s) supprimé(s) avec succès.`,
+          variant: "success",
+        });
+      } else if (successCount === 0) {
+        toast({
+          title: "Erreur",
+          description: "Aucun implant n'a pu être supprimé. Ces implants sont peut-être utilisés dans des interventions.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Suppression partielle",
+          description: `${successCount} implant(s) supprimé(s), ${failedCount} échec(s).`,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
+      toast({
+        title: "Erreur",
+        description: "Une erreur inattendue s'est produite.",
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
@@ -185,6 +257,34 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   const totalPages = Math.ceil(totalImplants / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedImplants = sortedImplants.slice(startIndex, startIndex + itemsPerPage);
+
+  const currentPageIds = paginatedImplants.map(i => i.id);
+  const allCurrentPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selectedIds.has(id));
+  const someCurrentPageSelected = currentPageIds.some(id => selectedIds.has(id));
+
+  const handleSelectRow = (id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) {
+        currentPageIds.forEach(id => next.add(id));
+      } else {
+        currentPageIds.forEach(id => next.delete(id));
+      }
+      return next;
+    });
+  };
 
   const handleSort = (columnId: ColumnId) => {
     if (sortColumn === columnId) {
@@ -363,10 +463,35 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
         )}
       </div>
 
-      <div className="flex items-center gap-2 mb-4">
-        <input type="checkbox" className="h-4 w-4 rounded border-gray-300" data-testid="checkbox-select-all" />
-        <span className="text-sm text-muted-foreground">{totalImplants} implants</span>
-      </div>
+      {selectedIds.size > 0 ? (
+        <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">{selectedIds.size} sélectionné(s)</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedIds(new Set())}
+              data-testid="button-clear-selection"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowBulkDeleteDialog(true)}
+            disabled={bulkDeleteMutation.isPending}
+            data-testid="button-bulk-delete"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Supprimer
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-sm text-muted-foreground">{totalImplants} implants</span>
+        </div>
+      )}
 
       <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
         <div className="overflow-x-auto">
@@ -374,7 +499,11 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
             <thead>
               <tr className="border-b border-border-gray bg-border-gray">
                 <th className="w-12 px-4 py-2">
-                  <input type="checkbox" className="h-4 w-4 rounded border-gray-300" />
+                  <Checkbox
+                    checked={allCurrentPageSelected ? true : someCurrentPageSelected ? "indeterminate" : false}
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                    data-testid="checkbox-select-all-header"
+                  />
                 </th>
                 {columns.map((column) => (
                   <th
@@ -426,15 +555,16 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
                 paginatedImplants.map((implant) => (
                   <tr 
                     key={implant.id} 
-                    className="border-b border-border-gray hover-elevate cursor-pointer"
+                    className={`border-b border-border-gray hover-elevate cursor-pointer ${selectedIds.has(implant.id) ? "bg-muted/50" : ""}`}
                     onClick={() => setLocation(`/implants/${implant.id}`)}
                     data-testid={`row-implant-${implant.id}`}
                   >
                     <td className="px-4 py-3">
-                      <input 
-                        type="checkbox" 
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        checked={selectedIds.has(implant.id)}
+                        onCheckedChange={(checked) => handleSelectRow(implant.id, !!checked)}
                         onClick={(e) => e.stopPropagation()}
+                        data-testid={`checkbox-implant-${implant.id}`}
                       />
                     </td>
                     {columns.map((column) => (
@@ -459,6 +589,31 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           onPageChange={setCurrentPage}
         />
       </div>
+
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              Voulez-vous vraiment supprimer {selectedIds.size} implant(s) du catalogue ?
+              Cette action est irréversible. Les implants utilisés dans des interventions ne pourront pas être supprimés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleteMutation.isPending} data-testid="button-cancel-delete">
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+              disabled={bulkDeleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {bulkDeleteMutation.isPending ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
