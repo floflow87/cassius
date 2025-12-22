@@ -135,7 +135,7 @@ export function ActesAdvancedFilterDrawer({ filters, onFiltersChange, activeFilt
   const [filterName, setFilterName] = useState("");
 
   const { data: savedFilters = [], isLoading: isLoadingFilters } = useQuery<SavedFilter[]>({
-    queryKey: ["/api/saved-filters", "actes"],
+    queryKey: ["/api/saved-filters/actes"],
   });
 
   const saveMutation = useMutation({
@@ -143,7 +143,7 @@ export function ActesAdvancedFilterDrawer({ filters, onFiltersChange, activeFilt
       return apiRequest("POST", "/api/saved-filters", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/saved-filters", "actes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-filters/actes"] });
       toast({ title: "Favori enregistré", description: "Le filtre a été ajouté à vos favoris." });
       setSaveDialogOpen(false);
       setFilterName("");
@@ -158,7 +158,7 @@ export function ActesAdvancedFilterDrawer({ filters, onFiltersChange, activeFilt
       return apiRequest("DELETE", `/api/saved-filters/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/saved-filters", "actes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-filters/actes"] });
       toast({ title: "Favori supprimé", description: "Le filtre a été retiré de vos favoris." });
     },
     onError: () => {
