@@ -59,12 +59,12 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r-0 overflow-visible">
-      <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center p-3 pt-4 pb-4">
-        <div className={`flex items-center ${isExpanded ? 'justify-center w-full' : 'justify-center'}`}>
+      <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center p-4 pt-5 pb-5">
+        <div className="flex items-center justify-center w-full">
           {isExpanded ? (
-            <img src={logoFull} alt="Cassius" className="h-8 w-auto" />
+            <img src={logoFull} alt="Cassius" className="h-12 w-auto" />
           ) : (
-            <img src={logoIcon} alt="Cassius" className="h-7 w-7 shrink-0" />
+            <img src={logoIcon} alt="Cassius" className="h-9 w-9 shrink-0" />
           )}
         </div>
       </SidebarHeader>
