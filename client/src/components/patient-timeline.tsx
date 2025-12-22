@@ -1,8 +1,8 @@
-import { Activity, Calendar, FileImage, ClipboardList, Stethoscope, Eye } from "lucide-react";
+import { Activity, Calendar, CalendarClock, FileImage, ClipboardList, Stethoscope, Eye } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { Patient, Operation, Implant, Radio, Visite, SurgeryImplantWithDetails, OperationWithImplants } from "@shared/schema";
+import type { Patient, Operation, Implant, Radio, Visite, SurgeryImplantWithDetails, OperationWithImplants, RendezVous } from "@shared/schema";
 
 interface RadioWithSignedUrl extends Radio {
   signedUrl?: string | null;
@@ -16,16 +16,19 @@ interface PatientWithDetails extends Patient {
   operations: OperationWithImplants[];
   surgeryImplants: SurgeryImplantWithVisites[];
   radios: RadioWithSignedUrl[];
+  upcomingAppointments?: RendezVous[];
 }
 
 interface TimelineEvent {
   id: string;
   date: string;
-  type: "operation" | "implant" | "radio" | "visite";
+  type: "operation" | "implant" | "radio" | "visite" | "rendezvous";
   title: string;
   description?: string;
   metadata?: Record<string, string | number>;
   radioData?: RadioWithSignedUrl;
+  isFuture?: boolean;
+  time?: string;
 }
 
 interface PatientTimelineProps {
@@ -38,6 +41,7 @@ const typeIcons = {
   implant: Activity,
   radio: FileImage,
   visite: Stethoscope,
+  rendezvous: CalendarClock,
 };
 
 const typeLabels = {
@@ -45,6 +49,7 @@ const typeLabels = {
   implant: "Implant",
   radio: "Radio",
   visite: "Visite",
+  rendezvous: "Rendez-vous",
 };
 
 const interventionLabels: Record<string, string> = {
@@ -110,6 +115,18 @@ export function PatientTimeline({ patient, onViewRadio }: PatientTimelineProps) 
     });
   });
 
+  patient.upcomingAppointments?.forEach((rdv) => {
+    events.push({
+      id: `rdv-${rdv.id}`,
+      date: rdv.date,
+      type: "rendezvous",
+      title: rdv.titre || "Rendez-vous",
+      description: rdv.description || undefined,
+      isFuture: true,
+      time: rdv.heureDebut,
+    });
+  });
+
   events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const formatDate = (dateString: string) => {
@@ -157,21 +174,26 @@ export function PatientTimeline({ patient, onViewRadio }: PatientTimelineProps) 
             {monthEvents.map((event) => {
               const Icon = typeIcons[event.type];
               return (
-                <Card key={event.id} data-testid={`timeline-event-${event.id}`}>
+                <Card key={event.id} data-testid={`timeline-event-${event.id}`} className={event.isFuture ? "border-primary/30 bg-primary/5" : ""}>
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0">
-                        <Icon className="h-4 w-4 text-muted-foreground" />
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-full shrink-0 ${event.isFuture ? "bg-primary/20" : "bg-muted"}`}>
+                        <Icon className={`h-4 w-4 ${event.isFuture ? "text-primary" : "text-muted-foreground"}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-medium">{event.title}</h4>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant={event.isFuture ? "default" : "outline"} className="text-xs">
                             {typeLabels[event.type]}
                           </Badge>
+                          {event.isFuture && (
+                            <Badge variant="secondary" className="text-xs">
+                              À venir
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {formatDate(event.date)}
+                          {formatDate(event.date)}{event.time && ` à ${event.time}`}
                         </p>
                         {event.description && (
                           <p className="text-sm mt-2 line-clamp-2">{event.description}</p>

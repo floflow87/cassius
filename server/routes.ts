@@ -224,7 +224,11 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const patient = await storage.getPatientWithDetails(organisationId, req.params.id);
+      const [patient, upcomingAppointments] = await Promise.all([
+        storage.getPatientWithDetails(organisationId, req.params.id),
+        storage.getPatientUpcomingRendezVous(organisationId, req.params.id)
+      ]);
+      
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
@@ -237,7 +241,7 @@ export async function registerRoutes(
         signedUrl: null,
       })) || [];
       
-      res.json({ ...patient, radios: radiosWithNullUrls });
+      res.json({ ...patient, radios: radiosWithNullUrls, upcomingAppointments });
     } catch (error) {
       console.error("Error fetching patient:", error);
       res.status(500).json({ error: "Failed to fetch patient" });

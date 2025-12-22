@@ -157,6 +157,7 @@ export interface IStorage {
 
   // RendezVous methods
   getPatientRendezVous(organisationId: string, patientId: string): Promise<RendezVous[]>;
+  getPatientUpcomingRendezVous(organisationId: string, patientId: string): Promise<RendezVous[]>;
   createRendezVous(organisationId: string, rdv: InsertRendezVous): Promise<RendezVous>;
   updateRendezVous(organisationId: string, id: string, rdv: Partial<InsertRendezVous>): Promise<RendezVous | undefined>;
   deleteRendezVous(organisationId: string, id: string): Promise<boolean>;
@@ -1523,6 +1524,17 @@ export class DatabaseStorage implements IStorage {
         eq(rendezVous.organisationId, organisationId)
       ))
       .orderBy(desc(rendezVous.date));
+  }
+
+  async getPatientUpcomingRendezVous(organisationId: string, patientId: string): Promise<RendezVous[]> {
+    const today = new Date().toISOString().split('T')[0];
+    return db.select().from(rendezVous)
+      .where(and(
+        eq(rendezVous.patientId, patientId),
+        eq(rendezVous.organisationId, organisationId),
+        gte(rendezVous.date, today)
+      ))
+      .orderBy(rendezVous.date);
   }
 
   async createRendezVous(organisationId: string, rdv: InsertRendezVous): Promise<RendezVous> {
