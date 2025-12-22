@@ -16,6 +16,8 @@ import {
   insertRendezVousSchema,
   insertDocumentSchema,
   updateDocumentSchema,
+  insertSavedFilterSchema,
+  savedFilterPageTypeEnum,
   patients,
 } from "@shared/schema";
 import type {
@@ -1648,6 +1650,56 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting rendez-vous:", error);
       res.status(500).json({ error: "Failed to delete rendez-vous" });
+    }
+  });
+
+  // ========== SAVED FILTERS ==========
+  app.get("/api/saved-filters/:pageType", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { pageType } = req.params;
+      const validPageTypes = savedFilterPageTypeEnum.enumValues;
+      if (!validPageTypes.includes(pageType as typeof validPageTypes[number])) {
+        return res.status(400).json({ error: "Invalid page type" });
+      }
+      const filters = await storage.getSavedFilters(organisationId, pageType as typeof validPageTypes[number]);
+      res.json(filters);
+    } catch (error) {
+      console.error("Error fetching saved filters:", error);
+      res.status(500).json({ error: "Failed to fetch saved filters" });
+    }
+  });
+
+  app.post("/api/saved-filters", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const filterData = insertSavedFilterSchema.parse(req.body);
+      const filter = await storage.createSavedFilter(organisationId, filterData);
+      res.status(201).json(filter);
+    } catch (error) {
+      console.error("Error creating saved filter:", error);
+      res.status(500).json({ error: "Failed to create saved filter" });
+    }
+  });
+
+  app.delete("/api/saved-filters/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteSavedFilter(organisationId, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Saved filter not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting saved filter:", error);
+      res.status(500).json({ error: "Failed to delete saved filter" });
     }
   });
 
