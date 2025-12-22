@@ -8,6 +8,7 @@ import {
   FileImage,
   Activity,
   ClipboardList,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +47,12 @@ const approchLabels: Record<string, string> = {
 const tempsLabels: Record<string, string> = {
   UN_TEMPS: "Un temps",
   DEUX_TEMPS: "Deux temps",
+};
+
+const miseEnChargeLabels: Record<string, string> = {
+  IMMEDIATE: "Immédiate",
+  PRECOCE: "Précoce",
+  DIFFEREE: "Différée",
 };
 
 export default function ActeDetailsPage() {
@@ -120,6 +127,14 @@ export default function ActeDetailsPage() {
               <User className="h-4 w-4" />
               Patient
             </CardTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation(`/patients/${operation.patient.id}/edit`)}
+              data-testid="button-edit-patient"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
           </CardHeader>
           <CardContent>
             <Link href={`/patients/${operation.patient.id}`}>
@@ -146,6 +161,14 @@ export default function ActeDetailsPage() {
               <Calendar className="h-4 w-4" />
               Détails de l'intervention
             </CardTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation(`/actes/${acteId}/edit`)}
+              data-testid="button-edit-intervention"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center justify-between">
@@ -170,12 +193,56 @@ export default function ActeDetailsPage() {
                 </span>
               </div>
             )}
+            {operation.typeMiseEnCharge && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Mise en charge</span>
+                <span className="text-sm">
+                  {miseEnChargeLabels[operation.typeMiseEnCharge] || operation.typeMiseEnCharge}
+                </span>
+              </div>
+            )}
             {operation.greffeOsseuse && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Greffe osseuse</span>
                 <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
                   Oui
                 </Badge>
+              </div>
+            )}
+            {operation.typeGreffe && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Type de greffe</span>
+                <span className="text-sm">{operation.typeGreffe}</span>
+              </div>
+            )}
+            {operation.greffeQuantite && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Quantité greffe</span>
+                <span className="text-sm">{operation.greffeQuantite}</span>
+              </div>
+            )}
+            {operation.greffeLocalisation && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Localisation greffe</span>
+                <span className="text-sm">{operation.greffeLocalisation}</span>
+              </div>
+            )}
+            {operation.conditionsMedicalesPreop && (
+              <div className="pt-2 border-t">
+                <span className="text-sm text-muted-foreground">Conditions préopératoires</span>
+                <p className="text-sm mt-1">{operation.conditionsMedicalesPreop}</p>
+              </div>
+            )}
+            {operation.notesPerop && (
+              <div className="pt-2 border-t">
+                <span className="text-sm text-muted-foreground">Notes peropératoires</span>
+                <p className="text-sm mt-1">{operation.notesPerop}</p>
+              </div>
+            )}
+            {operation.observationsPostop && (
+              <div className="pt-2 border-t">
+                <span className="text-sm text-muted-foreground">Observations postopératoires</span>
+                <p className="text-sm mt-1">{operation.observationsPostop}</p>
               </div>
             )}
           </CardContent>
@@ -188,6 +255,14 @@ export default function ActeDetailsPage() {
             <Activity className="h-4 w-4" />
             Implants posés ({operation.surgeryImplants.length})
           </CardTitle>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setLocation(`/actes/${acteId}/implants/add`)}
+            data-testid="button-add-implant"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
         </CardHeader>
         <CardContent>
           {operation.surgeryImplants.length === 0 ? (
