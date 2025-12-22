@@ -267,6 +267,22 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/patients/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const deleted = await storage.deletePatient(organisationId, req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting patient:", error);
+      res.status(500).json({ error: "Failed to delete patient" });
+    }
+  });
+
   // ========== OPERATIONS ==========
   app.get("/api/operations", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -412,6 +428,23 @@ export async function registerRoutes(
       }
       console.error("Error updating catalog implant:", error);
       res.status(500).json({ error: "Failed to update catalog implant" });
+    }
+  });
+
+  // Delete catalog implant
+  app.delete("/api/catalog-implants/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const deleted = await storage.deleteImplant(organisationId, req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Implant not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting implant:", error);
+      res.status(500).json({ error: "Failed to delete implant" });
     }
   });
 

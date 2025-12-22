@@ -62,6 +62,7 @@ export interface IStorage {
   getPatientWithDetails(organisationId: string, id: string): Promise<PatientDetail | undefined>;
   createPatient(organisationId: string, patient: InsertPatient): Promise<Patient>;
   updatePatient(organisationId: string, id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined>;
+  deletePatient(organisationId: string, id: string): Promise<boolean>;
   searchPatients(organisationId: string, query: string): Promise<Patient[]>;
   getPatientImplantCounts(organisationId: string): Promise<Record<string, number>>;
   getPatientsWithSummary(organisationId: string): Promise<PatientSummary>;
@@ -97,6 +98,7 @@ export interface IStorage {
   getImplant(organisationId: string, id: string): Promise<Implant | undefined>;
   createImplant(organisationId: string, implant: InsertImplant): Promise<Implant>;
   updateCatalogImplant(organisationId: string, id: string, updates: Partial<InsertImplant>): Promise<Implant | undefined>;
+  deleteImplant(organisationId: string, id: string): Promise<boolean>;
   getAllImplants(organisationId: string): Promise<Implant[]>;
   getAllImplantsWithStats(organisationId: string): Promise<ImplantWithStats[]>;
   getImplantBrands(organisationId: string): Promise<string[]>;
@@ -283,6 +285,16 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return updated || undefined;
+  }
+
+  async deletePatient(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(patients)
+      .where(and(
+        eq(patients.id, id),
+        eq(patients.organisationId, organisationId)
+      ))
+      .returning({ id: patients.id });
+    return result.length > 0;
   }
 
   async searchPatients(organisationId: string, query: string): Promise<Patient[]> {
@@ -499,6 +511,16 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return updated || undefined;
+  }
+
+  async deleteImplant(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(implants)
+      .where(and(
+        eq(implants.id, id),
+        eq(implants.organisationId, organisationId)
+      ))
+      .returning({ id: implants.id });
+    return result.length > 0;
   }
 
   async getAllImplants(organisationId: string): Promise<Implant[]> {
