@@ -111,6 +111,10 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   const searchQuery = externalSearchQuery ?? internalSearchQuery;
   const setSearchQuery = externalSetSearchQuery ?? setInternalSearchQuery;
   const itemsPerPage = 20;
+  
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [patientPopoverOpen, setPatientPopoverOpen] = useState(false);
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
@@ -172,6 +176,10 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
       if (!res.ok) throw new Error("Failed to fetch operations");
       return res.json();
     },
+  });
+
+  const { data: patients } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
   });
 
   useEffect(() => {
@@ -381,21 +389,86 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           />
           <span className="text-xs text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
         </div>
-        <Sheet>
+        <Sheet open={sheetOpen} onOpenChange={(open) => {
+          setSheetOpen(open);
+          if (!open) {
+            setSelectedPatientId(null);
+          }
+        }}>
           <SheetTrigger asChild>
             <Button data-testid="button-new-acte">
               <Plus className="h-4 w-4 mr-2" />
               Nouvel acte
             </Button>
           </SheetTrigger>
-          <SheetContent className="sm:max-w-lg">
+          <SheetContent className="sm:max-w-lg overflow-y-auto">
             <SheetHeader>
               <SheetTitle>Nouvel acte chirurgical</SheetTitle>
             </SheetHeader>
-            <div className="py-4">
-              <p className="text-sm text-muted-foreground">
-                Le formulaire de création d'acte sera disponible prochainement.
-              </p>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Patient</label>
+                <Popover open={patientPopoverOpen} onOpenChange={setPatientPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={patientPopoverOpen}
+                      className="w-full justify-between"
+                      data-testid="select-patient-trigger"
+                    >
+                      {selectedPatientId
+                        ? patients?.find((p) => p.id === selectedPatientId)
+                          ? `${patients.find((p) => p.id === selectedPatientId)?.prenom} ${patients.find((p) => p.id === selectedPatientId)?.nom}`
+                          : "Sélectionner un patient..."
+                        : "Sélectionner un patient..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[350px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Rechercher un patient..." data-testid="input-search-patient" />
+                      <CommandList>
+                        <CommandEmpty>Aucun patient trouvé.</CommandEmpty>
+                        <CommandGroup>
+                          <ScrollArea className="h-[200px]">
+                            {patients?.map((patient) => (
+                              <CommandItem
+                                key={patient.id}
+                                value={`${patient.prenom} ${patient.nom}`}
+                                onSelect={() => {
+                                  setSelectedPatientId(patient.id);
+                                  setPatientPopoverOpen(false);
+                                }}
+                                data-testid={`select-patient-${patient.id}`}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedPatientId === patient.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {patient.prenom} {patient.nom}
+                              </CommandItem>
+                            ))}
+                          </ScrollArea>
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              {selectedPatientId && (
+                <OperationForm 
+                  patientId={selectedPatientId}
+                  onSuccess={() => {
+                    setSheetOpen(false);
+                    setSelectedPatientId(null);
+                    queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+                  }}
+                />
+              )}
             </div>
           </SheetContent>
         </Sheet>
