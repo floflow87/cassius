@@ -514,35 +514,35 @@ export class DatabaseStorage implements IStorage {
   async getSurgeryImplantWithDetails(organisationId: string, id: string): Promise<ImplantDetail | undefined> {
     const start = Date.now();
     
+    // Optimized: Single JOIN query for all main entities instead of 3 sequential round trips
     const t1 = Date.now();
-    const surgeryImplant = await this.getSurgeryImplant(organisationId, id);
+    const joinedData = await db
+      .select({
+        surgeryImplant: surgeryImplants,
+        implant: implants,
+        surgery: operations,
+        patient: patients,
+      })
+      .from(surgeryImplants)
+      .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
+      .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+      .innerJoin(patients, eq(operations.patientId, patients.id))
+      .where(and(
+        eq(surgeryImplants.id, id),
+        eq(surgeryImplants.organisationId, organisationId)
+      ));
     const d1 = Date.now() - t1;
     
-    if (!surgeryImplant) {
-      console.log(`[IMPLANT-DETAIL] id=${id} surgeryImplant not found after ${d1}ms`);
+    if (joinedData.length === 0) {
+      console.log(`[IMPLANT-DETAIL] id=${id} not found after ${d1}ms`);
       return undefined;
     }
 
+    const { surgeryImplant, implant, surgery, patient } = joinedData[0];
+
+    // Parallel fetch for visites and radios (using catalog implant.id)
     const t2 = Date.now();
-    const [implantResult, surgeryResult] = await Promise.all([
-      db.select().from(implants).where(eq(implants.id, surgeryImplant.implantId)),
-      db.select().from(operations).where(eq(operations.id, surgeryImplant.surgeryId)),
-    ]);
-    const d2 = Date.now() - t2;
-
-    const implant = implantResult[0];
-    if (!implant) {
-      console.log(`[IMPLANT-DETAIL] id=${id} catalog implant not found. surgeryImplant=${d1}ms implant+surgery=${d2}ms`);
-      return undefined;
-    }
-
-    const surgery = surgeryResult[0];
-
-    const t3 = Date.now();
-    const [patientResult, implantVisites, implantRadios] = await Promise.all([
-      surgery 
-        ? db.select().from(patients).where(eq(patients.id, surgery.patientId))
-        : Promise.resolve([]),
+    const [implantVisites, implantRadios] = await Promise.all([
       db.select().from(visites)
         .where(and(eq(visites.implantId, implant.id), eq(visites.organisationId, organisationId)))
         .orderBy(desc(visites.date)),
@@ -550,16 +550,16 @@ export class DatabaseStorage implements IStorage {
         .where(and(eq(radios.implantId, implant.id), eq(radios.organisationId, organisationId)))
         .orderBy(desc(radios.date)),
     ]);
-    const d3 = Date.now() - t3;
+    const d2 = Date.now() - t2;
 
     const total = Date.now() - start;
-    console.log(`[IMPLANT-DETAIL] id=${id} total=${total}ms surgeryImplant=${d1}ms implant+surgery=${d2}ms patient+visites+radios=${d3}ms visites=${implantVisites.length} radios=${implantRadios.length}`);
+    console.log(`[IMPLANT-DETAIL] id=${id} total=${total}ms join=${d1}ms visites+radios=${d2}ms visites=${implantVisites.length} radios=${implantRadios.length}`);
 
     return {
       ...surgeryImplant,
       implant,
-      patient: patientResult[0] || undefined,
-      surgery: surgery || undefined,
+      patient,
+      surgery,
       visites: implantVisites,
       radios: implantRadios,
     };
