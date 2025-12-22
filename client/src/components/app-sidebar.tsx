@@ -6,12 +6,15 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
 import homeIcon from "/assets/icons/home.png";
@@ -31,6 +34,12 @@ const menuItems = [
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
+  const { state, open, setOpen } = useSidebar();
+  const isExpanded = state === "expanded";
+
+  const handleToggle = () => {
+    setOpen(!open);
+  };
 
   const isActive = (url: string) => {
     if (url === "/patients") {
@@ -50,7 +59,12 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0 overflow-visible">
       <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center p-3 pt-4 pb-4">
-        <img src={logoIcon} alt="Cassius" className="h-7 w-7" />
+        <div className={`flex items-center gap-2 ${isExpanded ? 'justify-start w-full px-2' : 'justify-center'}`}>
+          <img src={logoIcon} alt="Cassius" className="h-7 w-7 shrink-0" />
+          {isExpanded && (
+            <span className="text-lg font-semibold text-foreground truncate">Cassius</span>
+          )}
+        </div>
       </SidebarHeader>
 
       <SidebarContent className="bg-primary px-0 py-2">
@@ -58,31 +72,46 @@ export function AppSidebar() {
           {menuItems.map((item) => {
             const active = isActive(item.url);
             
+            const linkContent = (
+              <a
+                href={item.url}
+                onClick={handleNavClick(item.url)}
+                className={`flex h-12 w-full items-center ${
+                  isExpanded ? 'justify-start px-4 gap-3' : 'justify-center'
+                } ${
+                  active 
+                    ? "bg-secondary" 
+                    : "bg-transparent hover:bg-white/10"
+                }`}
+                data-testid={`link-nav-${item.title.toLowerCase()}`}
+              >
+                <img 
+                  src={item.icon} 
+                  alt={item.title}
+                  className="h-5 w-auto brightness-0 invert shrink-0"
+                />
+                {isExpanded && (
+                  <span className="text-sm font-medium text-white truncate">
+                    {item.title}
+                  </span>
+                )}
+              </a>
+            );
+            
             return (
               <SidebarMenuItem key={item.title} className="px-0">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <a
-                      href={item.url}
-                      onClick={handleNavClick(item.url)}
-                      className={`flex h-12 w-full items-center justify-center ${
-                        active 
-                          ? "bg-secondary" 
-                          : "bg-transparent hover:bg-white/10"
-                      }`}
-                      data-testid={`link-nav-${item.title.toLowerCase()}`}
-                    >
-                      <img 
-                        src={item.icon} 
-                        alt={item.title}
-                        className="h-5 w-auto brightness-0 invert"
-                      />
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
-                    {item.title}
-                  </TooltipContent>
-                </Tooltip>
+                {isExpanded ? (
+                  linkContent
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      {linkContent}
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
+                      {item.title}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </SidebarMenuItem>
             );
           })}
@@ -92,25 +121,64 @@ export function AppSidebar() {
       <SidebarFooter className="bg-primary px-0 py-2 pb-4 mt-auto">
         <SidebarMenu className="gap-0">
           <SidebarMenuItem className="px-0">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <a
-                  href="/settings"
-                  onClick={handleNavClick("/settings")}
-                  className="flex h-12 w-full items-center justify-center bg-transparent hover:bg-white/10"
-                  data-testid="link-settings"
-                >
-                  <img 
-                    src={settingsIcon} 
-                    alt="Paramètres"
-                    className="h-5 w-auto brightness-0 invert"
-                  />
-                </a>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
-                Paramètres
-              </TooltipContent>
-            </Tooltip>
+            {isExpanded ? (
+              <a
+                href="/settings"
+                onClick={handleNavClick("/settings")}
+                className="flex h-12 w-full items-center justify-start px-4 gap-3 bg-transparent hover:bg-white/10"
+                data-testid="link-settings"
+              >
+                <img 
+                  src={settingsIcon} 
+                  alt="Paramètres"
+                  className="h-5 w-auto brightness-0 invert shrink-0"
+                />
+                <span className="text-sm font-medium text-white truncate">
+                  Paramètres
+                </span>
+              </a>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href="/settings"
+                    onClick={handleNavClick("/settings")}
+                    className="flex h-12 w-full items-center justify-center bg-transparent hover:bg-white/10"
+                    data-testid="link-settings"
+                  >
+                    <img 
+                      src={settingsIcon} 
+                      alt="Paramètres"
+                      className="h-5 w-auto brightness-0 invert"
+                    />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
+                  Paramètres
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </SidebarMenuItem>
+          
+          {/* Toggle button */}
+          <SidebarMenuItem className="px-0 mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggle}
+              className={`flex h-10 w-full items-center ${
+                isExpanded ? 'justify-end px-4' : 'justify-center'
+              } text-white hover:bg-white/10`}
+              aria-expanded={isExpanded}
+              aria-label={isExpanded ? "Réduire le menu" : "Agrandir le menu"}
+              data-testid="button-toggle-sidebar"
+            >
+              {isExpanded ? (
+                <ChevronLeft className="h-5 w-5" />
+              ) : (
+                <ChevronRight className="h-5 w-5" />
+              )}
+            </Button>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

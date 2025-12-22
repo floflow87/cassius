@@ -216,13 +216,34 @@ function AuthenticatedApp() {
     );
   }
 
+  // Read initial sidebar state from localStorage (default to expanded)
+  const getInitialSidebarState = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('cassius.sidebarCollapsed');
+      return stored !== 'true'; // true = expanded (default), false = collapsed
+    }
+    return true;
+  };
+
+  const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarState);
+
+  // Persist sidebar state to localStorage when changed
+  const handleSidebarOpenChange = (open: boolean) => {
+    setSidebarOpen(open);
+    localStorage.setItem('cassius.sidebarCollapsed', open ? 'false' : 'true');
+  };
+
   const style = {
-    "--sidebar-width": "4rem",
+    "--sidebar-width": "14rem",
     "--sidebar-width-icon": "4rem",
   };
 
   return (
-    <SidebarProvider style={style as React.CSSProperties} defaultOpen={false}>
+    <SidebarProvider 
+      style={style as React.CSSProperties} 
+      open={sidebarOpen}
+      onOpenChange={handleSidebarOpenChange}
+    >
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0 bg-muted/30">
