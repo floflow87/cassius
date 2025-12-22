@@ -155,11 +155,25 @@ export function ImplantsAdvancedFilterDrawer({ filters, onFiltersChange, activeF
     });
   };
 
-  const handleLoadFilter = (filter: SavedFilter) => {
+  const handleLoadFilter = (filter: SavedFilter, combineMode?: "AND" | "OR" | null) => {
     try {
       const parsedFilters = JSON.parse(filter.filterData) as ImplantFilterGroup;
-      setLocalFilters(parsedFilters);
-      toast({ title: "Favori chargé", description: `"${filter.name}" a été appliqué.` });
+      
+      if (combineMode && filters && filters.rules.length > 0 && parsedFilters.rules.length > 0) {
+        const combinedFilters: ImplantFilterGroup = {
+          id: generateId(),
+          operator: combineMode,
+          rules: [...filters.rules, ...parsedFilters.rules],
+        };
+        onFiltersChange(combinedFilters);
+        setIsOpen(false);
+        toast({ title: "Filtres combinés", description: `"${filter.name}" combiné avec ${combineMode === "AND" ? "ET" : "OU"}.` });
+        return;
+      }
+      
+      onFiltersChange(parsedFilters);
+      setIsOpen(false);
+      toast({ title: "Favori appliqué", description: `"${filter.name}" a été appliqué.` });
     } catch {
       toast({ title: "Erreur", description: "Format de filtre invalide.", variant: "destructive" });
     }
@@ -285,25 +299,63 @@ export function ImplantsAdvancedFilterDrawer({ filters, onFiltersChange, activeF
             ) : savedFilters.length === 0 ? (
               <p className="text-sm text-muted-foreground">Aucun favori enregistré</p>
             ) : (
-              <ScrollArea className="max-h-32">
+              <ScrollArea className="max-h-40">
                 <div className="space-y-1">
                   {savedFilters.map((filter) => (
                     <div 
                       key={filter.id}
-                      className="flex items-center justify-between gap-2 p-2 rounded-md hover-elevate cursor-pointer"
-                      onClick={() => handleLoadFilter(filter)}
+                      className="flex items-center justify-between gap-2 p-2 rounded-md hover-elevate"
                       data-testid={`favorite-filter-${filter.id}`}
                     >
-                      <span className="text-sm truncate">{filter.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0"
-                        onClick={(e) => handleDeleteFilter(e, filter.id)}
-                        data-testid={`button-delete-favorite-${filter.id}`}
+                      <span 
+                        className="text-sm truncate flex-1 cursor-pointer"
+                        onClick={() => handleLoadFilter(filter)}
                       >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                        {filter.name}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => handleLoadFilter(filter, "AND")}
+                              data-testid={`button-combine-and-${filter.id}`}
+                            >
+                              +ET
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Combiner avec les filtres actuels (ET)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => handleLoadFilter(filter, "OR")}
+                              data-testid={`button-combine-or-${filter.id}`}
+                            >
+                              +OU
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Combiner avec les filtres actuels (OU)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={(e) => handleDeleteFilter(e, filter.id)}
+                          data-testid={`button-delete-favorite-${filter.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
