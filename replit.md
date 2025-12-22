@@ -120,6 +120,7 @@ The following methods in `server/storage.ts` were refactored from nested loops t
 - `getSurgeryImplantsByCatalogImplant`: Single 3-table JOIN
 - `getAllSurgeryImplants`: Single 4-table JOIN
 - `filterSurgeryImplants`: Single 4-table JOIN with WHERE conditions
+- `getSurgeryImplantWithDetails`: Single 4-table JOIN (surgeryImplants → implants → operations → patients) + parallel visites/radios fetch. Reduced from 3 sequential round trips to 2 batches. Includes timing logs: `[IMPLANT-DETAIL] id=X total=Xms join=Xms visites+radios=Xms`
 
 ### Lazy Signed URL Loading
 - List endpoints (`/api/patients/:id`, `/api/patients/:patientId/radios`, `/api/patients/:patientId/documents`) return `signedUrl: null`
@@ -132,6 +133,7 @@ Multi-column indexes added to `db/migrate-supabase.sql` for query optimization:
 - `idx_surgery_implants_org_implant`: ON surgery_implants(organisation_id, implant_id)
 - `idx_operations_org_patient`: ON operations(organisation_id, patient_id)
 - `idx_radios_org_patient`: ON radios(organisation_id, patient_id)
+- `idx_radios_org_implant`: ON radios(organisation_id, implant_id) - for implant details page queries
 - `idx_patients_org`: ON patients(organisation_id)
 - `idx_visites_org_implant`: ON visites(organisation_id, implant_id)
 - `idx_documents_org_patient`: ON documents(organisation_id, patient_id)
