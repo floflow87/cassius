@@ -40,11 +40,12 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { PatientForm } from "@/components/patient-form";
 import { CassiusBadge, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
-import { AdvancedFilterDrawer, FilterChips } from "@/components/advanced-filter-drawer";
+import { AdvancedFilterDrawer, FilterChips, type FilterGroup } from "@/components/advanced-filter-drawer";
+import { SavedFiltersManager } from "@/components/saved-filters-manager";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Patient } from "@shared/schema";
-import type { FilterGroup, FilterRule, PatientSearchResult } from "@shared/types";
+import type { FilterRule, PatientSearchResult } from "@shared/types";
 
 interface PatientsPageProps {
   searchQuery: string;
@@ -512,6 +513,13 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           filters={advancedFilters}
           onFiltersChange={setAdvancedFilters}
           activeFilterCount={activeFilterCount}
+        />
+        
+        <SavedFiltersManager
+          pageType="patients"
+          currentFilters={advancedFilters}
+          onLoadFilter={setAdvancedFilters}
+          hasActiveFilters={!!advancedFilters && advancedFilters.rules.length > 0}
         />
 
         <div className="flex items-center border rounded-md">

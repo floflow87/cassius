@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { ImplantsAdvancedFilterDrawer, ImplantFilterChips, type ImplantFilterGroup } from "@/components/implants-advanced-filter-drawer";
+import { SavedFiltersManager } from "@/components/saved-filters-manager";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -422,6 +423,13 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           filters={advancedFilters}
           onFiltersChange={setAdvancedFilters}
           activeFilterCount={advancedFilters?.rules.length || 0}
+        />
+        
+        <SavedFiltersManager
+          pageType="implants"
+          currentFilters={advancedFilters}
+          onLoadFilter={setAdvancedFilters}
+          hasActiveFilters={!!advancedFilters && advancedFilters.rules.length > 0}
         />
 
         {selectedIds.size > 0 && (
