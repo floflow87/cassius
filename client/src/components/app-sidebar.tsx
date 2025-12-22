@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
+import logoFull from "@assets/logo_Cassius_Plan_de_travail_1_copie_1765897934649.png";
 import homeIcon from "/assets/icons/home.png";
 import patientIcon from "/assets/icons/patient.png";
 import implantsIcon from "/assets/icons/implants.png";
@@ -25,7 +26,7 @@ import statsIcon from "/assets/icons/statistiques.png";
 import settingsIcon from "/assets/icons/settings.png";
 
 const menuItems = [
-  { title: "Accueil", url: "/dashboard", icon: homeIcon },
+  { title: "Tableau de bord", url: "/dashboard", icon: homeIcon },
   { title: "Patients", url: "/patients", icon: patientIcon },
   { title: "Implants", url: "/implants", icon: implantsIcon },
   { title: "Actes", url: "/actes", icon: actesIcon },
@@ -59,16 +60,17 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0 overflow-visible">
       <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center p-3 pt-4 pb-4">
-        <div className={`flex items-center gap-2 ${isExpanded ? 'justify-start w-full px-2' : 'justify-center'}`}>
-          <img src={logoIcon} alt="Cassius" className="h-7 w-7 shrink-0" />
-          {isExpanded && (
-            <span className="text-lg font-semibold text-foreground truncate">Cassius</span>
+        <div className={`flex items-center ${isExpanded ? 'justify-center w-full' : 'justify-center'}`}>
+          {isExpanded ? (
+            <img src={logoFull} alt="Cassius" className="h-8 w-auto" />
+          ) : (
+            <img src={logoIcon} alt="Cassius" className="h-7 w-7 shrink-0" />
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-primary px-0 py-2">
-        <SidebarMenu className="gap-0">
+      <SidebarContent className="bg-primary px-0 py-0">
+        <SidebarMenu className="gap-1 px-2 pt-2">
           {menuItems.map((item) => {
             const active = isActive(item.url);
             
@@ -76,14 +78,14 @@ export function AppSidebar() {
               <a
                 href={item.url}
                 onClick={handleNavClick(item.url)}
-                className={`flex h-12 w-full items-center ${
-                  isExpanded ? 'justify-start px-4 gap-3' : 'justify-center'
+                className={`flex h-10 items-center rounded-[5px] ${
+                  isExpanded ? 'justify-start px-3 gap-3' : 'justify-center w-full'
                 } ${
                   active 
                     ? "bg-secondary" 
                     : "bg-transparent hover:bg-white/10"
                 }`}
-                data-testid={`link-nav-${item.title.toLowerCase()}`}
+                data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
               >
                 <img 
                   src={item.icon} 
@@ -118,14 +120,58 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="bg-primary px-0 py-2 pb-4 mt-auto">
-        <SidebarMenu className="gap-0">
+      <SidebarFooter className="bg-primary px-2 py-2 pb-4 mt-auto">
+        <SidebarMenu className="gap-1">
+          {/* Toggle button - first */}
+          <SidebarMenuItem className="px-0">
+            {isExpanded ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleToggle}
+                    className="flex h-10 w-full items-center justify-end px-3 text-white hover:bg-white/10"
+                    aria-expanded={isExpanded}
+                    aria-label="Réduire le menu"
+                    data-testid="button-toggle-sidebar"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
+                  Réduire le menu
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleToggle}
+                    className="flex h-10 w-full items-center justify-center text-white hover:bg-white/10"
+                    aria-expanded={isExpanded}
+                    aria-label="Agrandir le menu"
+                    data-testid="button-toggle-sidebar"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
+                  Agrandir le menu
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </SidebarMenuItem>
+
+          {/* Settings button - second */}
           <SidebarMenuItem className="px-0">
             {isExpanded ? (
               <a
                 href="/settings"
                 onClick={handleNavClick("/settings")}
-                className="flex h-12 w-full items-center justify-start px-4 gap-3 bg-transparent hover:bg-white/10"
+                className="flex h-10 w-full items-center justify-start px-3 gap-3 rounded-[5px] bg-transparent hover:bg-white/10"
                 data-testid="link-settings"
               >
                 <img 
@@ -143,7 +189,7 @@ export function AppSidebar() {
                   <a
                     href="/settings"
                     onClick={handleNavClick("/settings")}
-                    className="flex h-12 w-full items-center justify-center bg-transparent hover:bg-white/10"
+                    className="flex h-10 w-full items-center justify-center rounded-[5px] bg-transparent hover:bg-white/10"
                     data-testid="link-settings"
                   >
                     <img 
@@ -158,27 +204,6 @@ export function AppSidebar() {
                 </TooltipContent>
               </Tooltip>
             )}
-          </SidebarMenuItem>
-          
-          {/* Toggle button */}
-          <SidebarMenuItem className="px-0 mt-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleToggle}
-              className={`flex h-10 w-full items-center ${
-                isExpanded ? 'justify-end px-4' : 'justify-center'
-              } text-white hover:bg-white/10`}
-              aria-expanded={isExpanded}
-              aria-label={isExpanded ? "Réduire le menu" : "Agrandir le menu"}
-              data-testid="button-toggle-sidebar"
-            >
-              {isExpanded ? (
-                <ChevronLeft className="h-5 w-5" />
-              ) : (
-                <ChevronRight className="h-5 w-5" />
-              )}
-            </Button>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
