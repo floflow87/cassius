@@ -14,6 +14,7 @@ import ImplantDetailsPage from "@/pages/implant-details";
 import CatalogImplantDetailsPage from "@/pages/catalog-implant-details";
 import PatientReportPage from "@/pages/patient-report";
 import DashboardPage from "@/pages/dashboard";
+import StatsPage from "@/pages/stats";
 import ImplantsPage from "@/pages/implants";
 import ActesPage from "@/pages/actes";
 import ActeDetailsPage from "@/pages/acte-details";
@@ -59,8 +60,11 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
     if (location === "/implants" || location.startsWith("/implants/")) {
       return { title: "Implants", subtitle: null };
     }
-    if (location === "/dashboard" || location === "/" || location === "/stats") {
+    if (location === "/dashboard" || location === "/") {
       return { title: "Tableau de bord", subtitle: null };
+    }
+    if (location === "/stats") {
+      return { title: "Statistiques", subtitle: null };
     }
     if (location === "/actes") {
       return { title: "Actes", subtitle: null };
@@ -157,7 +161,7 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/patients/:id/report" component={PatientReportPage} />
       <Route path="/patients/:patientId/implants/:implantId" component={ImplantDetailsPage} />
       <Route path="/dashboard" component={DashboardPage} />
-      <Route path="/stats" component={DashboardPage} />
+      <Route path="/stats" component={StatsPage} />
       <Route path="/implants">
         {() => <ImplantsPage />}
       </Route>
