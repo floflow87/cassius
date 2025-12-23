@@ -89,7 +89,16 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 
   // Fetch search results
   const { data: results, isLoading } = useQuery<GlobalSearchResults>({
-    queryKey: ["/api/search", { q: debouncedQuery }],
+    queryKey: ["/api/search", debouncedQuery],
+    queryFn: async () => {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error(`${res.status}: ${res.statusText}`);
+      }
+      return res.json();
+    },
     enabled: debouncedQuery.length >= 2,
   });
 
