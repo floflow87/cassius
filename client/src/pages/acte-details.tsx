@@ -39,6 +39,7 @@ import {
 import { RadioUploadForm } from "@/components/radio-upload-form";
 import { OperationEditForm } from "@/components/operation-edit-form";
 import { SurgeryImplantEditSheet } from "@/components/surgery-implant-edit-sheet";
+import { SurgeryImplantAddSheet } from "@/components/surgery-implant-add-sheet";
 import { SurgeryTimeline } from "@/components/surgery-timeline";
 import type { OperationDetail, SurgeryImplantWithDetails } from "@shared/types";
 
@@ -81,6 +82,7 @@ export default function ActeDetailsPage() {
   
   const [radioDialogOpen, setRadioDialogOpen] = useState(false);
   const [editInterventionOpen, setEditInterventionOpen] = useState(false);
+  const [addImplantOpen, setAddImplantOpen] = useState(false);
   const [editingImplant, setEditingImplant] = useState<SurgeryImplantWithDetails | null>(null);
 
   const { data: operation, isLoading } = useQuery<OperationDetail>({
@@ -280,12 +282,12 @@ export default function ActeDetailsPage() {
             Implants posés ({operation.surgeryImplants.length})
           </CardTitle>
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLocation(`/actes/${acteId}/implants/add`)}
+            size="sm"
+            onClick={() => setAddImplantOpen(true)}
             data-testid="button-add-implant"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 mr-1" />
+            Ajouter un implant
           </Button>
         </CardHeader>
         <CardContent>
@@ -300,6 +302,8 @@ export default function ActeDetailsPage() {
                   <TableHead>Site</TableHead>
                   <TableHead>Marque</TableHead>
                   <TableHead>Dimensions</TableHead>
+                  <TableHead>Type Os</TableHead>
+                  <TableHead>Mise en charge</TableHead>
                   <TableHead>ISQ Pose</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="w-10"></TableHead>
@@ -322,6 +326,20 @@ export default function ActeDetailsPage() {
                     </TableCell>
                     <TableCell>
                       {si.implant.diametre}mm x {si.implant.longueur}mm
+                    </TableCell>
+                    <TableCell>
+                      {si.typeOs ? (
+                        <span className="text-sm">{si.typeOs}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {si.miseEnCharge ? (
+                        <span className="text-sm">{miseEnChargeLabels[si.miseEnCharge] || si.miseEnCharge}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {si.isqPose ? (
@@ -406,7 +424,6 @@ export default function ActeDetailsPage() {
             Radiographies associées ({operation.radios.length})
           </CardTitle>
           <Button
-            variant="ghost"
             size="sm"
             onClick={() => setRadioDialogOpen(true)}
             data-testid="button-add-radio"
@@ -486,6 +503,14 @@ export default function ActeDetailsPage() {
         open={!!editingImplant}
         onOpenChange={(open) => !open && setEditingImplant(null)}
         onSuccess={() => setEditingImplant(null)}
+      />
+
+      <SurgeryImplantAddSheet
+        operationId={operation.id}
+        operationDate={operation.dateOperation}
+        open={addImplantOpen}
+        onOpenChange={setAddImplantOpen}
+        onSuccess={() => setAddImplantOpen(false)}
       />
     </div>
   );
