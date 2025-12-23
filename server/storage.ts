@@ -523,13 +523,26 @@ export class DatabaseStorage implements IStorage {
       const column = this.getColumnForField(field);
       if (!column) return "TRUE";
       
+      // Numeric fields that need value coercion
+      const numericFields = ["patient_age", "patient_implantCount", "implant_successRate", "surgery_successRate"];
+      const isNumericField = numericFields.includes(field);
+      
+      // Helper to coerce values to numbers for numeric fields
+      const coerceValue = (v: any) => {
+        if (isNumericField && v !== null && v !== undefined && v !== "") {
+          const num = Number(v);
+          return isNaN(num) ? v : num;
+        }
+        return v;
+      };
+      
       // Build the condition based on operator
       switch (operator) {
         case "equals":
-          params.push(value);
+          params.push(coerceValue(value));
           return `${column} = $${paramIndex++}`;
         case "not_equals":
-          params.push(value);
+          params.push(coerceValue(value));
           return `${column} != $${paramIndex++}`;
         case "contains":
           params.push(`%${value}%`);
@@ -538,19 +551,19 @@ export class DatabaseStorage implements IStorage {
           params.push(`%${value}%`);
           return `${column} NOT ILIKE $${paramIndex++}`;
         case "greater_than":
-          params.push(value);
+          params.push(coerceValue(value));
           return `${column} > $${paramIndex++}`;
         case "greater_than_or_equal":
-          params.push(value);
+          params.push(coerceValue(value));
           return `${column} >= $${paramIndex++}`;
         case "less_than":
-          params.push(value);
+          params.push(coerceValue(value));
           return `${column} < $${paramIndex++}`;
         case "less_than_or_equal":
-          params.push(value);
+          params.push(coerceValue(value));
           return `${column} <= $${paramIndex++}`;
         case "between":
-          params.push(value, value2);
+          params.push(coerceValue(value), coerceValue(value2));
           return `${column} BETWEEN $${paramIndex++} AND $${paramIndex++}`;
         case "is_true":
           return `${column} = TRUE`;
@@ -589,6 +602,7 @@ export class DatabaseStorage implements IStorage {
       patient_nom: "p.nom",
       patient_prenom: "p.prenom",
       patient_dateNaissance: "p.date_naissance",
+      patient_age: "CASE WHEN p.date_naissance IS NOT NULL THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, p.date_naissance::date))::integer ELSE NULL END",
       patient_statut: "p.statut",
       patient_derniereVisite: "last_rv.date",
       patient_implantCount: "(SELECT COUNT(*) FROM surgery_implants si2 JOIN operations o2 ON si2.surgery_id = o2.id WHERE o2.patient_id = p.id)",

@@ -91,6 +91,13 @@ export default function StatsPage() {
 
   const { data: stats, isLoading } = useQuery<ClinicalStats>({
     queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to],
+    queryFn: async () => {
+      const res = await fetch(`/api/stats/clinical?from=${dateRange.from}&to=${dateRange.to}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch clinical stats");
+      return res.json();
+    },
     enabled: period !== "custom" || (!!customFrom && !!customTo),
   });
 

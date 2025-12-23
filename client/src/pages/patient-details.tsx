@@ -1932,9 +1932,21 @@ export default function PatientDetailsPage() {
                             </div>
                             <div>
                               <span className="text-muted-foreground text-xs">ISQ actuel:</span>
-                              <p className="text-primary font-medium">
-                                {surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose || "-"}
-                              </p>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-primary font-medium cursor-help underline decoration-dotted">
+                                    {surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose || "-"}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs">
+                                  <div className="space-y-1">
+                                    <p><span className="text-muted-foreground">Pose:</span> {surgeryImplant.isqPose ?? "-"}</p>
+                                    {surgeryImplant.isq2m != null && <p><span className="text-muted-foreground">2 mois:</span> {surgeryImplant.isq2m}</p>}
+                                    {surgeryImplant.isq3m != null && <p><span className="text-muted-foreground">3 mois:</span> {surgeryImplant.isq3m}</p>}
+                                    {surgeryImplant.isq6m != null && <p><span className="text-muted-foreground">6 mois:</span> {surgeryImplant.isq6m}</p>}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
                             </div>
                           </div>
                         </div>

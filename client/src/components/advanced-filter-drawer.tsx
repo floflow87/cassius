@@ -22,6 +22,7 @@ const FILTER_FIELD_CONFIGS: FilterFieldConfig[] = [
   { field: "patient_nom", label: "Nom du patient", category: "patient", type: "text", operators: ["contains", "equals", "not_contains"] },
   { field: "patient_prenom", label: "Prénom du patient", category: "patient", type: "text", operators: ["contains", "equals", "not_contains"] },
   { field: "patient_dateNaissance", label: "Date de naissance", category: "patient", type: "date", operators: ["before", "after", "between"] },
+  { field: "patient_age", label: "Âge (années)", category: "patient", type: "number", operators: ["equals", "greater_than", "less_than", "greater_than_or_equal", "less_than_or_equal", "between"] },
   { field: "patient_statut", label: "Statut patient", category: "patient", type: "select", operators: ["equals", "not_equals"], options: [
     { value: "ACTIF", label: "Actif" },
     { value: "INACTIF", label: "Inactif" },

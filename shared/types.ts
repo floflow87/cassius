@@ -420,6 +420,7 @@ export type FilterField =
   | "patient_nom"
   | "patient_prenom"
   | "patient_dateNaissance"
+  | "patient_age"
   | "patient_statut"
   | "patient_derniereVisite"
   | "patient_implantCount"
