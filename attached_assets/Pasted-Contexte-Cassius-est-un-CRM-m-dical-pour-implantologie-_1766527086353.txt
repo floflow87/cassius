@@ -1,0 +1,274 @@
+Contexte
+
+Cassius est un CRM médical pour implantologie.
+Nous disposons désormais de données structurées : patients, actes, implants, visites, mesures ISQ, filtres avancés sauvegardés.
+
+Nous souhaitons créer une page “Statistiques cliniques” V1, destinée au pilotage de l’activité et du suivi clinique, sans analytics complexes ni IA.
+
+Objectifs
+
+Fournir une lecture claire de l’activité et des résultats cliniques
+
+Utiliser des visualisations adaptées au type de donnée
+
+Permettre un lien direct entre statistiques et données sources (via filtres)
+
+Garantir performance, simplicité et cohérence médicale
+
+Structure générale de la page
+Layout
+
+Page dédiée : /stats
+
+En-tête :
+
+Titre : “Statistiques cliniques”
+
+Sélecteur de période globale (ex : 30j / 3 mois / 6 mois / 1 an / personnalisé)
+
+Sections verticales (cartes empilées)
+
+SECTION 1 — Activité clinique
+1.1 Nombre d’actes par période
+Donnée
+
+Nombre d’actes chirurgicaux réalisés sur la période sélectionnée
+
+Visualisation recommandée
+
+✅ Graphique en barres (axe X = temps, axe Y = nombre d’actes)
+
+Pourquoi :
+
+lecture temporelle claire
+
+comparaison naturelle entre périodes
+
+Alternative
+
+Tableau si période courte ou export futur
+
+Interaction
+
+Sur clic d’une barre → appliquer un filtre :
+
+actes sur la période sélectionnée
+
+1.2 Nombre d’implants posés
+Donnée
+
+Total d’implants posés sur la période
+
+Visualisation recommandée
+
+✅ Carte KPI + mini sparkline
+
+Pourquoi :
+
+c’est une métrique de volume
+
+la tendance importe plus que le détail
+
+Alternative
+
+Barres si comparaison mensuelle demandée
+
+1.3 Répartition des actes par type
+
+(ex : pose, reprise, greffe, autre)
+
+Donnée
+
+Types d’actes
+
+Visualisation recommandée
+
+✅ Camembert (pie chart)
+
+Pourquoi :
+
+distribution simple
+
+peu de catégories
+
+lecture intuitive
+
+Alternative
+
+Barres horizontales si + de 5 catégories
+
+Interaction
+
+Clic sur une part → filtrer les actes de ce type
+
+SECTION 2 — Résultats cliniques
+2.1 Taux de succès global
+Donnée
+
+Pourcentage d’implants considérés comme “succès”
+
+Visualisation recommandée
+
+✅ Jauge / progress bar horizontale
+
+Pourquoi :
+
+lecture immédiate
+
+seuils cliniques visuels
+
+Alternative
+
+KPI simple + badge couleur
+
+2.2 Répartition ISQ (faible / modéré / élevé)
+Donnée
+
+Catégorisation des mesures ISQ
+
+Visualisation recommandée
+
+✅ Barres empilées
+
+Pourquoi :
+
+comparaison proportionnelle
+
+cohérent avec notion de seuils
+
+Alternative
+
+Camembert (moins précis mais acceptable)
+
+Interaction
+
+Clic sur une catégorie → filtrer implants correspondants
+
+2.3 Évolution moyenne de l’ISQ dans le temps
+Donnée
+
+ISQ moyen par période (tous implants confondus)
+
+Visualisation recommandée
+
+✅ Graphique en ligne
+
+Pourquoi :
+
+évolution biologique
+
+tendance plus importante que valeur brute
+
+Alternative
+
+Table si très peu de points
+
+SECTION 3 — Suivi & continuité des soins
+3.1 Délai moyen acte → première visite de suivi
+Donnée
+
+Temps moyen (en jours)
+
+Visualisation recommandée
+
+✅ KPI simple
+
+Pourquoi :
+
+une seule valeur
+
+comparaison mentale rapide
+
+Alternative
+
+Boxplot (V2, plus avancé)
+
+3.2 Implants sans suivi depuis X mois
+Donnée
+
+Nombre d’implants sans visite récente
+
+Visualisation recommandée
+
+✅ Tableau
+
+Colonnes :
+
+Patient
+
+Implant
+
+Date de pose
+
+Dernière visite
+
+Délai
+
+Pourquoi :
+
+donnée actionnable
+
+nécessite du détail
+
+Interaction
+
+Bouton “Créer des visites de suivi”
+
+SECTION 4 — Accès aux données sources
+Principe clé
+
+Chaque graphique ou KPI doit proposer :
+
+“Voir les patients”
+
+“Voir les actes”
+
+“Voir les implants”
+
+👉 Action = appliquer un filtre avancé existant ou généré dynamiquement.
+
+Backend / API
+Endpoint unique recommandé
+
+POST /api/stats
+
+Payload :
+
+{
+  "dateRange": { "from": "...", "to": "..." }
+}
+
+
+Retour :
+
+agrégats prêts à afficher
+
+pas de calcul lourd côté front
+
+Règles
+
+Les calculs doivent être faits côté backend
+
+Les statistiques doivent être traçables vers les entités sources
+
+Pas de requêtes N+1
+
+Performance & UX
+
+Lazy-load des sections (au scroll)
+
+Skeleton par carte
+
+Pas plus de 6–8 graphiques en V1
+
+Pas de graph si la donnée n’est pas pertinente visuellement (préférer tableau)
+
+Critères d’acceptation
+
+La page se charge rapidement (< 1s hors DB)
+
+Chaque stat est compréhensible sans légende longue
+
+Chaque stat mène à une action ou un filtre
+
+Aucune visualisation inutile ou redondante
