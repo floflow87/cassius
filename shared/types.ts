@@ -223,6 +223,29 @@ export interface IsqTrend {
   avgIsq: number;
 }
 
+export interface ClinicalStats {
+  activityByPeriod: { period: string; count: number }[];
+  implantsByPeriod: { period: string; count: number }[];
+  totalImplantsInPeriod: number;
+  actsByType: { type: string; count: number }[];
+  successRate: number;
+  complicationRate: number;
+  failureRate: number;
+  isqDistribution: { category: string; count: number }[];
+  isqEvolution: { period: string; avgIsq: number }[];
+  avgDelayToFirstVisit: number | null;
+  implantsWithoutFollowup: {
+    patientId: string;
+    patientNom: string;
+    patientPrenom: string;
+    implantId: string;
+    siteFdi: string;
+    datePose: string;
+    lastVisitDate: string | null;
+    daysSinceVisit: number | null;
+  }[];
+}
+
 export interface ImplantFilters {
   marque?: string;
   siteFdi?: string;

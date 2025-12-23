@@ -47,6 +47,7 @@ import type {
   SurgeryImplantWithDetails,
   DashboardStats,
   AdvancedStats,
+  ClinicalStats,
   ImplantFilters,
   CreateUserInput,
   OperationDetail,
@@ -147,6 +148,7 @@ export interface IStorage {
   // Stats methods
   getStats(organisationId: string): Promise<DashboardStats>;
   getAdvancedStats(organisationId: string): Promise<AdvancedStats>;
+  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string): Promise<ClinicalStats>;
 
   // User methods (not tenant-filtered, users are global)
   getUserById(id: string): Promise<User | undefined>;
@@ -1439,6 +1441,168 @@ export class DatabaseStorage implements IStorage {
       implantsByBrand: brandCounts,
       implantsBySite: siteCounts,
       isqTrends,
+    };
+  }
+
+  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string): Promise<ClinicalStats> {
+    const now = new Date();
+    const defaultFrom = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().split('T')[0];
+    const defaultTo = now.toISOString().split('T')[0];
+    const fromDate = dateFrom || defaultFrom;
+    const toDate = dateTo || defaultTo;
+
+    const allOperations = await db.select().from(operations)
+      .where(and(
+        eq(operations.organisationId, organisationId),
+        gte(operations.dateOperation, fromDate),
+        lte(operations.dateOperation, toDate)
+      ))
+      .orderBy(operations.dateOperation);
+
+    const allSurgeryImplants = await db.select().from(surgeryImplants)
+      .where(and(
+        eq(surgeryImplants.organisationId, organisationId),
+        gte(surgeryImplants.datePose, fromDate),
+        lte(surgeryImplants.datePose, toDate)
+      ));
+
+    const allVisites = await db.select().from(visites)
+      .where(eq(visites.organisationId, organisationId));
+
+    const activityByMonth: Record<string, number> = {};
+    allOperations.forEach(op => {
+      const month = op.dateOperation.substring(0, 7);
+      activityByMonth[month] = (activityByMonth[month] || 0) + 1;
+    });
+
+    const implantsByMonth: Record<string, number> = {};
+    allSurgeryImplants.forEach(si => {
+      const month = si.datePose.substring(0, 7);
+      implantsByMonth[month] = (implantsByMonth[month] || 0) + 1;
+    });
+
+    const actsByType: Record<string, number> = {};
+    allOperations.forEach(op => {
+      const type = op.typeIntervention || "AUTRE";
+      actsByType[type] = (actsByType[type] || 0) + 1;
+    });
+
+    const statusCounts = { SUCCES: 0, COMPLICATION: 0, ECHEC: 0, EN_SUIVI: 0 };
+    const isqValues: number[] = [];
+    allSurgeryImplants.forEach(si => {
+      const status = si.statut || "EN_SUIVI";
+      statusCounts[status as keyof typeof statusCounts]++;
+      if (si.isqPose) isqValues.push(si.isqPose);
+    });
+
+    const total = allSurgeryImplants.length;
+    const successRate = total > 0 ? Math.round((statusCounts.SUCCES / total) * 100) : 0;
+    const complicationRate = total > 0 ? Math.round((statusCounts.COMPLICATION / total) * 100) : 0;
+    const failureRate = total > 0 ? Math.round((statusCounts.ECHEC / total) * 100) : 0;
+
+    const isqDistribution = [
+      { category: "Faible (<55)", count: isqValues.filter(v => v < 55).length },
+      { category: "Modéré (55-70)", count: isqValues.filter(v => v >= 55 && v <= 70).length },
+      { category: "Élevé (>70)", count: isqValues.filter(v => v > 70).length },
+    ];
+
+    const isqByMonth: Record<string, { sum: number; count: number }> = {};
+    allSurgeryImplants.forEach(si => {
+      const month = si.datePose.substring(0, 7);
+      if (si.isqPose) {
+        if (!isqByMonth[month]) isqByMonth[month] = { sum: 0, count: 0 };
+        isqByMonth[month].sum += si.isqPose;
+        isqByMonth[month].count++;
+      }
+    });
+
+    const visitesPerImplant: Record<string, Date[]> = {};
+    allVisites.forEach(v => {
+      if (v.implantId) {
+        if (!visitesPerImplant[v.implantId]) visitesPerImplant[v.implantId] = [];
+        visitesPerImplant[v.implantId].push(new Date(v.date));
+      }
+    });
+
+    let totalDelayDays = 0;
+    let delayCount = 0;
+    allSurgeryImplants.forEach(si => {
+      const implantVisites = visitesPerImplant[si.implantId] || [];
+      if (implantVisites.length > 0) {
+        const poseDate = new Date(si.datePose);
+        const firstVisit = implantVisites.sort((a, b) => a.getTime() - b.getTime())[0];
+        const delay = Math.floor((firstVisit.getTime() - poseDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (delay >= 0) {
+          totalDelayDays += delay;
+          delayCount++;
+        }
+      }
+    });
+
+    const avgDelayToFirstVisit = delayCount > 0 ? Math.round(totalDelayDays / delayCount) : null;
+
+    const patientsMap: Record<string, { nom: string; prenom: string }> = {};
+    const patientsList = await db.select({ id: patients.id, nom: patients.nom, prenom: patients.prenom })
+      .from(patients)
+      .where(eq(patients.organisationId, organisationId));
+    patientsList.forEach(p => { patientsMap[p.id] = { nom: p.nom, prenom: p.prenom }; });
+
+    const operationsMap: Record<string, string> = {};
+    allOperations.forEach(op => { operationsMap[op.id] = op.patientId; });
+
+    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+    const implantsWithoutFollowup: ClinicalStats["implantsWithoutFollowup"] = [];
+    
+    const allOrgSurgeryImplants = await db.select().from(surgeryImplants)
+      .where(eq(surgeryImplants.organisationId, organisationId));
+
+    for (const si of allOrgSurgeryImplants) {
+      const implantVisites = visitesPerImplant[si.implantId] || [];
+      const lastVisit = implantVisites.length > 0 
+        ? implantVisites.sort((a, b) => b.getTime() - a.getTime())[0] 
+        : null;
+      
+      const daysSince = lastVisit 
+        ? Math.floor((now.getTime() - lastVisit.getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+
+      if (!lastVisit || lastVisit < threeMonthsAgo) {
+        const patientId = operationsMap[si.surgeryId];
+        const patient = patientId ? patientsMap[patientId] : null;
+        if (patient) {
+          implantsWithoutFollowup.push({
+            patientId,
+            patientNom: patient.nom,
+            patientPrenom: patient.prenom,
+            implantId: si.id,
+            siteFdi: si.siteFdi,
+            datePose: si.datePose,
+            lastVisitDate: lastVisit ? lastVisit.toISOString().split('T')[0] : null,
+            daysSinceVisit: daysSince,
+          });
+        }
+      }
+    }
+
+    return {
+      activityByPeriod: Object.entries(activityByMonth)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([period, count]) => ({ period, count })),
+      implantsByPeriod: Object.entries(implantsByMonth)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([period, count]) => ({ period, count })),
+      totalImplantsInPeriod: allSurgeryImplants.length,
+      actsByType: Object.entries(actsByType)
+        .map(([type, count]) => ({ type, count })),
+      successRate,
+      complicationRate,
+      failureRate,
+      isqDistribution,
+      isqEvolution: Object.entries(isqByMonth)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([period, data]) => ({ period, avgIsq: Math.round(data.sum / data.count) })),
+      avgDelayToFirstVisit,
+      implantsWithoutFollowup: implantsWithoutFollowup.slice(0, 20),
     };
   }
 

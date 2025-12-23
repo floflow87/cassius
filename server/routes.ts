@@ -1585,6 +1585,22 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/stats/clinical", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { from, to } = req.query;
+      const dateFrom = from ? String(from) : undefined;
+      const dateTo = to ? String(to) : undefined;
+      const stats = await storage.getClinicalStats(organisationId, dateFrom, dateTo);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching clinical stats:", error);
+      res.status(500).json({ error: "Failed to fetch clinical stats" });
+    }
+  });
+
   // Note: Legacy Replit Object Storage routes removed - using Supabase Storage now
 
   // ========== NOTES ==========
