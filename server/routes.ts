@@ -374,6 +374,21 @@ export async function registerRoutes(
     }
   });
 
+  // ========== GLOBAL SEARCH ==========
+  app.get("/api/search", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const query = req.query.q as string || "";
+      const results = await storage.globalSearch(organisationId, query);
+      res.json(results);
+    } catch (error) {
+      console.error("Error in global search:", error);
+      res.status(500).json({ error: "Failed to perform search" });
+    }
+  });
+
   // ========== PATIENTS ==========
   app.get("/api/patients", requireJwtOrSession, async (req, res) => {
     const env = process.env.APP_ENV || process.env.NODE_ENV || "unknown";

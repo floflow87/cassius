@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { GlobalSearch } from "@/components/global-search";
 import type { Patient } from "@shared/schema";
 
 interface UserInfo {
@@ -96,6 +97,8 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
           <span className="text-sm text-muted-foreground">{subtitle}</span>
         )}
       </div>
+      
+      <GlobalSearch className="flex-1 max-w-md" />
       
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-notifications">

@@ -542,3 +542,47 @@ export interface OperationTimeline {
   };
   events: TimelineEvent[];
 }
+
+// Global search types
+export interface GlobalSearchPatient {
+  id: string;
+  nom: string;
+  prenom: string;
+  dateNaissance: string;
+}
+
+export interface GlobalSearchActe {
+  id: string;
+  typeIntervention: TypeIntervention;
+  dateOperation: string;
+  patientId: string;
+  patientNom: string;
+  patientPrenom: string;
+}
+
+export interface GlobalSearchImplant {
+  id: string;
+  marque: string;
+  referenceFabricant: string | null;
+  siteFdi: string;
+  patientId: string;
+  patientNom: string;
+  patientPrenom: string;
+}
+
+export interface GlobalSearchDocument {
+  id: string;
+  nom: string;
+  type: string;
+  patientId: string;
+  patientNom: string;
+  patientPrenom: string;
+  date: string;
+}
+
+export interface GlobalSearchResults {
+  patients: GlobalSearchPatient[];
+  actes: GlobalSearchActe[];
+  implants: GlobalSearchImplant[];
+  documents: GlobalSearchDocument[];
+}

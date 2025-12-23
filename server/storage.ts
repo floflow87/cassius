@@ -57,6 +57,7 @@ import type {
   FilterRule,
   OperationTimeline,
   TimelineEvent,
+  GlobalSearchResults,
 } from "@shared/types";
 import { db, pool } from "./db";
 import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL } from "drizzle-orm";
@@ -185,6 +186,9 @@ export interface IStorage {
 
   // Timeline methods
   getOperationTimeline(organisationId: string, operationId: string): Promise<OperationTimeline | null>;
+  
+  // Global search
+  globalSearch(organisationId: string, query: string, limit?: number): Promise<GlobalSearchResults>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -666,6 +670,136 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return visits;
+  }
+
+  // ========== GLOBAL SEARCH ==========
+  async globalSearch(organisationId: string, query: string, limit: number = 5): Promise<GlobalSearchResults> {
+    if (!query || query.trim().length < 2) {
+      return { patients: [], actes: [], implants: [], documents: [] };
+    }
+
+    const searchTerm = `%${query.trim()}%`;
+    
+    // Run all searches in parallel for performance
+    const [patientsResult, actesResult, implantsResult, documentsResult] = await Promise.all([
+      // Search patients by nom or prenom
+      db.execute<{ id: string; nom: string; prenom: string; date_naissance: string }>(sql`
+        SELECT id, nom, prenom, date_naissance
+        FROM patients
+        WHERE organisation_id = ${organisationId}
+          AND (nom ILIKE ${searchTerm} OR prenom ILIKE ${searchTerm} 
+               OR CONCAT(prenom, ' ', nom) ILIKE ${searchTerm}
+               OR CONCAT(nom, ' ', prenom) ILIKE ${searchTerm})
+        ORDER BY nom, prenom
+        LIMIT ${limit}
+      `),
+      
+      // Search actes by type intervention or patient name
+      db.execute<{ 
+        id: string; 
+        type_intervention: string; 
+        date_operation: string;
+        patient_id: string;
+        patient_nom: string;
+        patient_prenom: string;
+      }>(sql`
+        SELECT o.id, o.type_intervention, o.date_operation, 
+               p.id as patient_id, p.nom as patient_nom, p.prenom as patient_prenom
+        FROM operations o
+        JOIN patients p ON o.patient_id = p.id AND p.organisation_id = ${organisationId}
+        WHERE o.organisation_id = ${organisationId}
+          AND (o.type_intervention ILIKE ${searchTerm} 
+               OR p.nom ILIKE ${searchTerm} 
+               OR p.prenom ILIKE ${searchTerm}
+               OR CONCAT(p.prenom, ' ', p.nom) ILIKE ${searchTerm})
+        ORDER BY o.date_operation DESC
+        LIMIT ${limit}
+      `),
+      
+      // Search implants by marque, reference or patient name
+      db.execute<{ 
+        id: string; 
+        marque: string; 
+        reference_fabricant: string | null;
+        site_fdi: string;
+        patient_id: string;
+        patient_nom: string;
+        patient_prenom: string;
+      }>(sql`
+        SELECT si.id, i.marque, i.reference_fabricant, si.site_fdi,
+               p.id as patient_id, p.nom as patient_nom, p.prenom as patient_prenom
+        FROM surgery_implants si
+        JOIN implants i ON si.implant_id = i.id AND i.organisation_id = ${organisationId}
+        JOIN operations o ON si.surgery_id = o.id AND o.organisation_id = ${organisationId}
+        JOIN patients p ON o.patient_id = p.id AND p.organisation_id = ${organisationId}
+        WHERE si.organisation_id = ${organisationId}
+          AND (i.marque ILIKE ${searchTerm} 
+               OR i.reference_fabricant ILIKE ${searchTerm}
+               OR si.site_fdi ILIKE ${searchTerm}
+               OR p.nom ILIKE ${searchTerm} 
+               OR p.prenom ILIKE ${searchTerm})
+        ORDER BY si.date_pose DESC
+        LIMIT ${limit}
+      `),
+      
+      // Search documents by nom, type or patient name
+      db.execute<{ 
+        id: string; 
+        nom: string; 
+        type: string;
+        date: string;
+        patient_id: string;
+        patient_nom: string;
+        patient_prenom: string;
+      }>(sql`
+        SELECT d.id, d.nom, d.type, d.date,
+               p.id as patient_id, p.nom as patient_nom, p.prenom as patient_prenom
+        FROM documents d
+        JOIN patients p ON d.patient_id = p.id AND p.organisation_id = ${organisationId}
+        WHERE d.organisation_id = ${organisationId}
+          AND (d.nom ILIKE ${searchTerm} 
+               OR d.type ILIKE ${searchTerm}
+               OR p.nom ILIKE ${searchTerm} 
+               OR p.prenom ILIKE ${searchTerm})
+        ORDER BY d.date DESC
+        LIMIT ${limit}
+      `)
+    ]);
+
+    return {
+      patients: patientsResult.rows.map(row => ({
+        id: row.id,
+        nom: row.nom,
+        prenom: row.prenom,
+        dateNaissance: row.date_naissance
+      })),
+      actes: actesResult.rows.map(row => ({
+        id: row.id,
+        typeIntervention: row.type_intervention as any,
+        dateOperation: row.date_operation,
+        patientId: row.patient_id,
+        patientNom: row.patient_nom,
+        patientPrenom: row.patient_prenom
+      })),
+      implants: implantsResult.rows.map(row => ({
+        id: row.id,
+        marque: row.marque,
+        referenceFabricant: row.reference_fabricant,
+        siteFdi: row.site_fdi,
+        patientId: row.patient_id,
+        patientNom: row.patient_nom,
+        patientPrenom: row.patient_prenom
+      })),
+      documents: documentsResult.rows.map(row => ({
+        id: row.id,
+        nom: row.nom,
+        type: row.type,
+        date: row.date,
+        patientId: row.patient_id,
+        patientNom: row.patient_nom,
+        patientPrenom: row.patient_prenom
+      }))
+    };
   }
 
   // ========== OPERATIONS ==========
