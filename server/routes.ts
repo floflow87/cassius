@@ -1425,10 +1425,13 @@ export async function registerRoutes(
 
       const buffer = Buffer.from(await response.arrayBuffer());
       
-      // Set appropriate headers
+      // Set appropriate headers for inline PDF viewing
       res.setHeader("Content-Type", doc.mimeType || "application/pdf");
       res.setHeader("Content-Length", buffer.length);
       res.setHeader("Content-Disposition", `inline; filename="${doc.fileName || 'document.pdf'}"`);
+      // Allow embedding in iframes from same origin
+      res.removeHeader("X-Frame-Options");
+      res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
       
       res.send(buffer);
     } catch (error) {
