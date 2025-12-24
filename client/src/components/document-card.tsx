@@ -67,13 +67,7 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
   const [urlError, setUrlError] = useState(false);
 
-  useEffect(() => {
-    return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
-    };
-  }, [blobUrl]);
+  // Cleanup not needed since we no longer use blob URLs
 
   // Auto-fetch signed URL when signedUrl is null but filePath exists
   useEffect(() => {
@@ -153,22 +147,16 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
     
     if (document.filePath) {
       setIsLoadingUrl(true);
-      // Use proxy endpoint to bypass CORS/CSP restrictions
+      // Use the proxy URL directly for iframe - no blob needed
       const proxyUrl = `/api/documents/${document.id}/file`;
-      const blob = await loadPdfAsBlob(proxyUrl);
-      if (!blob) {
-        setUrlError(true);
-      }
+      setBlobUrl(proxyUrl);
       setIsLoadingUrl(false);
     }
   };
 
   const handleCloseViewer = () => {
     setViewerOpen(false);
-    if (blobUrl) {
-      URL.revokeObjectURL(blobUrl);
-      setBlobUrl(null);
-    }
+    setBlobUrl(null);
   };
 
   const renameMutation = useMutation({
@@ -396,16 +384,16 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
                 <Button onClick={handleOpenViewer} variant="outline">Reessayer</Button>
               </div>
             ) : blobUrl ? (
-              <embed
-                src={blobUrl}
-                type="application/pdf"
-                className="w-full h-[70vh]"
+              <iframe
+                src={`${blobUrl}#toolbar=1&navpanes=0`}
+                className="w-full h-[70vh] border-0"
                 title={document.title}
               />
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <FileText className="h-24 w-24 text-muted-foreground" />
                 <p className="text-muted-foreground">Aucun fichier disponible</p>
+                <p className="text-sm text-muted-foreground">Cliquez sur "Ouvrir" pour voir le document dans un nouvel onglet</p>
               </div>
             )}
           </div>
