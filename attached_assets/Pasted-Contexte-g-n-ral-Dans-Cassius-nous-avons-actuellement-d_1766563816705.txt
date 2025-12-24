@@ -1,0 +1,279 @@
+Contexte général
+
+Dans Cassius, nous avons actuellement :
+
+des visites (historique clinique)
+
+des rendez-vous (à venir)
+
+Cela crée un doublon conceptuel et une confusion UX.
+De plus, nous souhaitons introduire un système de flags cliniques permettant de signaler, filtrer et piloter les situations à surveiller.
+
+PARTIE 1 — Centralisation Visites & RDV
+Objectif
+
+👉 Unifier visites et rendez-vous dans un seul concept : “RDV clinique”
+
+Un RDV peut être :
+
+passé (historique)
+
+à venir
+
+de différents types (consultation, suivi, chirurgie, contrôle, etc.)
+
+Modèle conceptuel
+
+Créer une entité unique :
+
+Appointment (RDV)
+
+id
+
+patient_id
+
+act_id (optionnel)
+
+implant_instance_id (optionnel)
+
+type (consultation, suivi, chirurgie, contrôle…)
+
+date_start
+
+date_end (optionnel)
+
+status :
+
+upcoming
+
+completed
+
+cancelled
+
+description / notes
+
+tags (optionnel)
+
+👉 Les “visites” existantes deviennent des RDV status = completed.
+
+Impacts UX
+
+Fiche patient :
+
+Un seul onglet “RDV”
+
+Deux sections :
+
+À venir
+
+Historique
+
+Timeline patient & acte :
+
+Les RDV apparaissent comme événements uniques
+
+Plus de distinction “visite vs rdv” dans l’UI
+
+Critères d’acceptation (Partie 1)
+
+Plus aucun doublon conceptuel
+
+Une seule source de vérité pour les interactions patient
+
+Timeline plus lisible
+
+PARTIE 2 — Système de Flags Cliniques (fondation produit)
+Philosophie
+
+Un flag est un signal clinique explicite, pas une tâche.
+Il sert à :
+
+attirer l’attention
+
+filtrer
+
+prioriser
+
+piloter
+
+1) Modèle de données — Flag
+
+Créer une entité Flag :
+
+id
+
+level (critical / warning / info)
+
+type (enum)
+
+label (ex : “ISQ faible”)
+
+description
+
+entity_type :
+
+patient
+
+act
+
+implant
+
+entity_id
+
+created_at
+
+resolved_at (nullable)
+
+resolved_by (nullable)
+
+👉 Un flag peut être actif ou résolu.
+
+2) Types de flags à implémenter (V1)
+🟥 Flags cliniques (critical)
+
+ISQ faible (< 60)
+
+ISQ en baisse significative
+
+Acte avec taux de succès < seuil
+
+🟧 Flags de suivi (warning)
+
+Implant sans ISQ récent (> X mois)
+
+Implant sans suivi post-op
+
+Patient sans RDV depuis X mois
+
+🟨 Flags de cohérence (info)
+
+Implant sans acte associé
+
+Document manquant pour un acte
+
+Données incomplètes
+
+3) Création des flags
+V1 — Création automatique
+
+Les flags sont créés automatiquement :
+
+via règles métier simples
+
+lors de certains événements (nouvelle ISQ, nouvel acte, calcul stats)
+
+👉 Pas de moteur de règles configurable en V1.
+
+4) Affichage des flags (UX global)
+A) Fiche patient
+
+Afficher 1 badge principal (le plus critique)
+
+Si plusieurs flags :
+
+badge + compteur
+
+hover → liste des autres flags
+
+Cliquer sur un flag ouvre le détail
+
+B) Tableaux (patients, actes, implants)
+
+Ajouter une colonne “Flag” :
+
+afficher le flag le plus critique
+
+couleur selon niveau
+
+hover :
+
+liste des autres flags actifs
+
+colonne filtrable
+
+C) Dashboard
+
+Ajouter une section “À surveiller” (lite) :
+
+Compteurs :
+
+X flags critiques
+
+Y flags warning
+
+Liste courte (top 5–10) :
+
+Patient / Implant / Acte
+
+Type de flag
+
+Lien direct
+
+D) Page Statistiques
+
+Ajouter un tableau “Flags actifs” :
+Colonnes :
+
+Type de flag
+
+Niveau
+
+Entité concernée
+
+Date
+
+Ancienneté
+
+Filtres :
+
+niveau
+
+type
+
+entité
+
+5) Filtres par flag (partout)
+
+Sur tous les tableaux (patients, actes, implants, documents si pertinent) :
+
+Ajouter un filtre :
+
+“A des flags”
+
+“Flags par niveau”
+
+“Type de flag”
+
+👉 Les flags deviennent une dimension transverse du produit.
+
+6) Résolution des flags
+
+Action possible :
+
+“Marquer comme résolu”
+
+La résolution :
+
+archive le flag
+
+conserve l’historique
+
+Un flag peut réapparaître si la condition redevient vraie
+
+Critères d’acceptation globaux
+
+Les flags sont visibles partout sans surcharge visuelle
+
+Un praticien peut :
+
+identifier rapidement ce qui nécessite attention
+
+filtrer et prioriser
+
+Les flags alimentent :
+
+dashboard
+
+stats
+
+exploration via filtres
