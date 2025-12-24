@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Calendar, FileImage, MoreVertical, Pencil, Download, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { Calendar, FileImage, MoreVertical, Pencil, Download, Trash2, ZoomIn, ZoomOut, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,7 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
   const [freshSignedUrl, setFreshSignedUrl] = useState<string | null>(null);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
   const [urlError, setUrlError] = useState(false);
+  const [thumbnailLoading, setThumbnailLoading] = useState(false);
 
   // Fetch fresh signed URL when opening viewer (handles expiration)
   // Returns the fresh URL directly for immediate use
@@ -81,6 +82,22 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
     return null;
   };
 
+  // Auto-fetch signed URL for thumbnail when signedUrl is null but filePath exists
+  useEffect(() => {
+    if (radio.filePath && !radio.signedUrl && !radio.url && !freshSignedUrl && !thumbnailLoading) {
+      setThumbnailLoading(true);
+      fetch(`/api/radios/${radio.id}/signed-url`, { credentials: "include" })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.signedUrl) {
+            setFreshSignedUrl(data.signedUrl);
+          }
+        })
+        .catch(err => console.error("Failed to load thumbnail URL:", err))
+        .finally(() => setThumbnailLoading(false));
+    }
+  }, [radio.id, radio.filePath, radio.signedUrl, radio.url, freshSignedUrl, thumbnailLoading]);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("fr-FR", {
       day: "2-digit",
@@ -90,8 +107,8 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
   };
 
   const getImageUrl = (useFresh = false) => {
-    // Use fresh signed URL if available (for viewer/download)
-    if (useFresh && freshSignedUrl) {
+    // Use fresh signed URL if available (for viewer/download or when loaded for thumbnail)
+    if (freshSignedUrl) {
       return freshSignedUrl;
     }
     // Use signed URL from Supabase Storage (for new uploads)
@@ -207,7 +224,11 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
           className="aspect-square bg-muted cursor-pointer"
           onClick={handleOpenViewer}
         >
-          {(radio.signedUrl || radio.url || radio.filePath) && !imageError ? (
+          {thumbnailLoading ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
+            </div>
+          ) : getImageUrl() && !imageError ? (
             <img
               src={getImageUrl()}
               alt={radio.title || `Radio ${typeLabels[radio.type]}`}
