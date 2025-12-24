@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Calendar, FileText, MoreVertical, Pencil, Download, Trash2, ExternalLink, X, Loader2 } from "lucide-react";
+import { Calendar, FileText, MoreVertical, Pencil, Download, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogClose,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -57,17 +56,12 @@ const TAG_COLORS: Record<string, string> = {
 
 export function DocumentCard({ document, patientId }: DocumentCardProps) {
   const { toast } = useToast();
-  const [viewerOpen, setViewerOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [newTitle, setNewTitle] = useState(document.title || "");
   const [renameError, setRenameError] = useState("");
   const [freshSignedUrl, setFreshSignedUrl] = useState<string | null>(null);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
-  const [urlError, setUrlError] = useState(false);
-
-  // Cleanup not needed since we no longer use blob URLs
 
   // Auto-fetch signed URL when signedUrl is null but filePath exists
   useEffect(() => {
@@ -87,7 +81,6 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
     if (!document.filePath) return null;
     
     setIsLoadingUrl(true);
-    setUrlError(false);
     try {
       const res = await fetch(`/api/documents/${document.id}/signed-url`, { credentials: "include" });
       if (res.ok) {
@@ -95,30 +88,12 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
         setFreshSignedUrl(data.signedUrl);
         return data.signedUrl;
       }
-      setUrlError(true);
     } catch (err) {
       console.error("Failed to refresh signed URL:", err);
-      setUrlError(true);
     } finally {
       setIsLoadingUrl(false);
     }
     return null;
-  };
-
-  const loadPdfAsBlob = async (url: string): Promise<string | null> => {
-    try {
-      const response = await fetch(url, { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch PDF");
-      const blob = await response.blob();
-      // Ensure the blob has the correct MIME type for PDF
-      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
-      const objectUrl = URL.createObjectURL(pdfBlob);
-      setBlobUrl(objectUrl);
-      return objectUrl;
-    } catch (err) {
-      console.error("Failed to load PDF as blob:", err);
-      return null;
-    }
   };
 
   const formatDate = (dateString: string | Date) => {
@@ -130,34 +105,25 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
     });
   };
 
-  const getDocumentUrl = (useFresh = false) => {
-    if (useFresh && freshSignedUrl) {
-      return freshSignedUrl;
-    }
-    if (document.signedUrl) {
-      return document.signedUrl;
-    }
-    return "";
-  };
-
-  const handleOpenViewer = async () => {
-    setViewerOpen(true);
-    setBlobUrl(null);
-    setUrlError(false);
-    
+  const handleOpenDocument = async () => {
+    // Open document directly in new tab - most reliable method as Chrome blocks iframe PDF viewing
     if (document.filePath) {
       setIsLoadingUrl(true);
-      // Use the proxy URL directly for iframe - no blob needed
-      const proxyUrl = `/api/documents/${document.id}/file`;
-      setBlobUrl(proxyUrl);
+      const url = await refreshSignedUrl();
       setIsLoadingUrl(false);
+      
+      if (url) {
+        window.open(url, "_blank");
+      } else {
+        toast({ 
+          title: "Erreur", 
+          description: "Impossible d'ouvrir le document. Veuillez reessayer.", 
+          variant: "destructive" 
+        });
+      }
     }
   };
 
-  const handleCloseViewer = () => {
-    setViewerOpen(false);
-    setBlobUrl(null);
-  };
 
   const renameMutation = useMutation({
     mutationFn: async (title: string) => {
@@ -250,7 +216,7 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
       >
         <div 
           className="aspect-square bg-muted cursor-pointer flex items-center justify-center"
-          onClick={handleOpenViewer}
+          onClick={handleOpenDocument}
         >
           <FileText className="h-16 w-16 text-primary" />
           {document.tags && document.tags.length > 0 && (
@@ -319,86 +285,6 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
           </div>
         </CardContent>
       </Card>
-
-      <Dialog open={viewerOpen} onOpenChange={handleCloseViewer}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 flex flex-col [&>button]:hidden">
-          <DialogHeader className="flex-shrink-0 p-4 border-b relative z-10">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="flex items-center gap-2 flex-wrap">
-                  <span className="truncate">{document.title}</span>
-                  {document.tags && document.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className={TAG_COLORS[tag] || TAG_COLORS.AUTRE}>
-                      {TAG_LABELS[tag] || tag}
-                    </Badge>
-                  ))}
-                </DialogTitle>
-                <DialogDescription className="text-sm text-muted-foreground">
-                  {formatDate(document.createdAt)}
-                  {document.sizeBytes && ` - ${formatFileSize(document.sizeBytes)}`}
-                </DialogDescription>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleDownload}
-                  data-testid="button-download-document"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Telecharger
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    const url = freshSignedUrl || document.signedUrl;
-                    if (url) window.open(url, "_blank");
-                  }}
-                  data-testid="button-open-new-tab"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Ouvrir
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCloseViewer}
-                  data-testid="button-close-viewer"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden bg-muted min-h-[60vh]">
-            {isLoadingUrl ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="text-muted-foreground ml-2">Chargement du document...</p>
-              </div>
-            ) : urlError ? (
-              <div className="flex flex-col items-center justify-center h-full gap-4">
-                <FileText className="h-24 w-24 text-muted-foreground" />
-                <p className="text-muted-foreground">Impossible de charger le document</p>
-                <Button onClick={handleOpenViewer} variant="outline">Reessayer</Button>
-              </div>
-            ) : blobUrl ? (
-              <iframe
-                src={`${blobUrl}#toolbar=1&navpanes=0`}
-                className="w-full h-[70vh] border-0"
-                title={document.title}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full gap-4">
-                <FileText className="h-24 w-24 text-muted-foreground" />
-                <p className="text-muted-foreground">Aucun fichier disponible</p>
-                <p className="text-sm text-muted-foreground">Cliquez sur "Ouvrir" pour voir le document dans un nouvel onglet</p>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={renameOpen} onOpenChange={handleRenameOpenChange}>
         <DialogContent>
