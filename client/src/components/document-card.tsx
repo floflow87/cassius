@@ -396,18 +396,12 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
                 <Button onClick={handleOpenViewer} variant="outline">Reessayer</Button>
               </div>
             ) : blobUrl ? (
-              <object
-                data={blobUrl}
+              <embed
+                src={blobUrl}
                 type="application/pdf"
                 className="w-full h-[70vh]"
                 title={document.title}
-              >
-                <div className="flex flex-col items-center justify-center h-full gap-4">
-                  <FileText className="h-24 w-24 text-muted-foreground" />
-                  <p className="text-muted-foreground">Votre navigateur ne supporte pas l'affichage de PDF</p>
-                  <Button onClick={handleDownload} variant="outline">Telecharger le PDF</Button>
-                </div>
-              </object>
+              />
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <FileText className="h-24 w-24 text-muted-foreground" />
