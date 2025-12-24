@@ -75,6 +75,20 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
     };
   }, [blobUrl]);
 
+  // Auto-fetch signed URL when signedUrl is null but filePath exists
+  useEffect(() => {
+    if (document.filePath && !document.signedUrl && !freshSignedUrl && !isLoadingUrl) {
+      fetch(`/api/documents/${document.id}/signed-url`, { credentials: "include" })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.signedUrl) {
+            setFreshSignedUrl(data.signedUrl);
+          }
+        })
+        .catch(err => console.error("Failed to load document URL:", err));
+    }
+  }, [document.id, document.filePath, document.signedUrl, freshSignedUrl, isLoadingUrl]);
+
   const refreshSignedUrl = async (): Promise<string | null> => {
     if (!document.filePath) return null;
     
