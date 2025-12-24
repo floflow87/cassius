@@ -708,7 +708,7 @@ export class DatabaseStorage implements IStorage {
         FROM operations o
         JOIN patients p ON o.patient_id = p.id AND p.organisation_id = ${organisationId}
         WHERE o.organisation_id = ${organisationId}
-          AND (o.type_intervention ILIKE ${searchTerm} 
+          AND (o.type_intervention::TEXT ILIKE ${searchTerm} 
                OR p.nom ILIKE ${searchTerm} 
                OR p.prenom ILIKE ${searchTerm}
                OR CONCAT(p.prenom, ' ', p.nom) ILIKE ${searchTerm})
@@ -742,26 +742,26 @@ export class DatabaseStorage implements IStorage {
         LIMIT ${limit}
       `),
       
-      // Search documents by nom, type or patient name
+      // Search documents by title, file_name or patient name
       db.execute<{ 
         id: string; 
-        nom: string; 
-        type: string;
-        date: string;
+        title: string; 
+        file_name: string;
+        created_at: string;
         patient_id: string;
         patient_nom: string;
         patient_prenom: string;
       }>(sql`
-        SELECT d.id, d.nom, d.type, d.date,
+        SELECT d.id, d.title, d.file_name, d.created_at,
                p.id as patient_id, p.nom as patient_nom, p.prenom as patient_prenom
         FROM documents d
         JOIN patients p ON d.patient_id = p.id AND p.organisation_id = ${organisationId}
         WHERE d.organisation_id = ${organisationId}
-          AND (d.nom ILIKE ${searchTerm} 
-               OR d.type ILIKE ${searchTerm}
+          AND (d.title ILIKE ${searchTerm} 
+               OR d.file_name ILIKE ${searchTerm}
                OR p.nom ILIKE ${searchTerm} 
                OR p.prenom ILIKE ${searchTerm})
-        ORDER BY d.date DESC
+        ORDER BY d.created_at DESC
         LIMIT ${limit}
       `)
     ]);
@@ -792,9 +792,9 @@ export class DatabaseStorage implements IStorage {
       })),
       documents: documentsResult.rows.map(row => ({
         id: row.id,
-        nom: row.nom,
-        type: row.type,
-        date: row.date,
+        nom: row.title || row.file_name,
+        type: row.file_name?.split('.').pop() || 'pdf',
+        date: row.created_at,
         patientId: row.patient_id,
         patientNom: row.patient_nom,
         patientPrenom: row.patient_prenom
