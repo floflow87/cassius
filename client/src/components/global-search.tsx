@@ -3,12 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Search, User, Stethoscope, Activity, FileText, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
 import type { GlobalSearchResults, TypeIntervention } from "@shared/types";
 
 const TYPE_INTERVENTION_LABELS: Record<TypeIntervention, string> = {
@@ -43,11 +38,12 @@ interface GlobalSearchProps {
 
 export function GlobalSearch({ className }: GlobalSearchProps) {
   const [, setLocation] = useLocation();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   // Debounce the search query
@@ -68,7 +64,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setIsOpen(true);
+        inputRef.current?.focus();
       }
     };
 
@@ -76,16 +72,17 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Focus input when dialog opens
+  // Close dropdown when clicking outside
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 0);
-    } else {
-      setQuery("");
-      setDebouncedQuery("");
-      setSelectedIndex(0);
-    }
-  }, [isOpen]);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsFocused(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Fetch search results
   const { data: results, isLoading } = useQuery<GlobalSearchResults>({
@@ -137,7 +134,8 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 
   // Navigate to result
   const navigateTo = useCallback((type: string, data: any) => {
-    setIsOpen(false);
+    setIsFocused(false);
+    setQuery("");
     switch (type) {
       case "patient":
         setLocation(`/patients/${data.id}`);
@@ -156,26 +154,31 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!hasResults) return;
-
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setSelectedIndex(i => Math.min(i + 1, flatResults.length - 1));
+        if (hasResults) {
+          setSelectedIndex(i => Math.min(i + 1, flatResults.length - 1));
+        }
         break;
       case "ArrowUp":
         e.preventDefault();
-        setSelectedIndex(i => Math.max(i - 1, 0));
+        if (hasResults) {
+          setSelectedIndex(i => Math.max(i - 1, 0));
+        }
         break;
       case "Enter":
         e.preventDefault();
-        const item = flatResults[selectedIndex];
-        if (item) {
-          navigateTo(item.type, item.data);
+        if (hasResults) {
+          const item = flatResults[selectedIndex];
+          if (item) {
+            navigateTo(item.type, item.data);
+          }
         }
         break;
       case "Escape":
-        setIsOpen(false);
+        setIsFocused(false);
+        inputRef.current?.blur();
         break;
     }
   };
@@ -217,70 +220,47 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
     );
   };
 
+  const showDropdown = isFocused && query.length >= 2;
+
   return (
-    <>
-      <Button 
-        variant="outline" 
-        className={`relative justify-start text-muted-foreground ${className}`}
-        onClick={() => setIsOpen(true)}
-        data-testid="button-global-search"
-      >
-        <Search className="h-4 w-4 mr-2" />
-        <span className="hidden sm:inline">Rechercher...</span>
-        <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground ml-auto">
+    <div ref={containerRef} className={`relative ${className}`}>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setIsFocused(true)}
+          onKeyDown={handleKeyDown}
+          placeholder="Rechercher..."
+          className="pl-9 pr-16 w-64"
+          data-testid="input-global-search"
+        />
+        <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
           <span className="text-xs">⌘</span>K
         </kbd>
-      </Button>
+      </div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-xl p-0 gap-0 overflow-hidden" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <div className="flex items-center border-b px-3">
-            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-            <Input
-              ref={inputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Rechercher un patient, acte, implant, document..."
-              className="border-0 focus-visible:ring-0 text-base"
-              data-testid="input-global-search"
-            />
-            {query && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6 shrink-0"
-                onClick={() => setQuery("")}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
-          <div ref={resultsRef} className="max-h-[60vh] overflow-y-auto">
-            {isLoading && debouncedQuery.length >= 2 && (
-              <div className="p-4 text-center text-muted-foreground text-sm">
+      {showDropdown && (
+        <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-popover border rounded-md shadow-lg overflow-hidden">
+          <div ref={resultsRef} className="max-h-80 overflow-y-auto">
+            {isLoading && (
+              <div className="p-3 text-center text-muted-foreground text-sm">
                 Recherche en cours...
               </div>
             )}
 
-            {!isLoading && debouncedQuery.length >= 2 && !hasResults && (
-              <div className="p-4 text-center text-muted-foreground text-sm">
+            {!isLoading && !hasResults && (
+              <div className="p-3 text-center text-muted-foreground text-sm">
                 Aucun résultat pour "{debouncedQuery}"
               </div>
             )}
 
-            {debouncedQuery.length < 2 && (
-              <div className="p-4 text-center text-muted-foreground text-sm">
-                Tapez au moins 2 caractères pour rechercher
-              </div>
-            )}
-
             {!isLoading && hasResults && results && (
-              <div className="py-2">
+              <div className="py-1">
                 {results.patients.length > 0 && (
                   <div>
-                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider bg-muted/50">
                       Patients
                     </div>
                     {results.patients.map((patient) => {
@@ -290,16 +270,16 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
                           key={patient.id}
                           data-index={idx}
                           className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${
-                            idx === selectedIndex ? "bg-accent" : "hover-elevate"
+                            idx === selectedIndex ? "bg-accent" : "hover:bg-accent/50"
                           }`}
                           onClick={() => navigateTo("patient", patient)}
                           data-testid={`search-result-patient-${patient.id}`}
                         >
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                             {renderCategoryIcon("patient")}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">
+                            <div className="font-medium text-sm truncate">
                               {patient.prenom} {patient.nom}
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -315,7 +295,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 
                 {results.actes.length > 0 && (
                   <div>
-                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider bg-muted/50">
                       Actes
                     </div>
                     {results.actes.map((acte) => {
@@ -325,16 +305,16 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
                           key={acte.id}
                           data-index={idx}
                           className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${
-                            idx === selectedIndex ? "bg-accent" : "hover-elevate"
+                            idx === selectedIndex ? "bg-accent" : "hover:bg-accent/50"
                           }`}
                           onClick={() => navigateTo("acte", acte)}
                           data-testid={`search-result-acte-${acte.id}`}
                         >
-                          <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center shrink-0">
+                          <div className="h-7 w-7 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center shrink-0">
                             {renderCategoryIcon("acte")}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">
+                            <div className="font-medium text-sm truncate">
                               {TYPE_INTERVENTION_LABELS[acte.typeIntervention] || acte.typeIntervention}
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -350,7 +330,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 
                 {results.implants.length > 0 && (
                   <div>
-                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider bg-muted/50">
                       Implants
                     </div>
                     {results.implants.map((implant) => {
@@ -360,16 +340,16 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
                           key={implant.id}
                           data-index={idx}
                           className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${
-                            idx === selectedIndex ? "bg-accent" : "hover-elevate"
+                            idx === selectedIndex ? "bg-accent" : "hover:bg-accent/50"
                           }`}
                           onClick={() => navigateTo("implant", implant)}
                           data-testid={`search-result-implant-${implant.id}`}
                         >
-                          <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center shrink-0">
+                          <div className="h-7 w-7 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center shrink-0">
                             {renderCategoryIcon("implant")}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">
+                            <div className="font-medium text-sm truncate">
                               {implant.marque} {implant.referenceFabricant && `– ${implant.referenceFabricant}`}
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -385,7 +365,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 
                 {results.documents.length > 0 && (
                   <div>
-                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider bg-muted/50">
                       Documents
                     </div>
                     {results.documents.map((doc) => {
@@ -395,20 +375,20 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
                           key={doc.id}
                           data-index={idx}
                           className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${
-                            idx === selectedIndex ? "bg-accent" : "hover-elevate"
+                            idx === selectedIndex ? "bg-accent" : "hover:bg-accent/50"
                           }`}
                           onClick={() => navigateTo("document", doc)}
                           data-testid={`search-result-document-${doc.id}`}
                         >
-                          <div className="h-8 w-8 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center shrink-0">
+                          <div className="h-7 w-7 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center shrink-0">
                             {renderCategoryIcon("document")}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">
+                            <div className="font-medium text-sm truncate">
                               {doc.nom}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {doc.type} – {doc.patientPrenom} {doc.patientNom} – {formatDate(doc.date)}
+                              {doc.type} – {doc.patientPrenom} {doc.patientNom}
                             </div>
                           </div>
                           {renderCategoryBadge("document")}
@@ -420,26 +400,8 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
               </div>
             )}
           </div>
-
-          {hasResults && (
-            <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground bg-muted/50">
-              <div className="flex items-center gap-2">
-                <kbd className="rounded border bg-background px-1.5 py-0.5">↑</kbd>
-                <kbd className="rounded border bg-background px-1.5 py-0.5">↓</kbd>
-                <span>naviguer</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <kbd className="rounded border bg-background px-1.5 py-0.5">↵</kbd>
-                <span>sélectionner</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <kbd className="rounded border bg-background px-1.5 py-0.5">esc</kbd>
-                <span>fermer</span>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+        </div>
+      )}
+    </div>
   );
 }
