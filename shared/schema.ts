@@ -514,6 +514,9 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({
   organisationId: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  dateStart: z.coerce.date(),
+  dateEnd: z.coerce.date().nullable().optional(),
 });
 
 export const updateAppointmentSchema = z.object({
