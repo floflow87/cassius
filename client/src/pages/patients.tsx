@@ -41,10 +41,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { PatientForm } from "@/components/patient-form";
 import { CassiusBadge, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import { AdvancedFilterDrawer, FilterChips, type FilterGroup } from "@/components/advanced-filter-drawer";
+import { CompactFlagList } from "@/components/flag-badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Patient } from "@shared/schema";
+import type { Patient, FlagWithEntity } from "@shared/schema";
 import type { FilterRule, PatientSearchResult } from "@shared/types";
+import { AlertTriangle } from "lucide-react";
 
 interface PatientsPageProps {
   searchQuery: string;
@@ -52,7 +54,7 @@ interface PatientsPageProps {
 }
 
 type SortDirection = "asc" | "desc" | null;
-type ColumnId = "patient" | "dateNaissance" | "contact" | "implants" | "derniereVisite" | "statut";
+type ColumnId = "patient" | "dateNaissance" | "contact" | "implants" | "derniereVisite" | "flags" | "statut";
 
 interface ColumnConfig {
   id: ColumnId;
@@ -67,6 +69,7 @@ const defaultColumns: ColumnConfig[] = [
   { id: "contact", label: "Contact", width: "w-44", sortable: true },
   { id: "implants", label: "Implants", width: "w-28", sortable: true },
   { id: "derniereVisite", label: "Dernière visite", width: "w-40", sortable: true },
+  { id: "flags", label: "Alertes", width: "w-32", sortable: true },
   { id: "statut", label: "Statut", width: "w-28", sortable: true },
 ];
 
@@ -177,6 +180,28 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     queryKey: ["/api/patients/summary"],
     enabled: !hasActiveFilters,
   });
+
+  // Fetch all flags with patient info
+  const { data: allFlags = [] } = useQuery<FlagWithEntity[]>({
+    queryKey: ["/api/flags", "withEntity"],
+    queryFn: async () => {
+      const res = await fetch("/api/flags?withEntity=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch flags");
+      return res.json();
+    },
+  });
+
+  // Group flags by patientId (includes flags from implants/operations linked to patient)
+  const flagsByPatient = useMemo(() => {
+    const grouped: Record<string, FlagWithEntity[]> = {};
+    allFlags.forEach((flag) => {
+      if (!flag.resolvedAt && flag.patientId) {
+        if (!grouped[flag.patientId]) grouped[flag.patientId] = [];
+        grouped[flag.patientId].push(flag);
+      }
+    });
+    return grouped;
+  }, [allFlags]);
   
   const isLoading = hasActiveFilters ? isSearchLoading : isSummaryLoading;
   const patients = hasActiveFilters ? searchData?.patients : summaryData?.patients;
@@ -237,6 +262,11 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           else if (!dateB) comparison = -1;
           else comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
           break;
+        case "flags":
+          const flagsA = flagsByPatient[a.id]?.length || 0;
+          const flagsB = flagsByPatient[b.id]?.length || 0;
+          comparison = flagsA - flagsB;
+          break;
         case "statut":
           comparison = 0;
           break;
@@ -246,7 +276,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
       
       return sortDirection === "desc" ? -comparison : comparison;
     });
-  }, [sortColumn, sortDirection, implantCounts, lastVisits]);
+  }, [sortColumn, sortDirection, implantCounts, lastVisits, flagsByPatient]);
 
   // When filters are active, server handles sorting and pagination
   // When no filters, we handle it client-side
@@ -477,6 +507,12 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           );
         }
         return <span className="text-sm text-muted-foreground">—</span>;
+      case "flags":
+        const patientFlags = flagsByPatient[patient.id] || [];
+        if (patientFlags.length === 0) {
+          return <span className="text-sm text-muted-foreground">—</span>;
+        }
+        return <CompactFlagList flags={patientFlags} maxVisible={2} />;
       case "statut":
         return (
           <CassiusBadge status={status}>
@@ -739,6 +775,11 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                       )}
                     </div>
                     
+                    {flagsByPatient[patient.id]?.length > 0 && (
+                      <div className="mt-3 pt-3 border-t">
+                        <CompactFlagList flags={flagsByPatient[patient.id]} maxVisible={2} />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );

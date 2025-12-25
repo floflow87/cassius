@@ -30,13 +30,22 @@ export type TypePilier = "DROIT" | "ANGULE" | "MULTI_UNIT";
 
 export interface Patient {
   id: string;
+  organisationId: string;
   nom: string;
   prenom: string;
   dateNaissance: string;
   sexe: Sexe;
   telephone: string | null;
   email: string | null;
+  adresse: string | null;
+  codePostal: string | null;
+  ville: string | null;
+  pays: string | null;
+  allergies: string | null;
+  traitement: string | null;
+  conditions: string | null;
   contexteMedical: string | null;
+  statut: "ACTIF" | "INACTIF" | "ARCHIVE" | null;
   createdAt: Date;
 }
 

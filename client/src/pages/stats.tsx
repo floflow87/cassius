@@ -37,6 +37,9 @@ import {
 } from "recharts";
 import { Link } from "wouter";
 import type { ClinicalStats } from "@shared/types";
+import type { FlagWithEntity } from "@shared/schema";
+import { FlagBadge } from "@/components/flag-badge";
+import { formatDistanceToNow } from "date-fns";
 
 const PERIOD_OPTIONS = [
   { value: "3m", label: "3 derniers mois" },
@@ -100,6 +103,26 @@ export default function StatsPage() {
     },
     enabled: period !== "custom" || (!!customFrom && !!customTo),
   });
+
+  // Fetch all active flags with entity info
+  const { data: flagsData = [] } = useQuery<FlagWithEntity[]>({
+    queryKey: ["/api/flags", "withEntity"],
+    queryFn: async () => {
+      const res = await fetch("/api/flags?withEntity=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch flags");
+      return res.json();
+    },
+  });
+
+  // Sort and group flags by level
+  const sortedFlags = [...flagsData].filter(f => !f.resolvedAt).sort((a, b) => {
+    const levelOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+    return levelOrder[a.level] - levelOrder[b.level];
+  });
+
+  const criticalCount = sortedFlags.filter(f => f.level === "CRITICAL").length;
+  const warningCount = sortedFlags.filter(f => f.level === "WARNING").length;
+  const infoCount = sortedFlags.filter(f => f.level === "INFO").length;
 
   if (isLoading) {
     return (
@@ -552,6 +575,88 @@ export default function StatsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Flags actifs section */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Flags actifs
+            </CardTitle>
+            <CardDescription>Alertes cliniques et points d'attention</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            {criticalCount > 0 && (
+              <Badge variant="destructive">{criticalCount} critique{criticalCount > 1 ? "s" : ""}</Badge>
+            )}
+            {warningCount > 0 && (
+              <Badge className="bg-orange-500 text-white">{warningCount} warning{warningCount > 1 ? "s" : ""}</Badge>
+            )}
+            {infoCount > 0 && (
+              <Badge variant="secondary">{infoCount} info{infoCount > 1 ? "s" : ""}</Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {sortedFlags.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-green-500" />
+              <p>Aucun flag actif</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-3 font-medium">Niveau</th>
+                    <th className="text-left py-2 px-3 font-medium">Type</th>
+                    <th className="text-left py-2 px-3 font-medium">Entité</th>
+                    <th className="text-left py-2 px-3 font-medium">Description</th>
+                    <th className="text-left py-2 px-3 font-medium">Créé</th>
+                    <th className="text-left py-2 px-3 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedFlags.slice(0, 20).map((flag) => (
+                    <tr key={flag.id} className="border-b hover:bg-muted/30" data-testid={`row-flag-${flag.id}`}>
+                      <td className="py-2 px-3">
+                        <FlagBadge flag={flag} compact />
+                      </td>
+                      <td className="py-2 px-3 text-muted-foreground">{flag.label}</td>
+                      <td className="py-2 px-3">
+                        {flag.patientNom ? (
+                          <span className="font-medium">{flag.patientPrenom} {flag.patientNom}</span>
+                        ) : (
+                          <span className="text-muted-foreground">{flag.entityName || flag.entityType}</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-muted-foreground max-w-xs truncate">{flag.description}</td>
+                      <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                        {flag.createdAt ? formatDistanceToNow(new Date(flag.createdAt), { addSuffix: true, locale: fr }) : "-"}
+                      </td>
+                      <td className="py-2 px-3">
+                        {flag.patientId ? (
+                          <Link href={`/patients/${flag.patientId}`}>
+                            <Button variant="ghost" size="sm" data-testid={`button-view-flag-${flag.id}`}>
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {sortedFlags.length > 20 && (
+                <p className="text-center text-sm text-muted-foreground mt-4">
+                  Affichage des 20 premiers flags sur {sortedFlags.length} au total
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

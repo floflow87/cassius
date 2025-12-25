@@ -156,7 +156,8 @@ export function CompactFlagList({ flags, maxVisible = 3 }: CompactFlagListProps)
   });
 
   const visibleFlags = sortedFlags.slice(0, maxVisible);
-  const remainingCount = flags.length - maxVisible;
+  const remainingFlags = sortedFlags.slice(maxVisible);
+  const remainingCount = remainingFlags.length;
 
   return (
     <div className="flex items-center gap-1" data-testid="compact-flag-list">
@@ -164,9 +165,36 @@ export function CompactFlagList({ flags, maxVisible = 3 }: CompactFlagListProps)
         <FlagBadge key={flag.id} flag={flag} compact />
       ))}
       {remainingCount > 0 && (
-        <Badge variant="secondary" className="text-xs">
-          +{remainingCount}
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="secondary" className="text-xs cursor-pointer">
+              +{remainingCount}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-sm">
+            <div className="space-y-2">
+              {remainingFlags.map((flag) => {
+                const IconComponent = levelConfig[flag.level].icon;
+                return (
+                  <div key={flag.id} className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="secondary"
+                        className={`${levelConfig[flag.level].className} text-xs`}
+                      >
+                        <IconComponent className="w-2.5 h-2.5 mr-1" />
+                        {typeLabels[flag.type] || flag.type}
+                      </Badge>
+                    </div>
+                    {flag.description && (
+                      <p className="text-xs text-muted-foreground pl-1">{flag.description}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );
