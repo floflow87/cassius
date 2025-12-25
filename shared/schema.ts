@@ -21,6 +21,7 @@ export const organisationsRelations = relations(organisations, ({ many }) => ({
   radios: many(radios),
   protheses: many(protheses),
   documents: many(documents),
+  flags: many(flags),
 }));
 
 export const sexeEnum = pgEnum("sexe", ["HOMME", "FEMME"]);
@@ -68,6 +69,24 @@ export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "
 export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"]);
 
 export const savedFilterPageTypeEnum = pgEnum("saved_filter_page_type", ["patients", "implants", "actes"]);
+
+// Flag system enums
+export const flagLevelEnum = pgEnum("flag_level", ["CRITICAL", "WARNING", "INFO"]);
+export const flagEntityTypeEnum = pgEnum("flag_entity_type", ["PATIENT", "OPERATION", "IMPLANT"]);
+export const flagTypeEnum = pgEnum("flag_type", [
+  // Critical (clinical)
+  "ISQ_LOW",
+  "ISQ_DECLINING",
+  "LOW_SUCCESS_RATE",
+  // Warning (follow-up)
+  "NO_RECENT_ISQ",
+  "NO_POSTOP_FOLLOWUP",
+  "NO_RECENT_APPOINTMENT",
+  // Info (coherence)
+  "IMPLANT_NO_OPERATION",
+  "MISSING_DOCUMENT",
+  "INCOMPLETE_DATA"
+]);
 
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -402,6 +421,32 @@ export const appointmentsRelations = relations(appointments, ({ one }) => ({
   }),
 }));
 
+// Table flags - Clinical alerts and warnings
+export const flags = pgTable("flags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  level: flagLevelEnum("level").notNull(),
+  type: flagTypeEnum("type").notNull(),
+  label: text("label").notNull(),
+  description: text("description"),
+  entityType: flagEntityTypeEnum("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by").references(() => users.id, { onDelete: "set null" }),
+});
+
+export const flagsRelations = relations(flags, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [flags.organisationId],
+    references: [organisations.id],
+  }),
+  resolvedByUser: one(users, {
+    fields: [flags.resolvedBy],
+    references: [users.id],
+  }),
+}));
+
 // Table documents patients (PDF, etc.)
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -538,6 +583,34 @@ export type AppointmentType = typeof appointmentTypeValues[number];
 export const appointmentStatusValues = ["UPCOMING", "COMPLETED", "CANCELLED"] as const;
 export type AppointmentStatus = typeof appointmentStatusValues[number];
 
+// Flag schemas and types
+export const insertFlagSchema = createInsertSchema(flags).omit({
+  id: true,
+  organisationId: true,
+  createdAt: true,
+  resolvedAt: true,
+  resolvedBy: true,
+});
+
+export const flagLevelValues = ["CRITICAL", "WARNING", "INFO"] as const;
+export type FlagLevel = typeof flagLevelValues[number];
+
+export const flagEntityTypeValues = ["PATIENT", "OPERATION", "IMPLANT"] as const;
+export type FlagEntityType = typeof flagEntityTypeValues[number];
+
+export const flagTypeValues = [
+  "ISQ_LOW",
+  "ISQ_DECLINING",
+  "LOW_SUCCESS_RATE",
+  "NO_RECENT_ISQ",
+  "NO_POSTOP_FOLLOWUP",
+  "NO_RECENT_APPOINTMENT",
+  "IMPLANT_NO_OPERATION",
+  "MISSING_DOCUMENT",
+  "INCOMPLETE_DATA"
+] as const;
+export type FlagType = typeof flagTypeValues[number];
+
 export const insertDocumentSchema = createInsertSchema(documents).omit({
   id: true,
   organisationId: true,
@@ -608,6 +681,9 @@ export type RendezVous = typeof rendezVous.$inferSelect;
 export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 export type Appointment = typeof appointments.$inferSelect;
 
+export type InsertFlag = z.infer<typeof insertFlagSchema>;
+export type Flag = typeof flags.$inferSelect;
+
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
 
@@ -630,4 +706,11 @@ export interface AppointmentWithDetails extends Appointment {
   operation?: Operation;
   surgeryImplant?: SurgeryImplant & { implant: Implant };
   radio?: Radio;
+}
+
+export interface FlagWithEntity extends Flag {
+  entityName?: string;
+  patientId?: string;
+  patientNom?: string;
+  patientPrenom?: string;
 }

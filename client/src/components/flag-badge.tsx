@@ -1,0 +1,173 @@
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertTriangle, AlertCircle, Info, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Flag, FlagWithEntity } from "@shared/schema";
+
+interface FlagBadgeProps {
+  flag: Flag | FlagWithEntity;
+  showResolve?: boolean;
+  compact?: boolean;
+  onResolved?: () => void;
+}
+
+const levelConfig = {
+  CRITICAL: {
+    icon: AlertTriangle,
+    className: "bg-destructive text-destructive-foreground",
+    label: "Critique",
+  },
+  WARNING: {
+    icon: AlertCircle,
+    className: "bg-orange-500 text-white dark:bg-orange-600",
+    label: "Attention",
+  },
+  INFO: {
+    icon: Info,
+    className: "bg-blue-500 text-white dark:bg-blue-600",
+    label: "Information",
+  },
+};
+
+const typeLabels: Record<string, string> = {
+  ISQ_LOW: "ISQ faible",
+  ISQ_DECLINING: "ISQ en déclin",
+  LOW_SUCCESS_RATE: "Taux de succès bas",
+  NO_RECENT_ISQ: "Pas d'ISQ récent",
+  NO_POSTOP_FOLLOWUP: "Pas de suivi post-op",
+  NO_RECENT_APPOINTMENT: "Sans visite récente",
+  IMPLANT_NO_OPERATION: "Implant sans opération",
+  MISSING_DOCUMENT: "Document manquant",
+  INCOMPLETE_DATA: "Données incomplètes",
+};
+
+export function FlagBadge({ flag, showResolve = false, compact = false, onResolved }: FlagBadgeProps) {
+  const config = levelConfig[flag.level];
+  const Icon = config.icon;
+
+  const resolveMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("PATCH", `/api/flags/${flag.id}/resolve`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
+      onResolved?.();
+    },
+  });
+
+  if (compact) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant="secondary"
+            className={`${config.className} gap-1 cursor-default`}
+            data-testid={`flag-badge-${flag.id}`}
+          >
+            <Icon className="w-3 h-3" />
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="font-medium">{flag.label}</p>
+          {flag.description && <p className="text-xs text-muted-foreground">{flag.description}</p>}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center gap-2 p-2 rounded-md border bg-card"
+      data-testid={`flag-item-${flag.id}`}
+    >
+      <Badge
+        variant="secondary"
+        className={`${config.className} gap-1`}
+      >
+        <Icon className="w-3 h-3" />
+        <span>{typeLabels[flag.type] || flag.type}</span>
+      </Badge>
+      <span className="text-sm text-muted-foreground flex-1">{flag.description || flag.label}</span>
+      {showResolve && !flag.resolvedAt && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => resolveMutation.mutate()}
+              disabled={resolveMutation.isPending}
+              data-testid={`button-resolve-flag-${flag.id}`}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Marquer comme résolu</TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
+
+interface FlagListProps {
+  flags: Flag[];
+  showResolve?: boolean;
+  onResolved?: () => void;
+}
+
+export function FlagList({ flags, showResolve = false, onResolved }: FlagListProps) {
+  if (flags.length === 0) {
+    return null;
+  }
+
+  const criticalFlags = flags.filter((f) => f.level === "CRITICAL");
+  const warningFlags = flags.filter((f) => f.level === "WARNING");
+  const infoFlags = flags.filter((f) => f.level === "INFO");
+
+  return (
+    <div className="space-y-2" data-testid="flag-list">
+      {criticalFlags.map((flag) => (
+        <FlagBadge key={flag.id} flag={flag} showResolve={showResolve} onResolved={onResolved} />
+      ))}
+      {warningFlags.map((flag) => (
+        <FlagBadge key={flag.id} flag={flag} showResolve={showResolve} onResolved={onResolved} />
+      ))}
+      {infoFlags.map((flag) => (
+        <FlagBadge key={flag.id} flag={flag} showResolve={showResolve} onResolved={onResolved} />
+      ))}
+    </div>
+  );
+}
+
+interface CompactFlagListProps {
+  flags: Flag[];
+  maxVisible?: number;
+}
+
+export function CompactFlagList({ flags, maxVisible = 3 }: CompactFlagListProps) {
+  if (flags.length === 0) {
+    return null;
+  }
+
+  const sortedFlags = [...flags].sort((a, b) => {
+    const levelOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+    return levelOrder[a.level] - levelOrder[b.level];
+  });
+
+  const visibleFlags = sortedFlags.slice(0, maxVisible);
+  const remainingCount = flags.length - maxVisible;
+
+  return (
+    <div className="flex items-center gap-1" data-testid="compact-flag-list">
+      {visibleFlags.map((flag) => (
+        <FlagBadge key={flag.id} flag={flag} compact />
+      ))}
+      {remainingCount > 0 && (
+        <Badge variant="secondary" className="text-xs">
+          +{remainingCount}
+        </Badge>
+      )}
+    </div>
+  );
+}

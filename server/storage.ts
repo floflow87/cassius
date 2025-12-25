@@ -13,6 +13,7 @@ import {
   documents,
   savedFilters,
   appointments,
+  flags,
   type Patient,
   type InsertPatient,
   type Operation,
@@ -43,6 +44,9 @@ import {
   type Appointment,
   type InsertAppointment,
   type AppointmentWithDetails,
+  type Flag,
+  type InsertFlag,
+  type FlagWithEntity,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -177,6 +181,7 @@ export interface IStorage {
   deleteRendezVous(organisationId: string, id: string): Promise<boolean>;
 
   // Appointment methods (unified RDV)
+  getAllAppointments(organisationId: string, status?: string): Promise<Appointment[]>;
   getAppointment(organisationId: string, id: string): Promise<Appointment | undefined>;
   getAppointmentWithDetails(organisationId: string, id: string): Promise<AppointmentWithDetails | undefined>;
   getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]>;
@@ -203,6 +208,15 @@ export interface IStorage {
   
   // Global search
   globalSearch(organisationId: string, query: string, limit?: number): Promise<GlobalSearchResults>;
+
+  // Flag methods
+  getFlags(organisationId: string, includeResolved?: boolean): Promise<Flag[]>;
+  getFlagsWithEntity(organisationId: string, includeResolved?: boolean): Promise<FlagWithEntity[]>;
+  getEntityFlags(organisationId: string, entityType: string, entityId: string): Promise<Flag[]>;
+  createFlag(organisationId: string, flag: InsertFlag): Promise<Flag>;
+  resolveFlag(organisationId: string, id: string, userId: string): Promise<Flag | undefined>;
+  deleteFlag(organisationId: string, id: string): Promise<boolean>;
+  upsertFlag(organisationId: string, flag: InsertFlag): Promise<Flag>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -417,8 +431,8 @@ export class DatabaseStorage implements IStorage {
     }
     if (needsLastVisitJoin) {
       fromClause += ` LEFT JOIN LATERAL (
-        SELECT date FROM rendez_vous WHERE patient_id = p.id AND organisation_id = p.organisation_id 
-        ORDER BY date DESC LIMIT 1
+        SELECT date_start as date FROM appointments WHERE patient_id = p.id AND organisation_id = p.organisation_id AND status = 'COMPLETED'
+        ORDER BY date_start DESC LIMIT 1
       ) last_rv ON true`;
     }
     
@@ -1452,22 +1466,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; titre: string | null }>> {
-    const today = new Date().toISOString().split('T')[0];
-    const allRendezVous = await db
+    const now = new Date();
+    const allAppointments = await db
       .select()
-      .from(rendezVous)
+      .from(appointments)
       .where(and(
-        eq(rendezVous.organisationId, organisationId),
-        lte(rendezVous.date, today)
+        eq(appointments.organisationId, organisationId),
+        eq(appointments.status, 'COMPLETED'),
+        lte(appointments.dateStart, now)
       ))
-      .orderBy(desc(rendezVous.date));
+      .orderBy(desc(appointments.dateStart));
 
     const lastVisitByPatient: Record<string, { date: string; titre: string | null }> = {};
-    for (const rdv of allRendezVous) {
-      if (!lastVisitByPatient[rdv.patientId]) {
-        lastVisitByPatient[rdv.patientId] = {
-          date: rdv.date,
-          titre: rdv.titre,
+    for (const apt of allAppointments) {
+      if (!lastVisitByPatient[apt.patientId]) {
+        lastVisitByPatient[apt.patientId] = {
+          date: apt.dateStart.toISOString().split('T')[0],
+          titre: apt.title,
         };
       }
     }
@@ -1628,8 +1643,11 @@ export class DatabaseStorage implements IStorage {
         lte(surgeryImplants.datePose, toDate)
       ));
 
-    const allVisites = await db.select().from(visites)
-      .where(eq(visites.organisationId, organisationId));
+    const allCompletedAppointments = await db.select().from(appointments)
+      .where(and(
+        eq(appointments.organisationId, organisationId),
+        eq(appointments.status, 'COMPLETED')
+      ));
 
     const activityByMonth: Record<string, number> = {};
     allOperations.forEach(op => {
@@ -1678,21 +1696,21 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    const visitesPerImplant: Record<string, Date[]> = {};
-    allVisites.forEach(v => {
-      if (v.implantId) {
-        if (!visitesPerImplant[v.implantId]) visitesPerImplant[v.implantId] = [];
-        visitesPerImplant[v.implantId].push(new Date(v.date));
+    const visitesPerSurgeryImplant: Record<string, Date[]> = {};
+    allCompletedAppointments.forEach(apt => {
+      if (apt.surgeryImplantId) {
+        if (!visitesPerSurgeryImplant[apt.surgeryImplantId]) visitesPerSurgeryImplant[apt.surgeryImplantId] = [];
+        visitesPerSurgeryImplant[apt.surgeryImplantId].push(apt.dateStart);
       }
     });
 
     let totalDelayDays = 0;
     let delayCount = 0;
     allSurgeryImplants.forEach(si => {
-      const implantVisites = visitesPerImplant[si.implantId] || [];
-      if (implantVisites.length > 0) {
+      const siVisites = visitesPerSurgeryImplant[si.id] || [];
+      if (siVisites.length > 0) {
         const poseDate = new Date(si.datePose);
-        const firstVisit = implantVisites.sort((a, b) => a.getTime() - b.getTime())[0];
+        const firstVisit = siVisites.sort((a, b) => a.getTime() - b.getTime())[0];
         const delay = Math.floor((firstVisit.getTime() - poseDate.getTime()) / (1000 * 60 * 60 * 24));
         if (delay >= 0) {
           totalDelayDays += delay;
@@ -1719,9 +1737,9 @@ export class DatabaseStorage implements IStorage {
       .where(eq(surgeryImplants.organisationId, organisationId));
 
     for (const si of allOrgSurgeryImplants) {
-      const implantVisites = visitesPerImplant[si.implantId] || [];
-      const lastVisit = implantVisites.length > 0 
-        ? implantVisites.sort((a, b) => b.getTime() - a.getTime())[0] 
+      const siVisites = visitesPerSurgeryImplant[si.id] || [];
+      const lastVisit = siVisites.length > 0 
+        ? siVisites.sort((a, b) => b.getTime() - a.getTime())[0] 
         : null;
       
       const daysSince = lastVisit 
@@ -1956,6 +1974,20 @@ export class DatabaseStorage implements IStorage {
       surgeryImplant: surgeryImplantData,
       radio: radioData,
     };
+  }
+
+  async getAllAppointments(organisationId: string, status?: string): Promise<Appointment[]> {
+    const conditions = [eq(appointments.organisationId, organisationId)];
+    if (status === 'UPCOMING') {
+      conditions.push(eq(appointments.status, 'UPCOMING'));
+    } else if (status === 'COMPLETED') {
+      conditions.push(eq(appointments.status, 'COMPLETED'));
+    } else if (status === 'CANCELLED') {
+      conditions.push(eq(appointments.status, 'CANCELLED'));
+    }
+    return db.select().from(appointments)
+      .where(and(...conditions))
+      .orderBy(desc(appointments.dateStart));
   }
 
   async getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]> {
@@ -2359,6 +2391,173 @@ export class DatabaseStorage implements IStorage {
       RETROALVEOLAIRE: "Rétro-alvéolaire",
     };
     return labels[type] || type;
+  }
+
+  // ========== FLAGS ==========
+  async getFlags(organisationId: string, includeResolved = false): Promise<Flag[]> {
+    let query = db
+      .select()
+      .from(flags)
+      .where(eq(flags.organisationId, organisationId));
+    
+    if (!includeResolved) {
+      query = db
+        .select()
+        .from(flags)
+        .where(and(
+          eq(flags.organisationId, organisationId),
+          sql`${flags.resolvedAt} IS NULL`
+        ));
+    }
+    
+    return query.orderBy(desc(flags.createdAt));
+  }
+
+  async getFlagsWithEntity(organisationId: string, includeResolved = false): Promise<FlagWithEntity[]> {
+    const allFlags = await this.getFlags(organisationId, includeResolved);
+    
+    const result: FlagWithEntity[] = [];
+    
+    for (const flag of allFlags) {
+      let entityName: string | undefined;
+      let patientId: string | undefined;
+      let patientNom: string | undefined;
+      let patientPrenom: string | undefined;
+      
+      if (flag.entityType === "PATIENT") {
+        const [patient] = await db
+          .select()
+          .from(patients)
+          .where(eq(patients.id, flag.entityId))
+          .limit(1);
+        if (patient) {
+          entityName = `${patient.prenom} ${patient.nom}`;
+          patientId = patient.id;
+          patientNom = patient.nom;
+          patientPrenom = patient.prenom;
+        }
+      } else if (flag.entityType === "OPERATION") {
+        const [op] = await db
+          .select({
+            id: operations.id,
+            typeIntervention: operations.typeIntervention,
+            patientId: patients.id,
+            patientNom: patients.nom,
+            patientPrenom: patients.prenom,
+          })
+          .from(operations)
+          .innerJoin(patients, eq(operations.patientId, patients.id))
+          .where(eq(operations.id, flag.entityId))
+          .limit(1);
+        if (op) {
+          entityName = this.getInterventionLabel(op.typeIntervention || "");
+          patientId = op.patientId;
+          patientNom = op.patientNom;
+          patientPrenom = op.patientPrenom;
+        }
+      } else if (flag.entityType === "IMPLANT") {
+        const [si] = await db
+          .select({
+            id: surgeryImplants.id,
+            siteFdi: surgeryImplants.siteFdi,
+            marque: implants.marque,
+            patientId: patients.id,
+            patientNom: patients.nom,
+            patientPrenom: patients.prenom,
+          })
+          .from(surgeryImplants)
+          .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
+          .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+          .innerJoin(patients, eq(operations.patientId, patients.id))
+          .where(eq(surgeryImplants.id, flag.entityId))
+          .limit(1);
+        if (si) {
+          entityName = `${si.marque} - Site ${si.siteFdi}`;
+          patientId = si.patientId;
+          patientNom = si.patientNom;
+          patientPrenom = si.patientPrenom;
+        }
+      }
+      
+      result.push({
+        ...flag,
+        entityName,
+        patientId,
+        patientNom,
+        patientPrenom,
+      });
+    }
+    
+    return result;
+  }
+
+  async getEntityFlags(organisationId: string, entityType: string, entityId: string): Promise<Flag[]> {
+    return db
+      .select()
+      .from(flags)
+      .where(and(
+        eq(flags.organisationId, organisationId),
+        eq(flags.entityType, entityType as "PATIENT" | "OPERATION" | "IMPLANT"),
+        eq(flags.entityId, entityId),
+        sql`${flags.resolvedAt} IS NULL`
+      ))
+      .orderBy(desc(flags.createdAt));
+  }
+
+  async createFlag(organisationId: string, flag: InsertFlag): Promise<Flag> {
+    const [created] = await db
+      .insert(flags)
+      .values({
+        ...flag,
+        organisationId,
+      })
+      .returning();
+    return created;
+  }
+
+  async resolveFlag(organisationId: string, id: string, userId: string): Promise<Flag | undefined> {
+    const [updated] = await db
+      .update(flags)
+      .set({
+        resolvedAt: new Date(),
+        resolvedBy: userId,
+      })
+      .where(and(
+        eq(flags.id, id),
+        eq(flags.organisationId, organisationId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async deleteFlag(organisationId: string, id: string): Promise<boolean> {
+    const result = await db
+      .delete(flags)
+      .where(and(
+        eq(flags.id, id),
+        eq(flags.organisationId, organisationId)
+      ));
+    return true;
+  }
+
+  async upsertFlag(organisationId: string, flag: InsertFlag): Promise<Flag> {
+    const existing = await db
+      .select()
+      .from(flags)
+      .where(and(
+        eq(flags.organisationId, organisationId),
+        eq(flags.type, flag.type),
+        eq(flags.entityType, flag.entityType),
+        eq(flags.entityId, flag.entityId),
+        sql`${flags.resolvedAt} IS NULL`
+      ))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      return existing[0];
+    }
+    
+    return this.createFlag(organisationId, flag);
   }
 }
 

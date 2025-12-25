@@ -244,3 +244,66 @@ ON appointments(organisation_id, surgery_implant_id);
 --         RAISE NOTICE 'Migrated % visites to appointments', (SELECT COUNT(*) FROM appointments);
 --     END IF;
 -- END $$;
+
+-- ============================================
+-- Flags system - Clinical alerts and warnings
+-- ============================================
+
+-- Create flag level enum
+DO $$ BEGIN
+    CREATE TYPE flag_level AS ENUM ('CRITICAL', 'WARNING', 'INFO');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Create flag entity type enum
+DO $$ BEGIN
+    CREATE TYPE flag_entity_type AS ENUM ('PATIENT', 'OPERATION', 'IMPLANT');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Create flag type enum
+DO $$ BEGIN
+    CREATE TYPE flag_type AS ENUM (
+        'ISQ_LOW',
+        'ISQ_DECLINING',
+        'LOW_SUCCESS_RATE',
+        'NO_RECENT_ISQ',
+        'NO_POSTOP_FOLLOWUP',
+        'NO_RECENT_APPOINTMENT',
+        'IMPLANT_NO_OPERATION',
+        'MISSING_DOCUMENT',
+        'INCOMPLETE_DATA'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Create flags table
+CREATE TABLE IF NOT EXISTS flags (
+    id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+    level flag_level NOT NULL,
+    type flag_type NOT NULL,
+    label TEXT NOT NULL,
+    description TEXT,
+    entity_type flag_entity_type NOT NULL,
+    entity_id VARCHAR NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+    resolved_at TIMESTAMP,
+    resolved_by VARCHAR REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Indexes for flags table
+CREATE INDEX IF NOT EXISTS idx_flags_org 
+ON flags(organisation_id);
+
+CREATE INDEX IF NOT EXISTS idx_flags_entity 
+ON flags(organisation_id, entity_type, entity_id);
+
+CREATE INDEX IF NOT EXISTS idx_flags_level 
+ON flags(organisation_id, level);
+
+CREATE INDEX IF NOT EXISTS idx_flags_unresolved 
+ON flags(organisation_id, resolved_at) WHERE resolved_at IS NULL;

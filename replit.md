@@ -196,3 +196,54 @@ Appointment-to-SurgeryImplant Mapping:
 ### Data Migration
 - Legacy visites data migrated to appointments via `db/migrate-visites-to-appointments.sql`
 - 51 visites converted to COMPLETED SUIVI appointments with proper surgeryImplantId and operationId links
+
+## Clinical Flag System (December 2025)
+
+### Overview
+Automated clinical alerts and warnings system that detects potential issues requiring attention. Flags are displayed on patient cards, patient details, and dashboard.
+
+### Flag Levels
+- **CRITICAL**: Clinical issues requiring immediate attention (low ISQ, declining ISQ)
+- **WARNING**: Follow-up gaps that may indicate care quality issues (no recent ISQ, no post-op follow-up)
+- **INFO**: Data completeness issues (missing documents, incomplete data)
+
+### Flag Types
+- `ISQ_LOW`: ISQ measurement below 55 threshold
+- `ISQ_DECLINING`: ISQ dropped by 10+ points between measurements
+- `LOW_SUCCESS_RATE`: Patient/operation with low implant success rate
+- `NO_RECENT_ISQ`: No ISQ measurement in past 90 days for active implant
+- `NO_POSTOP_FOLLOWUP`: No follow-up appointment 30+ days after surgery
+- `NO_RECENT_APPOINTMENT`: Active patient with implants, no visit in 180+ days
+- `IMPLANT_NO_OPERATION`: Orphaned implant record
+- `MISSING_DOCUMENT`: Required document not uploaded
+- `INCOMPLETE_DATA`: Patient/implant with missing critical fields
+
+### API Endpoints
+- `GET /api/flags` - List all flags (supports `?includeResolved=true` and `?withEntity=true`)
+- `GET /api/flags/:entityType/:entityId` - Get flags for specific entity
+- `POST /api/flags` - Create manual flag
+- `PATCH /api/flags/:id/resolve` - Mark flag as resolved
+- `DELETE /api/flags/:id` - Delete flag
+- `POST /api/flags/detect` - Trigger automatic flag detection
+
+### Detection Engine
+- `server/flagEngine.ts` - Contains detection logic for all flag types
+- `runFlagDetection(organisationId)` - Runs all detection rules and upserts flags
+- Detection is idempotent - won't create duplicate flags for same entity/type
+
+### Frontend Components
+- `FlagBadge` (`client/src/components/flag-badge.tsx`): Displays individual flag with level indicator
+- `FlagList`: Full list view with resolve buttons
+- `CompactFlagList`: Condensed view for patient headers (max 3 visible)
+- Dashboard "À surveiller" section: Shows top 5 flags with links to patients
+
+### Database Schema
+```sql
+flags (
+  id, organisation_id, level, type, label, description,
+  entity_type, entity_id,
+  created_at, resolved_at, resolved_by
+)
+```
+- `entity_type`: PATIENT | OPERATION | IMPLANT
+- `entity_id`: References the entity (patient.id, operations.id, or surgery_implants.id)

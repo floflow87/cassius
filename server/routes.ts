@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { requireJwtOrSession } from "./jwtMiddleware";
 import * as supabaseStorage from "./supabaseStorage";
 import { getTopSlowestEndpoints, getTopDbHeavyEndpoints, getAllStats, clearStats } from "./instrumentation";
+import { runFlagDetection } from "./flagEngine";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -20,6 +21,7 @@ import {
   savedFilterPageTypeEnum,
   insertAppointmentSchema,
   updateAppointmentSchema,
+  insertFlagSchema,
   patients,
 } from "@shared/schema";
 import type {
@@ -1757,6 +1759,22 @@ export async function registerRoutes(
   });
 
   // ========== APPOINTMENTS (Unified RDV) ==========
+  
+  // Get all appointments for organisation (for dashboard)
+  app.get("/api/appointments", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { status } = req.query;
+      const appointmentsList = await storage.getAllAppointments(organisationId, status as string);
+      res.json(appointmentsList);
+    } catch (error) {
+      console.error("Error fetching all appointments:", error);
+      res.status(500).json({ error: "Failed to fetch appointments" });
+    }
+  });
+  
   app.get("/api/patients/:patientId/appointments", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -1904,6 +1922,113 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting saved filter:", error);
       res.status(500).json({ error: "Failed to delete saved filter" });
+    }
+  });
+
+  // ========== FLAGS ==========
+  app.get("/api/flags", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const includeResolved = req.query.includeResolved === "true";
+      const withEntity = req.query.withEntity === "true";
+      
+      if (withEntity) {
+        const flags = await storage.getFlagsWithEntity(organisationId, includeResolved);
+        res.json(flags);
+      } else {
+        const flags = await storage.getFlags(organisationId, includeResolved);
+        res.json(flags);
+      }
+    } catch (error) {
+      console.error("Error fetching flags:", error);
+      res.status(500).json({ error: "Failed to fetch flags" });
+    }
+  });
+
+  app.get("/api/flags/:entityType/:entityId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { entityType, entityId } = req.params;
+      const flags = await storage.getEntityFlags(organisationId, entityType, entityId);
+      res.json(flags);
+    } catch (error) {
+      console.error("Error fetching entity flags:", error);
+      res.status(500).json({ error: "Failed to fetch entity flags" });
+    }
+  });
+
+  app.post("/api/flags", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const flagData = insertFlagSchema.parse(req.body);
+      const flag = await storage.createFlag(organisationId, flagData);
+      res.status(201).json(flag);
+    } catch (error) {
+      console.error("Error creating flag:", error);
+      res.status(500).json({ error: "Failed to create flag" });
+    }
+  });
+
+  app.patch("/api/flags/:id/resolve", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const userId = req.jwtUser?.id;
+      if (!userId) {
+        return res.status(400).json({ error: "User ID required" });
+      }
+      const flag = await storage.resolveFlag(organisationId, id, userId);
+      if (!flag) {
+        return res.status(404).json({ error: "Flag not found" });
+      }
+      res.json(flag);
+    } catch (error) {
+      console.error("Error resolving flag:", error);
+      res.status(500).json({ error: "Failed to resolve flag" });
+    }
+  });
+
+  app.delete("/api/flags/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteFlag(organisationId, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Flag not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting flag:", error);
+      res.status(500).json({ error: "Failed to delete flag" });
+    }
+  });
+
+  app.post("/api/flags/detect", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const result = await runFlagDetection(organisationId);
+      res.json({ 
+        success: true,
+        created: result.created,
+        existing: result.existing,
+        resolved: result.resolved,
+        message: `Détection terminée: ${result.created} nouveaux flags, ${result.existing} existants, ${result.resolved} résolus`
+      });
+    } catch (error) {
+      console.error("Error running flag detection:", error);
+      res.status(500).json({ error: "Failed to run flag detection" });
     }
   });
 

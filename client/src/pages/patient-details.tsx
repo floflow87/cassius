@@ -36,6 +36,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PatientDetailsSkeleton } from "@/components/page-skeletons";
+import { FlagList, CompactFlagList } from "@/components/flag-badge";
+import type { Flag } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Sheet,
@@ -174,6 +176,12 @@ export default function PatientDetailsPage() {
 
   const { data: patient, isLoading } = useQuery<PatientWithDetails>({
     queryKey: ["/api/patients", patientId],
+    enabled: !!patientId,
+  });
+
+  // Query for patient flags
+  const { data: patientFlags = [] } = useQuery<Flag[]>({
+    queryKey: ["/api/flags/PATIENT", patientId],
     enabled: !!patientId,
   });
 
@@ -1307,6 +1315,9 @@ export default function PatientDetailsPage() {
                 </div>
               </PopoverContent>
             </Popover>
+            {patientFlags.length > 0 && (
+              <CompactFlagList flags={patientFlags} maxVisible={3} />
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {calculateAge(patient.dateNaissance)} ans - Depuis {new Date(patient.createdAt).getFullYear()}

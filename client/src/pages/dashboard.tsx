@@ -34,7 +34,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import type { Operation, Visite, User, Patient, SurgeryImplant } from "@shared/schema";
+import type { Operation, Appointment, User, Patient, SurgeryImplant, FlagWithEntity } from "@shared/schema";
+import { FlagBadge } from "@/components/flag-badge";
+import { Link } from "wouter";
 
 interface BasicStats {
   totalPatients: number;
@@ -208,8 +210,8 @@ export default function DashboardPage() {
     queryKey: ["/api/stats/advanced"],
   });
   
-  const { data: visites } = useQuery<Visite[]>({
-    queryKey: ["/api/visites"],
+  const { data: upcomingAppointments } = useQuery<Appointment[]>({
+    queryKey: ["/api/appointments?status=UPCOMING"],
   });
 
   const { data: patients } = useQuery<Patient[]>({
@@ -218,6 +220,10 @@ export default function DashboardPage() {
 
   const { data: surgeryImplants } = useQuery<SurgeryImplant[]>({
     queryKey: ["/api/surgery-implants"],
+  });
+
+  const { data: flagsData } = useQuery<FlagWithEntity[]>({
+    queryKey: ["/api/flags?withEntity=true"],
   });
 
   const filteredPatients = patients?.filter(p => 
@@ -267,10 +273,9 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const upcomingVisites = visites?.filter(v => {
-    const visitDate = new Date(v.date);
-    return visitDate >= new Date();
-  }).slice(0, 4) || [];
+  const upcomingVisites = upcomingAppointments?.filter(apt => 
+    apt.status === 'UPCOMING'
+  ).slice(0, 4) || [];
 
   const isqStats = {
     success: stats?.implantsByStatus?.["SUCCES"] || 0,
@@ -325,9 +330,9 @@ export default function DashboardPage() {
           icon={<Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
           iconBgColor="bg-blue-100 dark:bg-blue-900/30"
           stats={[
-            { label: "Aujourd'hui", value: upcomingVisites.filter(v => {
+            { label: "Aujourd'hui", value: upcomingVisites.filter(apt => {
               const today = new Date();
-              const visitDate = new Date(v.date);
+              const visitDate = new Date(apt.dateStart);
               return visitDate.toDateString() === today.toDateString();
             }).length },
             { label: "Cette semaine", value: upcomingVisites.length },
@@ -532,70 +537,57 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {upcomingVisites.length > 0 ? (
-              upcomingVisites.map((visite) => (
+              upcomingVisites.map((apt) => (
                 <AppointmentItem
-                  key={visite.id}
-                  date={new Date(visite.date)}
-                  title="Visite de contrôle"
-                  description={visite.notes || "Aucune note"}
-                  type="suivi"
-                  time="09:00"
+                  key={apt.id}
+                  date={new Date(apt.dateStart)}
+                  title={apt.title}
+                  description={apt.description || ""}
+                  type={apt.type.toLowerCase() === "chirurgie" ? "action" : apt.type.toLowerCase() as "consultation" | "suivi" | "action"}
+                  time={new Date(apt.dateStart).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 />
               ))
             ) : (
-              <>
-                <AppointmentItem
-                  date={new Date()}
-                  title="Contrôle post-opératoire"
-                  description="Patient: Martin Dupont"
-                  type="suivi"
-                  time="09:00"
-                />
-                <AppointmentItem
-                  date={new Date(Date.now() + 86400000)}
-                  title="Consultation initiale"
-                  description="Patient: Sophie Bernard"
-                  type="consultation"
-                  time="10:30"
-                />
-                <AppointmentItem
-                  date={new Date(Date.now() + 86400000 * 2)}
-                  title="Suivi ISQ 3 mois"
-                  description="Patient: Jean Dubois"
-                  type="suivi"
-                  time="14:00"
-                />
-              </>
+              <p className="text-sm text-muted-foreground py-2">Aucun rendez-vous à venir</p>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Actions à mener</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-500" />
+              À surveiller
+            </CardTitle>
+            <Badge variant="secondary" className="text-xs">
+              {flagsData?.length || 0} alertes
+            </Badge>
           </CardHeader>
           <CardContent className="space-y-3">
-            <AppointmentItem
-              date={new Date()}
-              title="Planifier suivi ISQ"
-              description="Implant posé il y a 3 mois"
-              type="action"
-              time="Urgent"
-            />
-            <AppointmentItem
-              date={new Date(Date.now() + 86400000)}
-              title="Radio de contrôle"
-              description="Patient: Pierre Martin"
-              type="action"
-              time="Cette semaine"
-            />
-            <AppointmentItem
-              date={new Date(Date.now() + 86400000 * 3)}
-              title="Mise en charge différée"
-              description="Patient: Marie Leroy"
-              type="action"
-              time="J+90"
-            />
+            {flagsData && flagsData.length > 0 ? (
+              flagsData.slice(0, 5).map((flag) => (
+                <Link 
+                  key={flag.id} 
+                  href={flag.patientId ? `/patients/${flag.patientId}` : "#"}
+                  className="block"
+                >
+                  <div className="flex items-start gap-3 p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer" data-testid={`flag-dashboard-${flag.id}`}>
+                    <FlagBadge flag={flag} compact />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{flag.label}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {flag.patientPrenom} {flag.patientNom} {flag.entityName ? `- ${flag.entityName}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="text-center py-6">
+                <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Aucune alerte en cours</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
