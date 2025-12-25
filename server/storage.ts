@@ -2190,71 +2190,108 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // 3. Get all visites for implants in this surgery (visites link to catalog implant ID)
-    const catalogImplantIds = surgeryImplantsData.map(s => s.implant.id);
-    
-    if (catalogImplantIds.length > 0) {
-      const visitesData = await db
-        .select()
-        .from(visites)
+    // 3. Get appointments for this operation (either directly linked or via surgeryImplant)
+    // First, try appointments linked to surgeryImplants used in this operation
+    if (surgeryImplantIds.length > 0) {
+      const appointmentsData = await db
+        .select({
+          appointment: appointments,
+          dateStr: sql<string>`TO_CHAR(${appointments.dateStart}, 'YYYY-MM-DD')`,
+        })
+        .from(appointments)
         .where(and(
-          eq(visites.organisationId, organisationId),
-          inArray(visites.implantId, catalogImplantIds)
+          eq(appointments.organisationId, organisationId),
+          or(
+            eq(appointments.operationId, operationId),
+            inArray(appointments.surgeryImplantId, surgeryImplantIds)
+          )
         ))
-        .orderBy(visites.date);
+        .orderBy(appointments.dateStart);
 
-      // Add visite events - show all visits regardless of ISQ presence
-      for (const visite of visitesData) {
-        const implantInfoList = catalogImplantMap.get(visite.implantId);
-        if (implantInfoList && implantInfoList.length > 0) {
-          // Find the best matching surgery implant based on date (use the one closest before or on the visit date)
-          const sortedByDate = implantInfoList
-            .filter(info => info.surgeryImplant.datePose <= visite.date)
-            .sort((a, b) => new Date(b.surgeryImplant.datePose).getTime() - new Date(a.surgeryImplant.datePose).getTime());
+      // Add appointment events as visits
+      for (const { appointment, dateStr: appointmentDate } of appointmentsData) {
+        
+        // Try to find the associated surgery implant for context
+        let surgeryImplant = appointment.surgeryImplantId 
+          ? surgeryImplantMap.get(appointment.surgeryImplantId)?.surgeryImplant 
+          : null;
+        let implant = appointment.surgeryImplantId 
+          ? surgeryImplantMap.get(appointment.surgeryImplantId)?.implant 
+          : null;
+        
+        let stability: "low" | "moderate" | "high" | undefined;
+        let delta: number | undefined;
+        let previousValue: number | undefined;
+        
+        if (appointment.isq !== null) {
+          stability = this.getIsqStability(appointment.isq);
           
-          const implantInfo = sortedByDate[0] || implantInfoList[0];
-          const surgeryImplant = implantInfo.surgeryImplant;
-          const implant = implantInfo.implant;
-          
-          let stability: "low" | "moderate" | "high" | undefined;
-          let delta: number | undefined;
-          let previousValue: number | undefined;
-          
-          if (visite.isq !== null) {
-            stability = this.getIsqStability(visite.isq);
-            
-            // Get previous ISQ value for delta calculation
-            const history = isqHistory.get(visite.implantId) || [];
-            const previousMeasurements = history.filter(h => h.date < visite.date);
+          // Try to calculate ISQ delta if we have a linked implant
+          if (implant) {
+            const history = isqHistory.get(implant.id) || [];
+            const previousMeasurements = history.filter(h => h.date < appointmentDate);
             previousValue = previousMeasurements.length > 0 
               ? previousMeasurements[previousMeasurements.length - 1].value 
               : undefined;
-            delta = previousValue !== undefined ? visite.isq - previousValue : undefined;
+            delta = previousValue !== undefined ? appointment.isq - previousValue : undefined;
             
             // Track this measurement for future delta calculations
-            if (!isqHistory.has(visite.implantId)) {
-              isqHistory.set(visite.implantId, []);
+            if (!isqHistory.has(implant.id)) {
+              isqHistory.set(implant.id, []);
             }
-            isqHistory.get(visite.implantId)!.push({ date: visite.date, value: visite.isq });
+            isqHistory.get(implant.id)!.push({ date: appointmentDate, value: appointment.isq });
           }
-          
-          events.push({
-            type: "VISIT",
-            at: visite.date,
-            title: "Visite de contrôle",
-            description: visite.notes || undefined,
-            status: isInPast(visite.date) ? "done" : "upcoming",
-            visitId: visite.id,
-            visitType: "suivi",
-            surgeryImplantId: surgeryImplant.id,
-            implantLabel: `${surgeryImplant.siteFdi} - ${implant.marque}`,
-            siteFdi: surgeryImplant.siteFdi,
-            value: visite.isq ?? undefined,
-            stability,
-            delta,
-            previousValue,
-          });
         }
+        
+        events.push({
+          type: "VISIT",
+          at: appointmentDate,
+          title: appointment.title,
+          description: appointment.description || undefined,
+          status: appointment.status === "COMPLETED" ? "done" : (appointment.status === "CANCELLED" ? "cancelled" : "upcoming"),
+          visitId: appointment.id,
+          visitType: appointment.type.toLowerCase(),
+          surgeryImplantId: surgeryImplant?.id,
+          implantLabel: surgeryImplant && implant ? `${surgeryImplant.siteFdi} - ${implant.marque}` : undefined,
+          siteFdi: surgeryImplant?.siteFdi,
+          value: appointment.isq ?? undefined,
+          stability,
+          delta,
+          previousValue,
+        });
+      }
+    } else {
+      // No surgery implants, just get appointments directly linked to this operation
+      const appointmentsData = await db
+        .select({
+          appointment: appointments,
+          dateStr: sql<string>`TO_CHAR(${appointments.dateStart}, 'YYYY-MM-DD')`,
+        })
+        .from(appointments)
+        .where(and(
+          eq(appointments.organisationId, organisationId),
+          eq(appointments.operationId, operationId)
+        ))
+        .orderBy(appointments.dateStart);
+
+      for (const { appointment, dateStr: appointmentDate } of appointmentsData) {
+        
+        let stability: "low" | "moderate" | "high" | undefined;
+        if (appointment.isq !== null) {
+          stability = this.getIsqStability(appointment.isq);
+        }
+        
+        events.push({
+          type: "VISIT",
+          at: appointmentDate,
+          title: appointment.title,
+          description: appointment.description || undefined,
+          status: appointment.status === "COMPLETED" ? "done" : (appointment.status === "CANCELLED" ? "cancelled" : "upcoming"),
+          visitId: appointment.id,
+          visitType: appointment.type.toLowerCase(),
+          value: appointment.isq ?? undefined,
+          stability,
+        });
       }
     }
 
