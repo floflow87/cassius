@@ -93,9 +93,11 @@ import { RadioCard } from "@/components/radio-card";
 import { RadioUploadForm } from "@/components/radio-upload-form";
 import { DocumentCard } from "@/components/document-card";
 import { DocumentUploadForm } from "@/components/document-upload-form";
+import { AppointmentCard } from "@/components/appointment-card";
+import { AppointmentForm } from "@/components/appointment-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Patient, Operation, Implant, Radio, Visite, Note, RendezVous, Document, SurgeryImplantWithDetails, OperationWithImplants } from "@shared/schema";
+import type { Patient, Operation, Implant, Radio, Visite, Note, RendezVous, Document, SurgeryImplantWithDetails, OperationWithImplants, Appointment } from "@shared/schema";
 
 interface SurgeryImplantWithVisites extends SurgeryImplantWithDetails {
   visites?: Visite[];
@@ -631,6 +633,15 @@ export default function PatientDetailsPage() {
     queryKey: ["/api/patients", patientId, "rendez-vous"],
     enabled: !!patientId,
   });
+
+  // Unified Appointments (new system)
+  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery<Appointment[]>({
+    queryKey: ["/api/patients", patientId, "appointments"],
+    enabled: !!patientId,
+  });
+  const upcomingAppointments = appointments.filter((a) => a.status === "UPCOMING").sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
+  const completedAppointments = appointments.filter((a) => a.status === "COMPLETED" || a.status === "CANCELLED").sort((a, b) => new Date(b.dateStart).getTime() - new Date(a.dateStart).getTime());
 
   const createRdvMutation = useMutation({
     mutationFn: async (data: typeof rdvForm) => {
@@ -2269,10 +2280,10 @@ export default function PatientDetailsPage() {
 
         <TabsContent value="visits" className="mt-4 space-y-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="text-lg font-semibold">Suivi & Visites</h2>
-            <Sheet open={rdvDialogOpen} onOpenChange={setRdvDialogOpen}>
+            <h2 className="text-lg font-semibold">Rendez-vous</h2>
+            <Sheet open={appointmentDialogOpen} onOpenChange={setAppointmentDialogOpen}>
               <SheetTrigger asChild>
-                <Button data-testid="button-new-rdv">
+                <Button data-testid="button-new-appointment">
                   <Plus className="h-4 w-4 mr-2" />
                   Nouveau rendez-vous
                 </Button>
@@ -2281,102 +2292,23 @@ export default function PatientDetailsPage() {
                 <SheetHeader>
                   <SheetTitle>Nouveau rendez-vous</SheetTitle>
                 </SheetHeader>
-                <div className="mt-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="rdv-titre">Titre</Label>
-                    <Input
-                      id="rdv-titre"
-                      value={rdvForm.titre}
-                      onChange={(e) => setRdvForm({ ...rdvForm, titre: e.target.value })}
-                      placeholder="Ex: Consultation pré-opératoire"
-                      data-testid="input-rdv-titre"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="rdv-date">Date</Label>
-                    <Input
-                      id="rdv-date"
-                      type="date"
-                      value={rdvForm.date}
-                      onChange={(e) => setRdvForm({ ...rdvForm, date: e.target.value })}
-                      data-testid="input-rdv-date"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="rdv-heure-debut">Heure début</Label>
-                      <Input
-                        id="rdv-heure-debut"
-                        type="time"
-                        value={rdvForm.heureDebut}
-                        onChange={(e) => setRdvForm({ ...rdvForm, heureDebut: e.target.value })}
-                        data-testid="input-rdv-heure-debut"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="rdv-heure-fin">Heure fin</Label>
-                      <Input
-                        id="rdv-heure-fin"
-                        type="time"
-                        value={rdvForm.heureFin}
-                        onChange={(e) => setRdvForm({ ...rdvForm, heureFin: e.target.value })}
-                        data-testid="input-rdv-heure-fin"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {(["CONSULTATION", "SUIVI", "CHIRURGIE"] as const).map((tag) => {
-                        const config = getRdvTagConfig(tag);
-                        return (
-                          <Button
-                            key={tag}
-                            variant="outline"
-                            size="sm"
-                            type="button"
-                            onClick={() => setRdvForm({ ...rdvForm, tag })}
-                            className={rdvForm.tag === tag ? `${config.className} ring-2 ring-primary` : ""}
-                            data-testid={`button-rdv-tag-${tag.toLowerCase()}`}
-                          >
-                            {config.label}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="rdv-description">Description (optionnelle)</Label>
-                    <Textarea
-                      id="rdv-description"
-                      value={rdvForm.description}
-                      onChange={(e) => setRdvForm({ ...rdvForm, description: e.target.value })}
-                      placeholder="Informations complémentaires..."
-                      rows={3}
-                      data-testid="input-rdv-description"
-                    />
-                  </div>
-                  <div className="flex justify-end pt-4">
-                    <Button
-                      onClick={() => createRdvMutation.mutate(rdvForm)}
-                      disabled={!rdvForm.titre.trim() || !rdvForm.date || createRdvMutation.isPending}
-                      data-testid="button-submit-rdv"
-                    >
-                      Créer le rendez-vous
-                    </Button>
-                  </div>
+                <div className="mt-6">
+                  <AppointmentForm
+                    patientId={patient.id}
+                    onSuccess={() => setAppointmentDialogOpen(false)}
+                  />
                 </div>
               </SheetContent>
             </Sheet>
           </div>
 
-          {rdvsLoading ? (
+          {appointmentsLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-24 w-full" />
               ))}
             </div>
-          ) : patientRdvs.length === 0 ? (
+          ) : appointments.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
@@ -2388,229 +2320,37 @@ export default function PatientDetailsPage() {
             </Card>
           ) : (
             <>
-              {upcomingRdvs.length > 0 && (
+              {upcomingAppointments.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-base font-medium text-muted-foreground">Rendez-vous à venir</h3>
-                  {upcomingRdvs.map((rdv) => {
-                    const tagConfig = getRdvTagConfig(rdv.tag as RdvTag);
-                    return (
-                      <div
-                        key={rdv.id}
-                        className={`bg-card rounded-md p-4 border-l-4 ${tagConfig.borderColor} border border-border`}
-                        data-testid={`card-rdv-upcoming-${rdv.id}`}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="font-medium text-sm">{rdv.titre}</span>
-                              <Badge variant="secondary" className={`text-xs ${tagConfig.className}`}>
-                                {tagConfig.label}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground mb-1">
-                              {formatRdvDate(rdv.date)} - {rdv.heureDebut} à {rdv.heureFin}
-                            </p>
-                            {rdv.description && (
-                              <p className="text-sm text-muted-foreground mt-2">{rdv.description}</p>
-                            )}
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="shrink-0" data-testid={`button-rdv-menu-${rdv.id}`}>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-white dark:bg-zinc-900">
-                              <DropdownMenuItem onClick={() => setEditingRdv(rdv)} data-testid={`button-edit-rdv-${rdv.id}`}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Modifier
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setDeleteRdvId(rdv.id)} className="text-destructive" data-testid={`button-delete-rdv-${rdv.id}`}>
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Supprimer
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <h3 className="text-base font-medium text-muted-foreground">Rendez-vous a venir</h3>
+                  <div className="space-y-3">
+                    {upcomingAppointments.map((appointment) => (
+                      <AppointmentCard
+                        key={appointment.id}
+                        appointment={appointment}
+                        patientId={patient.id}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {pastRdvs.length > 0 && (
+              {completedAppointments.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-base font-medium text-muted-foreground">Historique</h3>
-                  {pastRdvs.map((rdv) => {
-                    const tagConfig = getRdvTagConfig(rdv.tag as RdvTag);
-                    return (
-                      <div
-                        key={rdv.id}
-                        className="bg-muted/50 rounded-md p-4 border border-border"
-                        data-testid={`card-rdv-past-${rdv.id}`}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="font-medium text-sm text-muted-foreground">{rdv.titre}</span>
-                              <Badge variant="secondary" className={`text-xs ${tagConfig.className}`}>
-                                {tagConfig.label}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground mb-1">
-                              {formatRdvDate(rdv.date)} - {rdv.heureDebut} à {rdv.heureFin}
-                            </p>
-                            {rdv.description && (
-                              <p className="text-sm text-muted-foreground mt-2">{rdv.description}</p>
-                            )}
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="shrink-0" data-testid={`button-rdv-menu-${rdv.id}`}>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-white dark:bg-zinc-900">
-                              <DropdownMenuItem onClick={() => setEditingRdv(rdv)} data-testid={`button-edit-rdv-${rdv.id}`}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Modifier
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setDeleteRdvId(rdv.id)} className="text-destructive" data-testid={`button-delete-rdv-${rdv.id}`}>
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Supprimer
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="space-y-3">
+                    {completedAppointments.map((appointment) => (
+                      <AppointmentCard
+                        key={appointment.id}
+                        appointment={appointment}
+                        patientId={patient.id}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </>
           )}
-
-          <Sheet open={!!editingRdv} onOpenChange={(open) => !open && setEditingRdv(null)}>
-            <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-white dark:bg-zinc-900">
-              <SheetHeader>
-                <SheetTitle>Modifier le rendez-vous</SheetTitle>
-              </SheetHeader>
-              {editingRdv && (
-                <div className="mt-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-rdv-titre">Titre</Label>
-                    <Input
-                      id="edit-rdv-titre"
-                      value={editingRdv.titre}
-                      onChange={(e) => setEditingRdv({ ...editingRdv, titre: e.target.value })}
-                      data-testid="input-edit-rdv-titre"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-rdv-date">Date</Label>
-                    <Input
-                      id="edit-rdv-date"
-                      type="date"
-                      value={editingRdv.date}
-                      onChange={(e) => setEditingRdv({ ...editingRdv, date: e.target.value })}
-                      data-testid="input-edit-rdv-date"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-rdv-heure-debut">Heure début</Label>
-                      <Input
-                        id="edit-rdv-heure-debut"
-                        type="time"
-                        value={editingRdv.heureDebut}
-                        onChange={(e) => setEditingRdv({ ...editingRdv, heureDebut: e.target.value })}
-                        data-testid="input-edit-rdv-heure-debut"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-rdv-heure-fin">Heure fin</Label>
-                      <Input
-                        id="edit-rdv-heure-fin"
-                        type="time"
-                        value={editingRdv.heureFin}
-                        onChange={(e) => setEditingRdv({ ...editingRdv, heureFin: e.target.value })}
-                        data-testid="input-edit-rdv-heure-fin"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {(["CONSULTATION", "SUIVI", "CHIRURGIE"] as const).map((tag) => {
-                        const config = getRdvTagConfig(tag);
-                        return (
-                          <Button
-                            key={tag}
-                            variant="outline"
-                            size="sm"
-                            type="button"
-                            onClick={() => setEditingRdv({ ...editingRdv, tag })}
-                            className={editingRdv.tag === tag ? `${config.className} ring-2 ring-primary` : ""}
-                            data-testid={`button-edit-rdv-tag-${tag.toLowerCase()}`}
-                          >
-                            {config.label}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-rdv-description">Description (optionnelle)</Label>
-                    <Textarea
-                      id="edit-rdv-description"
-                      value={editingRdv.description || ""}
-                      onChange={(e) => setEditingRdv({ ...editingRdv, description: e.target.value })}
-                      rows={3}
-                      data-testid="input-edit-rdv-description"
-                    />
-                  </div>
-                  <div className="flex justify-end pt-4">
-                    <Button
-                      onClick={() => updateRdvMutation.mutate({
-                        id: editingRdv.id,
-                        titre: editingRdv.titre,
-                        description: editingRdv.description || "",
-                        date: editingRdv.date,
-                        heureDebut: editingRdv.heureDebut,
-                        heureFin: editingRdv.heureFin,
-                        tag: editingRdv.tag as RdvTag,
-                      })}
-                      disabled={!editingRdv.titre.trim() || !editingRdv.date || updateRdvMutation.isPending}
-                      data-testid="button-update-rdv"
-                    >
-                      Enregistrer
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </SheetContent>
-          </Sheet>
-
-          <AlertDialog open={!!deleteRdvId} onOpenChange={(open) => !open && setDeleteRdvId(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Supprimer le rendez-vous ?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Cette action est irréversible. Le rendez-vous sera définitivement supprimé.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel data-testid="button-cancel-delete-rdv">Annuler</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => deleteRdvId && deleteRdvMutation.mutate(deleteRdvId)}
-                  className="bg-primary text-primary-foreground"
-                  data-testid="button-confirm-delete-rdv"
-                >
-                  Supprimer
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </TabsContent>
 
         <TabsContent value="notes" className="mt-4 space-y-6">

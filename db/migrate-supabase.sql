@@ -157,3 +157,90 @@ CREATE TABLE IF NOT EXISTS saved_filters (
 -- Index on saved_filters for queries by organisation and page_type
 CREATE INDEX IF NOT EXISTS idx_saved_filters_org_page 
 ON saved_filters(organisation_id, page_type);
+
+-- ============================================
+-- Unified Appointments Table (added December 2025)
+-- Replaces visites and rendez_vous with a single unified model
+-- ============================================
+
+-- Create appointment_type enum if not exists
+DO $$ BEGIN
+    CREATE TYPE appointment_type AS ENUM ('CONSULTATION', 'SUIVI', 'CHIRURGIE', 'CONTROLE', 'URGENCE', 'AUTRE');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Create appointment_status enum if not exists
+DO $$ BEGIN
+    CREATE TYPE appointment_status AS ENUM ('UPCOMING', 'COMPLETED', 'CANCELLED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Create appointments table if not exists
+CREATE TABLE IF NOT EXISTS appointments (
+    id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+    patient_id VARCHAR NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    operation_id VARCHAR REFERENCES operations(id) ON DELETE SET NULL,
+    surgery_implant_id VARCHAR REFERENCES surgery_implants(id) ON DELETE SET NULL,
+    type appointment_type NOT NULL,
+    status appointment_status NOT NULL DEFAULT 'UPCOMING',
+    title TEXT NOT NULL,
+    description TEXT,
+    date_start TIMESTAMP NOT NULL,
+    date_end TIMESTAMP,
+    isq REAL,
+    radio_id VARCHAR REFERENCES radios(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+-- Indexes for appointments table
+CREATE INDEX IF NOT EXISTS idx_appointments_org 
+ON appointments(organisation_id);
+
+CREATE INDEX IF NOT EXISTS idx_appointments_patient 
+ON appointments(organisation_id, patient_id);
+
+CREATE INDEX IF NOT EXISTS idx_appointments_status 
+ON appointments(organisation_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_appointments_date 
+ON appointments(organisation_id, date_start);
+
+CREATE INDEX IF NOT EXISTS idx_appointments_surgery_implant 
+ON appointments(organisation_id, surgery_implant_id);
+
+-- ============================================
+-- Migration script: visites -> appointments
+-- Run this to migrate existing visites data
+-- ============================================
+-- DO $$
+-- DECLARE
+--     appointments_empty BOOLEAN;
+-- BEGIN
+--     SELECT NOT EXISTS (SELECT 1 FROM appointments LIMIT 1) INTO appointments_empty;
+--     
+--     IF appointments_empty THEN
+--         INSERT INTO appointments (
+--             organisation_id, patient_id, operation_id, surgery_implant_id,
+--             type, status, title, description, date_start, isq, radio_id
+--         )
+--         SELECT 
+--             v.organisation_id,
+--             v.patient_id,
+--             NULL, -- operation_id - will need manual linking
+--             NULL, -- surgery_implant_id - visites.implant_id points to catalog, not surgery_implants
+--             'SUIVI'::appointment_type,
+--             'COMPLETED'::appointment_status,
+--             'Visite de suivi',
+--             v.notes,
+--             v.date::timestamp,
+--             v.isq,
+--             v.radio_id
+--         FROM visites v;
+--         
+--         RAISE NOTICE 'Migrated % visites to appointments', (SELECT COUNT(*) FROM appointments);
+--     END IF;
+-- END $$;

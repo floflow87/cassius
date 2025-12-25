@@ -18,6 +18,8 @@ import {
   updateDocumentSchema,
   insertSavedFilterSchema,
   savedFilterPageTypeEnum,
+  insertAppointmentSchema,
+  updateAppointmentSchema,
   patients,
 } from "@shared/schema";
 import type {
@@ -1751,6 +1753,107 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting rendez-vous:", error);
       res.status(500).json({ error: "Failed to delete rendez-vous" });
+    }
+  });
+
+  // ========== APPOINTMENTS (Unified RDV) ==========
+  app.get("/api/patients/:patientId/appointments", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId } = req.params;
+      const { status } = req.query;
+      
+      let appointmentsList;
+      if (status === "upcoming") {
+        appointmentsList = await storage.getPatientUpcomingAppointments(organisationId, patientId);
+      } else if (status === "completed") {
+        appointmentsList = await storage.getPatientCompletedAppointments(organisationId, patientId);
+      } else {
+        appointmentsList = await storage.getPatientAppointments(organisationId, patientId);
+      }
+      res.json(appointmentsList);
+    } catch (error) {
+      console.error("Error fetching appointments:", error);
+      res.status(500).json({ error: "Failed to fetch appointments" });
+    }
+  });
+
+  app.get("/api/appointments/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const { details } = req.query;
+      
+      if (details === "true") {
+        const appointment = await storage.getAppointmentWithDetails(organisationId, id);
+        if (!appointment) {
+          return res.status(404).json({ error: "Appointment not found" });
+        }
+        res.json(appointment);
+      } else {
+        const appointment = await storage.getAppointment(organisationId, id);
+        if (!appointment) {
+          return res.status(404).json({ error: "Appointment not found" });
+        }
+        res.json(appointment);
+      }
+    } catch (error) {
+      console.error("Error fetching appointment:", error);
+      res.status(500).json({ error: "Failed to fetch appointment" });
+    }
+  });
+
+  app.post("/api/patients/:patientId/appointments", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId } = req.params;
+      const appointmentData = insertAppointmentSchema.parse({ ...req.body, patientId });
+      const appointment = await storage.createAppointment(organisationId, appointmentData);
+      res.status(201).json(appointment);
+    } catch (error) {
+      console.error("Error creating appointment:", error);
+      res.status(500).json({ error: "Failed to create appointment" });
+    }
+  });
+
+  app.patch("/api/appointments/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const updateData = updateAppointmentSchema.parse(req.body) as Parameters<typeof storage.updateAppointment>[2];
+      const appointment = await storage.updateAppointment(organisationId, id, updateData);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      res.json(appointment);
+    } catch (error) {
+      console.error("Error updating appointment:", error);
+      res.status(500).json({ error: "Failed to update appointment" });
+    }
+  });
+
+  app.delete("/api/appointments/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteAppointment(organisationId, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting appointment:", error);
+      res.status(500).json({ error: "Failed to delete appointment" });
     }
   });
 

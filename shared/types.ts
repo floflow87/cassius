@@ -69,6 +69,7 @@ export interface Implant {
   diametre: number;
   longueur: number;
   lot: string | null;
+  notes: string | null;
 }
 
 // SurgeryImplant = implant posé lors d'une chirurgie (avec contexte de pose)

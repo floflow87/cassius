@@ -17,6 +17,7 @@ export const organisationsRelations = relations(organisations, ({ many }) => ({
   implants: many(implants),
   surgeryImplants: many(surgeryImplants),
   visites: many(visites),
+  appointments: many(appointments),
   radios: many(radios),
   protheses: many(protheses),
   documents: many(documents),
@@ -47,6 +48,21 @@ export const typeProtheseEnum = pgEnum("type_prothese", ["VISSEE", "SCELLEE"]);
 export const typePilierEnum = pgEnum("type_pilier", ["DROIT", "ANGULE", "MULTI_UNIT"]);
 export const typeNoteTagEnum = pgEnum("type_note_tag", ["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"]);
 export const typeRendezVousTagEnum = pgEnum("type_rdv_tag", ["CONSULTATION", "SUIVI", "CHIRURGIE"]);
+
+// Enums pour les rendez-vous unifiés (appointments)
+export const appointmentTypeEnum = pgEnum("appointment_type", [
+  "CONSULTATION",
+  "SUIVI", 
+  "CHIRURGIE",
+  "CONTROLE",
+  "URGENCE",
+  "AUTRE"
+]);
+export const appointmentStatusEnum = pgEnum("appointment_status", [
+  "UPCOMING",
+  "COMPLETED",
+  "CANCELLED"
+]);
 export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
 export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
 export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"]);
@@ -82,6 +98,7 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   operations: many(operations),
   radios: many(radios),
   visites: many(visites),
+  appointments: many(appointments),
   documents: many(documents),
 }));
 
@@ -343,6 +360,48 @@ export const rendezVousRelations = relations(rendezVous, ({ one }) => ({
   }),
 }));
 
+// Table appointments - RDV cliniques unifiés (remplace visites + rendez_vous)
+export const appointments = pgTable("appointments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  operationId: varchar("operation_id").references(() => operations.id, { onDelete: "set null" }),
+  surgeryImplantId: varchar("surgery_implant_id").references(() => surgeryImplants.id, { onDelete: "set null" }),
+  type: appointmentTypeEnum("type").notNull(),
+  status: appointmentStatusEnum("status").default("UPCOMING").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  dateStart: timestamp("date_start").notNull(),
+  dateEnd: timestamp("date_end"),
+  isq: real("isq"),
+  radioId: varchar("radio_id").references(() => radios.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const appointmentsRelations = relations(appointments, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [appointments.organisationId],
+    references: [organisations.id],
+  }),
+  patient: one(patients, {
+    fields: [appointments.patientId],
+    references: [patients.id],
+  }),
+  operation: one(operations, {
+    fields: [appointments.operationId],
+    references: [operations.id],
+  }),
+  surgeryImplant: one(surgeryImplants, {
+    fields: [appointments.surgeryImplantId],
+    references: [surgeryImplants.id],
+  }),
+  radio: one(radios, {
+    fields: [appointments.radioId],
+    references: [radios.id],
+  }),
+}));
+
 // Table documents patients (PDF, etc.)
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -450,6 +509,32 @@ export const insertRendezVousSchema = createInsertSchema(rendezVous).omit({
   createdAt: true,
 });
 
+export const insertAppointmentSchema = createInsertSchema(appointments).omit({
+  id: true,
+  organisationId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateAppointmentSchema = z.object({
+  type: z.enum(["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"]).optional(),
+  status: z.enum(["UPCOMING", "COMPLETED", "CANCELLED"]).optional(),
+  title: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  dateStart: z.coerce.date().optional(),
+  dateEnd: z.coerce.date().nullable().optional(),
+  isq: z.number().nullable().optional(),
+  operationId: z.string().nullable().optional(),
+  surgeryImplantId: z.string().nullable().optional(),
+  radioId: z.string().nullable().optional(),
+});
+
+export const appointmentTypeValues = ["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"] as const;
+export type AppointmentType = typeof appointmentTypeValues[number];
+
+export const appointmentStatusValues = ["UPCOMING", "COMPLETED", "CANCELLED"] as const;
+export type AppointmentStatus = typeof appointmentStatusValues[number];
+
 export const insertDocumentSchema = createInsertSchema(documents).omit({
   id: true,
   organisationId: true,
@@ -517,6 +602,9 @@ export type Note = typeof notes.$inferSelect;
 export type InsertRendezVous = z.infer<typeof insertRendezVousSchema>;
 export type RendezVous = typeof rendezVous.$inferSelect;
 
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+export type Appointment = typeof appointments.$inferSelect;
+
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
 
@@ -532,4 +620,11 @@ export interface SurgeryImplantWithDetails extends SurgeryImplant {
 
 export interface OperationWithImplants extends Operation {
   surgeryImplants: SurgeryImplantWithDetails[];
+}
+
+export interface AppointmentWithDetails extends Appointment {
+  patient?: Patient;
+  operation?: Operation;
+  surgeryImplant?: SurgeryImplant & { implant: Implant };
+  radio?: Radio;
 }

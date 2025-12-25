@@ -12,6 +12,7 @@ import {
   rendezVous,
   documents,
   savedFilters,
+  appointments,
   type Patient,
   type InsertPatient,
   type Operation,
@@ -39,6 +40,9 @@ import {
   type SavedFilter,
   type InsertSavedFilter,
   type SavedFilterPageType,
+  type Appointment,
+  type InsertAppointment,
+  type AppointmentWithDetails,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -171,6 +175,16 @@ export interface IStorage {
   createRendezVous(organisationId: string, rdv: InsertRendezVous): Promise<RendezVous>;
   updateRendezVous(organisationId: string, id: string, rdv: Partial<InsertRendezVous>): Promise<RendezVous | undefined>;
   deleteRendezVous(organisationId: string, id: string): Promise<boolean>;
+
+  // Appointment methods (unified RDV)
+  getAppointment(organisationId: string, id: string): Promise<Appointment | undefined>;
+  getAppointmentWithDetails(organisationId: string, id: string): Promise<AppointmentWithDetails | undefined>;
+  getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]>;
+  getPatientUpcomingAppointments(organisationId: string, patientId: string): Promise<Appointment[]>;
+  getPatientCompletedAppointments(organisationId: string, patientId: string): Promise<Appointment[]>;
+  createAppointment(organisationId: string, appointment: InsertAppointment): Promise<Appointment>;
+  updateAppointment(organisationId: string, id: string, data: Partial<InsertAppointment>): Promise<Appointment | undefined>;
+  deleteAppointment(organisationId: string, id: string): Promise<boolean>;
 
   // Document methods
   getDocument(organisationId: string, id: string): Promise<Document | undefined>;
@@ -1899,6 +1913,109 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(rendezVous.id, id),
         eq(rendezVous.organisationId, organisationId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ========== APPOINTMENTS (Unified RDV) ==========
+  async getAppointment(organisationId: string, id: string): Promise<Appointment | undefined> {
+    const [appointment] = await db.select().from(appointments)
+      .where(and(
+        eq(appointments.id, id),
+        eq(appointments.organisationId, organisationId)
+      ));
+    return appointment || undefined;
+  }
+
+  async getAppointmentWithDetails(organisationId: string, id: string): Promise<AppointmentWithDetails | undefined> {
+    const appointment = await this.getAppointment(organisationId, id);
+    if (!appointment) return undefined;
+
+    const [patientData, operationData, radioData] = await Promise.all([
+      appointment.patientId ? this.getPatient(organisationId, appointment.patientId) : Promise.resolve(undefined),
+      appointment.operationId ? this.getOperation(organisationId, appointment.operationId) : Promise.resolve(undefined),
+      appointment.radioId ? this.getRadio(organisationId, appointment.radioId) : Promise.resolve(undefined),
+    ]);
+
+    let surgeryImplantData: (SurgeryImplant & { implant: Implant }) | undefined;
+    if (appointment.surgeryImplantId) {
+      const detail = await this.getSurgeryImplantWithDetails(organisationId, appointment.surgeryImplantId);
+      if (detail) {
+        surgeryImplantData = {
+          ...detail,
+          implant: detail.implant,
+        };
+      }
+    }
+
+    return {
+      ...appointment,
+      patient: patientData,
+      operation: operationData,
+      surgeryImplant: surgeryImplantData,
+      radio: radioData,
+    };
+  }
+
+  async getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]> {
+    return db.select().from(appointments)
+      .where(and(
+        eq(appointments.patientId, patientId),
+        eq(appointments.organisationId, organisationId)
+      ))
+      .orderBy(desc(appointments.dateStart));
+  }
+
+  async getPatientUpcomingAppointments(organisationId: string, patientId: string): Promise<Appointment[]> {
+    const now = new Date();
+    return db.select().from(appointments)
+      .where(and(
+        eq(appointments.patientId, patientId),
+        eq(appointments.organisationId, organisationId),
+        eq(appointments.status, "UPCOMING"),
+        gte(appointments.dateStart, now)
+      ))
+      .orderBy(appointments.dateStart);
+  }
+
+  async getPatientCompletedAppointments(organisationId: string, patientId: string): Promise<Appointment[]> {
+    return db.select().from(appointments)
+      .where(and(
+        eq(appointments.patientId, patientId),
+        eq(appointments.organisationId, organisationId),
+        eq(appointments.status, "COMPLETED")
+      ))
+      .orderBy(desc(appointments.dateStart));
+  }
+
+  async createAppointment(organisationId: string, appointment: InsertAppointment): Promise<Appointment> {
+    const [created] = await db.insert(appointments).values({
+      ...appointment,
+      organisationId,
+    }).returning();
+    return created;
+  }
+
+  async updateAppointment(organisationId: string, id: string, data: Partial<InsertAppointment>): Promise<Appointment | undefined> {
+    const [updated] = await db.update(appointments)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(appointments.id, id),
+        eq(appointments.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteAppointment(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(appointments)
+      .where(and(
+        eq(appointments.id, id),
+        eq(appointments.organisationId, organisationId)
       ))
       .returning();
     return result.length > 0;
