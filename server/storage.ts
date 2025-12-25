@@ -47,6 +47,7 @@ import {
   type Flag,
   type InsertFlag,
   type FlagWithEntity,
+  type AppointmentWithPatient,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -182,6 +183,7 @@ export interface IStorage {
 
   // Appointment methods (unified RDV)
   getAllAppointments(organisationId: string, status?: string): Promise<Appointment[]>;
+  getAllAppointmentsWithPatient(organisationId: string, status?: string): Promise<AppointmentWithPatient[]>;
   getAppointment(organisationId: string, id: string): Promise<Appointment | undefined>;
   getAppointmentWithDetails(organisationId: string, id: string): Promise<AppointmentWithDetails | undefined>;
   getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]>;
@@ -1988,6 +1990,34 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(appointments)
       .where(and(...conditions))
       .orderBy(desc(appointments.dateStart));
+  }
+
+  async getAllAppointmentsWithPatient(organisationId: string, status?: string): Promise<AppointmentWithPatient[]> {
+    const conditions = [eq(appointments.organisationId, organisationId)];
+    if (status === 'UPCOMING') {
+      conditions.push(eq(appointments.status, 'UPCOMING'));
+    } else if (status === 'COMPLETED') {
+      conditions.push(eq(appointments.status, 'COMPLETED'));
+    } else if (status === 'CANCELLED') {
+      conditions.push(eq(appointments.status, 'CANCELLED'));
+    }
+    
+    const result = await db
+      .select({
+        appointment: appointments,
+        patientNom: patients.nom,
+        patientPrenom: patients.prenom,
+      })
+      .from(appointments)
+      .innerJoin(patients, eq(appointments.patientId, patients.id))
+      .where(and(...conditions))
+      .orderBy(appointments.dateStart);
+    
+    return result.map(r => ({
+      ...r.appointment,
+      patientNom: r.patientNom,
+      patientPrenom: r.patientPrenom,
+    }));
   }
 
   async getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]> {

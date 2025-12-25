@@ -714,3 +714,8 @@ export interface FlagWithEntity extends Flag {
   patientNom?: string;
   patientPrenom?: string;
 }
+
+export interface AppointmentWithPatient extends Appointment {
+  patientNom: string;
+  patientPrenom: string;
+}

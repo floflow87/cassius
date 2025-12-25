@@ -1140,7 +1140,7 @@ export default function PatientDetailsPage() {
   const implantCount = patient.surgeryImplants?.length || 0;
   const operationCount = patient.operations?.length || 0;
   const radioCount = patient.radios?.length || 0;
-  const visiteCount = patient.surgeryImplants?.reduce((acc, imp) => acc + (imp.visites?.length || 0), 0) || 0;
+  const visiteCount = completedAppointments.length;
 
   const sortedOperations = [...(patient.operations || [])].sort(
     (a, b) => new Date(b.dateOperation).getTime() - new Date(a.dateOperation).getTime()
@@ -1217,20 +1217,28 @@ export default function PatientDetailsPage() {
     });
   });
 
-  // Ajouter les rendez-vous passés à la timeline
-  patientRdvs.forEach((rdv) => {
-    const rdvDate = new Date(rdv.date);
-    // Seulement les rendez-vous passés
-    if (rdvDate < today) {
-      const tagConfig = getRdvTagConfig(rdv.tag as RdvTag);
+  // Ajouter les rendez-vous passés à la timeline (depuis appointments)
+  completedAppointments.forEach((apt) => {
+    const aptDate = new Date(apt.dateStart);
+    // Seulement les rendez-vous avec une date passée
+    if (aptDate <= today) {
+      const typeLabel = apt.type === "CONSULTATION" ? "Consultation" : 
+                        apt.type === "SUIVI" ? "Suivi" : 
+                        apt.type === "CHIRURGIE" ? "Chirurgie" :
+                        apt.type === "CONTROLE" ? "Contrôle" :
+                        apt.type === "URGENCE" ? "Urgence" : "Autre";
+      const typeClassName = apt.type === "CONSULTATION" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : 
+                            apt.type === "SUIVI" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : 
+                            apt.type === "CHIRURGIE" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" :
+                            "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300";
       timelineEvents.push({
-        id: `rdv-${rdv.id}`,
-        date: rdvDate,
+        id: `apt-${apt.id}`,
+        date: aptDate,
         type: "rdv",
-        title: rdv.titre,
-        description: rdv.description || tagConfig.label,
-        badges: [tagConfig.label],
-        badgeClassName: tagConfig.className,
+        title: apt.title,
+        description: apt.description || typeLabel,
+        badges: [typeLabel],
+        badgeClassName: typeClassName,
       });
     }
   });
@@ -1702,7 +1710,12 @@ export default function PatientDetailsPage() {
                     <ClipboardList className="h-4 w-4 text-primary" />
                     Enregistrer un acte
                   </Button>
-                  <Button variant="ghost" className="w-full justify-start gap-3">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start gap-3"
+                    onClick={() => setAppointmentDialogOpen(true)}
+                    data-testid="button-plan-visit"
+                  >
                     <Calendar className="h-4 w-4 text-primary" />
                     Planifier une visite
                   </Button>

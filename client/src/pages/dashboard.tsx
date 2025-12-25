@@ -34,7 +34,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import type { Operation, Appointment, User, Patient, SurgeryImplant, FlagWithEntity } from "@shared/schema";
+import type { Operation, Appointment, User, Patient, SurgeryImplant, FlagWithEntity, AppointmentWithPatient } from "@shared/schema";
 import { FlagBadge } from "@/components/flag-badge";
 import { Link } from "wouter";
 
@@ -210,8 +210,8 @@ export default function DashboardPage() {
     queryKey: ["/api/stats/advanced"],
   });
   
-  const { data: upcomingAppointments } = useQuery<Appointment[]>({
-    queryKey: ["/api/appointments?status=UPCOMING"],
+  const { data: upcomingAppointments } = useQuery<AppointmentWithPatient[]>({
+    queryKey: ["/api/appointments?status=UPCOMING&withPatient=true"],
   });
 
   const { data: patients } = useQuery<Patient[]>({
@@ -542,7 +542,7 @@ export default function DashboardPage() {
                   key={apt.id}
                   date={new Date(apt.dateStart)}
                   title={apt.title}
-                  description={apt.description || ""}
+                  description={`${apt.patientPrenom} ${apt.patientNom}${apt.description ? ` - ${apt.description}` : ""}`}
                   type={apt.type.toLowerCase() === "chirurgie" ? "action" : apt.type.toLowerCase() as "consultation" | "suivi" | "action"}
                   time={new Date(apt.dateStart).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 />

@@ -1766,9 +1766,14 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const { status } = req.query;
-      const appointmentsList = await storage.getAllAppointments(organisationId, status as string);
-      res.json(appointmentsList);
+      const { status, withPatient } = req.query;
+      if (withPatient === "true") {
+        const appointmentsList = await storage.getAllAppointmentsWithPatient(organisationId, status as string);
+        res.json(appointmentsList);
+      } else {
+        const appointmentsList = await storage.getAllAppointments(organisationId, status as string);
+        res.json(appointmentsList);
+      }
     } catch (error) {
       console.error("Error fetching all appointments:", error);
       res.status(500).json({ error: "Failed to fetch appointments" });
