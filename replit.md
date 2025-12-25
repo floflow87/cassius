@@ -62,7 +62,8 @@ Cassius employs a modern full-stack architecture designed for scalability, maint
 - **Implants**: Product catalog - implant specifications (brand, diameter, length, reference, lot).
 - **Surgery Implants**: Implants placed during surgery - links surgeries to implants with placement data (site FDI, status, ISQ measurements, bone type, loading, notes).
 - **Radios**: Stored radiograph images (panoramic, CBCT, retroalveolar).
-- **Visites**: Follow-up appointments, including ISQ measurements and clinical notes.
+- **Appointments** (NEW - December 2025): Unified appointment system replacing separate "visites" and "rendez-vous". Supports multiple types (CONSULTATION, SUIVI, CHIRURGIE, CONTROLE, URGENCE, AUTRE) and statuses (UPCOMING, COMPLETED, CANCELLED). Can be linked to operations and surgery implants for ISQ tracking.
+- **Visites** (LEGACY): Follow-up appointments migrated to appointments table. Old visites data preserved as COMPLETED SUIVI appointments.
 - **Documents**: General PDF document management (quotes, consents, reports).
 - **Notes**: Clinical notes with customizable tags (Consultation, Chirurgie, Suivi, Complication, Administrative).
 
@@ -152,7 +153,7 @@ Multi-column indexes added to `db/migrate-supabase.sql` for query optimization:
 Event types aggregated:
 - **SURGERY**: The operation itself with intervention type and notes
 - **ISQ**: Initial ISQ measurements from surgery implants (isqPose)
-- **VISIT**: Follow-up visits linked to catalog implants used in the surgery
+- **VISIT**: Follow-up appointments linked to the operation or surgery implants (uses new appointments table)
 - **RADIO**: Radiographs linked to the operation
 
 ISQ Delta Calculation:
@@ -160,6 +161,38 @@ ISQ Delta Calculation:
 - ISQ history is tracked per catalog implant to compute accurate deltas
 - Stability indicators: low (<55), moderate (55-70), high (>70)
 
-Visit-to-SurgeryImplant Mapping:
-- Visits are linked to catalog implants (via `visites.implantId`)
-- When multiple surgery implants share the same catalog implant, the best match is selected based on date (closest surgery before or on the visit date)
+Appointment-to-SurgeryImplant Mapping:
+- Appointments are linked directly to surgery implants (via `appointments.surgeryImplantId`) or operations (via `appointments.operationId`)
+- Timeline uses SQL TO_CHAR for date formatting to avoid timezone issues
+
+## Unified Appointments System (December 2025)
+
+### API Endpoints
+- `GET /api/patients/:patientId/appointments` - List all appointments for a patient (supports ?status filter)
+- `POST /api/patients/:patientId/appointments` - Create new appointment
+- `PATCH /api/appointments/:id` - Update appointment (including status changes)
+- `DELETE /api/appointments/:id` - Delete appointment
+
+### Appointment Schema
+```typescript
+{
+  id, organisationId, patientId,
+  operationId?,      // Optional link to surgery
+  surgeryImplantId?, // Optional link for ISQ tracking
+  type: CONSULTATION | SUIVI | CHIRURGIE | CONTROLE | URGENCE | AUTRE,
+  status: UPCOMING | COMPLETED | CANCELLED,
+  title, description?,
+  dateStart, dateEnd?,
+  isq?,              // ISQ measurement (0-100)
+  radioId?           // Optional link to radiograph
+}
+```
+
+### Frontend Components
+- `AppointmentCard` (`client/src/components/appointment-card.tsx`): Displays appointment with dropdown menu (edit, complete, cancel, delete)
+- `AppointmentForm` (`client/src/components/appointment-form.tsx`): Create/edit appointment form with type/status selection and ISQ field
+- Patient details "Rendez-vous" tab shows upcoming appointments and completed history
+
+### Data Migration
+- Legacy visites data migrated to appointments via `db/migrate-visites-to-appointments.sql`
+- 51 visites converted to COMPLETED SUIVI appointments with proper surgeryImplantId and operationId links
