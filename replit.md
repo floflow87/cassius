@@ -91,6 +91,15 @@ Implant tracking uses `implants` (catalog) and `surgery_implants` (placement dat
     - Flags are associated with entities like PATIENT, OPERATION, IMPLANT.
     - Patient details: Header shows patient-level alerts with tooltip; implant table shows per-implant flags.
     - Notes tab: Alerts interleaved chronologically with clinical notes, colored by severity.
+- **Document Explorer**:
+    - Global Documents page at `/documents` with folder tree navigation.
+    - Virtual folders: Patients (grouped by patient), Actes (grouped by operation), Non classés (unlinked).
+    - Backend: `getDocumentTree()` and `getDocumentsFiltered()` storage methods.
+    - API: `GET /api/documents/tree` for folder structure, `GET /api/documents` with filters.
+    - Shared types: `DocumentTree`, `DocumentTreeNode`, `DocumentFilters` in `shared/types.ts`.
+    - Features: breadcrumb navigation, search, sort (date/name/size), document actions (view, download, rename, delete).
+    - Document viewer modal for inline viewing of images and PDFs.
+    - Documents can optionally link to operations via `operationId` foreign key.
 
 ## External Dependencies
 
