@@ -522,17 +522,25 @@ export async function registerRoutes(
         signedUrl: null,
       })) || [];
       
-      // Add latestIsq to each surgeryImplant
-      const surgeryImplantsWithIsq = patient.surgeryImplants?.map(si => ({
-        ...si,
-        latestIsq: computeLatestIsq(si),
-      })) || [];
+      // Add latestIsq and flag info to each surgeryImplant (batch to avoid N+1)
+      const surgeryImplantIds = (patient.surgeryImplants || []).map(si => si.id);
+      const implantFlagSummaries = await storage.getSurgeryImplantFlagSummaries(organisationId, surgeryImplantIds);
+      
+      const surgeryImplantsWithExtras = (patient.surgeryImplants || []).map((si) => {
+        const siFlagSummary = implantFlagSummaries.get(si.id) || { activeFlagCount: 0 };
+        return {
+          ...si,
+          latestIsq: computeLatestIsq(si),
+          topFlag: siFlagSummary.topFlag,
+          activeFlagCount: siFlagSummary.activeFlagCount,
+        };
+      });
       
       res.json({ 
         ...patient, 
         radios: radiosWithNullUrls, 
         upcomingAppointments,
-        surgeryImplants: surgeryImplantsWithIsq,
+        surgeryImplants: surgeryImplantsWithExtras,
         topFlag: flagSummary.topFlag,
         activeFlagCount: flagSummary.activeFlagCount,
       });
@@ -1095,18 +1103,19 @@ export async function registerRoutes(
     try {
       const surgeryImplants = await storage.getPatientSurgeryImplants(organisationId, req.params.id);
       
-      // Add latestIsq and flag info to each implant
-      const implantsWithExtras = await Promise.all(
-        surgeryImplants.map(async (si) => {
-          const flagSummary = await storage.getSurgeryImplantFlagSummary(organisationId, si.id);
-          return {
-            ...si,
-            latestIsq: computeLatestIsq(si),
-            topFlag: flagSummary.topFlag,
-            activeFlagCount: flagSummary.activeFlagCount,
-          };
-        })
-      );
+      // Add latestIsq and flag info to each implant (batch to avoid N+1)
+      const implantIds = surgeryImplants.map(si => si.id);
+      const flagSummaries = await storage.getSurgeryImplantFlagSummaries(organisationId, implantIds);
+      
+      const implantsWithExtras = surgeryImplants.map((si) => {
+        const flagSummary = flagSummaries.get(si.id) || { activeFlagCount: 0 };
+        return {
+          ...si,
+          latestIsq: computeLatestIsq(si),
+          topFlag: flagSummary.topFlag,
+          activeFlagCount: flagSummary.activeFlagCount,
+        };
+      });
       
       res.json(implantsWithExtras);
     } catch (error) {
@@ -1152,18 +1161,19 @@ export async function registerRoutes(
         surgeryImplants = await storage.getAllSurgeryImplants(organisationId);
       }
       
-      // Add latestIsq and flag info to each implant
-      const implantsWithExtras = await Promise.all(
-        surgeryImplants.map(async (si) => {
-          const flagSummary = await storage.getSurgeryImplantFlagSummary(organisationId, si.id);
-          return {
-            ...si,
-            latestIsq: computeLatestIsq(si),
-            topFlag: flagSummary.topFlag,
-            activeFlagCount: flagSummary.activeFlagCount,
-          };
-        })
-      );
+      // Add latestIsq and flag info to each implant (batch to avoid N+1)
+      const implantIds = surgeryImplants.map(si => si.id);
+      const flagSummaries = await storage.getSurgeryImplantFlagSummaries(organisationId, implantIds);
+      
+      const implantsWithExtras = surgeryImplants.map((si) => {
+        const flagSummary = flagSummaries.get(si.id) || { activeFlagCount: 0 };
+        return {
+          ...si,
+          latestIsq: computeLatestIsq(si),
+          topFlag: flagSummary.topFlag,
+          activeFlagCount: flagSummary.activeFlagCount,
+        };
+      });
       
       res.json(implantsWithExtras);
     } catch (error) {

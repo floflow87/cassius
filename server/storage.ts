@@ -2857,6 +2857,64 @@ export class DatabaseStorage implements IStorage {
       throw err;
     }
   }
+  
+  // Batch method to get flag summaries for multiple surgery implants at once
+  async getSurgeryImplantFlagSummaries(organisationId: string, surgeryImplantIds: string[]): Promise<Map<string, { topFlag?: TopFlag; activeFlagCount: number }>> {
+    const result = new Map<string, { topFlag?: TopFlag; activeFlagCount: number }>();
+    
+    if (surgeryImplantIds.length === 0) {
+      return result;
+    }
+    
+    try {
+      // Single query for all implant flags
+      const allImplantFlags = await db.select().from(flags).where(and(
+        eq(flags.organisationId, organisationId),
+        eq(flags.entityType, "IMPLANT"),
+        inArray(flags.entityId, surgeryImplantIds),
+        sql`${flags.resolvedAt} IS NULL`
+      ));
+      
+      // Group flags by surgeryImplantId
+      const flagsByImplant = new Map<string, Flag[]>();
+      for (const flag of allImplantFlags) {
+        if (!flagsByImplant.has(flag.entityId)) {
+          flagsByImplant.set(flag.entityId, []);
+        }
+        flagsByImplant.get(flag.entityId)!.push(flag);
+      }
+      
+      // Build summaries
+      const levelPriority: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+      
+      for (const [implantId, implantFlags] of flagsByImplant) {
+        implantFlags.sort((a: Flag, b: Flag) => {
+          const levelDiff = (levelPriority[a.level] ?? 3) - (levelPriority[b.level] ?? 3);
+          if (levelDiff !== 0) return levelDiff;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        
+        const top = implantFlags[0];
+        result.set(implantId, {
+          topFlag: {
+            type: top.type,
+            level: top.level as "CRITICAL" | "WARNING" | "INFO",
+            label: top.label,
+            createdAt: top.createdAt.toISOString(),
+          },
+          activeFlagCount: implantFlags.length,
+        });
+      }
+      
+      return result;
+    } catch (err: any) {
+      // If flags table doesn't exist, return empty map
+      if (err?.code === "42P01") {
+        return result;
+      }
+      throw err;
+    }
+  }
 }
 
 // Helper function to compute latest ISQ from surgery implant fields

@@ -236,9 +236,11 @@ export default function ImplantDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "implants"] });
       setAddISQSheetOpen(false);
       setIsqFormData({ date: new Date().toISOString().split('T')[0], value: "", notes: "" });
       toast({
@@ -277,8 +279,11 @@ export default function ImplantDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "implants"] });
       setEditIsqSheetOpen(false);
       setEditingIsqPoint(null);
       toast({
@@ -316,8 +321,11 @@ export default function ImplantDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "implants"] });
       toast({
         title: "Mesure supprimée",
         description: "La valeur ISQ a été supprimée",

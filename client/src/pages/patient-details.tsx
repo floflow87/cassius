@@ -36,7 +36,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PatientDetailsSkeleton } from "@/components/page-skeletons";
-import { FlagList, CompactFlagList } from "@/components/flag-badge";
+import { FlagList, CompactFlagList, TopFlagSummary } from "@/components/flag-badge";
 import type { Flag } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -103,16 +103,21 @@ import type { Patient, Operation, Implant, Radio, Visite, Note, RendezVous, Docu
 
 interface SurgeryImplantWithVisites extends SurgeryImplantWithDetails {
   visites?: Visite[];
+  latestIsq?: { value: number; label: string };
+  topFlag?: { type: string; level: "CRITICAL" | "WARNING" | "INFO"; label: string };
+  activeFlagCount?: number;
 }
 
 interface PatientWithDetails extends Patient {
   operations: OperationWithImplants[];
   surgeryImplants: SurgeryImplantWithVisites[];
   radios: Radio[];
+  topFlag?: { type: string; level: "CRITICAL" | "WARNING" | "INFO"; label: string };
+  activeFlagCount?: number;
 }
 
 type ImplantSortDirection = "asc" | "desc" | null;
-type ImplantColumnId = "marque" | "dimensions" | "position" | "site" | "typeOs" | "greffe" | "chirurgie" | "miseEnCharge" | "isq" | "situation" | "operation" | "datePose";
+type ImplantColumnId = "marque" | "dimensions" | "position" | "site" | "typeOs" | "greffe" | "chirurgie" | "miseEnCharge" | "isq" | "flag" | "situation" | "operation" | "datePose";
 
 interface ImplantColumnConfig {
   id: ImplantColumnId;
@@ -130,7 +135,8 @@ const defaultImplantColumns: ImplantColumnConfig[] = [
   { id: "greffe", label: "Greffe", width: "min-w-16", sortable: true },
   { id: "chirurgie", label: "Chirurgie", width: "min-w-20", sortable: true },
   { id: "miseEnCharge", label: "Mise en charge", width: "min-w-28", sortable: true },
-  { id: "isq", label: "ISQ", width: "min-w-20", sortable: true },
+  { id: "isq", label: "ISQ", width: "min-w-24", sortable: true },
+  { id: "flag", label: "Alertes", width: "min-w-20", sortable: false },
   { id: "situation", label: "Situation", width: "min-w-28", sortable: true },
   { id: "operation", label: "Opération", width: "min-w-32", sortable: true },
 ];
@@ -1022,9 +1028,9 @@ export default function PatientDetailsPage() {
           comparison = new Date(a.datePose || 0).getTime() - new Date(b.datePose || 0).getTime();
           break;
         case "isq":
-          const isqA = a.isq6m || a.isq3m || a.isq2m || a.isqPose || 0;
-          const isqB = b.isq6m || b.isq3m || b.isq2m || b.isqPose || 0;
-          comparison = isqA - isqB;
+          const isqValA = a.latestIsq?.value || 0;
+          const isqValB = b.latestIsq?.value || 0;
+          comparison = isqValA - isqValB;
           break;
         case "position":
           comparison = (a.positionImplant || "").localeCompare(b.positionImplant || "");
@@ -1057,8 +1063,6 @@ export default function PatientDetailsPage() {
 
   // Render implant table cell content
   const renderImplantCellContent = useCallback((columnId: ImplantColumnId, surgeryImplant: SurgeryImplantWithVisites) => {
-    const currentIsq = surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose;
-    
     switch (columnId) {
       case "site":
         return (
@@ -1084,16 +1088,27 @@ export default function PatientDetailsPage() {
           </span>
         );
       case "isq":
-        if (!currentIsq) return "-";
-        const isqClassName = currentIsq >= 70 
+        const latestIsq = surgeryImplant.latestIsq;
+        if (!latestIsq) return <span className="text-muted-foreground">-</span>;
+        const isqClassName = latestIsq.value >= 70 
           ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-0" 
-          : currentIsq >= 60 
+          : latestIsq.value >= 60 
             ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-0" 
             : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-0";
         return (
-          <Badge className={`font-mono ${isqClassName}`}>
-            {currentIsq}
-          </Badge>
+          <div className="flex items-center gap-1">
+            <Badge className={`font-mono ${isqClassName}`}>
+              {latestIsq.value}
+            </Badge>
+            <span className="text-xs text-muted-foreground">{latestIsq.label}</span>
+          </div>
+        );
+      case "flag":
+        return (
+          <TopFlagSummary 
+            topFlag={surgeryImplant.topFlag} 
+            activeFlagCount={surgeryImplant.activeFlagCount} 
+          />
         );
       case "position":
         return <span className="text-sm">{getPositionLabel(surgeryImplant.positionImplant)}</span>;
