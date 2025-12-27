@@ -338,6 +338,8 @@ export default function ImplantDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "implants"] });
+      setDeleteIsqDialogOpen(false);
+      setIsqPointToDelete(null);
       toast({
         title: "Mesure supprimée",
         description: "La valeur ISQ a été supprimée",
@@ -345,6 +347,8 @@ export default function ImplantDetailsPage() {
       });
     },
     onError: () => {
+      setDeleteIsqDialogOpen(false);
+      setIsqPointToDelete(null);
       toast({
         title: "Erreur",
         description: "Une erreur est survenue lors de la suppression",
@@ -434,8 +438,6 @@ export default function ImplantDetailsPage() {
         visiteId: isqPointToDelete.visiteId,
       });
     }
-    setDeleteIsqDialogOpen(false);
-    setIsqPointToDelete(null);
   };
 
   const formatDate = (dateString: string) => {

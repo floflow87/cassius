@@ -2060,6 +2060,20 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/patients/:patientId/flags", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId } = req.params;
+      const flagsData = await storage.getPatientAllFlags(organisationId, patientId);
+      res.json(flagsData);
+    } catch (error) {
+      console.error("Error fetching patient flags:", error);
+      res.status(500).json({ error: "Failed to fetch patient flags" });
+    }
+  });
+
   app.get("/api/flags/:entityType/:entityId", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;

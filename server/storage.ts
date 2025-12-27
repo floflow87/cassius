@@ -2734,6 +2734,59 @@ export class DatabaseStorage implements IStorage {
       throw err;
     }
   }
+
+  async getPatientAllFlags(organisationId: string, patientId: string): Promise<{ patientFlags: Flag[]; implantFlagsById: Record<string, Flag[]> }> {
+    try {
+      // Get direct patient flags
+      const patientFlagsResult = await db.select().from(flags).where(and(
+        eq(flags.organisationId, organisationId),
+        eq(flags.entityType, "PATIENT"),
+        eq(flags.entityId, patientId),
+        sql`${flags.resolvedAt} IS NULL`
+      )).orderBy(desc(flags.createdAt));
+      
+      // Get patient's operation IDs
+      const patientOps = await db.select({ id: operations.id }).from(operations)
+        .where(and(eq(operations.organisationId, organisationId), eq(operations.patientId, patientId)));
+      const opIds = patientOps.map(o => o.id);
+      
+      // Get patient's surgery implant IDs (via operations) and their flags
+      const implantFlagsById: Record<string, Flag[]> = {};
+      
+      if (opIds.length > 0) {
+        const patientSurgeryImplants = await db.select({ id: surgeryImplants.id }).from(surgeryImplants)
+          .where(and(eq(surgeryImplants.organisationId, organisationId), inArray(surgeryImplants.surgeryId, opIds)));
+        const siIds = patientSurgeryImplants.map(si => si.id);
+        
+        if (siIds.length > 0) {
+          const allImplantFlags = await db.select().from(flags).where(and(
+            eq(flags.organisationId, organisationId),
+            eq(flags.entityType, "IMPLANT"),
+            inArray(flags.entityId, siIds),
+            sql`${flags.resolvedAt} IS NULL`
+          )).orderBy(desc(flags.createdAt));
+          
+          // Group by implant ID
+          for (const flag of allImplantFlags) {
+            if (!implantFlagsById[flag.entityId]) {
+              implantFlagsById[flag.entityId] = [];
+            }
+            implantFlagsById[flag.entityId].push(flag);
+          }
+        }
+      }
+      
+      return {
+        patientFlags: patientFlagsResult,
+        implantFlagsById,
+      };
+    } catch (err: any) {
+      if (err?.code === "42P01") {
+        return { patientFlags: [], implantFlagsById: {} };
+      }
+      throw err;
+    }
+  }
   
   async getAllPatientFlagSummaries(organisationId: string): Promise<Map<string, { topFlag?: TopFlag; activeFlagCount: number }>> {
     // Optimized: Batch query for all patients instead of N+1

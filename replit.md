@@ -1,249 +1,114 @@
 # Cassius - Dental Implantology Management Platform
 
 ## Overview
-
-Cassius is a SaaS platform designed for dental implantologists, providing a comprehensive solution for clinical documentation management. It streamlines patient record keeping, surgical operation logging, implant tracking, radiograph storage, and follow-up visit management, including ISQ measurements.
-
-The platform's core capabilities include:
-- Managing patient demographics and clinical histories.
-- Documenting surgical procedures with detailed implant information.
-- Storing and organizing radiographs and other clinical images.
-- Tracking implant stability over time with ISQ measurements.
-- Providing timeline views for patients and implants.
-- Facilitating clinical notes with predefined tags for various medical contexts.
-- Offering basic search functionalities for efficient data retrieval.
-
-Cassius aims to enhance efficiency, accuracy, and compliance in dental implantology practices, offering a robust tool for modern oral surgeons.
+Cassius is a SaaS platform for dental implantologists, designed to streamline clinical documentation. It manages patient records, surgical operations, implant tracking, radiograph storage, and follow-up visits, including ISQ measurements. The platform aims to enhance efficiency, accuracy, and compliance in dental implantology practices. Key capabilities include patient management, detailed surgical documentation, radiograph organization, ISQ tracking, timeline views, and clinical notes with predefined tags.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
+Cassius uses a modern full-stack architecture focusing on scalability and responsiveness.
 
-Cassius employs a modern full-stack architecture designed for scalability, maintainability, and a responsive user experience.
-
-### Frontend Architecture
+### Frontend
 - **Framework**: React 18 with TypeScript.
-- **Routing**: Wouter for lightweight client-side navigation.
-- **State Management**: TanStack React Query handles server state.
-- **UI Components**: shadcn/ui (built on Radix primitives and Tailwind CSS) ensures accessible and customizable components.
-- **Design System**: Follows Carbon Design System principles for a professional medical aesthetic.
-- **Styling**: Tailwind CSS with CSS variables supports theming, including light/dark modes.
-- **Forms**: React Hook Form with Zod for robust form management and validation.
-- **File Uploads**: Uppy with AWS S3 integration is used for client-side file uploads.
+- **Routing**: Wouter.
+- **State Management**: TanStack React Query.
+- **UI Components**: shadcn/ui (Radix primitives, Tailwind CSS).
+- **Design System**: Carbon Design System principles.
+- **Styling**: Tailwind CSS with CSS variables for theming.
+- **Forms**: React Hook Form with Zod validation.
+- **File Uploads**: Uppy with AWS S3 integration.
 
-### Backend Architecture
+### Backend
 - **Runtime**: Node.js with TypeScript.
-- **Framework**: Express.js for RESTful API endpoints under `/api/*`.
-- **Build Tools**: esbuild for server bundling and Vite for client development.
+- **Framework**: Express.js for RESTful APIs.
+- **Build Tools**: esbuild (server), Vite (client).
 
 ### Data Storage
-- **Database**: PostgreSQL, managed by Supabase, with separate projects for development and production environments.
-- **ORM**: Drizzle ORM provides type-safe queries and schema management.
-- **Schema**: Defined in `shared/schema.ts` (Drizzle) and `db/schema.sql` (raw SQL).
-- **Object Storage**: Supabase Storage is utilized for storing radiographs and other documents, replacing Replit Object Storage.
+- **Database**: PostgreSQL, managed by Supabase.
+- **ORM**: Drizzle ORM for type-safe queries.
+- **Object Storage**: Supabase Storage for radiographs and documents.
 
 ### Authentication
-- **Mechanism**: Session-based authentication using Passport.js with LocalStrategy.
-- **Security**: Passwords hashed with scrypt, and JWT for secure sessions.
-- **Access Control**: Role-based access for CHIRURGIEN, ASSISTANT, and ADMIN roles.
+- **Mechanism**: Session-based using Passport.js (LocalStrategy).
+- **Security**: scrypt for password hashing, JWT for sessions.
+- **Access Control**: Role-based (CHIRURGIEN, ASSISTANT, ADMIN).
 - **Protected Routes**: All `/api/*` routes require authentication.
 
-### Multi-Tenant Architecture
-- **Organisations**: The platform supports multi-tenancy, isolating data for each dental cabinet/clinic.
-- All core data tables include an `organisationId` to enforce tenant isolation.
+### Multi-Tenancy
+- Supports multiple organizations with data isolation via `organisationId` in core tables.
 
 ### Key Data Models
-- **Organisations**: Top-level entities for tenant isolation.
-- **Users**: Authenticated individuals with specific roles within an organization.
-- **Patients**: Central entity, storing personal and medical data.
-- **Operations (Surgeries)**: Records of surgical interventions.
-- **Implants**: Product catalog - implant specifications (brand, diameter, length, reference, lot).
-- **Surgery Implants**: Implants placed during surgery - links surgeries to implants with placement data (site FDI, status, ISQ measurements, bone type, loading, notes).
-- **Radios**: Stored radiograph images (panoramic, CBCT, retroalveolar).
-- **Appointments** (NEW - December 2025): Unified appointment system replacing separate "visites" and "rendez-vous". Supports multiple types (CONSULTATION, SUIVI, CHIRURGIE, CONTROLE, URGENCE, AUTRE) and statuses (UPCOMING, COMPLETED, CANCELLED). Can be linked to operations and surgery implants for ISQ tracking.
-- **Visites** (LEGACY): Follow-up appointments migrated to appointments table. Old visites data preserved as COMPLETED SUIVI appointments.
-- **Documents**: General PDF document management (quotes, consents, reports).
-- **Notes**: Clinical notes with customizable tags (Consultation, Chirurgie, Suivi, Complication, Administrative).
+- **Organisations**: Top-level tenant entities.
+- **Users**: Authenticated individuals with roles.
+- **Patients**: Personal and medical data.
+- **Operations**: Records of surgical interventions.
+- **Implants**: Product catalog (type, brand, reference, dimensions, lot).
+- **Surgery Implants**: Placement data for implants during surgery (site, status, ISQ, bone type, loading, notes).
+- **Radios**: Stored radiograph images.
+- **Appointments**: Unified system for all visit types (CONSULTATION, SUIVI, CHIRURGIE, CONTROLE, URGENCE, AUTRE) and statuses (UPCOMING, COMPLETED, CANCELLED). Can link to operations and surgery implants for ISQ tracking.
+- **Documents**: General PDF management.
+- **Notes**: Clinical notes with customizable tags.
 
 ### Data Model Architecture
-The implant tracking uses a two-table design:
-- **implants** (catalog): Contains product information - typeImplant, marque, referenceFabricant, diametre, longueur, lot
-- **surgery_implants** (placement): Contains placement data - surgeryId, implantId, siteFdi, positionImplant, typeOs, miseEnCharge, greffe, isqPose, isqContrôle, statut, datePose, notes
-
-Patient implant access path: patients → surgeries → surgery_implants → implants (via joins)
-
-Frontend components use `SurgeryImplantWithDetails` type which includes the full implant details via the `implant` property.
+Implant tracking uses `implants` (catalog) and `surgery_implants` (placement data linked to surgeries). Patient implant access is via patients → surgeries → surgery_implants → implants.
 
 ### Project Structure
 - `client/`: React frontend.
-- `server/`: Express backend, including database and storage interfaces.
-- `db/`: Database schema, seeding, and migration scripts.
-- `shared/`: Shared Drizzle schema and Zod types.
+- `server/`: Express backend, database, storage interfaces.
+- `db/`: Database schema, seeding, migrations.
+- `shared/`: Shared Drizzle schema, Zod types.
+
+### UI/UX Decisions
+- Carbon Design System principles for medical aesthetic.
+- Tailwind CSS with CSS variables for flexible theming (light/dark modes).
+- `shadcn/ui` for accessible and customizable components.
+
+### Technical Implementations
+- **Performance Optimizations**:
+    - Request instrumentation with timing and query counting.
+    - N+1 query elimination through efficient JOINs in `server/storage.ts`.
+    - Lazy signed URL loading for object storage.
+    - Multi-column database indexes for query optimization.
+    - Summary endpoints for efficient data retrieval.
+- **Timeline Features**:
+    - `GET /api/operations/:id/timeline` endpoint for chronological surgery events.
+    - Event types: SURGERY, ISQ, VISIT, RADIO.
+    - ISQ delta calculation and stability indicators.
+    - Appointments linked to surgery implants or operations.
+- **Unified Appointments System**:
+    - CRUD API endpoints for appointments.
+    - Comprehensive schema including type, status, dates, ISQ, and optional links to operations/radios.
+    - Frontend components for appointment display and forms.
+    - Migration of legacy `visites` data to the new appointments table.
+- **Clinical Flag System**:
+    - Automated alerts (CRITICAL, WARNING, INFO) for clinical issues and data completeness.
+    - Flag types include `ISQ_LOW`, `ISQ_DECLINING`, `NO_RECENT_ISQ`, `NO_POSTOP_FOLLOWUP`, `MISSING_DOCUMENT`, etc.
+    - API endpoints for listing, creating, resolving, and detecting flags.
+    - `server/flagEngine.ts` for detection logic.
+    - Frontend components for displaying flags on patient cards, details, and dashboards.
+    - Flags are associated with entities like PATIENT, OPERATION, IMPLANT.
 
 ## External Dependencies
 
 ### Database
-- **Supabase PostgreSQL**: Used for both development (`cassius-dev`) and production (`cassius-prod`) databases. Connection is established via a session pooler (port 6543) for compatibility.
-- **Drizzle ORM**: Integrated for type-safe database interactions and schema management.
+- **Supabase PostgreSQL**: For development and production databases.
+- **Drizzle ORM**: For type-safe database interactions.
 
 ### Object Storage
-- **Supabase Storage**: Utilized for storing patient radiographs and PDF documents. This provides dynamic signed URLs for secure access and direct frontend uploads.
+- **Supabase Storage**: For storing patient radiographs and PDF documents.
 
 ### UI Libraries
-- **Radix UI**: Provides accessible and unstyled component primitives.
-- **Lucide React**: Icon library for consistent iconography.
-- **Tailwind CSS**: Employed for utility-first styling and responsive design.
+- **Radix UI**: For accessible component primitives.
+- **Lucide React**: Icon library.
+- **Tailwind CSS**: For utility-first styling.
 
 ### Form Handling
-- **React Hook Form**: Manages form state and validation.
-- **Zod**: Used for schema validation, ensuring data integrity across client and server.
-- **drizzle-zod**: Generates Zod schemas directly from Drizzle tables.
+- **React Hook Form**: For form state and validation.
+- **Zod**: For schema validation.
+- **drizzle-zod**: For generating Zod schemas from Drizzle tables.
 
 ### Development Tools
-- **Vite**: Powers the frontend development server with Hot Module Replacement (HMR).
-- **esbuild**: Used for fast server-side code bundling.
-- **TypeScript**: Ensures type safety throughout the entire codebase.
-
-## Performance Optimizations (December 2025)
-
-### Request Instrumentation
-- **Timing Middleware**: All requests tracked with X-Response-Time header
-- **Query Counting**: AsyncLocalStorage-based context for monitoring database queries per request
-- **Diagnostic Endpoints**: `/api/perf/stats`, `/api/perf/all`, `/api/perf/reset` for performance analysis
-- **Slow Request Detection**: [SLOW] and [MANY_QUERIES] flags logged for requests exceeding thresholds
-
-### N+1 Query Elimination
-The following methods in `server/storage.ts` were refactored from nested loops to efficient JOIN queries:
-- `getPatientWithDetails`: Uses 4 batched queries instead of 1 + N + N*M queries
-- `getPatientSurgeryImplants`: Single 3-table JOIN (surgeryImplants → implants → operations)
-- `getSurgeryImplantsByCatalogImplant`: Single 3-table JOIN
-- `getAllSurgeryImplants`: Single 4-table JOIN
-- `filterSurgeryImplants`: Single 4-table JOIN with WHERE conditions
-- `getSurgeryImplantWithDetails`: Single 4-table JOIN (surgeryImplants → implants → operations → patients) + parallel visites/radios fetch. Reduced from 3 sequential round trips to 2 batches. Includes timing logs: `[IMPLANT-DETAIL] id=X total=Xms join=Xms visites+radios=Xms`
-
-### Lazy Signed URL Loading
-- List endpoints (`/api/patients/:id`, `/api/patients/:patientId/radios`, `/api/patients/:patientId/documents`) return `signedUrl: null`
-- Frontend uses `fetchFreshSignedUrl` helper for on-demand URL generation when viewing individual files
-- Reduces Supabase Storage API calls significantly
-
-### Database Indexes
-Multi-column indexes added to `db/migrate-supabase.sql` for query optimization:
-- `idx_surgery_implants_org_surgery`: ON surgery_implants(organisation_id, surgery_id)
-- `idx_surgery_implants_org_implant`: ON surgery_implants(organisation_id, implant_id)
-- `idx_operations_org_patient`: ON operations(organisation_id, patient_id)
-- `idx_radios_org_patient`: ON radios(organisation_id, patient_id)
-- `idx_radios_org_implant`: ON radios(organisation_id, implant_id) - for implant details page queries
-- `idx_patients_org`: ON patients(organisation_id)
-- `idx_visites_org_implant`: ON visites(organisation_id, implant_id)
-- `idx_documents_org_patient`: ON documents(organisation_id, patient_id)
-
-### Summary Endpoints
-- `GET /api/patients/summary`: Returns combined patient list with operation counts and last visit dates in 3 parallel queries
-- Frontend patient list uses summary endpoint instead of 3 separate API calls
-
-## Timeline Features (December 2025)
-
-### Surgery Timeline
-- **Endpoint**: `GET /api/operations/:id/timeline` - Returns chronological events for a surgery
-- **Component**: `SurgeryTimeline` in `client/src/components/surgery-timeline.tsx`
-- **Types**: `OperationTimeline`, `TimelineEvent` in `shared/types.ts`
-
-Event types aggregated:
-- **SURGERY**: The operation itself with intervention type and notes
-- **ISQ**: Initial ISQ measurements from surgery implants (isqPose)
-- **VISIT**: Follow-up appointments linked to the operation or surgery implants (uses new appointments table)
-- **RADIO**: Radiographs linked to the operation
-
-ISQ Delta Calculation:
-- Delta is calculated from the previous ISQ measurement (not just initial isqPose)
-- ISQ history is tracked per catalog implant to compute accurate deltas
-- Stability indicators: low (<55), moderate (55-70), high (>70)
-
-Appointment-to-SurgeryImplant Mapping:
-- Appointments are linked directly to surgery implants (via `appointments.surgeryImplantId`) or operations (via `appointments.operationId`)
-- Timeline uses SQL TO_CHAR for date formatting to avoid timezone issues
-
-## Unified Appointments System (December 2025)
-
-### API Endpoints
-- `GET /api/patients/:patientId/appointments` - List all appointments for a patient (supports ?status filter)
-- `POST /api/patients/:patientId/appointments` - Create new appointment
-- `PATCH /api/appointments/:id` - Update appointment (including status changes)
-- `DELETE /api/appointments/:id` - Delete appointment
-
-### Appointment Schema
-```typescript
-{
-  id, organisationId, patientId,
-  operationId?,      // Optional link to surgery
-  surgeryImplantId?, // Optional link for ISQ tracking
-  type: CONSULTATION | SUIVI | CHIRURGIE | CONTROLE | URGENCE | AUTRE,
-  status: UPCOMING | COMPLETED | CANCELLED,
-  title, description?,
-  dateStart, dateEnd?,
-  isq?,              // ISQ measurement (0-100)
-  radioId?           // Optional link to radiograph
-}
-```
-
-### Frontend Components
-- `AppointmentCard` (`client/src/components/appointment-card.tsx`): Displays appointment with dropdown menu (edit, complete, cancel, delete)
-- `AppointmentForm` (`client/src/components/appointment-form.tsx`): Create/edit appointment form with type/status selection and ISQ field
-- Patient details "Rendez-vous" tab shows upcoming appointments and completed history
-
-### Data Migration
-- Legacy visites data migrated to appointments via `db/migrate-visites-to-appointments.sql`
-- 51 visites converted to COMPLETED SUIVI appointments with proper surgeryImplantId and operationId links
-
-## Clinical Flag System (December 2025)
-
-### Overview
-Automated clinical alerts and warnings system that detects potential issues requiring attention. Flags are displayed on patient cards, patient details, and dashboard.
-
-### Flag Levels
-- **CRITICAL**: Clinical issues requiring immediate attention (low ISQ, declining ISQ)
-- **WARNING**: Follow-up gaps that may indicate care quality issues (no recent ISQ, no post-op follow-up)
-- **INFO**: Data completeness issues (missing documents, incomplete data)
-
-### Flag Types
-- `ISQ_LOW`: ISQ measurement below 55 threshold
-- `ISQ_DECLINING`: ISQ dropped by 10+ points between measurements
-- `LOW_SUCCESS_RATE`: Patient/operation with low implant success rate
-- `NO_RECENT_ISQ`: No ISQ measurement in past 90 days for active implant
-- `NO_POSTOP_FOLLOWUP`: No follow-up appointment 30+ days after surgery
-- `NO_RECENT_APPOINTMENT`: Active patient with implants, no visit in 180+ days
-- `IMPLANT_NO_OPERATION`: Orphaned implant record
-- `MISSING_DOCUMENT`: Required document not uploaded
-- `INCOMPLETE_DATA`: Patient/implant with missing critical fields
-
-### API Endpoints
-- `GET /api/flags` - List all flags (supports `?includeResolved=true` and `?withEntity=true`)
-- `GET /api/flags/:entityType/:entityId` - Get flags for specific entity
-- `POST /api/flags` - Create manual flag
-- `PATCH /api/flags/:id/resolve` - Mark flag as resolved
-- `DELETE /api/flags/:id` - Delete flag
-- `POST /api/flags/detect` - Trigger automatic flag detection
-
-### Detection Engine
-- `server/flagEngine.ts` - Contains detection logic for all flag types
-- `runFlagDetection(organisationId)` - Runs all detection rules and upserts flags
-- Detection is idempotent - won't create duplicate flags for same entity/type
-
-### Frontend Components
-- `FlagBadge` (`client/src/components/flag-badge.tsx`): Displays individual flag with level indicator
-- `FlagList`: Full list view with resolve buttons
-- `CompactFlagList`: Condensed view for patient headers (max 3 visible)
-- Dashboard "À surveiller" section: Shows top 5 flags with links to patients
-
-### Database Schema
-```sql
-flags (
-  id, organisation_id, level, type, label, description,
-  entity_type, entity_id,
-  created_at, resolved_at, resolved_by
-)
-```
-- `entity_type`: PATIENT | OPERATION | IMPLANT
-- `entity_id`: References the entity (patient.id, operations.id, or surgery_implants.id)
+- **Vite**: Frontend development server.
+- **esbuild**: Server-side code bundling.
+- **TypeScript**: Type safety across the codebase.

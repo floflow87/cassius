@@ -36,7 +36,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PatientDetailsSkeleton } from "@/components/page-skeletons";
-import { FlagList, CompactFlagList, TopFlagSummary } from "@/components/flag-badge";
+import { FlagList, CompactFlagList, TopFlagSummary, FlagsTooltipBadge } from "@/components/flag-badge";
 import type { Flag } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -185,16 +185,18 @@ export default function PatientDetailsPage() {
     enabled: !!patientId,
   });
 
-  // Query for patient flags
-  const { data: patientFlags = [] } = useQuery<Flag[]>({
-    queryKey: ["/api/flags", "entity", "PATIENT", patientId],
+  // Query for all patient flags (including implant-level flags)
+  const { data: allPatientFlagsData } = useQuery<{ patientFlags: Flag[]; implantFlagsById: Record<string, Flag[]> }>({
+    queryKey: ["/api/patients", patientId, "flags"],
     queryFn: async () => {
-      const res = await fetch(`/api/flags/PATIENT/${patientId}`, { credentials: "include" });
+      const res = await fetch(`/api/patients/${patientId}/flags`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch flags");
       return res.json();
     },
     enabled: !!patientId,
   });
+  const patientFlags = allPatientFlagsData?.patientFlags ?? [];
+  const implantFlagsById = allPatientFlagsData?.implantFlagsById ?? {};
 
   // Mutation pour mettre à jour le statut patient
   const updateStatusMutation = useMutation({
@@ -1104,6 +1106,10 @@ export default function PatientDetailsPage() {
           </div>
         );
       case "flag":
+        const implantFlags = implantFlagsById[surgeryImplant.id] || [];
+        if (implantFlags.length > 0) {
+          return <FlagsTooltipBadge flags={implantFlags} />;
+        }
         return (
           <TopFlagSummary 
             topFlag={surgeryImplant.topFlag} 
@@ -1135,7 +1141,7 @@ export default function PatientDetailsPage() {
       default:
         return null;
     }
-  }, []);
+  }, [implantFlagsById]);
 
   if (isLoading) {
     return <PatientDetailsSkeleton />;
@@ -1344,7 +1350,41 @@ export default function PatientDetailsPage() {
               </PopoverContent>
             </Popover>
             {patientFlags.length > 0 && (
-              <CompactFlagList flags={patientFlags} maxVisible={3} />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge 
+                    variant="secondary" 
+                    className="bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 cursor-help gap-1"
+                    data-testid="badge-patient-alerts"
+                  >
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>{patientFlags.length} alerte{patientFlags.length > 1 ? 's' : ''}</span>
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-sm">
+                  <div className="space-y-2">
+                    {patientFlags.map((flag) => {
+                      const levelConfig: Record<string, { label: string; className: string }> = {
+                        CRITICAL: { label: "Critique", className: "text-red-500" },
+                        WARNING: { label: "Attention", className: "text-orange-500" },
+                        INFO: { label: "Info", className: "text-blue-500" },
+                      };
+                      const config = levelConfig[flag.level] || levelConfig.INFO;
+                      return (
+                        <div key={flag.id} className="flex items-start gap-2">
+                          <AlertTriangle className={`w-3 h-3 mt-0.5 ${config.className}`} />
+                          <div>
+                            <p className="font-medium text-sm">{flag.label}</p>
+                            {flag.description && (
+                              <p className="text-xs text-muted-foreground">{flag.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
           <p className="text-sm text-muted-foreground">
