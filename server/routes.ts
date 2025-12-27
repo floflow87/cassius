@@ -1402,7 +1402,7 @@ export async function registerRoutes(
     }
   });
 
-  // Get filtered/paginated documents list
+  // Get filtered/paginated documents list (legacy - documents only)
   app.get("/api/documents", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -1427,6 +1427,33 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching documents:", error);
       res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
+  // Get unified files list (documents + radios combined)
+  app.get("/api/files", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const filters = {
+        scope: req.query.scope as 'patients' | 'operations' | 'unclassified' | 'all' | undefined,
+        patientId: req.query.patientId as string | undefined,
+        operationId: req.query.operationId as string | undefined,
+        q: req.query.q as string | undefined,
+        from: req.query.from as string | undefined,
+        to: req.query.to as string | undefined,
+        sort: req.query.sort as 'name' | 'date' | 'type' | 'size' | undefined,
+        sortDir: req.query.sortDir as 'asc' | 'desc' | undefined,
+        page: req.query.page ? parseInt(req.query.page as string) : undefined,
+        pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string) : undefined,
+      };
+      
+      const result = await storage.getUnifiedFiles(organisationId, filters);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching unified files:", error);
+      res.status(500).json({ error: "Failed to fetch files" });
     }
   });
 
