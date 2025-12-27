@@ -236,6 +236,9 @@ export default function ImplantDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
       setAddISQSheetOpen(false);
       setIsqFormData({ date: new Date().toISOString().split('T')[0], value: "", notes: "" });
       toast({
@@ -274,6 +277,8 @@ export default function ImplantDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
       setEditIsqSheetOpen(false);
       setEditingIsqPoint(null);
       toast({
@@ -311,6 +316,8 @@ export default function ImplantDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
       toast({
         title: "Mesure supprimée",
         description: "La valeur ISQ a été supprimée",

@@ -150,6 +150,8 @@ export interface IStorage {
   getImplantVisites(organisationId: string, implantId: string): Promise<Visite[]>;
   createVisite(organisationId: string, visite: InsertVisite): Promise<Visite>;
   getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; titre: string | null }>>;
+  findSurgeryImplantForVisite(organisationId: string, catalogImplantId: string, patientId: string): Promise<string | null>;
+  syncVisiteIsqToSurgeryImplant(organisationId: string, surgeryImplantId: string, isqValue: number, visiteDate: string): Promise<void>;
 
   // Prothese methods
   createProthese(organisationId: string, prothese: InsertProthese): Promise<Prothese>;
@@ -1489,6 +1491,59 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return lastVisitByPatient;
+  }
+
+  async findSurgeryImplantForVisite(organisationId: string, catalogImplantId: string, patientId: string): Promise<string | null> {
+    const result = await db
+      .select({ surgeryImplantId: surgeryImplants.id })
+      .from(surgeryImplants)
+      .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+      .where(and(
+        eq(surgeryImplants.implantId, catalogImplantId),
+        eq(operations.patientId, patientId),
+        eq(surgeryImplants.organisationId, organisationId)
+      ))
+      .orderBy(desc(surgeryImplants.datePose))
+      .limit(1);
+    
+    return result.length > 0 ? result[0].surgeryImplantId : null;
+  }
+
+  async syncVisiteIsqToSurgeryImplant(organisationId: string, surgeryImplantId: string, isqValue: number, visiteDate: string): Promise<void> {
+    const [si] = await db
+      .select({ datePose: surgeryImplants.datePose })
+      .from(surgeryImplants)
+      .where(and(
+        eq(surgeryImplants.id, surgeryImplantId),
+        eq(surgeryImplants.organisationId, organisationId)
+      ));
+    
+    if (!si) return;
+    
+    const poseDate = new Date(si.datePose);
+    const visiteDateObj = new Date(visiteDate);
+    const daysDiff = Math.floor((visiteDateObj.getTime() - poseDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    let updateField: 'isqPose' | 'isq2m' | 'isq3m' | 'isq6m';
+    if (daysDiff < 30) {
+      updateField = 'isqPose';
+    } else if (daysDiff < 75) {
+      updateField = 'isq2m';
+    } else if (daysDiff < 135) {
+      updateField = 'isq3m';
+    } else {
+      updateField = 'isq6m';
+    }
+    
+    await db
+      .update(surgeryImplants)
+      .set({ [updateField]: isqValue })
+      .where(and(
+        eq(surgeryImplants.id, surgeryImplantId),
+        eq(surgeryImplants.organisationId, organisationId)
+      ));
+    
+    console.log(`[ISQ-SYNC] Updated surgery_implant ${surgeryImplantId} ${updateField}=${isqValue} (daysDiff=${daysDiff})`);
   }
 
   // ========== PROTHESES ==========

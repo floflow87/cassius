@@ -1549,6 +1549,31 @@ export async function registerRoutes(
     try {
       const data = insertVisiteSchema.parse(req.body);
       const visite = await storage.createVisite(organisationId, data);
+      
+      // Sync ISQ to surgery_implant and trigger flag detection
+      if (data.isq !== null && data.isq !== undefined) {
+        const surgeryImplantId = await storage.findSurgeryImplantForVisite(
+          organisationId, 
+          data.implantId, 
+          data.patientId
+        );
+        
+        if (surgeryImplantId) {
+          await storage.syncVisiteIsqToSurgeryImplant(
+            organisationId, 
+            surgeryImplantId, 
+            data.isq, 
+            data.date
+          );
+          
+          // Trigger flag detection asynchronously
+          runFlagDetection(organisationId).catch(err => 
+            console.error("Flag detection failed after visite ISQ sync:", err)
+          );
+          console.log(`[VISITE-ISQ] Synced ISQ=${data.isq} to surgery_implant=${surgeryImplantId}`);
+        }
+      }
+      
       res.status(201).json(visite);
     } catch (error) {
       if (error instanceof z.ZodError) {

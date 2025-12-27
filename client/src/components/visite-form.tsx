@@ -53,6 +53,8 @@ export function VisiteForm({ implantId, patientId, onSuccess }: VisiteFormProps)
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
       queryClient.invalidateQueries({ queryKey: ["/api/implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
       toast({
         title: "Visite enregistrée",
         description: "La visite de contrôle a été ajoutée.",

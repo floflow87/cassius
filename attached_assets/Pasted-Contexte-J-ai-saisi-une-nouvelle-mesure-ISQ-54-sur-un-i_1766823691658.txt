@@ -1,0 +1,114 @@
+Contexte
+J’ai saisi une nouvelle mesure ISQ à 54 sur un implant posé (patient Jeanne Dupont).
+La mesure est enregistrée mais ne remonte nulle part :
+	•	pas dans la vue d’ensemble implant
+	•	pas dans le tableau des implants du patient
+	•	pas de badge/alerte sur la fiche patient
+	•	rien dans la colonne alertes du tableau patients
+
+Je veux corriger la chaîne complète : ISQ latest value + flags + agrégats patient + refresh UI.
+
+⸻
+
+1) Assurer que les vues utilisent le “latest ISQ”
+
+Backend
+
+Dans tous les endpoints qui listent des implants (implant detail, implants d’un patient, tableau implants global), ajouter explicitement :
+	•	latest_isq_value
+	•	latest_isq_at
+
+Implémentation recommandée (SQL) :
+	•	join sur une subquery / lateral join qui prend ORDER BY measured_at DESC LIMIT 1
+	•	ou une view implant_latest_isq
+
+✅ DoD : après ajout d’une mesure, les endpoints renvoient immédiatement le dernier ISQ.
+
+⸻
+
+2) Recalculer / créer les flags à chaque saisie ISQ
+
+Règle
+
+Si latest_isq_value < 60 → créer/mettre à jour un flag actif :
+	•	entity_type = “implant”
+	•	type = “ISQ_LOW”
+	•	level = “critical”
+	•	label = “ISQ faible”
+
+Si latest_isq_value entre 60 et 69 → warning (optionnel)
+Si ≥ 70 → supprimer/résoudre le flag “ISQ_LOW” si présent
+
+Déclenchement
+
+Après POST /api/isq (création d’une mesure), exécuter immédiatement :
+	•	recomputeImplantFlags(implantInstanceId)
+
+✅ DoD : mettre ISQ 54 génère un flag implant visible en DB + retourné par API.
+
+⸻
+
+3) Propager les flags au patient
+
+Option A (recommandée V1) : agrégat live
+
+Sur endpoints patient (fiche + liste patients), ajouter :
+	•	patient_critical_flag_count
+	•	patient_top_flag (le plus critique, le plus récent)
+
+via une requête :
+	•	flags actifs sur implants du patient (et/ou actes)
+	•	tri par level puis date
+
+Option B : flags patient “dérivés”
+
+Créer/mettre à jour un flag patient “HAS_CRITICAL_FLAGS” quand un implant critique existe.
+
+✅ DoD : Jeanne Dupont affiche un badge alerte sur sa fiche + un flag dans la colonne “alertes” du tableau patients.
+
+⸻
+
+4) Exposer les flags dans toutes les réponses API utiles
+	•	GET /api/patients (tableau patients) doit inclure :
+	•	top_flag + flag_count
+	•	GET /api/patients/:id doit inclure :
+	•	top_flag + active_flags[] (au moins)
+	•	GET /api/patients/:id/implants doit inclure :
+	•	latest_isq_value
+	•	top_flag pour chaque implant
+
+⸻
+
+5) Fix UI : refetch / invalidation après mutation
+
+Après l’action “Ajouter ISQ” :
+	•	refetch implant detail
+	•	refetch patient detail (si affiché)
+	•	refetch patient implants list
+	•	refetch patients list si elle est en mémoire
+
+Interdire de rester sur un état cache non mis à jour.
+
+✅ DoD : immédiatement après la saisie ISQ, l’UI se met à jour sans refresh navigateur.
+
+⸻
+
+6) Ajout de logs (pour vérifier)
+
+Après POST ISQ, logger :
+	•	implantInstanceId
+	•	latest_isq_value
+	•	flags created/updated/resolved
+	•	patientId + top_flag recomputed
+
+⸻
+
+Acceptance test
+	1.	Sur Jeanne Dupont, ajouter ISQ=54
+	2.	Résultat attendu :
+
+	•	l’implant affiche latest ISQ=54 dans la vue d’ensemble + tableaux
+	•	un badge “ISQ faible” apparaît sur fiche implant
+	•	la fiche patient affiche un badge alerte + compteur
+	•	le tableau patients affiche le flag dans la colonne alertes
+	•	les filtres par flag retrouvent Jeanne Dupont
