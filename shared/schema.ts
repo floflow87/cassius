@@ -451,7 +451,8 @@ export const flagsRelations = relations(flags, ({ one }) => ({
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
-  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").references(() => patients.id, { onDelete: "cascade" }),
+  operationId: varchar("operation_id").references(() => operations.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   filePath: text("file_path").notNull(),
   mimeType: text("mime_type"),
@@ -470,6 +471,10 @@ export const documentsRelations = relations(documents, ({ one }) => ({
   patient: one(patients, {
     fields: [documents.patientId],
     references: [patients.id],
+  }),
+  operation: one(operations, {
+    fields: [documents.operationId],
+    references: [operations.id],
   }),
   createdByUser: one(users, {
     fields: [documents.createdBy],
@@ -632,6 +637,8 @@ export type DocumentTag = typeof documentTagValues[number];
 export const updateDocumentSchema = z.object({
   title: z.string().min(1).optional(),
   tags: z.array(z.enum(documentTagValues)).optional(),
+  patientId: z.string().nullable().optional(),
+  operationId: z.string().nullable().optional(),
 });
 
 export const insertOrganisationSchema = createInsertSchema(organisations).omit({
@@ -718,4 +725,9 @@ export interface FlagWithEntity extends Flag {
 export interface AppointmentWithPatient extends Appointment {
   patientNom: string;
   patientPrenom: string;
+}
+
+export interface DocumentWithDetails extends Document {
+  patient?: Patient;
+  operation?: Operation;
 }

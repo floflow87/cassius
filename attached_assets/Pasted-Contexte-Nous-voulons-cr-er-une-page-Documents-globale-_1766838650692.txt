@@ -1,0 +1,331 @@
+Contexte
+
+Nous voulons créer une page Documents globale dans Cassius (route /documents) présentée comme un explorateur de fichiers :
+
+Panneau gauche : arborescence (racine → dossiers)
+
+Panneau principal : liste des fichiers du dossier sélectionné
+
+Breadcrumb : navigation type “Documents / Patients / Jeanne Dupont / …”
+
+Tous les documents sont ceux uploadés depuis :
+
+fiches patients
+
+fiches actes
+
+On peut aussi uploader depuis cette page et rattacher à un patient et/ou un acte.
+
+Les documents sont stockés en Supabase Storage privé (bucket privé), accessibles via URLs signées.
+
+Objectifs
+
+Centraliser tous les documents dans une UI type Explorer
+
+Permettre : recherche / tri / filtres / tags
+
+Permettre l’upload multi-fichiers + rattachement patient/acte
+
+Permettre les actions : ouvrir, télécharger, renommer, déplacer (virtuel), supprimer
+
+Garantir performance (pagination, lazy signed URLs, pas de N+1)
+
+UX / UI
+Layout global
+
+Route : /documents
+
+2 colonnes + header :
+
+Header : breadcrumb + search + actions
+
+Left sidebar : arbre des dossiers
+
+Main : liste style explorer
+
+Header
+
+Breadcrumb cliquable (ex: Documents / Patients / Jeanne Dupont)
+
+Barre de recherche (scope : dossier courant + toggle “Global”)
+
+Boutons :
+
+Uploader
+
+Nouveau dossier (optionnel V2, si on veut des dossiers manuels)
+
+Filtres
+
+Trier
+
+Arborescence (V1 recommandée : virtuelle)
+
+Racine : Documents
+
+Patients
+
+{Nom Prénom} (dossier virtuel par patient_id)
+
+Actes
+
+{Type acte} — {Date} — {Patient} (dossier virtuel par act_id)
+
+Non classés (documents sans rattachement complet, à éviter)
+
+⚠️ L’arborescence est virtuelle : on ne crée pas de “dossiers” dans Storage, on s’appuie sur les métadonnées DB (patient_id/act_id + storage_path).
+
+Données et modèle
+Table documents (si pas déjà)
+
+Champs minimum :
+
+id (uuid)
+
+organisation_id
+
+patient_id (nullable mais recommandé)
+
+act_id (nullable)
+
+name (nom affiché)
+
+original_name (nom fichier)
+
+mime_type
+
+size_bytes
+
+bucket (ex: patient-documents)
+
+storage_path (ex: org/{orgId}/patients/{patientId}/documents/{docId}/{filename})
+
+created_at
+
+created_by
+
+Tags
+
+table tags : id, organisation_id, name, color (optionnel)
+
+pivot document_tags : document_id, tag_id
+
+Features
+1) Listing + navigation
+
+Cliquer un dossier dans l’arbre → liste des documents correspondants
+
+Breadcrumb met à jour le dossier
+
+Pagination dans la liste
+
+Tri :
+
+date d’ajout
+
+nom
+
+type
+
+taille
+
+2) Recherche
+
+Recherche par :
+
+name / original_name
+
+tags
+
+patient / acte (via jointure)
+
+Deux modes :
+
+“Dans le dossier”
+
+“Global”
+
+3) Viewer
+
+Clic sur un document → ouvre un viewer :
+
+Image (zoom/pan)
+
+PDF (viewer PDF)
+
+Navigation “précédent/suivant” dans le dossier courant
+
+4) Upload
+
+Bouton Uploader :
+
+drag & drop
+
+multi-fichiers
+
+à la validation :
+
+rattacher à un patient (obligatoire si upload via dossier patient)
+
+rattacher à un acte (optionnel)
+
+tags (optionnel)
+
+rename possible avant upload (optionnel V1)
+
+Règles de rattachement
+
+Si upload depuis dossier Patients/{patientId} → patient_id prérempli
+
+Si upload depuis dossier Actes/{actId} → act_id prérempli ET patient_id auto via act
+
+Sinon → modal impose au moins patient_id (ou bascule dans “Non classés” si tu acceptes exceptionnellement)
+
+5) Actions (menu “…”)
+
+Ouvrir
+
+Télécharger (URL signée)
+
+Renommer (met à jour documents.name)
+
+Modifier rattachement (changer patient/acte)
+
+Gérer tags (add/remove)
+
+Supprimer (DB + Storage)
+
+API / Backend
+Endpoints recommandés
+Arbre
+
+GET /api/documents/tree
+Retourne une structure légère :
+
+nodes system: Patients, Actes, Non classés
+
+listes patient nodes (id, name)
+
+listes act nodes (id, label, patient)
+
+⚠️ Charger l’arbre progressivement si trop de patients (lazy : search patients).
+
+Listing
+
+GET /api/documents
+Query params :
+
+scope = patients|acts|unclassified|all
+
+patientId (optionnel)
+
+actId (optionnel)
+
+q (search)
+
+tags (liste)
+
+from/to (dates)
+
+sort (name/date/type/size)
+
+page, pageSize
+
+Retour :
+
+documents (métadonnées sans signed url)
+
+totalCount
+
+Signed URL (viewer/download)
+
+GET /api/documents/:id/signed-url
+
+renvoie URL signée courte (1h)
+
+générée à la demande (pas dans listing)
+
+Upload (recommandé : signed upload)
+
+POST /api/documents/upload-url
+Body :
+
+patientId
+
+actId (optionnel)
+
+fileName
+
+mimeType
+
+size
+
+tags (optionnel)
+
+desiredDisplayName (optionnel)
+
+Retour :
+
+documentId
+
+uploadUrl (signed)
+
+storage_path
+
+Puis POST /api/documents/:id/complete (optionnel) pour finaliser.
+
+Update metadata
+
+PATCH /api/documents/:id
+
+rename
+
+tags
+
+reattach patient/act
+
+Delete
+
+DELETE /api/documents/:id
+
+Sécurité & contraintes
+
+Bucket Supabase privé
+
+Accès via URLs signées uniquement
+
+Vérifier organisation_id sur toutes les opérations
+
+Interdire accès à un document d’une autre organisation
+
+Performance
+
+Pagination obligatoire
+
+Lazy signed URLs
+
+Thumbnails :
+
+optionnel V1 : pas de génération de thumbnails, juste icône par type
+
+V2 : thumbnails pour images
+
+Critères d’acceptation
+
+La page /documents ressemble à un explorer :
+
+arbre + breadcrumb + liste
+
+Je peux retrouver un doc par :
+
+navigation (Patients/Actes)
+
+recherche
+
+tags
+
+Je peux uploader plusieurs fichiers et les rattacher à patient/acte
+
+Je peux ouvrir/télécharger/renommer/supprimer
+
+Tout est privé (signed URLs) et performant

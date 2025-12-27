@@ -48,6 +48,7 @@ import {
   type InsertFlag,
   type FlagWithEntity,
   type AppointmentWithPatient,
+  type DocumentWithDetails,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -77,6 +78,36 @@ export type PatientSummary = {
   patients: Patient[];
   implantCounts: Record<string, number>;
   lastVisits: Record<string, { date: string; titre: string | null }>;
+};
+
+export type DocumentTreeNode = {
+  id: string;
+  name: string;
+  type: 'patient' | 'operation';
+  count: number;
+  patientId?: string;
+  operationId?: string;
+};
+
+export type DocumentTree = {
+  patients: DocumentTreeNode[];
+  operations: DocumentTreeNode[];
+  unclassifiedCount: number;
+  totalCount: number;
+};
+
+export type DocumentFilters = {
+  scope?: 'patients' | 'operations' | 'unclassified' | 'all';
+  patientId?: string;
+  operationId?: string;
+  q?: string;
+  tags?: string[];
+  from?: string;
+  to?: string;
+  sort?: 'name' | 'date' | 'type' | 'size';
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
 };
 
 export interface IStorage {
@@ -200,8 +231,10 @@ export interface IStorage {
   // Document methods
   getDocument(organisationId: string, id: string): Promise<Document | undefined>;
   getPatientDocuments(organisationId: string, patientId: string): Promise<Document[]>;
+  getDocumentTree(organisationId: string): Promise<DocumentTree>;
+  getDocumentsFiltered(organisationId: string, filters: DocumentFilters): Promise<{ documents: DocumentWithDetails[]; totalCount: number }>;
   createDocument(organisationId: string, doc: InsertDocument & { createdBy?: string | null }): Promise<Document>;
-  updateDocument(organisationId: string, id: string, updates: { title?: string; tags?: string[] }): Promise<Document | undefined>;
+  updateDocument(organisationId: string, id: string, updates: { title?: string; tags?: string[]; patientId?: string | null; operationId?: string | null }): Promise<Document | undefined>;
   deleteDocument(organisationId: string, id: string): Promise<boolean>;
 
   // SavedFilter methods
@@ -2164,6 +2197,122 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(documents.createdAt));
   }
 
+  async getDocumentTree(organisationId: string): Promise<DocumentTree> {
+    const result = await pool.query(`
+      WITH patient_counts AS (
+        SELECT d.patient_id, p.nom, p.prenom, COUNT(*) as count
+        FROM documents d
+        JOIN patients p ON d.patient_id = p.id
+        WHERE d.organisation_id = $1 AND d.patient_id IS NOT NULL
+        GROUP BY d.patient_id, p.nom, p.prenom
+      ),
+      operation_counts AS (
+        SELECT d.operation_id, o.type_intervention, o.date_operation, p.nom as patient_nom, p.prenom as patient_prenom, p.id as patient_id, COUNT(*) as count
+        FROM documents d
+        JOIN operations o ON d.operation_id = o.id
+        JOIN patients p ON o.patient_id = p.id
+        WHERE d.organisation_id = $1 AND d.operation_id IS NOT NULL
+        GROUP BY d.operation_id, o.type_intervention, o.date_operation, p.nom, p.prenom, p.id
+      ),
+      unclassified_count AS (
+        SELECT COUNT(*) as count FROM documents
+        WHERE organisation_id = $1 AND patient_id IS NULL
+      ),
+      total_count AS (
+        SELECT COUNT(*) as count FROM documents
+        WHERE organisation_id = $1
+      )
+      SELECT 
+        (SELECT json_agg(json_build_object('id', patient_id, 'name', nom || ' ' || prenom, 'type', 'patient', 'count', count, 'patientId', patient_id)) FROM patient_counts) as patients,
+        (SELECT json_agg(json_build_object('id', operation_id, 'name', type_intervention || ' - ' || date_operation || ' - ' || patient_nom || ' ' || patient_prenom, 'type', 'operation', 'count', count, 'operationId', operation_id, 'patientId', patient_id)) FROM operation_counts) as operations,
+        (SELECT count FROM unclassified_count) as unclassified_count,
+        (SELECT count FROM total_count) as total_count
+    `, [organisationId]);
+    
+    const row = result.rows[0];
+    return {
+      patients: row.patients || [],
+      operations: row.operations || [],
+      unclassifiedCount: parseInt(row.unclassified_count) || 0,
+      totalCount: parseInt(row.total_count) || 0,
+    };
+  }
+
+  async getDocumentsFiltered(organisationId: string, filters: DocumentFilters): Promise<{ documents: DocumentWithDetails[]; totalCount: number }> {
+    const { scope, patientId, operationId, q, tags, from, to, sort = 'date', sortDir = 'desc', page = 1, pageSize = 25 } = filters;
+    
+    const conditions: SQL[] = [eq(documents.organisationId, organisationId)];
+    
+    if (scope === 'patients' && !patientId) {
+      conditions.push(sql`${documents.patientId} IS NOT NULL`);
+    } else if (scope === 'operations' && !operationId) {
+      conditions.push(sql`${documents.operationId} IS NOT NULL`);
+    } else if (scope === 'unclassified') {
+      conditions.push(sql`${documents.patientId} IS NULL`);
+    }
+    
+    if (patientId) {
+      conditions.push(eq(documents.patientId, patientId));
+    }
+    if (operationId) {
+      conditions.push(eq(documents.operationId, operationId));
+    }
+    if (q) {
+      conditions.push(or(
+        ilike(documents.title, `%${q}%`),
+        ilike(documents.fileName, `%${q}%`)
+      )!);
+    }
+    if (tags && tags.length > 0) {
+      conditions.push(sql`${documents.tags} && ARRAY[${sql.join(tags.map(t => sql`${t}`), sql`, `)}]::text[]`);
+    }
+    if (from) {
+      conditions.push(gte(documents.createdAt, new Date(from)));
+    }
+    if (to) {
+      conditions.push(lte(documents.createdAt, new Date(to)));
+    }
+    
+    const whereClause = and(...conditions);
+    
+    const orderByColumn = sort === 'name' ? documents.title 
+      : sort === 'type' ? documents.mimeType 
+      : sort === 'size' ? documents.sizeBytes 
+      : documents.createdAt;
+    const orderBy = sortDir === 'asc' ? orderByColumn : desc(orderByColumn);
+    
+    const offset = (page - 1) * pageSize;
+    
+    const [docsResult, countResult] = await Promise.all([
+      db.select({
+        document: documents,
+        patient: patients,
+        operation: operations,
+      })
+        .from(documents)
+        .leftJoin(patients, eq(documents.patientId, patients.id))
+        .leftJoin(operations, eq(documents.operationId, operations.id))
+        .where(whereClause)
+        .orderBy(orderBy)
+        .limit(pageSize)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)` })
+        .from(documents)
+        .where(whereClause),
+    ]);
+    
+    const documentsWithDetails: DocumentWithDetails[] = docsResult.map(row => ({
+      ...row.document,
+      patient: row.patient || undefined,
+      operation: row.operation || undefined,
+    }));
+    
+    return {
+      documents: documentsWithDetails,
+      totalCount: Number(countResult[0]?.count || 0),
+    };
+  }
+
   async createDocument(organisationId: string, doc: InsertDocument & { createdBy?: string | null }): Promise<Document> {
     const [created] = await db.insert(documents).values({
       ...doc,
@@ -2172,7 +2321,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateDocument(organisationId: string, id: string, updates: { title?: string; tags?: string[] }): Promise<Document | undefined> {
+  async updateDocument(organisationId: string, id: string, updates: { title?: string; tags?: string[]; patientId?: string | null; operationId?: string | null }): Promise<Document | undefined> {
     const [updated] = await db.update(documents)
       .set(updates)
       .where(and(
