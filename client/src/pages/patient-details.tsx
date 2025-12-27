@@ -2485,78 +2485,147 @@ export default function PatientDetailsPage() {
           </Card>
 
           <div className="space-y-4">
-            <h3 className="text-base font-semibold">Historique des notes</h3>
+            <h3 className="text-base font-semibold">Historique</h3>
             {notesLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
                   <Skeleton key={i} className="h-32 w-full" />
                 ))}
               </div>
-            ) : patientNotes.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-sm text-muted-foreground">
-                    Aucune note pour ce patient
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {patientNotes.map((note) => {
-                  const tagConfig = getTagConfig(note.tag as any);
-                  const authorName = note.user.prenom && note.user.nom 
-                    ? `${note.user.prenom.charAt(0)}. ${note.user.nom}`
-                    : note.user.nom || "Utilisateur";
-                  
-                  return (
-                    <Card key={note.id} data-testid={`card-note-${note.id}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-sm">{authorName}</span>
-                              {tagConfig && (
-                                <Badge variant="secondary" className={`text-xs ${tagConfig.className}`}>
-                                  {tagConfig.label}
-                                </Badge>
-                              )}
+            ) : (() => {
+              const allImplantFlagsFlat = Object.values(implantFlagsById).flat();
+              const allFlags = [...patientFlags, ...allImplantFlagsFlat];
+              
+              type TimelineItem = 
+                | { type: "note"; data: NoteWithUser; date: Date }
+                | { type: "flag"; data: Flag; date: Date };
+              
+              const timelineItems: TimelineItem[] = [
+                ...patientNotes.map(note => ({
+                  type: "note" as const,
+                  data: note,
+                  date: new Date(note.createdAt),
+                })),
+                ...allFlags.map(flag => ({
+                  type: "flag" as const,
+                  data: flag,
+                  date: new Date(flag.createdAt),
+                })),
+              ].sort((a, b) => b.date.getTime() - a.date.getTime());
+              
+              if (timelineItems.length === 0) {
+                return (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
+                      <p className="text-sm text-muted-foreground">
+                        Aucune note ou alerte pour ce patient
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              
+              const levelConfig: Record<string, { label: string; className: string; bgClassName: string }> = {
+                CRITICAL: { label: "Critique", className: "text-red-500", bgClassName: "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800" },
+                WARNING: { label: "Attention", className: "text-orange-500", bgClassName: "bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800" },
+                INFO: { label: "Info", className: "text-blue-500", bgClassName: "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800" },
+              };
+              
+              return (
+                <div className="space-y-4">
+                  {timelineItems.map((item, idx) => {
+                    if (item.type === "note") {
+                      const note = item.data;
+                      const tagConfig = getTagConfig(note.tag as any);
+                      const authorName = note.user.prenom && note.user.nom 
+                        ? `${note.user.prenom.charAt(0)}. ${note.user.nom}`
+                        : note.user.nom || "Utilisateur";
+                      
+                      return (
+                        <Card key={`note-${note.id}`} data-testid={`card-note-${note.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium text-sm">{authorName}</span>
+                                  {tagConfig && (
+                                    <Badge variant="secondary" className={`text-xs ${tagConfig.className}`}>
+                                      {tagConfig.label}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-3">
+                                  {formatNoteDatetime(note.createdAt)}
+                                </p>
+                                <p className="text-sm text-foreground whitespace-pre-wrap">
+                                  {note.contenu}
+                                </p>
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="shrink-0" data-testid={`button-note-menu-${note.id}`}>
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="bg-white dark:bg-zinc-900">
+                                  <DropdownMenuItem onClick={() => setEditingNote(note)} data-testid={`button-edit-note-${note.id}`}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Modifier
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => setDeleteNoteId(note.id)} 
+                                    className="text-destructive"
+                                    data-testid={`button-delete-note-${note.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Supprimer
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
-                            <p className="text-xs text-muted-foreground mb-3">
-                              {formatNoteDatetime(note.createdAt)}
-                            </p>
-                            <p className="text-sm text-foreground whitespace-pre-wrap">
-                              {note.contenu}
-                            </p>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="shrink-0" data-testid={`button-note-menu-${note.id}`}>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-white dark:bg-zinc-900">
-                              <DropdownMenuItem onClick={() => setEditingNote(note)} data-testid={`button-edit-note-${note.id}`}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Modifier
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => setDeleteNoteId(note.id)} 
-                                className="text-destructive"
-                                data-testid={`button-delete-note-${note.id}`}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Supprimer
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    } else {
+                      const flag = item.data;
+                      const config = levelConfig[flag.level] || levelConfig.INFO;
+                      
+                      return (
+                        <Card key={`flag-${flag.id}`} className={`border ${config.bgClassName}`} data-testid={`card-flag-${flag.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <AlertTriangle className={`h-4 w-4 mt-0.5 ${config.className}`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="secondary" className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                                    Alerte
+                                  </Badge>
+                                  <Badge variant="secondary" className={`text-xs ${
+                                    flag.level === "CRITICAL" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200" :
+                                    flag.level === "WARNING" ? "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200" :
+                                    "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                                  }`}>
+                                    {config.label}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  {formatNoteDatetime(flag.createdAt)}
+                                </p>
+                                <p className="font-medium text-sm">{flag.label}</p>
+                                {flag.description && (
+                                  <p className="text-sm text-muted-foreground mt-1">{flag.description}</p>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    }
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           <Sheet open={!!editingNote} onOpenChange={(open) => !open && setEditingNote(null)}>

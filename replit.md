@@ -85,9 +85,12 @@ Implant tracking uses `implants` (catalog) and `surgery_implants` (placement dat
     - Automated alerts (CRITICAL, WARNING, INFO) for clinical issues and data completeness.
     - Flag types include `ISQ_LOW`, `ISQ_DECLINING`, `NO_RECENT_ISQ`, `NO_POSTOP_FOLLOWUP`, `MISSING_DOCUMENT`, etc.
     - API endpoints for listing, creating, resolving, and detecting flags.
+    - New `/api/patients/:patientId/flags` endpoint returns `{ patientFlags, implantFlagsById }`.
     - `server/flagEngine.ts` for detection logic.
     - Frontend components for displaying flags on patient cards, details, and dashboards.
     - Flags are associated with entities like PATIENT, OPERATION, IMPLANT.
+    - Patient details: Header shows patient-level alerts with tooltip; implant table shows per-implant flags.
+    - Notes tab: Alerts interleaved chronologically with clinical notes, colored by severity.
 
 ## External Dependencies
 
