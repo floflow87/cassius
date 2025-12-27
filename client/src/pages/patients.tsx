@@ -108,7 +108,23 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
       const saved = localStorage.getItem(STORAGE_KEY_COLUMNS);
       if (saved) {
         const savedOrder = JSON.parse(saved) as ColumnId[];
-        return savedOrder.map(id => defaultColumns.find(c => c.id === id)!).filter(Boolean);
+        // Map saved order to columns, filtering out any that no longer exist
+        const orderedColumns = savedOrder
+          .map(id => defaultColumns.find(c => c.id === id))
+          .filter(Boolean) as ColumnConfig[];
+        // Add any new columns that weren't in the saved order (at the end, before 'statut')
+        const savedIds = new Set(savedOrder);
+        const newColumns = defaultColumns.filter(c => !savedIds.has(c.id));
+        if (newColumns.length > 0) {
+          // Insert new columns before 'statut' column if it exists at the end
+          const statutIndex = orderedColumns.findIndex(c => c.id === "statut");
+          if (statutIndex === orderedColumns.length - 1) {
+            orderedColumns.splice(statutIndex, 0, ...newColumns);
+          } else {
+            orderedColumns.push(...newColumns);
+          }
+        }
+        return orderedColumns;
       }
     } catch {}
     return defaultColumns;
