@@ -73,6 +73,7 @@ import type {
   DocumentTree,
   DocumentTreeNode,
   DocumentFilters,
+  UnifiedFile,
 } from "@shared/types";
 import { db, pool } from "./db";
 import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL } from "drizzle-orm";
@@ -2173,29 +2174,42 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDocumentTree(organisationId: string): Promise<DocumentTree> {
+    // Combine documents and radios for unified file tree
     const result = await pool.query(`
-      WITH patient_counts AS (
-        SELECT d.patient_id, p.nom, p.prenom, COUNT(*) as count
-        FROM documents d
-        JOIN patients p ON d.patient_id = p.id
-        WHERE d.organisation_id = $1 AND d.patient_id IS NOT NULL
-        GROUP BY d.patient_id, p.nom, p.prenom
+      WITH all_files AS (
+        -- Documents
+        SELECT patient_id, operation_id FROM documents WHERE organisation_id = $1
+        UNION ALL
+        -- Radios
+        SELECT patient_id, operation_id FROM radios WHERE organisation_id = $1
+      ),
+      patient_counts AS (
+        SELECT f.patient_id, p.nom, p.prenom, COUNT(*) as count
+        FROM all_files f
+        JOIN patients p ON f.patient_id = p.id
+        WHERE f.patient_id IS NOT NULL
+        GROUP BY f.patient_id, p.nom, p.prenom
       ),
       operation_counts AS (
-        SELECT d.operation_id, o.type_intervention, o.date_operation, p.nom as patient_nom, p.prenom as patient_prenom, p.id as patient_id, COUNT(*) as count
-        FROM documents d
-        JOIN operations o ON d.operation_id = o.id
+        SELECT f.operation_id, o.type_intervention, o.date_operation, p.nom as patient_nom, p.prenom as patient_prenom, p.id as patient_id, COUNT(*) as count
+        FROM all_files f
+        JOIN operations o ON f.operation_id = o.id
         JOIN patients p ON o.patient_id = p.id
-        WHERE d.organisation_id = $1 AND d.operation_id IS NOT NULL
-        GROUP BY d.operation_id, o.type_intervention, o.date_operation, p.nom, p.prenom, p.id
+        WHERE f.operation_id IS NOT NULL
+        GROUP BY f.operation_id, o.type_intervention, o.date_operation, p.nom, p.prenom, p.id
       ),
       unclassified_count AS (
-        SELECT COUNT(*) as count FROM documents
-        WHERE organisation_id = $1 AND patient_id IS NULL
+        SELECT COUNT(*) as count FROM (
+          SELECT id FROM documents WHERE organisation_id = $1 AND patient_id IS NULL
+          UNION ALL
+          SELECT id FROM radios WHERE organisation_id = $1 AND patient_id IS NULL
+        ) unclassified
       ),
       total_count AS (
-        SELECT COUNT(*) as count FROM documents
-        WHERE organisation_id = $1
+        SELECT (
+          (SELECT COUNT(*) FROM documents WHERE organisation_id = $1) +
+          (SELECT COUNT(*) FROM radios WHERE organisation_id = $1)
+        ) as count
       )
       SELECT 
         (SELECT json_agg(json_build_object('id', patient_id, 'name', nom || ' ' || prenom, 'type', 'patient', 'count', count, 'patientId', patient_id)) FROM patient_counts) as patients,
@@ -2315,6 +2329,193 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return result.length > 0;
+  }
+
+  async getUnifiedFiles(organisationId: string, filters: DocumentFilters): Promise<{ files: UnifiedFile[]; totalCount: number }> {
+    const { scope, patientId, operationId, q, from, to, sort = 'date', sortDir = 'desc', page = 1, pageSize = 25 } = filters;
+    const offset = (page - 1) * pageSize;
+    
+    // Build WHERE conditions for documents
+    let docWhere = `d.organisation_id = $1`;
+    let radioWhere = `r.organisation_id = $1`;
+    const params: (string | Date)[] = [organisationId];
+    let paramIndex = 2;
+
+    if (scope === 'patients' && !patientId) {
+      docWhere += ` AND d.patient_id IS NOT NULL`;
+      radioWhere += ` AND r.patient_id IS NOT NULL`;
+    } else if (scope === 'operations' && !operationId) {
+      docWhere += ` AND d.operation_id IS NOT NULL`;
+      radioWhere += ` AND r.operation_id IS NOT NULL`;
+    } else if (scope === 'unclassified') {
+      docWhere += ` AND d.patient_id IS NULL`;
+      radioWhere += ` AND r.patient_id IS NULL`;
+    }
+
+    if (patientId) {
+      docWhere += ` AND d.patient_id = $${paramIndex}`;
+      radioWhere += ` AND r.patient_id = $${paramIndex}`;
+      params.push(patientId);
+      paramIndex++;
+    }
+    if (operationId) {
+      docWhere += ` AND d.operation_id = $${paramIndex}`;
+      radioWhere += ` AND r.operation_id = $${paramIndex}`;
+      params.push(operationId);
+      paramIndex++;
+    }
+    if (q) {
+      docWhere += ` AND (d.title ILIKE $${paramIndex} OR d.file_name ILIKE $${paramIndex})`;
+      radioWhere += ` AND (r.title ILIKE $${paramIndex} OR r.file_name ILIKE $${paramIndex})`;
+      params.push(`%${q}%`);
+      paramIndex++;
+    }
+    if (from) {
+      docWhere += ` AND d.created_at >= $${paramIndex}`;
+      radioWhere += ` AND r.created_at >= $${paramIndex}`;
+      params.push(from);
+      paramIndex++;
+    }
+    if (to) {
+      docWhere += ` AND d.created_at <= $${paramIndex}`;
+      radioWhere += ` AND r.created_at <= $${paramIndex}`;
+      params.push(to);
+      paramIndex++;
+    }
+
+    // Determine sort column
+    const sortColumn = sort === 'name' ? 'title' 
+      : sort === 'size' ? 'size_bytes' 
+      : sort === 'type' ? 'mime_type'
+      : 'created_at';
+    const sortDirection = sortDir === 'asc' ? 'ASC' : 'DESC';
+
+    // Query combining documents and radios
+    const query = `
+      WITH unified AS (
+        SELECT 
+          d.id,
+          'document' as source_type,
+          d.title,
+          d.file_name,
+          d.file_path,
+          d.mime_type,
+          d.size_bytes,
+          d.tags,
+          d.patient_id,
+          d.operation_id,
+          d.created_at,
+          d.created_by,
+          NULL as radio_type,
+          NULL as radio_date,
+          NULL as implant_id
+        FROM documents d
+        WHERE ${docWhere}
+        
+        UNION ALL
+        
+        SELECT 
+          r.id,
+          'radio' as source_type,
+          r.title,
+          r.file_name,
+          r.file_path,
+          r.mime_type,
+          r.size_bytes,
+          NULL as tags,
+          r.patient_id,
+          r.operation_id,
+          r.created_at,
+          r.created_by,
+          r.type as radio_type,
+          r.date as radio_date,
+          r.implant_id
+        FROM radios r
+        WHERE ${radioWhere}
+      )
+      SELECT 
+        u.*,
+        p.id as p_id, p.nom as p_nom, p.prenom as p_prenom, p.date_naissance as p_date_naissance, p.sexe as p_sexe,
+        o.id as o_id, o.date_operation as o_date_operation, o.type_intervention as o_type_intervention, o.patient_id as o_patient_id
+      FROM unified u
+      LEFT JOIN patients p ON u.patient_id = p.id
+      LEFT JOIN operations o ON u.operation_id = o.id
+      ORDER BY u.${sortColumn} ${sortDirection}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    params.push(pageSize.toString(), offset.toString());
+
+    // Count query
+    const countQuery = `
+      SELECT (
+        (SELECT COUNT(*) FROM documents d WHERE ${docWhere}) +
+        (SELECT COUNT(*) FROM radios r WHERE ${radioWhere})
+      ) as total
+    `;
+
+    const [filesResult, countResult] = await Promise.all([
+      pool.query(query, params),
+      pool.query(countQuery, params.slice(0, paramIndex - 1))
+    ]);
+
+    const files: UnifiedFile[] = filesResult.rows.map(row => ({
+      id: row.id,
+      sourceType: row.source_type as 'document' | 'radio',
+      title: row.title,
+      fileName: row.file_name,
+      filePath: row.file_path,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes ? Number(row.size_bytes) : null,
+      tags: row.tags,
+      patientId: row.patient_id,
+      operationId: row.operation_id,
+      createdAt: new Date(row.created_at),
+      createdBy: row.created_by,
+      radioType: row.radio_type,
+      radioDate: row.radio_date,
+      implantId: row.implant_id,
+      patient: row.p_id ? {
+        id: row.p_id,
+        organisationId,
+        nom: row.p_nom,
+        prenom: row.p_prenom,
+        dateNaissance: row.p_date_naissance,
+        sexe: row.p_sexe,
+        telephone: null,
+        email: null,
+        adresse: null,
+        codePostal: null,
+        ville: null,
+        pays: null,
+        allergies: null,
+        traitement: null,
+        conditions: null,
+        contexteMedical: null,
+        statut: null,
+        createdAt: new Date(),
+      } : undefined,
+      operation: row.o_id ? {
+        id: row.o_id,
+        patientId: row.o_patient_id,
+        dateOperation: row.o_date_operation,
+        typeIntervention: row.o_type_intervention,
+        typeChirurgieTemps: null,
+        typeChirurgieApproche: null,
+        greffeOsseuse: null,
+        typeGreffe: null,
+        greffeQuantite: null,
+        greffeLocalisation: null,
+        typeMiseEnCharge: null,
+        conditionsMedicalesPreop: null,
+        notesPerop: null,
+        observationsPostop: null,
+      } : undefined,
+    }));
+
+    return {
+      files,
+      totalCount: Number(countResult.rows[0]?.total || 0),
+    };
   }
 
   // ========== SAVED FILTERS ==========
