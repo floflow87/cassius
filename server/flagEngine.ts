@@ -41,29 +41,44 @@ export async function detectFlags(organisationId: string): Promise<FlagCandidate
 }
 
 async function detectLowIsq(organisationId: string, candidates: FlagCandidate[]): Promise<void> {
-  const lowIsqImplants = await db
+  // Check ALL ISQ fields (pose, 2m, 3m, 6m) for low values
+  const allImplantsWithIsq = await db
     .select({
       id: surgeryImplants.id,
       siteFdi: surgeryImplants.siteFdi,
       isqPose: surgeryImplants.isqPose,
+      isq2m: surgeryImplants.isq2m,
+      isq3m: surgeryImplants.isq3m,
+      isq6m: surgeryImplants.isq6m,
       marque: implants.marque,
     })
     .from(surgeryImplants)
     .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
     .where(and(
       eq(surgeryImplants.organisationId, organisationId),
-      sql`(${surgeryImplants.isqPose} IS NOT NULL AND ${surgeryImplants.isqPose} < ${ISQ_LOW_THRESHOLD})`
+      sql`(
+        (${surgeryImplants.isqPose} IS NOT NULL AND ${surgeryImplants.isqPose} < ${ISQ_LOW_THRESHOLD}) OR
+        (${surgeryImplants.isq2m} IS NOT NULL AND ${surgeryImplants.isq2m} < ${ISQ_LOW_THRESHOLD}) OR
+        (${surgeryImplants.isq3m} IS NOT NULL AND ${surgeryImplants.isq3m} < ${ISQ_LOW_THRESHOLD}) OR
+        (${surgeryImplants.isq6m} IS NOT NULL AND ${surgeryImplants.isq6m} < ${ISQ_LOW_THRESHOLD})
+      )`
     ));
 
-  for (const si of lowIsqImplants) {
-    candidates.push({
-      level: "CRITICAL",
-      type: "ISQ_LOW",
-      label: "ISQ faible",
-      description: `Implant ${si.marque} site ${si.siteFdi}: ISQ pose = ${si.isqPose} (seuil: 55)`,
-      entityType: "IMPLANT",
-      entityId: si.id,
-    });
+  for (const si of allImplantsWithIsq) {
+    // Find the most recent (last) ISQ value that is low
+    const lastIsq = si.isq6m ?? si.isq3m ?? si.isq2m ?? si.isqPose;
+    const isqLabel = si.isq6m ? "6m" : si.isq3m ? "3m" : si.isq2m ? "2m" : "pose";
+    
+    if (lastIsq !== null && lastIsq < ISQ_LOW_THRESHOLD) {
+      candidates.push({
+        level: "CRITICAL",
+        type: "ISQ_LOW",
+        label: "ISQ faible",
+        description: `Implant ${si.marque} site ${si.siteFdi}: ISQ ${isqLabel} = ${lastIsq} (seuil: 55)`,
+        entityType: "IMPLANT",
+        entityId: si.id,
+      });
+    }
   }
 }
 

@@ -1021,6 +1021,16 @@ export async function registerRoutes(
       if (!updated) {
         return res.status(404).json({ error: "Surgery implant not found" });
       }
+      
+      // Auto-trigger flag detection if ISQ fields were updated
+      const isqFields = ['isqPose', 'isq2m', 'isq3m', 'isq6m'];
+      const hasIsqUpdate = isqFields.some(field => field in req.body);
+      if (hasIsqUpdate) {
+        runFlagDetection(organisationId).catch(err => 
+          console.error("Flag detection failed:", err)
+        );
+      }
+      
       res.json(updated);
     } catch (error) {
       console.error("Error updating surgery implant:", error);
