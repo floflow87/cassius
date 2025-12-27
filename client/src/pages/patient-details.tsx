@@ -181,7 +181,12 @@ export default function PatientDetailsPage() {
 
   // Query for patient flags
   const { data: patientFlags = [] } = useQuery<Flag[]>({
-    queryKey: ["/api/flags/PATIENT", patientId],
+    queryKey: ["/api/flags", "entity", "PATIENT", patientId],
+    queryFn: async () => {
+      const res = await fetch(`/api/flags/PATIENT/${patientId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch flags");
+      return res.json();
+    },
     enabled: !!patientId,
   });
 

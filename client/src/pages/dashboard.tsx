@@ -34,7 +34,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import type { Operation, Appointment, User, Patient, SurgeryImplant, FlagWithEntity, AppointmentWithPatient } from "@shared/schema";
+import type { Operation, Appointment, User, Patient, SurgeryImplantWithDetails, FlagWithEntity, AppointmentWithPatient } from "@shared/schema";
 import { FlagBadge } from "@/components/flag-badge";
 import { Link } from "wouter";
 
@@ -218,12 +218,17 @@ export default function DashboardPage() {
     queryKey: ["/api/patients"],
   });
 
-  const { data: surgeryImplants } = useQuery<SurgeryImplant[]>({
+  const { data: surgeryImplants } = useQuery<SurgeryImplantWithDetails[]>({
     queryKey: ["/api/surgery-implants"],
   });
 
   const { data: flagsData } = useQuery<FlagWithEntity[]>({
-    queryKey: ["/api/flags?withEntity=true"],
+    queryKey: ["/api/flags", "withEntity"],
+    queryFn: async () => {
+      const res = await fetch("/api/flags?withEntity=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch flags");
+      return res.json();
+    },
   });
 
   const filteredPatients = patients?.filter(p => 
@@ -591,6 +596,84 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Section Implants récents avec ISQ */}
+      {surgeryImplants && surgeryImplants.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <CardTitle className="text-base flex items-center gap-2">
+              <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
+              </svg>
+              Implants récents
+            </CardTitle>
+            <Badge variant="secondary" className="text-xs">
+              {surgeryImplants.length} implants
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {surgeryImplants.slice(0, 8).map((si) => {
+                // Determine the last ISQ value
+                const lastIsq = si.isq6m ?? si.isq3m ?? si.isq2m ?? si.isqPose;
+                const isqLabel = si.isq6m ? "6m" : si.isq3m ? "3m" : si.isq2m ? "2m" : si.isqPose ? "pose" : null;
+                const isLowIsq = lastIsq !== null && lastIsq <= 55;
+                
+                return (
+                  <Link 
+                    key={si.id} 
+                    href={`/implants/${si.id}`}
+                    className="block"
+                  >
+                    <div 
+                      className="flex items-center justify-between p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer"
+                      data-testid={`implant-dashboard-${si.id}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                          <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                            {si.siteFdi}
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">
+                            {si.patient?.prenom} {si.patient?.nom}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {si.implant?.marque} {si.implant?.diametre}x{si.implant?.longueur}mm
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 text-right">
+                        {lastIsq !== null ? (
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              variant="secondary" 
+                              className={isLowIsq 
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" 
+                                : lastIsq >= 70 
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                              }
+                            >
+                              ISQ {lastIsq}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              ({isqLabel})
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {(!stats || stats.totalPatients === 0) && (
         <Card>

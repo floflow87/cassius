@@ -11,7 +11,7 @@ import {
 } from "@shared/schema";
 import { eq, and, sql, lt, isNull, desc } from "drizzle-orm";
 
-const ISQ_LOW_THRESHOLD = 55;
+const ISQ_LOW_THRESHOLD = 56; // ISQ <= 55 triggers alert (uses < 56)
 const ISQ_DECLINE_THRESHOLD = 10;
 const DAYS_NO_RECENT_ISQ = 90;
 const DAYS_NO_POSTOP_FOLLOWUP = 30;
@@ -60,7 +60,7 @@ async function detectLowIsq(organisationId: string, candidates: FlagCandidate[])
       level: "CRITICAL",
       type: "ISQ_LOW",
       label: "ISQ faible",
-      description: `Implant ${si.marque} site ${si.siteFdi}: ISQ pose = ${si.isqPose} (seuil: ${ISQ_LOW_THRESHOLD})`,
+      description: `Implant ${si.marque} site ${si.siteFdi}: ISQ pose = ${si.isqPose} (seuil: 55)`,
       entityType: "IMPLANT",
       entityId: si.id,
     });
