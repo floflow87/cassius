@@ -49,6 +49,16 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { OperationForm } from "@/components/operation-form";
@@ -129,6 +139,8 @@ export default function ImplantDetailsPage() {
     notes: string;
   } | null>(null);
   const [editIsqSheetOpen, setEditIsqSheetOpen] = useState(false);
+  const [deleteIsqDialogOpen, setDeleteIsqDialogOpen] = useState(false);
+  const [isqPointToDelete, setIsqPointToDelete] = useState<ISQPoint | null>(null);
 
   const { data: implantData, isLoading, isFetching } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
@@ -411,12 +423,19 @@ export default function ImplantDetailsPage() {
   };
 
   const handleDeleteIsq = (point: ISQPoint) => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer cette mesure ISQ ?")) {
+    setIsqPointToDelete(point);
+    setDeleteIsqDialogOpen(true);
+  };
+  
+  const confirmDeleteIsq = () => {
+    if (isqPointToDelete) {
       deleteIsqMutation.mutate({
-        source: point.source,
-        visiteId: point.visiteId,
+        source: isqPointToDelete.source,
+        visiteId: isqPointToDelete.visiteId,
       });
     }
+    setDeleteIsqDialogOpen(false);
+    setIsqPointToDelete(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -1239,6 +1258,33 @@ export default function ImplantDetailsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Delete ISQ Confirmation Dialog */}
+      <AlertDialog open={deleteIsqDialogOpen} onOpenChange={setDeleteIsqDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isqPointToDelete && (
+                <>
+                  Voulez-vous vraiment supprimer la mesure ISQ de <strong>{isqPointToDelete.value}</strong> ({isqPointToDelete.label}) ?
+                  Cette action est irréversible.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-isq">Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteIsq}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-isq"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
