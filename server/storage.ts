@@ -70,6 +70,9 @@ import type {
   GlobalSearchResults,
   TopFlag,
   LatestIsq,
+  DocumentTree,
+  DocumentTreeNode,
+  DocumentFilters,
 } from "@shared/types";
 import { db, pool } from "./db";
 import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL } from "drizzle-orm";
@@ -80,35 +83,7 @@ export type PatientSummary = {
   lastVisits: Record<string, { date: string; titre: string | null }>;
 };
 
-export type DocumentTreeNode = {
-  id: string;
-  name: string;
-  type: 'patient' | 'operation';
-  count: number;
-  patientId?: string;
-  operationId?: string;
-};
-
-export type DocumentTree = {
-  patients: DocumentTreeNode[];
-  operations: DocumentTreeNode[];
-  unclassifiedCount: number;
-  totalCount: number;
-};
-
-export type DocumentFilters = {
-  scope?: 'patients' | 'operations' | 'unclassified' | 'all';
-  patientId?: string;
-  operationId?: string;
-  q?: string;
-  tags?: string[];
-  from?: string;
-  to?: string;
-  sort?: 'name' | 'date' | 'type' | 'size';
-  sortDir?: 'asc' | 'desc';
-  page?: number;
-  pageSize?: number;
-};
+export type { DocumentTree, DocumentTreeNode, DocumentFilters };
 
 export interface IStorage {
   // Patient methods - all require organisationId for multi-tenant isolation

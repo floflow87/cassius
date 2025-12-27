@@ -632,3 +632,33 @@ export interface GlobalSearchResults {
   implants: GlobalSearchImplant[];
   documents: GlobalSearchDocument[];
 }
+
+export interface DocumentTreeNode {
+  id: string;
+  name: string;
+  type: 'patient' | 'operation';
+  count: number;
+  patientId?: string;
+  operationId?: string;
+}
+
+export interface DocumentTree {
+  patients: DocumentTreeNode[];
+  operations: DocumentTreeNode[];
+  unclassifiedCount: number;
+  totalCount: number;
+}
+
+export interface DocumentFilters {
+  scope?: 'patients' | 'operations' | 'unclassified' | 'all';
+  patientId?: string;
+  operationId?: string;
+  q?: string;
+  tags?: string[];
+  from?: string;
+  to?: string;
+  sort?: 'name' | 'date' | 'type' | 'size';
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+}

@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, FolderClosed } from "lucide-react";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
 import logoFull from "@assets/logo_Cassius_Plan_de_travail_1_copie_1765897934649.png";
@@ -25,11 +25,19 @@ import actesIcon from "/assets/icons/actes.png";
 import statsIcon from "/assets/icons/statistiques.png";
 import settingsIcon from "/assets/icons/settings.png";
 
-const menuItems = [
+type MenuItem = {
+  title: string;
+  url: string;
+  icon?: string;
+  lucideIcon?: typeof FolderClosed;
+};
+
+const menuItems: MenuItem[] = [
   { title: "Tableau de bord", url: "/dashboard", icon: homeIcon },
   { title: "Patients", url: "/patients", icon: patientIcon },
   { title: "Implants", url: "/implants", icon: implantsIcon },
   { title: "Actes", url: "/actes", icon: actesIcon },
+  { title: "Documents", url: "/documents", lucideIcon: FolderClosed },
   { title: "Statistiques", url: "/stats", icon: statsIcon },
 ];
 
@@ -87,11 +95,15 @@ export function AppSidebar() {
                 }`}
                 data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
               >
-                <img 
-                  src={item.icon} 
-                  alt={item.title}
-                  className="h-5 w-auto brightness-0 invert shrink-0"
-                />
+                {item.icon ? (
+                  <img 
+                    src={item.icon} 
+                    alt={item.title}
+                    className="h-5 w-auto brightness-0 invert shrink-0"
+                  />
+                ) : item.lucideIcon && (
+                  <item.lucideIcon className="h-5 w-5 text-white shrink-0" />
+                )}
                 {isExpanded && (
                   <span className="text-sm font-medium text-white truncate">
                     {item.title}

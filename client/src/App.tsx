@@ -18,6 +18,7 @@ import StatsPage from "@/pages/stats";
 import ImplantsPage from "@/pages/implants";
 import ActesPage from "@/pages/actes";
 import ActeDetailsPage from "@/pages/acte-details";
+import DocumentsPage from "@/pages/documents";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import { apiRequest } from "@/lib/queryClient";
@@ -69,6 +70,9 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
     }
     if (location === "/actes") {
       return { title: "Actes", subtitle: null };
+    }
+    if (location === "/documents") {
+      return { title: "Documents", subtitle: null };
     }
     return { title: "Cassius", subtitle: null };
   };
@@ -173,6 +177,7 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
         {() => <ActesPage />}
       </Route>
       <Route path="/actes/:id" component={ActeDetailsPage} />
+      <Route path="/documents" component={DocumentsPage} />
       <Route component={NotFound} />
     </Switch>
   );
