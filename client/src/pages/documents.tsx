@@ -123,56 +123,43 @@ function FolderTreeItem({
   isSelected, 
   onToggle, 
   onSelect,
-  depth = 0 
+  hasChildren = false,
 }: { 
-  node: { name: string; count: number; type: string; id?: string; children?: typeof node[] };
+  node: { name: string; count: number; type: string; id?: string };
   isOpen?: boolean;
   isSelected?: boolean;
   onToggle?: () => void;
   onSelect: () => void;
-  depth?: number;
+  hasChildren?: boolean;
 }) {
-  const hasChildren = node.children && node.children.length > 0;
-  
   return (
-    <div>
-      <button
-        onClick={() => {
-          if (hasChildren && onToggle) onToggle();
-          onSelect();
-        }}
-        className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover-elevate ${
-          isSelected ? "bg-accent" : ""
-        }`}
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
-        data-testid={`folder-${node.type}-${node.id || 'root'}`}
-      >
-        {hasChildren ? (
-          isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />
-        ) : (
-          <span className="w-4" />
-        )}
-        {isOpen ? (
-          <FolderOpen className="h-4 w-4 shrink-0 text-amber-500" />
-        ) : (
-          <FolderClosed className="h-4 w-4 shrink-0 text-amber-500" />
-        )}
-        <span className="truncate flex-1 text-left">{node.name}</span>
-        {node.count > 0 && (
-          <Badge variant="secondary" className="text-xs">
-            {node.count}
-          </Badge>
-        )}
-      </button>
-      {hasChildren && isOpen && node.children?.map((child, i) => (
-        <FolderTreeItem 
-          key={child.id || i} 
-          node={child} 
-          depth={depth + 1}
-          onSelect={() => {}}
-        />
-      ))}
-    </div>
+    <button
+      onClick={() => {
+        if (hasChildren && onToggle) onToggle();
+        onSelect();
+      }}
+      className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover-elevate ${
+        isSelected ? "bg-accent" : ""
+      }`}
+      data-testid={`folder-${node.type}-${node.id || 'root'}`}
+    >
+      {hasChildren ? (
+        isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />
+      ) : (
+        <span className="w-4" />
+      )}
+      {isOpen ? (
+        <FolderOpen className="h-4 w-4 shrink-0 text-amber-500" />
+      ) : (
+        <FolderClosed className="h-4 w-4 shrink-0 text-amber-500" />
+      )}
+      <span className="truncate flex-1 text-left">{node.name}</span>
+      {node.count > 0 && (
+        <Badge variant="secondary" className="text-xs">
+          {node.count}
+        </Badge>
+      )}
+    </button>
   );
 }
 
@@ -269,7 +256,7 @@ export default function DocumentsPage() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['patients', 'operations']));
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'size'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [viewingDoc, setViewingDoc] = useState<DocumentWithDetails | null>(null);
+  const [viewingDoc, setViewingDoc] = useState<{ doc: DocumentWithDetails; url: string } | null>(null);
   const [editingDoc, setEditingDoc] = useState<DocumentWithDetails | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [deletingDoc, setDeletingDoc] = useState<DocumentWithDetails | null>(null);
@@ -405,7 +392,13 @@ export default function DocumentsPage() {
       });
       if (!response.ok) throw new Error('Failed to get URL');
       const { signedUrl } = await response.json();
-      window.open(signedUrl, '_blank');
+      
+      const isViewable = doc.mimeType?.startsWith('image/') || doc.mimeType === 'application/pdf';
+      if (isViewable) {
+        setViewingDoc({ doc, url: signedUrl });
+      } else {
+        window.open(signedUrl, '_blank');
+      }
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible d'ouvrir le document", variant: "destructive" });
     }
@@ -472,6 +465,7 @@ export default function DocumentsPage() {
                   node={{ name: 'Patients', count: tree?.patients.reduce((acc, p) => acc + p.count, 0) || 0, type: 'patients' }}
                   isOpen={expandedFolders.has('patients')}
                   isSelected={currentFolder.type === 'patients'}
+                  hasChildren={(tree?.patients.length || 0) > 0}
                   onToggle={() => toggleFolder('patients')}
                   onSelect={() => handleFolderSelect('patients')}
                 />
@@ -489,6 +483,7 @@ export default function DocumentsPage() {
                   node={{ name: 'Actes', count: tree?.operations.reduce((acc, o) => acc + o.count, 0) || 0, type: 'operations' }}
                   isOpen={expandedFolders.has('operations')}
                   isSelected={currentFolder.type === 'operations'}
+                  hasChildren={(tree?.operations.length || 0) > 0}
                   onToggle={() => toggleFolder('operations')}
                   onSelect={() => handleFolderSelect('operations')}
                 />
@@ -585,6 +580,54 @@ export default function DocumentsPage() {
           )}
         </ScrollArea>
       </div>
+      
+      <Dialog open={!!viewingDoc} onOpenChange={() => setViewingDoc(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-2 pr-8">
+              {viewingDoc && getFileIcon(viewingDoc.doc.mimeType)}
+              <span className="truncate">{viewingDoc?.doc.title}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto min-h-0">
+            {viewingDoc && viewingDoc.doc.mimeType?.startsWith('image/') && (
+              <div className="flex items-center justify-center p-4">
+                <img 
+                  src={viewingDoc.url} 
+                  alt={viewingDoc.doc.title}
+                  className="max-w-full max-h-[60vh] object-contain rounded-md"
+                  data-testid="document-viewer-image"
+                />
+              </div>
+            )}
+            {viewingDoc && viewingDoc.doc.mimeType === 'application/pdf' && (
+              <iframe
+                src={viewingDoc.url}
+                className="w-full h-[60vh] rounded-md border"
+                title={viewingDoc.doc.title}
+                data-testid="document-viewer-pdf"
+              />
+            )}
+          </div>
+          <DialogFooter className="shrink-0">
+            <Button 
+              variant="outline" 
+              onClick={() => viewingDoc && window.open(viewingDoc.url, '_blank')}
+              data-testid="button-open-new-tab"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Ouvrir dans un nouvel onglet
+            </Button>
+            <Button 
+              onClick={() => viewingDoc && handleDownload(viewingDoc.doc)}
+              data-testid="button-download-viewer"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Télécharger
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <Dialog open={!!editingDoc} onOpenChange={() => setEditingDoc(null)}>
         <DialogContent>
