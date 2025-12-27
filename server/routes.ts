@@ -1388,22 +1388,69 @@ export async function registerRoutes(
 
   // ========== DOCUMENTS (PDF) ==========
   
+  // Get document tree structure for explorer
+  app.get("/api/documents/tree", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const tree = await storage.getDocumentTree(organisationId);
+      res.json(tree);
+    } catch (error) {
+      console.error("Error fetching document tree:", error);
+      res.status(500).json({ error: "Failed to fetch document tree" });
+    }
+  });
+
+  // Get filtered/paginated documents list
+  app.get("/api/documents", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const filters = {
+        scope: req.query.scope as 'patients' | 'operations' | 'unclassified' | 'all' | undefined,
+        patientId: req.query.patientId as string | undefined,
+        operationId: req.query.operationId as string | undefined,
+        q: req.query.q as string | undefined,
+        tags: req.query.tags ? (Array.isArray(req.query.tags) ? req.query.tags as string[] : [req.query.tags as string]) : undefined,
+        from: req.query.from as string | undefined,
+        to: req.query.to as string | undefined,
+        sort: req.query.sort as 'name' | 'date' | 'type' | 'size' | undefined,
+        sortDir: req.query.sortDir as 'asc' | 'desc' | undefined,
+        page: req.query.page ? parseInt(req.query.page as string) : undefined,
+        pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string) : undefined,
+      };
+      
+      const result = await storage.getDocumentsFiltered(organisationId, filters);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
   // Get signed upload URL for client-side document upload
   app.post("/api/documents/upload-url", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
     try {
-      const { patientId, fileName, mimeType } = req.body;
-      if (!patientId || !fileName) {
-        return res.status(400).json({ error: "patientId and fileName are required" });
+      const { patientId, operationId, fileName, mimeType } = req.body;
+      if (!fileName) {
+        return res.status(400).json({ error: "fileName is required" });
       }
 
       // Generate unique document ID
       const documentId = crypto.randomUUID();
       
-      // Generate file path: org/{orgId}/patients/{patientId}/documents/{docId}/{filename}
-      const filePath = `org/${organisationId}/patients/${patientId}/documents/${documentId}/${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      // Generate file path based on context
+      let filePath: string;
+      if (patientId) {
+        filePath = `org/${organisationId}/patients/${patientId}/documents/${documentId}/${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      } else {
+        filePath = `org/${organisationId}/documents/${documentId}/${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      }
 
       // Get signed upload URL from Supabase
       const { signedUrl, token, path } = await supabaseStorage.createSignedUploadUrl(filePath);
@@ -1413,6 +1460,8 @@ export async function registerRoutes(
         signedUrl,
         token,
         filePath: path,
+        patientId: patientId || null,
+        operationId: operationId || null,
       });
     } catch (error) {
       console.error("Error getting document upload URL:", error);
