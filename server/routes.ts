@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, computeLatestIsq } from "./storage";
 import { requireJwtOrSession } from "./jwtMiddleware";
 import * as supabaseStorage from "./supabaseStorage";
 import { getTopSlowestEndpoints, getTopDbHeavyEndpoints, getAllStats, clearStats } from "./instrumentation";
@@ -435,13 +435,24 @@ export async function registerRoutes(
   });
 
   // OPTIMIZATION: Combined summary endpoint - reduces 3 API calls to 1 for patient list view
+  // Now includes flag summaries per patient
   app.get("/api/patients/summary", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
     try {
-      const summary = await storage.getPatientsWithSummary(organisationId);
-      res.json(summary);
+      const [summary, flagSummaries] = await Promise.all([
+        storage.getPatientsWithSummary(organisationId),
+        storage.getAllPatientFlagSummaries(organisationId),
+      ]);
+      
+      // Convert Map to object for JSON serialization
+      const flagsByPatient: Record<string, { topFlag?: any; activeFlagCount: number }> = {};
+      for (const [patientId, data] of flagSummaries) {
+        flagsByPatient[patientId] = data;
+      }
+      
+      res.json({ ...summary, flagsByPatient });
     } catch (error) {
       console.error("Error fetching patient summary:", error);
       res.status(500).json({ error: "Failed to fetch patient summary" });
@@ -493,9 +504,10 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const [patient, upcomingAppointments] = await Promise.all([
+      const [patient, upcomingAppointments, flagSummary] = await Promise.all([
         storage.getPatientWithDetails(organisationId, req.params.id),
-        storage.getPatientUpcomingRendezVous(organisationId, req.params.id)
+        storage.getPatientUpcomingRendezVous(organisationId, req.params.id),
+        storage.getPatientFlagSummary(organisationId, req.params.id),
       ]);
       
       if (!patient) {
@@ -510,7 +522,20 @@ export async function registerRoutes(
         signedUrl: null,
       })) || [];
       
-      res.json({ ...patient, radios: radiosWithNullUrls, upcomingAppointments });
+      // Add latestIsq to each surgeryImplant
+      const surgeryImplantsWithIsq = patient.surgeryImplants?.map(si => ({
+        ...si,
+        latestIsq: computeLatestIsq(si),
+      })) || [];
+      
+      res.json({ 
+        ...patient, 
+        radios: radiosWithNullUrls, 
+        upcomingAppointments,
+        surgeryImplants: surgeryImplantsWithIsq,
+        topFlag: flagSummary.topFlag,
+        activeFlagCount: flagSummary.activeFlagCount,
+      });
     } catch (error) {
       console.error("Error fetching patient:", error);
       res.status(500).json({ error: "Failed to fetch patient" });
@@ -964,11 +989,19 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const surgeryImplant = await storage.getSurgeryImplantWithDetails(organisationId, req.params.id);
+      const [surgeryImplant, flagSummary] = await Promise.all([
+        storage.getSurgeryImplantWithDetails(organisationId, req.params.id),
+        storage.getSurgeryImplantFlagSummary(organisationId, req.params.id),
+      ]);
       if (!surgeryImplant) {
         return res.status(404).json({ error: "Implant not found" });
       }
-      res.json(surgeryImplant);
+      res.json({
+        ...surgeryImplant,
+        latestIsq: computeLatestIsq(surgeryImplant),
+        topFlag: flagSummary.topFlag,
+        activeFlagCount: flagSummary.activeFlagCount,
+      });
     } catch (error) {
       console.error("Error fetching surgery implant:", error);
       res.status(500).json({ error: "Failed to fetch surgery implant" });
@@ -1061,7 +1094,21 @@ export async function registerRoutes(
 
     try {
       const surgeryImplants = await storage.getPatientSurgeryImplants(organisationId, req.params.id);
-      res.json(surgeryImplants);
+      
+      // Add latestIsq and flag info to each implant
+      const implantsWithExtras = await Promise.all(
+        surgeryImplants.map(async (si) => {
+          const flagSummary = await storage.getSurgeryImplantFlagSummary(organisationId, si.id);
+          return {
+            ...si,
+            latestIsq: computeLatestIsq(si),
+            topFlag: flagSummary.topFlag,
+            activeFlagCount: flagSummary.activeFlagCount,
+          };
+        })
+      );
+      
+      res.json(implantsWithExtras);
     } catch (error) {
       console.error("Error fetching patient implants:", error);
       res.status(500).json({ error: "Failed to fetch implants" });
@@ -1086,23 +1133,39 @@ export async function registerRoutes(
   });
 
   // Liste tous les surgery_implants avec filtrage optionnel
+  // Now includes latestIsq and flag info
   app.get("/api/surgery-implants", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
     try {
       const { marque, siteFdi, typeOs, statut } = req.query;
+      let surgeryImplants;
       if (marque || siteFdi || typeOs || statut) {
-        const filtered = await storage.filterSurgeryImplants(organisationId, {
+        surgeryImplants = await storage.filterSurgeryImplants(organisationId, {
           marque: marque as string,
           siteFdi: siteFdi as string,
           typeOs: typeOs as string,
           statut: statut as string,
         });
-        return res.json(filtered);
+      } else {
+        surgeryImplants = await storage.getAllSurgeryImplants(organisationId);
       }
-      const surgeryImplants = await storage.getAllSurgeryImplants(organisationId);
-      res.json(surgeryImplants);
+      
+      // Add latestIsq and flag info to each implant
+      const implantsWithExtras = await Promise.all(
+        surgeryImplants.map(async (si) => {
+          const flagSummary = await storage.getSurgeryImplantFlagSummary(organisationId, si.id);
+          return {
+            ...si,
+            latestIsq: computeLatestIsq(si),
+            topFlag: flagSummary.topFlag,
+            activeFlagCount: flagSummary.activeFlagCount,
+          };
+        })
+      );
+      
+      res.json(implantsWithExtras);
     } catch (error) {
       console.error("Error fetching surgery implants:", error);
       res.status(500).json({ error: "Failed to fetch surgery implants" });

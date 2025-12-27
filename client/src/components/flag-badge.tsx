@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Flag, FlagWithEntity } from "@shared/schema";
+import type { TopFlag } from "@shared/types";
 
 interface FlagBadgeProps {
   flag: Flag | FlagWithEntity;
@@ -195,6 +196,46 @@ export function CompactFlagList({ flags, maxVisible = 3 }: CompactFlagListProps)
             </div>
           </TooltipContent>
         </Tooltip>
+      )}
+    </div>
+  );
+}
+
+interface TopFlagSummaryProps {
+  topFlag?: TopFlag;
+  activeFlagCount?: number;
+}
+
+export function TopFlagSummary({ topFlag, activeFlagCount = 0 }: TopFlagSummaryProps) {
+  if (!topFlag || activeFlagCount === 0) {
+    return null;
+  }
+
+  const config = levelConfig[topFlag.level];
+  const Icon = config.icon;
+  const typeLabel = typeLabels[topFlag.type] || topFlag.label;
+
+  return (
+    <div className="flex items-center gap-1" data-testid="top-flag-summary">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant="secondary"
+            className={`${config.className} gap-1 cursor-default`}
+            data-testid="top-flag-badge"
+          >
+            <Icon className="w-3 h-3" />
+            <span className="text-xs">{typeLabel}</span>
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="font-medium">{topFlag.label}</p>
+        </TooltipContent>
+      </Tooltip>
+      {activeFlagCount > 1 && (
+        <Badge variant="outline" className="text-xs">
+          +{activeFlagCount - 1}
+        </Badge>
       )}
     </div>
   );

@@ -205,6 +205,42 @@ export interface ImplantWithPatient extends SurgeryImplant {
   patient?: Patient;
 }
 
+// Latest ISQ info for surgery implants
+export interface LatestIsq {
+  value: number;
+  label: "pose" | "2m" | "3m" | "6m";
+  date?: string;
+}
+
+// Top flag summary for entities
+export interface TopFlag {
+  type: string;
+  level: "CRITICAL" | "WARNING" | "INFO";
+  label: string;
+  createdAt?: string;
+}
+
+// Extended surgery implant with flag and ISQ info
+export interface SurgeryImplantWithFlags extends SurgeryImplantWithDetails {
+  latestIsq?: LatestIsq;
+  topFlag?: TopFlag;
+  activeFlagCount?: number;
+}
+
+// Extended patient with flag info
+export interface PatientWithFlags extends Patient {
+  topFlag?: TopFlag;
+  activeFlagCount?: number;
+}
+
+// Patient summary for list views
+export interface PatientSummary extends Patient {
+  operationCount: number;
+  lastVisitDate?: string;
+  topFlag?: TopFlag;
+  activeFlagCount?: number;
+}
+
 export interface DashboardStats {
   totalPatients: number;
   totalOperations: number;

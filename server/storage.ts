@@ -67,6 +67,8 @@ import type {
   OperationTimeline,
   TimelineEvent,
   GlobalSearchResults,
+  TopFlag,
+  LatestIsq,
 } from "@shared/types";
 import { db, pool } from "./db";
 import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL } from "drizzle-orm";
@@ -221,6 +223,11 @@ export interface IStorage {
   resolveFlag(organisationId: string, id: string, userId: string): Promise<Flag | undefined>;
   deleteFlag(organisationId: string, id: string): Promise<boolean>;
   upsertFlag(organisationId: string, flag: InsertFlag): Promise<Flag>;
+  
+  // Flag aggregation methods
+  getPatientFlagSummary(organisationId: string, patientId: string): Promise<{ topFlag?: TopFlag; activeFlagCount: number }>;
+  getAllPatientFlagSummaries(organisationId: string): Promise<Map<string, { topFlag?: TopFlag; activeFlagCount: number }>>;
+  getSurgeryImplantFlagSummary(organisationId: string, surgeryImplantId: string): Promise<{ topFlag?: TopFlag; activeFlagCount: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2644,6 +2651,205 @@ export class DatabaseStorage implements IStorage {
     
     return this.createFlag(organisationId, flag);
   }
+
+  // ========== FLAG AGGREGATION ==========
+  
+  async getPatientFlagSummary(organisationId: string, patientId: string): Promise<{ topFlag?: TopFlag; activeFlagCount: number }> {
+    // Get all unresolved flags for this patient:
+    // 1. Direct patient flags
+    // 2. Flags on patient's operations
+    // 3. Flags on patient's surgery implants
+    
+    const patientFlags = await db.select().from(flags).where(and(
+      eq(flags.organisationId, organisationId),
+      eq(flags.entityType, "PATIENT"),
+      eq(flags.entityId, patientId),
+      sql`${flags.resolvedAt} IS NULL`
+    ));
+    
+    // Get patient's operation IDs
+    const patientOps = await db.select({ id: operations.id }).from(operations)
+      .where(and(eq(operations.organisationId, organisationId), eq(operations.patientId, patientId)));
+    const opIds = patientOps.map(o => o.id);
+    
+    let operationFlags: Flag[] = [];
+    if (opIds.length > 0) {
+      operationFlags = await db.select().from(flags).where(and(
+        eq(flags.organisationId, organisationId),
+        eq(flags.entityType, "OPERATION"),
+        inArray(flags.entityId, opIds),
+        sql`${flags.resolvedAt} IS NULL`
+      ));
+    }
+    
+    // Get patient's surgery implant IDs (via operations)
+    let implantFlags: Flag[] = [];
+    if (opIds.length > 0) {
+      const patientSurgeryImplants = await db.select({ id: surgeryImplants.id }).from(surgeryImplants)
+        .where(and(eq(surgeryImplants.organisationId, organisationId), inArray(surgeryImplants.surgeryId, opIds)));
+      const siIds = patientSurgeryImplants.map(si => si.id);
+      
+      if (siIds.length > 0) {
+        implantFlags = await db.select().from(flags).where(and(
+          eq(flags.organisationId, organisationId),
+          eq(flags.entityType, "IMPLANT"),
+          inArray(flags.entityId, siIds),
+          sql`${flags.resolvedAt} IS NULL`
+        ));
+      }
+    }
+    
+    const allFlags = [...patientFlags, ...operationFlags, ...implantFlags];
+    const activeFlagCount = allFlags.length;
+    
+    if (activeFlagCount === 0) {
+      return { activeFlagCount: 0 };
+    }
+    
+    // Sort by level priority (CRITICAL > WARNING > INFO), then by createdAt desc
+    const levelPriority: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+    allFlags.sort((a, b) => {
+      const levelDiff = (levelPriority[a.level] ?? 3) - (levelPriority[b.level] ?? 3);
+      if (levelDiff !== 0) return levelDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    
+    const top = allFlags[0];
+    return {
+      topFlag: {
+        type: top.type,
+        level: top.level as "CRITICAL" | "WARNING" | "INFO",
+        label: top.label,
+        createdAt: top.createdAt.toISOString(),
+      },
+      activeFlagCount,
+    };
+  }
+  
+  async getAllPatientFlagSummaries(organisationId: string): Promise<Map<string, { topFlag?: TopFlag; activeFlagCount: number }>> {
+    // Optimized: Batch query for all patients instead of N+1
+    const result = new Map<string, { topFlag?: TopFlag; activeFlagCount: number }>();
+    
+    // Get all unresolved flags
+    const allFlags = await db.select().from(flags).where(and(
+      eq(flags.organisationId, organisationId),
+      sql`${flags.resolvedAt} IS NULL`
+    ));
+    
+    // Build lookup maps: surgeryImplantId -> patientId, operationId -> patientId
+    const opToPatient = new Map<string, string>();
+    const siToOp = new Map<string, string>();
+    
+    const allOps = await db.select({ id: operations.id, patientId: operations.patientId })
+      .from(operations).where(eq(operations.organisationId, organisationId));
+    for (const op of allOps) {
+      opToPatient.set(op.id, op.patientId);
+    }
+    
+    const allSi = await db.select({ id: surgeryImplants.id, surgeryId: surgeryImplants.surgeryId })
+      .from(surgeryImplants).where(eq(surgeryImplants.organisationId, organisationId));
+    for (const si of allSi) {
+      siToOp.set(si.id, si.surgeryId);
+    }
+    
+    // Group flags by patient
+    const patientFlagsMap = new Map<string, Flag[]>();
+    
+    for (const flag of allFlags) {
+      let patientId: string | undefined;
+      
+      if (flag.entityType === "PATIENT") {
+        patientId = flag.entityId;
+      } else if (flag.entityType === "OPERATION") {
+        patientId = opToPatient.get(flag.entityId);
+      } else if (flag.entityType === "IMPLANT") {
+        const opId = siToOp.get(flag.entityId);
+        if (opId) patientId = opToPatient.get(opId);
+      }
+      
+      if (patientId) {
+        if (!patientFlagsMap.has(patientId)) {
+          patientFlagsMap.set(patientId, []);
+        }
+        patientFlagsMap.get(patientId)!.push(flag);
+      }
+    }
+    
+    // Build summary for each patient
+    const levelPriority: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+    
+    for (const [patientId, patientFlags] of patientFlagsMap) {
+      patientFlags.sort((a, b) => {
+        const levelDiff = (levelPriority[a.level] ?? 3) - (levelPriority[b.level] ?? 3);
+        if (levelDiff !== 0) return levelDiff;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      
+      const top = patientFlags[0];
+      result.set(patientId, {
+        topFlag: {
+          type: top.type,
+          level: top.level as "CRITICAL" | "WARNING" | "INFO",
+          label: top.label,
+          createdAt: top.createdAt.toISOString(),
+        },
+        activeFlagCount: patientFlags.length,
+      });
+    }
+    
+    return result;
+  }
+  
+  async getSurgeryImplantFlagSummary(organisationId: string, surgeryImplantId: string): Promise<{ topFlag?: TopFlag; activeFlagCount: number }> {
+    const implantFlags = await db.select().from(flags).where(and(
+      eq(flags.organisationId, organisationId),
+      eq(flags.entityType, "IMPLANT"),
+      eq(flags.entityId, surgeryImplantId),
+      sql`${flags.resolvedAt} IS NULL`
+    ));
+    
+    const activeFlagCount = implantFlags.length;
+    
+    if (activeFlagCount === 0) {
+      return { activeFlagCount: 0 };
+    }
+    
+    const levelPriority: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+    implantFlags.sort((a, b) => {
+      const levelDiff = (levelPriority[a.level] ?? 3) - (levelPriority[b.level] ?? 3);
+      if (levelDiff !== 0) return levelDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    
+    const top = implantFlags[0];
+    return {
+      topFlag: {
+        type: top.type,
+        level: top.level as "CRITICAL" | "WARNING" | "INFO",
+        label: top.label,
+        createdAt: top.createdAt.toISOString(),
+      },
+      activeFlagCount,
+    };
+  }
+}
+
+// Helper function to compute latest ISQ from surgery implant fields
+export function computeLatestIsq(surgeryImplant: SurgeryImplant): LatestIsq | undefined {
+  // Check in order: 6m > 3m > 2m > pose
+  if (surgeryImplant.isq6m !== null && surgeryImplant.isq6m !== undefined) {
+    return { value: surgeryImplant.isq6m, label: "6m" };
+  }
+  if (surgeryImplant.isq3m !== null && surgeryImplant.isq3m !== undefined) {
+    return { value: surgeryImplant.isq3m, label: "3m" };
+  }
+  if (surgeryImplant.isq2m !== null && surgeryImplant.isq2m !== undefined) {
+    return { value: surgeryImplant.isq2m, label: "2m" };
+  }
+  if (surgeryImplant.isqPose !== null && surgeryImplant.isqPose !== undefined) {
+    return { value: surgeryImplant.isqPose, label: "pose" };
+  }
+  return undefined;
 }
 
 export const storage = new DatabaseStorage();

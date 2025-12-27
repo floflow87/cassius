@@ -41,11 +41,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { PatientForm } from "@/components/patient-form";
 import { CassiusBadge, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import { AdvancedFilterDrawer, FilterChips, type FilterGroup } from "@/components/advanced-filter-drawer";
-import { CompactFlagList } from "@/components/flag-badge";
+import { CompactFlagList, TopFlagSummary } from "@/components/flag-badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Patient, FlagWithEntity } from "@shared/schema";
-import type { FilterRule, PatientSearchResult } from "@shared/types";
+import type { FilterRule, PatientSearchResult, TopFlag } from "@shared/types";
 import { AlertTriangle } from "lucide-react";
 
 interface PatientsPageProps {
@@ -188,16 +188,18 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   });
 
   // OPTIMIZATION: Combined summary endpoint - reduces 3 API calls to 1 (when no filters)
+  // Now includes flag summaries per patient
   const { data: summaryData, isLoading: isSummaryLoading } = useQuery<{
     patients: Patient[];
     implantCounts: Record<string, number>;
     lastVisits: Record<string, { date: string; titre: string | null }>;
+    flagsByPatient: Record<string, { topFlag?: TopFlag; activeFlagCount: number }>;
   }>({
     queryKey: ["/api/patients/summary"],
     enabled: !hasActiveFilters,
   });
 
-  // Fetch all flags with patient info
+  // Fetch all flags with patient info (fallback for when filters are active)
   const { data: allFlags = [] } = useQuery<FlagWithEntity[]>({
     queryKey: ["/api/flags", "withEntity"],
     queryFn: async () => {
@@ -205,19 +207,37 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
       if (!res.ok) throw new Error("Failed to fetch flags");
       return res.json();
     },
+    enabled: hasActiveFilters,
   });
 
-  // Group flags by patientId (includes flags from implants/operations linked to patient)
+  // Use flagsByPatient from summary endpoint, or build from allFlags when filters are active
   const flagsByPatient = useMemo(() => {
-    const grouped: Record<string, FlagWithEntity[]> = {};
+    if (summaryData?.flagsByPatient) {
+      return summaryData.flagsByPatient;
+    }
+    // Fallback: group flags by patientId when filters are active
+    const grouped: Record<string, { topFlag?: TopFlag; activeFlagCount: number }> = {};
     allFlags.forEach((flag) => {
       if (!flag.resolvedAt && flag.patientId) {
-        if (!grouped[flag.patientId]) grouped[flag.patientId] = [];
-        grouped[flag.patientId].push(flag);
+        if (!grouped[flag.patientId]) {
+          grouped[flag.patientId] = { activeFlagCount: 0 };
+        }
+        grouped[flag.patientId].activeFlagCount += 1;
+        // Set topFlag as the most critical one
+        if (!grouped[flag.patientId].topFlag || 
+            (flag.level === "CRITICAL" && grouped[flag.patientId].topFlag?.level !== "CRITICAL") ||
+            (flag.level === "WARNING" && grouped[flag.patientId].topFlag?.level === "INFO")) {
+          grouped[flag.patientId].topFlag = {
+            type: flag.type,
+            level: flag.level as "CRITICAL" | "WARNING" | "INFO",
+            label: flag.label,
+            createdAt: flag.createdAt?.toISOString?.() || String(flag.createdAt),
+          };
+        }
       }
     });
     return grouped;
-  }, [allFlags]);
+  }, [summaryData?.flagsByPatient, allFlags]);
   
   const isLoading = hasActiveFilters ? isSearchLoading : isSummaryLoading;
   const patients = hasActiveFilters ? searchData?.patients : summaryData?.patients;
@@ -279,8 +299,8 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           else comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
           break;
         case "flags":
-          const flagsA = flagsByPatient[a.id]?.length || 0;
-          const flagsB = flagsByPatient[b.id]?.length || 0;
+          const flagsA = flagsByPatient[a.id]?.activeFlagCount || 0;
+          const flagsB = flagsByPatient[b.id]?.activeFlagCount || 0;
           comparison = flagsA - flagsB;
           break;
         case "statut":
@@ -524,11 +544,11 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         }
         return <span className="text-sm text-muted-foreground">—</span>;
       case "flags":
-        const patientFlags = flagsByPatient[patient.id] || [];
-        if (patientFlags.length === 0) {
+        const patientFlagData = flagsByPatient[patient.id];
+        if (!patientFlagData || patientFlagData.activeFlagCount === 0) {
           return <span className="text-sm text-muted-foreground">—</span>;
         }
-        return <CompactFlagList flags={patientFlags} maxVisible={2} />;
+        return <TopFlagSummary topFlag={patientFlagData.topFlag} activeFlagCount={patientFlagData.activeFlagCount} />;
       case "statut":
         return (
           <CassiusBadge status={status}>
@@ -791,9 +811,12 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                       )}
                     </div>
                     
-                    {flagsByPatient[patient.id]?.length > 0 && (
+                    {flagsByPatient[patient.id]?.activeFlagCount > 0 && (
                       <div className="mt-3 pt-3 border-t">
-                        <CompactFlagList flags={flagsByPatient[patient.id]} maxVisible={2} />
+                        <TopFlagSummary 
+                          topFlag={flagsByPatient[patient.id]?.topFlag} 
+                          activeFlagCount={flagsByPatient[patient.id]?.activeFlagCount} 
+                        />
                       </div>
                     )}
                   </CardContent>
