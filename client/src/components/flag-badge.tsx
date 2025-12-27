@@ -62,13 +62,15 @@ export function FlagBadge({ flag, showResolve = false, compact = false, onResolv
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge
-            variant="secondary"
-            className={`${config.className} gap-1 cursor-default`}
-            data-testid={`flag-badge-${flag.id}`}
-          >
-            <Icon className="w-3 h-3" />
-          </Badge>
+          <span className="inline-flex">
+            <Badge
+              variant="secondary"
+              className={`${config.className} gap-1 cursor-default`}
+              data-testid={`flag-badge-${flag.id}`}
+            >
+              <Icon className="w-3 h-3" />
+            </Badge>
+          </span>
         </TooltipTrigger>
         <TooltipContent>
           <p className="font-medium">{flag.label}</p>
@@ -168,9 +170,11 @@ export function CompactFlagList({ flags, maxVisible = 3 }: CompactFlagListProps)
       {remainingCount > 0 && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Badge variant="secondary" className="text-xs cursor-pointer">
-              +{remainingCount}
-            </Badge>
+            <span className="inline-flex">
+              <Badge variant="secondary" className="text-xs cursor-pointer">
+                +{remainingCount}
+              </Badge>
+            </span>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-sm">
             <div className="space-y-2">
@@ -219,14 +223,16 @@ export function TopFlagSummary({ topFlag, activeFlagCount = 0 }: TopFlagSummaryP
     <div className="flex items-center gap-1" data-testid="top-flag-summary">
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge
-            variant="secondary"
-            className={`${config.className} gap-1 cursor-default`}
-            data-testid="top-flag-badge"
-          >
-            <Icon className="w-3 h-3" />
-            <span className="text-xs">{typeLabel}</span>
-          </Badge>
+          <span className="inline-flex">
+            <Badge
+              variant="secondary"
+              className={`${config.className} gap-1 cursor-default`}
+              data-testid="top-flag-badge"
+            >
+              <Icon className="w-3 h-3" />
+              <span className="text-xs">{typeLabel}</span>
+            </Badge>
+          </span>
         </TooltipTrigger>
         <TooltipContent>
           <p className="font-medium">{topFlag.label}</p>
