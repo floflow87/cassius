@@ -26,7 +26,12 @@ import {
   SortDesc,
   FolderClosed,
   AlertCircle,
+  Grid,
+  List,
+  UserCircle,
+  Stethoscope,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -55,6 +60,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { DocumentWithDetails } from "@shared/schema";
 import type { DocumentTree, DocumentTreeNode, DocumentFilters, UnifiedFile, TypeRadio } from "@shared/types";
 
@@ -180,29 +186,45 @@ function FileRow({
   onView, 
   onDownload, 
   onEdit, 
-  onDelete 
+  onDelete,
+  isSelected,
+  onToggleSelect,
+  onNavigateToPatient,
+  onNavigateToOperation,
 }: { 
   file: UnifiedFile;
   onView: () => void;
   onDownload: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+  onNavigateToPatient?: () => void;
+  onNavigateToOperation?: () => void;
 }) {
   const isRadio = file.sourceType === 'radio';
   
   return (
     <div
-      className="flex items-center gap-4 px-4 py-3 border-b hover-elevate cursor-pointer"
+      className="flex items-center gap-3 px-4 py-2.5 border-b hover-elevate cursor-pointer"
       onClick={onView}
       data-testid={`file-row-${file.sourceType}-${file.id}`}
     >
+      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+        <Checkbox 
+          checked={isSelected} 
+          onCheckedChange={onToggleSelect}
+          data-testid={`checkbox-file-${file.sourceType}-${file.id}`}
+        />
+      </div>
+      
       <div className="shrink-0">
         {getFileIcon(file.mimeType)}
       </div>
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium truncate">{file.title}</span>
+          <span className="text-sm truncate">{file.title}</span>
           {isRadio && file.radioType && (
             <Badge variant="secondary" className={`text-xs ${RADIO_TYPE_COLORS[file.radioType] || ''}`}>
               {RADIO_TYPE_LABELS[file.radioType] || file.radioType}
@@ -233,7 +255,7 @@ function FileRow({
         </div>
       </div>
       
-      <div className="text-sm text-muted-foreground shrink-0">
+      <div className="text-xs text-muted-foreground shrink-0">
         {formatFileSize(file.sizeBytes)}
       </div>
       
@@ -252,6 +274,18 @@ function FileRow({
             <Download className="h-4 w-4 mr-2" />
             Télécharger
           </DropdownMenuItem>
+          {onNavigateToPatient && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onNavigateToPatient(); }}>
+              <UserCircle className="h-4 w-4 mr-2" />
+              Voir le patient
+            </DropdownMenuItem>
+          )}
+          {onNavigateToOperation && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onNavigateToOperation(); }}>
+              <Stethoscope className="h-4 w-4 mr-2" />
+              Voir l'acte
+            </DropdownMenuItem>
+          )}
           {!isRadio && (
             <>
               <DropdownMenuSeparator />
@@ -275,8 +309,121 @@ function FileRow({
   );
 }
 
+function FileGridItem({ 
+  file, 
+  onView, 
+  onDownload, 
+  onEdit, 
+  onDelete,
+  isSelected,
+  onToggleSelect,
+  onNavigateToPatient,
+  onNavigateToOperation,
+  thumbnailUrl,
+}: { 
+  file: UnifiedFile;
+  onView: () => void;
+  onDownload: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+  onNavigateToPatient?: () => void;
+  onNavigateToOperation?: () => void;
+  thumbnailUrl?: string;
+}) {
+  const isRadio = file.sourceType === 'radio';
+  const isImage = file.mimeType?.startsWith('image/');
+  const isPdf = file.mimeType === 'application/pdf';
+  
+  return (
+    <div
+      className={`relative flex flex-col items-center p-3 rounded-md hover-elevate cursor-pointer border ${isSelected ? 'bg-accent border-primary' : 'border-transparent'}`}
+      onClick={onView}
+      data-testid={`file-grid-${file.sourceType}-${file.id}`}
+    >
+      <div className="absolute top-2 left-2" onClick={(e) => e.stopPropagation()}>
+        <Checkbox 
+          checked={isSelected} 
+          onCheckedChange={onToggleSelect}
+          data-testid={`checkbox-grid-${file.sourceType}-${file.id}`}
+        />
+      </div>
+      
+      <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <MoreHorizontal className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView(); }}>
+              <Eye className="h-4 w-4 mr-2" />
+              Ouvrir
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDownload(); }}>
+              <Download className="h-4 w-4 mr-2" />
+              Télécharger
+            </DropdownMenuItem>
+            {onNavigateToPatient && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onNavigateToPatient(); }}>
+                <UserCircle className="h-4 w-4 mr-2" />
+                Voir le patient
+              </DropdownMenuItem>
+            )}
+            {onNavigateToOperation && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onNavigateToOperation(); }}>
+                <Stethoscope className="h-4 w-4 mr-2" />
+                Voir l'acte
+              </DropdownMenuItem>
+            )}
+            {!isRadio && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Renommer
+                </DropdownMenuItem>
+              </>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Supprimer
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      
+      <div className="w-20 h-20 flex items-center justify-center mb-2 bg-muted/50 rounded-md overflow-hidden">
+        {thumbnailUrl && isImage ? (
+          <img src={thumbnailUrl} alt={file.title} className="w-full h-full object-cover" />
+        ) : isPdf ? (
+          <FileText className="h-10 w-10 text-red-500" />
+        ) : isImage ? (
+          <Image className="h-10 w-10 text-blue-500" />
+        ) : (
+          <File className="h-10 w-10 text-muted-foreground" />
+        )}
+      </div>
+      
+      <span className="text-xs text-center truncate w-full max-w-[100px]" title={file.title}>
+        {file.title}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {format(new Date(file.createdAt), "dd/MM/yy", { locale: fr })}
+      </span>
+    </div>
+  );
+}
+
 export default function DocumentsPage() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPath, setCurrentPath] = useState<FolderPath[]>([
     { type: 'root', name: 'Documents' }
@@ -284,10 +431,13 @@ export default function DocumentsPage() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['patients', 'operations']));
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'size'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [viewingFile, setViewingFile] = useState<{ file: UnifiedFile; url: string } | null>(null);
   const [editingDoc, setEditingDoc] = useState<UnifiedFile | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [deletingFile, setDeletingFile] = useState<UnifiedFile | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
   const currentFolder = currentPath[currentPath.length - 1];
 
@@ -364,6 +514,63 @@ export default function DocumentsPage() {
       toast({ title: "Erreur", description: "Échec du renommage", variant: "destructive" });
     },
   });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (filesToDelete: { id: string; sourceType: 'document' | 'radio' }[]) => {
+      await Promise.all(
+        filesToDelete.map(({ id, sourceType }) => {
+          const endpoint = sourceType === 'radio' ? `/api/radios/${id}` : `/api/documents/${id}`;
+          return apiRequest("DELETE", endpoint);
+        })
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents/tree"] });
+      setSelectedFiles(new Set());
+      setBulkDeleteConfirm(false);
+      toast({ title: "Fichiers supprimés" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Échec de la suppression", variant: "destructive" });
+    },
+  });
+
+  const toggleFileSelection = (fileKey: string) => {
+    setSelectedFiles(prev => {
+      const next = new Set(prev);
+      if (next.has(fileKey)) {
+        next.delete(fileKey);
+      } else {
+        next.add(fileKey);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedFiles.size === files.length) {
+      setSelectedFiles(new Set());
+    } else {
+      setSelectedFiles(new Set(files.map(f => `${f.sourceType}-${f.id}`)));
+    }
+  };
+
+  const getSelectedFilesData = () => {
+    return files.filter(f => selectedFiles.has(`${f.sourceType}-${f.id}`));
+  };
+
+  const handleBulkDownload = async () => {
+    const selected = getSelectedFilesData();
+    for (const file of selected) {
+      await handleDownload(file);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    const selected = getSelectedFilesData();
+    bulkDeleteMutation.mutate(selected.map(f => ({ id: f.id, sourceType: f.sourceType })));
+  };
 
   const handleNavigate = (index: number) => {
     setCurrentPath(currentPath.slice(0, index + 1));
@@ -548,23 +755,49 @@ export default function DocumentsPage() {
       </aside>
       
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b bg-card">
+        <div className="flex items-center justify-between gap-4 px-6 py-3 border-b bg-card">
           <Breadcrumb path={currentPath} onNavigate={handleNavigate} />
           
           <div className="flex items-center gap-2">
+            {selectedFiles.size > 0 && (
+              <div className="flex items-center gap-2 mr-2 pr-2 border-r">
+                <span className="text-sm text-muted-foreground">
+                  {selectedFiles.size} sélectionné{selectedFiles.size > 1 ? 's' : ''}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBulkDownload}
+                  data-testid="button-bulk-download"
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Télécharger
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkDeleteConfirm(true)}
+                  data-testid="button-bulk-delete"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Supprimer
+                </Button>
+              </div>
+            )}
+            
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-64"
+                className="pl-9 w-48"
                 data-testid="input-search-documents"
               />
             </div>
             
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-              <SelectTrigger className="w-32" data-testid="select-sort">
+              <SelectTrigger className="w-28" data-testid="select-sort">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -582,6 +815,27 @@ export default function DocumentsPage() {
             >
               {sortDir === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
             </Button>
+            
+            <div className="flex border rounded-md">
+              <Button
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="rounded-r-none"
+                onClick={() => setViewMode('list')}
+                data-testid="button-view-list"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="rounded-l-none"
+                onClick={() => setViewMode('grid')}
+                data-testid="button-view-grid"
+              >
+                <Grid className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
         
@@ -598,10 +852,15 @@ export default function DocumentsPage() {
               <p className="text-lg font-medium">Aucun fichier</p>
               <p className="text-sm">Ce dossier est vide</p>
             </div>
-          ) : (
+          ) : viewMode === 'list' ? (
             <div>
-              <div className="px-4 py-2 text-xs text-muted-foreground border-b bg-muted/50">
-                {totalCount} fichier{totalCount > 1 ? 's' : ''}
+              <div className="flex items-center gap-3 px-4 py-2 text-xs text-muted-foreground border-b bg-muted/50">
+                <Checkbox 
+                  checked={selectedFiles.size === files.length && files.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                  data-testid="checkbox-select-all"
+                />
+                <span>{totalCount} fichier{totalCount > 1 ? 's' : ''}</span>
               </div>
               {files.map(file => (
                 <FileRow
@@ -611,8 +870,39 @@ export default function DocumentsPage() {
                   onDownload={() => handleDownload(file)}
                   onEdit={() => handleStartEdit(file)}
                   onDelete={() => setDeletingFile(file)}
+                  isSelected={selectedFiles.has(`${file.sourceType}-${file.id}`)}
+                  onToggleSelect={() => toggleFileSelection(`${file.sourceType}-${file.id}`)}
+                  onNavigateToPatient={file.patientId ? () => setLocation(`/patients/${file.patientId}`) : undefined}
+                  onNavigateToOperation={file.operationId ? () => setLocation(`/operations/${file.operationId}`) : undefined}
                 />
               ))}
+            </div>
+          ) : (
+            <div className="p-4">
+              <div className="flex items-center gap-3 px-2 py-2 text-xs text-muted-foreground mb-2">
+                <Checkbox 
+                  checked={selectedFiles.size === files.length && files.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                  data-testid="checkbox-select-all-grid"
+                />
+                <span>{totalCount} fichier{totalCount > 1 ? 's' : ''}</span>
+              </div>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
+                {files.map(file => (
+                  <FileGridItem
+                    key={`${file.sourceType}-${file.id}`}
+                    file={file}
+                    onView={() => handleView(file)}
+                    onDownload={() => handleDownload(file)}
+                    onEdit={() => handleStartEdit(file)}
+                    onDelete={() => setDeletingFile(file)}
+                    isSelected={selectedFiles.has(`${file.sourceType}-${file.id}`)}
+                    onToggleSelect={() => toggleFileSelection(`${file.sourceType}-${file.id}`)}
+                    onNavigateToPatient={file.patientId ? () => setLocation(`/patients/${file.patientId}`) : undefined}
+                    onNavigateToOperation={file.operationId ? () => setLocation(`/operations/${file.operationId}`) : undefined}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </ScrollArea>
@@ -720,6 +1010,33 @@ export default function DocumentsPage() {
               onClick={() => deletingFile && deleteMutation.mutate({ id: deletingFile.id, sourceType: deletingFile.sourceType })}
               disabled={deleteMutation.isPending}
               data-testid="button-confirm-delete"
+            >
+              Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={bulkDeleteConfirm} onOpenChange={() => setBulkDeleteConfirm(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Supprimer {selectedFiles.size} fichier{selectedFiles.size > 1 ? 's' : ''}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            Êtes-vous sûr de vouloir supprimer {selectedFiles.size} fichier{selectedFiles.size > 1 ? 's' : ''} ? Cette action est irréversible.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDeleteConfirm(false)}>
+              Annuler
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDelete}
+              disabled={bulkDeleteMutation.isPending}
+              data-testid="button-confirm-bulk-delete"
             >
               Supprimer
             </Button>
