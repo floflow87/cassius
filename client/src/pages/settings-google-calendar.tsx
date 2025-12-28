@@ -215,8 +215,19 @@ export default function GoogleCalendarIntegration() {
                 )}
                 
                 <p className="text-sm text-muted-foreground">
-                  Cliquez sur le bouton ci-dessous pour connecter votre compte Google et activer la synchronisation.
+                  Pour connecter Google Calendar, utilisez le panneau "Intégrations" de Replit (icône puzzle dans la barre latérale) et configurez le connecteur Google Calendar.
                 </p>
+                
+                <div className="flex gap-2 flex-wrap">
+                  <Button 
+                    variant="outline"
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] })}
+                    data-testid="button-refresh-status"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Vérifier la connexion
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
