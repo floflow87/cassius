@@ -1,90 +1,219 @@
-// Google Calendar Integration - Replit Connector
-// Uses the Replit connector for secure OAuth token management
+// Google Calendar Integration - Standard OAuth 2.0 Implementation
+// Multi-tenant: Each organization stores their own OAuth tokens
 
 import { google, calendar_v3 } from 'googleapis';
+import crypto from 'crypto';
 
-let connectionSettings: any;
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/userinfo.email',
+];
 
-async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
-  }
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
-  }
-
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-calendar',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('Google Calendar not connected');
-  }
-  return accessToken;
+interface OAuthConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
 }
 
-export async function getGoogleCalendarClient(): Promise<calendar_v3.Calendar> {
-  const accessToken = await getAccessToken();
+interface TokenData {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: Date;
+  scope: string;
+  email?: string;
+}
 
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({
-    access_token: accessToken
+interface StoredIntegration {
+  accessToken: string | null;
+  refreshToken: string | null;
+  tokenExpiresAt: Date | null;
+}
+
+function getOAuthConfig(): OAuthConfig {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new Error('Google OAuth configuration missing. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI environment variables.');
+  }
+
+  return { clientId, clientSecret, redirectUri };
+}
+
+function createOAuth2Client(): InstanceType<typeof google.auth.OAuth2> {
+  const config = getOAuthConfig();
+  return new google.auth.OAuth2(config.clientId, config.clientSecret, config.redirectUri);
+}
+
+// State parameter signing for CSRF protection
+const STATE_SECRET = process.env.SESSION_SECRET || 'cassius-oauth-state-secret';
+
+export function generateSignedState(organisationId: string): string {
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const payload = JSON.stringify({ organisationId, nonce, ts: Date.now() });
+  const signature = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex');
+  const state = Buffer.from(JSON.stringify({ payload, signature })).toString('base64url');
+  return state;
+}
+
+export function verifySignedState(state: string): { organisationId: string } | null {
+  try {
+    const decoded = JSON.parse(Buffer.from(state, 'base64url').toString('utf-8'));
+    const { payload, signature } = decoded;
+    const expectedSignature = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex');
+    
+    if (signature !== expectedSignature) {
+      console.error('State signature mismatch');
+      return null;
+    }
+    
+    const data = JSON.parse(payload);
+    
+    // Check state is not expired (15 minutes max)
+    if (Date.now() - data.ts > 15 * 60 * 1000) {
+      console.error('State expired');
+      return null;
+    }
+    
+    return { organisationId: data.organisationId };
+  } catch (error) {
+    console.error('Failed to verify state:', error);
+    return null;
+  }
+}
+
+export function generateAuthUrl(organisationId: string): string {
+  const oauth2Client = createOAuth2Client();
+  const state = generateSignedState(organisationId);
+  
+  return oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: SCOPES,
+    state,
+    prompt: 'consent', // Force consent to get refresh token
   });
+}
 
+export async function exchangeCodeForTokens(code: string): Promise<TokenData> {
+  const oauth2Client = createOAuth2Client();
+  
+  const { tokens } = await oauth2Client.getToken(code);
+  
+  if (!tokens.access_token || !tokens.refresh_token) {
+    throw new Error('Failed to obtain access and refresh tokens');
+  }
+  
+  // Get user email
+  oauth2Client.setCredentials(tokens);
+  const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+  const userInfo = await oauth2.userinfo.get();
+  
+  return {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresAt: new Date(tokens.expiry_date || Date.now() + 3600 * 1000),
+    scope: tokens.scope || SCOPES.join(' '),
+    email: userInfo.data.email || undefined,
+  };
+}
+
+export async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresAt: Date }> {
+  const oauth2Client = createOAuth2Client();
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
+  
+  const { credentials } = await oauth2Client.refreshAccessToken();
+  
+  if (!credentials.access_token) {
+    throw new Error('Failed to refresh access token');
+  }
+  
+  return {
+    accessToken: credentials.access_token,
+    expiresAt: new Date(credentials.expiry_date || Date.now() + 3600 * 1000),
+  };
+}
+
+export async function getGoogleCalendarClient(integration: StoredIntegration): Promise<calendar_v3.Calendar> {
+  if (!integration.accessToken || !integration.refreshToken) {
+    throw new Error('Google Calendar not connected');
+  }
+  
+  const oauth2Client = createOAuth2Client();
+  
+  // Check if token is expired or about to expire (5 min buffer)
+  const needsRefresh = !integration.tokenExpiresAt || 
+    new Date(integration.tokenExpiresAt).getTime() < Date.now() + 5 * 60 * 1000;
+  
+  if (needsRefresh) {
+    const refreshed = await refreshAccessToken(integration.refreshToken);
+    oauth2Client.setCredentials({
+      access_token: refreshed.accessToken,
+      refresh_token: integration.refreshToken,
+    });
+    // Note: Caller should update the stored token with refreshed values
+  } else {
+    oauth2Client.setCredentials({
+      access_token: integration.accessToken,
+      refresh_token: integration.refreshToken,
+    });
+  }
+  
   return google.calendar({ version: 'v3', auth: oauth2Client });
 }
 
-export async function isGoogleCalendarConnected(): Promise<boolean> {
+export function isConfigured(): boolean {
   try {
-    await getAccessToken();
+    getOAuthConfig();
     return true;
   } catch {
     return false;
   }
 }
 
-export async function getGoogleCalendarStatus(): Promise<{
+export async function getGoogleCalendarStatus(integration: StoredIntegration | null): Promise<{
   connected: boolean;
+  configured: boolean;
   email?: string;
   error?: string;
 }> {
+  const configured = isConfigured();
+  
+  if (!configured) {
+    return {
+      connected: false,
+      configured: false,
+      error: 'Google OAuth non configuré. Définissez GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et GOOGLE_REDIRECT_URI.',
+    };
+  }
+  
+  if (!integration || !integration.accessToken || !integration.refreshToken) {
+    return {
+      connected: false,
+      configured: true,
+    };
+  }
+  
   try {
-    const client = await getGoogleCalendarClient();
-    const settings = await client.settings.get({ setting: 'timezone' });
-    
-    // Try to get user email from connection settings
-    const email = connectionSettings?.settings?.email || connectionSettings?.settings?.oauth?.email;
+    const client = await getGoogleCalendarClient(integration);
+    await client.settings.get({ setting: 'timezone' });
     
     return {
       connected: true,
-      email: email || undefined,
+      configured: true,
     };
   } catch (error: any) {
     return {
       connected: false,
+      configured: true,
       error: error.message,
     };
   }
 }
 
-export async function listCalendars(): Promise<Array<{ id: string; summary: string; primary: boolean }>> {
-  const client = await getGoogleCalendarClient();
+export async function listCalendars(integration: StoredIntegration): Promise<Array<{ id: string; summary: string; primary: boolean }>> {
+  const client = await getGoogleCalendarClient(integration);
   const response = await client.calendarList.list();
   
   return (response.data.items || []).map(cal => ({
@@ -103,8 +232,8 @@ export interface CreateEventParams {
   cassiusAppointmentId: string;
 }
 
-export async function createCalendarEvent(params: CreateEventParams): Promise<{ eventId: string; etag: string }> {
-  const client = await getGoogleCalendarClient();
+export async function createCalendarEvent(integration: StoredIntegration, params: CreateEventParams): Promise<{ eventId: string; etag: string }> {
+  const client = await getGoogleCalendarClient(integration);
   
   const event: calendar_v3.Schema$Event = {
     summary: params.summary,
@@ -145,8 +274,8 @@ export interface UpdateEventParams {
   cassiusAppointmentId: string;
 }
 
-export async function updateCalendarEvent(params: UpdateEventParams): Promise<{ etag: string }> {
-  const client = await getGoogleCalendarClient();
+export async function updateCalendarEvent(integration: StoredIntegration, params: UpdateEventParams): Promise<{ etag: string }> {
+  const client = await getGoogleCalendarClient(integration);
   
   const event: calendar_v3.Schema$Event = {
     summary: params.summary,
@@ -177,8 +306,8 @@ export async function updateCalendarEvent(params: UpdateEventParams): Promise<{ 
   };
 }
 
-export async function deleteCalendarEvent(calendarId: string, eventId: string): Promise<void> {
-  const client = await getGoogleCalendarClient();
+export async function deleteCalendarEvent(integration: StoredIntegration, calendarId: string, eventId: string): Promise<void> {
+  const client = await getGoogleCalendarClient(integration);
   
   try {
     await client.events.delete({
@@ -186,15 +315,14 @@ export async function deleteCalendarEvent(calendarId: string, eventId: string): 
       eventId,
     });
   } catch (error: any) {
-    // If event already deleted (404), ignore
     if (error.code !== 404) {
       throw error;
     }
   }
 }
 
-export async function getCalendarEvent(calendarId: string, eventId: string): Promise<calendar_v3.Schema$Event | null> {
-  const client = await getGoogleCalendarClient();
+export async function getCalendarEvent(integration: StoredIntegration, calendarId: string, eventId: string): Promise<calendar_v3.Schema$Event | null> {
+  const client = await getGoogleCalendarClient(integration);
   
   try {
     const response = await client.events.get({
