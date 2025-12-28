@@ -100,6 +100,18 @@ Implant tracking uses `implants` (catalog) and `surgery_implants` (placement dat
     - Features: breadcrumb navigation, search, sort (date/name/size), document actions (view, download, rename, delete).
     - Document viewer modal for inline viewing of images and PDFs.
     - Documents can optionally link to operations via `operationId` foreign key.
+- **Calendar Page**:
+    - Professional scheduling page at `/calendar` using FullCalendar library.
+    - Views: Day, Week, Month, and Agenda (list) views with toggle buttons.
+    - 3-column layout: Filters sidebar (mini calendar, type/status filters), main calendar grid, appointment details drawer.
+    - API: `GET /api/appointments/calendar` with date range filtering (start, end) and optional filters (types[], statuses[], patientId, operationId).
+    - Shared types: `CalendarAppointment`, `CalendarFilters` in `shared/types.ts`.
+    - Features: Drag-and-drop rescheduling, quick appointment creation on date click, event click opens detail drawer.
+    - Appointment types with color coding: CONSULTATION (blue), SUIVI (green), CHIRURGIE (red), CONTROLE (yellow), URGENCE (orange), AUTRE (gray).
+    - AppointmentDrawer: View details, mark complete/cancelled, delete appointments.
+    - QuickCreateDialog: Inline form for rapid appointment creation with patient selection.
+    - Custom CSS styling for FullCalendar matching the design system with dark mode support.
+    - Navigation: Sidebar link and header calendar button.
 
 ## External Dependencies
 
