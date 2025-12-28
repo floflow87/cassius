@@ -9,7 +9,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay, parse } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, User, Plus, Check, Pencil, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -248,6 +248,186 @@ function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, on
   );
 }
 
+interface CalendarSearchProps {
+  appointments: CalendarAppointment[];
+  onSelectAppointment: (id: string) => void;
+  onSelectDate: (date: Date) => void;
+  onSelectPatient: (patientId: string) => void;
+}
+
+function CalendarSearch({ appointments, onSelectAppointment, onSelectDate, onSelectPatient }: CalendarSearchProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  
+  const { data: patients = [] } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
+    enabled: searchQuery.length > 0,
+  });
+  
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return { appointments: [], patients: [], dateMatch: null };
+    
+    const query = searchQuery.toLowerCase().trim();
+    
+    // Try to parse as date
+    let dateMatch: Date | null = null;
+    const datePatterns = [
+      { pattern: /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, format: "dd/MM/yyyy" },
+      { pattern: /^(\d{1,2})\/(\d{1,2})$/, format: "dd/MM" },
+      { pattern: /^(\d{4})-(\d{2})-(\d{2})$/, format: "yyyy-MM-dd" },
+    ];
+    
+    for (const { pattern, format: fmt } of datePatterns) {
+      if (pattern.test(searchQuery)) {
+        try {
+          let parsedDate: Date;
+          if (fmt === "dd/MM") {
+            const currentYear = new Date().getFullYear();
+            parsedDate = parse(`${searchQuery}/${currentYear}`, "dd/MM/yyyy", new Date());
+          } else {
+            parsedDate = parse(searchQuery, fmt, new Date());
+          }
+          if (!isNaN(parsedDate.getTime())) {
+            dateMatch = parsedDate;
+            break;
+          }
+        } catch {}
+      }
+    }
+    
+    // Search appointments
+    const matchedAppointments = appointments
+      .filter(apt => {
+        const title = (apt.title || "").toLowerCase();
+        const patientName = `${apt.patientPrenom} ${apt.patientNom}`.toLowerCase();
+        return title.includes(query) || patientName.includes(query);
+      })
+      .slice(0, 5);
+    
+    // Search patients
+    const matchedPatients = patients
+      .filter(p => {
+        const name = `${p.prenom} ${p.nom}`.toLowerCase();
+        return name.includes(query);
+      })
+      .slice(0, 3);
+    
+    return {
+      appointments: matchedAppointments,
+      patients: matchedPatients,
+      dateMatch,
+    };
+  }, [searchQuery, appointments, patients]);
+  
+  const hasResults = searchResults.appointments.length > 0 || 
+                     searchResults.patients.length > 0 || 
+                     searchResults.dateMatch !== null;
+  
+  const handleSelect = (type: "appointment" | "patient" | "date", id?: string, date?: Date) => {
+    if (type === "appointment" && id) {
+      onSelectAppointment(id);
+    } else if (type === "date" && date) {
+      onSelectDate(date);
+    } else if (type === "patient" && id) {
+      onSelectPatient(id);
+    }
+    setIsOpen(false);
+    setSearchQuery("");
+  };
+  
+  return (
+    <div className="relative" data-testid="calendar-search">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          ref={inputRef}
+          type="text"
+          placeholder="Rechercher..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => setTimeout(() => setIsOpen(false), 200)}
+          className="pl-9 w-64"
+          data-testid="input-calendar-search"
+        />
+      </div>
+      
+      {isOpen && searchQuery.trim() && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 overflow-hidden" data-testid="search-results">
+          {!hasResults ? (
+            <div className="p-3 text-sm text-muted-foreground text-center" data-testid="text-no-results">
+              Aucun résultat
+            </div>
+          ) : (
+            <div className="max-h-80 overflow-auto">
+              {searchResults.dateMatch && (
+                <div className="p-2 border-b">
+                  <div className="text-xs text-muted-foreground px-2 mb-1">Date</div>
+                  <button
+                    className="w-full text-left px-2 py-1.5 rounded hover-elevate flex items-center gap-2"
+                    onClick={() => handleSelect("date", undefined, searchResults.dateMatch!)}
+                    data-testid="search-result-date"
+                  >
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">
+                      {format(searchResults.dateMatch, "EEEE d MMMM yyyy", { locale: fr })}
+                    </span>
+                  </button>
+                </div>
+              )}
+              
+              {searchResults.appointments.length > 0 && (
+                <div className="p-2 border-b">
+                  <div className="text-xs text-muted-foreground px-2 mb-1">Rendez-vous</div>
+                  {searchResults.appointments.map(apt => (
+                    <button
+                      key={apt.id}
+                      className="w-full text-left px-2 py-1.5 rounded hover-elevate"
+                      onClick={() => handleSelect("appointment", apt.id)}
+                      data-testid={`search-result-appointment-${apt.id}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${getAppointmentColor(apt.type)}`} />
+                        <span className="text-sm font-medium truncate">{apt.title || `RDV - ${apt.patientPrenom} ${apt.patientNom}`}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground pl-4">
+                        {format(new Date(apt.dateStart), "d MMM yyyy HH:mm", { locale: fr })}
+                        {" - "}
+                        {apt.patientPrenom} {apt.patientNom}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {searchResults.patients.length > 0 && (
+                <div className="p-2">
+                  <div className="text-xs text-muted-foreground px-2 mb-1">Patients</div>
+                  {searchResults.patients.map(patient => (
+                    <button
+                      key={patient.id}
+                      className="w-full text-left px-2 py-1.5 rounded hover-elevate flex items-center gap-2"
+                      onClick={() => handleSelect("patient", patient.id)}
+                      data-testid={`search-result-patient-${patient.id}`}
+                    >
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{patient.prenom} {patient.nom}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const editFormSchema = z.object({
   title: z.string().min(1, "Titre requis"),
   type: z.enum(["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"]),
@@ -311,7 +491,20 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
   
   const cancelEditing = () => {
     setIsEditing(false);
-    form.reset();
+    // Reset to current appointment values, not schema defaults
+    if (appointment) {
+      const dateStart = new Date(appointment.dateStart);
+      form.reset({
+        title: appointment.title || "",
+        type: appointment.type as EditFormData["type"],
+        status: appointment.status as EditFormData["status"],
+        dateStart: format(dateStart, "yyyy-MM-dd"),
+        timeStart: format(dateStart, "HH:mm"),
+        timeEnd: appointment.dateEnd ? format(new Date(appointment.dateEnd), "HH:mm") : "",
+        description: appointment.description || "",
+        isq: appointment.isq?.toString() || "",
+      });
+    }
   };
   
   const updateMutation = useMutation({
@@ -1061,6 +1254,18 @@ export default function CalendarPage() {
           </div>
           
           <div className="flex items-center gap-2">
+            <CalendarSearch
+              appointments={appointments}
+              onSelectAppointment={(id) => {
+                setDrawerAppointmentId(id);
+                setDrawerOpen(true);
+              }}
+              onSelectDate={handleMiniCalendarSelect}
+              onSelectPatient={(patientId) => {
+                navigate(`/patients/${patientId}`);
+              }}
+            />
+            
             <div className="flex border rounded-md">
               {[
                 { key: "timeGridDay", label: "Jour" },
