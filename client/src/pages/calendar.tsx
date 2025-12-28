@@ -1173,10 +1173,13 @@ export default function CalendarPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // Use a ref to store the initial date (only set once on mount)
+  const initialDateRef = useRef(new Date());
+  
+  const [selectedDate, setSelectedDate] = useState(() => initialDateRef.current);
   const [currentView, setCurrentView] = useState<"dayGridMonth" | "timeGridWeek" | "timeGridDay" | "listWeek">("timeGridWeek");
   const [dateRange, setDateRange] = useState(() => {
-    const now = new Date();
+    const now = initialDateRef.current;
     return {
       start: format(startOfMonth(subMonths(now, 1)), "yyyy-MM-dd"),
       end: format(endOfMonth(addMonths(now, 1)), "yyyy-MM-dd"),
@@ -1408,53 +1411,55 @@ export default function CalendarPage() {
           </div>
         </div>
         
-        <div className="flex-1 p-4 overflow-auto">
-          {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-96 w-full" />
+        <div className="flex-1 p-4 overflow-auto relative">
+          {isLoading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50">
+              <div className="space-y-2 w-full max-w-md">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-8 w-3/4" />
+              </div>
             </div>
-          ) : (
-            <FullCalendar
-              ref={calendarRef}
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-              initialView={currentView}
-              locale="fr"
-              headerToolbar={false}
-              events={events}
-              editable={true}
-              selectable={true}
-              selectMirror={true}
-              dayMaxEvents={true}
-              weekends={true}
-              firstDay={1}
-              slotMinTime="07:00:00"
-              slotMaxTime="21:00:00"
-              slotDuration="00:30:00"
-              eventClick={handleEventClick}
-              dateClick={handleDateClick}
-              eventDrop={handleEventDrop}
-              datesSet={handleDatesSet}
-              eventContent={renderEventContent}
-              height="100%"
-              allDaySlot={false}
-              nowIndicator={true}
-              slotLabelFormat={{
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              }}
-              eventTimeFormat={{
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              }}
-              dayHeaderFormat={{
-                weekday: "short",
-                day: "numeric",
-              }}
-            />
           )}
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+            initialView={currentView}
+            initialDate={initialDateRef.current}
+            locale="fr"
+            headerToolbar={false}
+            events={events}
+            editable={true}
+            selectable={true}
+            selectMirror={true}
+            dayMaxEvents={true}
+            weekends={true}
+            firstDay={1}
+            slotMinTime="07:00:00"
+            slotMaxTime="21:00:00"
+            slotDuration="00:30:00"
+            eventClick={handleEventClick}
+            dateClick={handleDateClick}
+            eventDrop={handleEventDrop}
+            datesSet={handleDatesSet}
+            eventContent={renderEventContent}
+            height="100%"
+            allDaySlot={false}
+            nowIndicator={true}
+            slotLabelFormat={{
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }}
+            eventTimeFormat={{
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }}
+            dayHeaderFormat={{
+              weekday: "short",
+              day: "numeric",
+            }}
+          />
         </div>
       </div>
       
