@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { CalendarAppointment, CalendarFilters, Patient } from "@shared/types";
 import type { AppointmentWithDetails } from "@shared/schema";
 import type { EventClickArg, EventDropArg, EventContentArg } from "@fullcalendar/core";
+import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 
 const appointmentTypes = [
   { value: "CONSULTATION", label: "Consultation", color: "bg-blue-500" },
@@ -1277,6 +1278,15 @@ export default function CalendarPage() {
     });
   }, [updateMutation]);
   
+  const handleEventResize = useCallback((info: EventResizeDoneArg) => {
+    const { event } = info;
+    updateMutation.mutate({
+      id: event.id,
+      dateStart: event.start!,
+      dateEnd: event.end || undefined,
+    });
+  }, [updateMutation]);
+  
   const handleDatesSet = useCallback((info: { start: Date; end: Date; view: { currentStart: Date } }) => {
     setDateRange({
       start: format(info.start, "yyyy-MM-dd"),
@@ -1312,13 +1322,30 @@ export default function CalendarPage() {
   
   const renderEventContent = (eventInfo: EventContentArg) => {
     const { type, status, patientNom, patientPrenom, isq } = eventInfo.event.extendedProps;
+    const start = eventInfo.event.start;
+    const end = eventInfo.event.end;
+    
+    // Calculate event duration in minutes for conditional display
+    let durationMinutes = 30; // default
+    if (start && end) {
+      durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+    }
+    
+    // Show time for events >= 45 minutes in time-based views
+    const showTime = durationMinutes >= 45 && eventInfo.view.type !== "dayGridMonth" && eventInfo.view.type !== "listWeek";
     
     return (
       <div className="p-1 text-xs overflow-hidden" data-testid={`calendar-event-${eventInfo.event.id}`}>
+        {showTime && start && (
+          <div className="text-white/70 text-[10px]">
+            {format(start, "HH:mm")}
+            {end && ` - ${format(end, "HH:mm")}`}
+          </div>
+        )}
         <div className="font-medium truncate text-white">
           {eventInfo.event.title}
         </div>
-        {eventInfo.view.type !== "dayGridMonth" && (
+        {eventInfo.view.type !== "dayGridMonth" && durationMinutes >= 30 && (
           <div className="text-white/80 truncate">
             {patientPrenom} {patientNom}
             {isq !== null && isq !== undefined && ` • ISQ ${isq}`}
@@ -1440,6 +1467,7 @@ export default function CalendarPage() {
             eventClick={handleEventClick}
             dateClick={handleDateClick}
             eventDrop={handleEventDrop}
+            eventResize={handleEventResize}
             datesSet={handleDatesSet}
             eventContent={renderEventContent}
             height="100%"
