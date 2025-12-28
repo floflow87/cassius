@@ -160,8 +160,9 @@ interface CalendarSidebarProps {
   filters: {
     types: string[];
     statuses: string[];
+    showOnlyAtRisk: boolean;
   };
-  onFiltersChange: (filters: { types: string[]; statuses: string[] }) => void;
+  onFiltersChange: (filters: { types: string[]; statuses: string[]; showOnlyAtRisk: boolean }) => void;
 }
 
 function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, onFiltersChange }: CalendarSidebarProps) {
@@ -198,12 +199,16 @@ function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, on
     onFiltersChange({ ...filters, statuses: newStatuses });
   };
   
-  const clearFilters = () => {
-    onFiltersChange({ types: [], statuses: [] });
+  const toggleAtRisk = () => {
+    onFiltersChange({ ...filters, showOnlyAtRisk: !filters.showOnlyAtRisk });
   };
   
-  const hasFilters = filters.types.length > 0 || filters.statuses.length > 0;
-  const filterCount = filters.types.length + filters.statuses.length;
+  const clearFilters = () => {
+    onFiltersChange({ types: [], statuses: [], showOnlyAtRisk: false });
+  };
+  
+  const hasFilters = filters.types.length > 0 || filters.statuses.length > 0 || filters.showOnlyAtRisk;
+  const filterCount = filters.types.length + filters.statuses.length + (filters.showOnlyAtRisk ? 1 : 0);
   
   return (
     <div className="w-64 border-r bg-muted/30 flex flex-col shrink-0" data-testid="calendar-sidebar">
@@ -287,6 +292,21 @@ function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, on
                       </label>
                     ))}
                   </div>
+                </div>
+                
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Alertes</Label>
+                  <label 
+                    className="flex items-center gap-2 cursor-pointer"
+                    data-testid="filter-at-risk"
+                  >
+                    <Checkbox
+                      checked={filters.showOnlyAtRisk}
+                      onCheckedChange={toggleAtRisk}
+                    />
+                    <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+                    <span className="text-sm">RDV à risque</span>
+                  </label>
                 </div>
               </div>
             </div>
@@ -1234,9 +1254,10 @@ export default function CalendarPage() {
       end: format(endOfMonth(addMonths(now, 1)), "yyyy-MM-dd"),
     };
   });
-  const [filters, setFilters] = useState<{ types: string[]; statuses: string[] }>({
+  const [filters, setFilters] = useState<{ types: string[]; statuses: string[]; showOnlyAtRisk: boolean }>({
     types: [],
     statuses: [],
+    showOnlyAtRisk: false,
   });
   
   const [drawerAppointmentId, setDrawerAppointmentId] = useState<string | null>(null);
@@ -1275,7 +1296,14 @@ export default function CalendarPage() {
   });
   
   const events = useMemo(() => {
-    return appointments.map(apt => ({
+    let filteredAppointments = appointments;
+    
+    // Apply at-risk filter if enabled (client-side)
+    if (filters.showOnlyAtRisk) {
+      filteredAppointments = appointments.filter(apt => apt.hasCriticalFlag);
+    }
+    
+    return filteredAppointments.map(apt => ({
       id: apt.id,
       title: apt.title || (apt.patientPrenom && apt.patientNom ? `${apt.patientPrenom} ${apt.patientNom}` : "Nouveau rdv"),
       start: apt.dateStart,
@@ -1292,7 +1320,7 @@ export default function CalendarPage() {
       borderColor: "transparent",
       classNames: [getAppointmentColor(apt.type)],
     }));
-  }, [appointments]);
+  }, [appointments, filters.showOnlyAtRisk]);
   
   const updateMutation = useMutation({
     mutationFn: async ({ id, dateStart, dateEnd }: { id: string; dateStart: Date; dateEnd?: Date }) => {
