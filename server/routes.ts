@@ -2327,29 +2327,101 @@ export async function registerRoutes(
   });
 
   // ============================================
-  // Google Calendar Integration Routes
-  // Multi-tenant architecture: supports org-level (default) and user-level integrations
-  // - Org-level: userId=null, shared across all users in organisation
-  // - User-level: userId set, overrides org-level for that specific user
-  // Phase A: Org-level integration, infrastructure ready for user-level
+  // Google Calendar Integration Routes - OAuth 2.0
+  // Multi-tenant: Each organization stores their own OAuth tokens
   // ============================================
+
+  // Initiate OAuth flow - redirects to Google consent screen
+  app.get("/api/integrations/google/connect", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      if (!googleCalendar.isConfigured()) {
+        return res.status(500).json({ 
+          error: "Google OAuth non configuré. Contactez l'administrateur." 
+        });
+      }
+
+      const authUrl = googleCalendar.generateAuthUrl(organisationId);
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error("Error generating auth URL:", error);
+      res.status(500).json({ error: error.message || "Failed to initiate OAuth" });
+    }
+  });
+
+  // OAuth callback - handles the redirect from Google
+  app.get("/api/integrations/google/callback", async (req, res) => {
+    const { code, state, error: oauthError } = req.query;
+    const baseUrl = process.env.APP_BASE_URL || '';
+
+    if (oauthError) {
+      console.error("OAuth error:", oauthError);
+      return res.redirect(`${baseUrl}/settings/integrations/google-calendar?error=oauth_denied`);
+    }
+
+    if (!code || !state) {
+      return res.redirect(`${baseUrl}/settings/integrations/google-calendar?error=missing_params`);
+    }
+
+    // Verify signed state
+    const stateData = googleCalendar.verifySignedState(state as string);
+    if (!stateData) {
+      return res.redirect(`${baseUrl}/settings/integrations/google-calendar?error=invalid_state`);
+    }
+
+    const { organisationId } = stateData;
+
+    try {
+      // Exchange code for tokens
+      const tokens = await googleCalendar.exchangeCodeForTokens(code as string);
+
+      // Store or update integration with tokens
+      let integration = await storage.getCalendarIntegration(organisationId);
+
+      if (integration) {
+        await storage.updateCalendarIntegration(organisationId, integration.id, {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          tokenExpiresAt: tokens.expiresAt,
+          scope: tokens.scope,
+          providerUserEmail: tokens.email,
+          isEnabled: true,
+        });
+      } else {
+        await storage.createCalendarIntegration(organisationId, {
+          organisationId,
+          userId: null,
+          provider: "google",
+          isEnabled: true,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          tokenExpiresAt: tokens.expiresAt,
+          scope: tokens.scope,
+          providerUserEmail: tokens.email,
+        });
+      }
+
+      res.redirect(`${baseUrl}/settings/integrations/google-calendar?success=connected`);
+    } catch (error: any) {
+      console.error("OAuth callback error:", error);
+      res.redirect(`${baseUrl}/settings/integrations/google-calendar?error=token_exchange_failed`);
+    }
+  });
 
   app.get("/api/integrations/google/status", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
-    
-    // Multi-tenant support: defaults to org-level (userId=undefined)
-    // Phase B: Add scope=user query param to check user-level integration
-    // For security, userId is always derived from JWT, never from client input
 
     try {
-      const status = await googleCalendar.getGoogleCalendarStatus();
-      // Currently org-level only; user-level infrastructure ready in storage layer
       const integration = await storage.getCalendarIntegration(organisationId);
+      const status = await googleCalendar.getGoogleCalendarStatus(integration || null);
       
       res.json({
         connected: status.connected,
-        email: status.email,
+        configured: status.configured,
+        email: integration?.providerUserEmail || undefined,
         error: status.error,
         integration: integration ? {
           id: integration.id,
@@ -2363,13 +2435,20 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("Error getting Google status:", error);
-      res.json({ connected: false, error: error.message });
+      res.json({ connected: false, configured: googleCalendar.isConfigured(), error: error.message });
     }
   });
 
   app.get("/api/integrations/google/calendars", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
     try {
-      const calendars = await googleCalendar.listCalendars();
+      const integration = await storage.getCalendarIntegration(organisationId);
+      if (!integration || !integration.accessToken) {
+        return res.status(400).json({ error: "Google Calendar not connected" });
+      }
+      const calendars = await googleCalendar.listCalendars(integration);
       res.json(calendars);
     } catch (error: any) {
       console.error("Error listing calendars:", error);
@@ -2380,8 +2459,6 @@ export async function registerRoutes(
   app.patch("/api/integrations/google/settings", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
-    
-    // Phase A: org-level only. Phase B will derive userId from authenticated JWT.
 
     try {
       const { isEnabled, targetCalendarId, targetCalendarName } = req.body;
@@ -2389,21 +2466,14 @@ export async function registerRoutes(
       let integration = await storage.getCalendarIntegration(organisationId);
       
       if (!integration) {
-        integration = await storage.createCalendarIntegration(organisationId, {
-          organisationId,
-          userId: null, // Org-level integration
-          provider: "google",
-          isEnabled: isEnabled ?? true,
-          targetCalendarId: targetCalendarId || null,
-          targetCalendarName: targetCalendarName || null,
-        });
-      } else {
-        integration = await storage.updateCalendarIntegration(organisationId, integration.id, {
-          isEnabled: isEnabled ?? integration.isEnabled,
-          targetCalendarId: targetCalendarId !== undefined ? targetCalendarId : integration.targetCalendarId,
-          targetCalendarName: targetCalendarName !== undefined ? targetCalendarName : integration.targetCalendarName,
-        });
+        return res.status(404).json({ error: "No integration found. Please connect first." });
       }
+
+      integration = await storage.updateCalendarIntegration(organisationId, integration.id, {
+        isEnabled: isEnabled ?? integration.isEnabled,
+        targetCalendarId: targetCalendarId !== undefined ? targetCalendarId : integration.targetCalendarId,
+        targetCalendarName: targetCalendarName !== undefined ? targetCalendarName : integration.targetCalendarName,
+      });
       
       res.json(integration);
     } catch (error: any) {
@@ -2412,12 +2482,10 @@ export async function registerRoutes(
     }
   });
 
-  // Disconnect Google Calendar integration (delete integration record)
+  // Disconnect Google Calendar integration (clear tokens)
   app.delete("/api/integrations/google/disconnect", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
-    
-    // Phase A: org-level only. Phase B will derive userId from authenticated JWT.
 
     try {
       const integration = await storage.getCalendarIntegration(organisationId);
@@ -2426,10 +2494,16 @@ export async function registerRoutes(
         return res.status(404).json({ error: "No integration found" });
       }
       
-      // Delete the integration record
-      await storage.deleteCalendarIntegration(organisationId, integration.id);
+      // Clear tokens but keep the record for settings
+      await storage.updateCalendarIntegration(organisationId, integration.id, {
+        accessToken: null,
+        refreshToken: null,
+        tokenExpiresAt: null,
+        providerUserEmail: null,
+        isEnabled: false,
+      });
       
-      res.json({ success: true, message: "Google Calendar integration disconnected" });
+      res.json({ success: true, message: "Google Calendar disconnected" });
     } catch (error: any) {
       console.error("Error disconnecting integration:", error);
       res.status(500).json({ error: error.message || "Failed to disconnect" });
@@ -2439,19 +2513,17 @@ export async function registerRoutes(
   app.post("/api/integrations/google/sync-now", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
-    
-    // Phase A: org-level only. Phase B will derive userId from authenticated JWT.
 
     try {
       const integration = await storage.getCalendarIntegration(organisationId);
       
-      if (!integration || !integration.isEnabled) {
-        return res.status(400).json({ error: "Google Calendar integration not enabled" });
+      if (!integration || !integration.isEnabled || !integration.accessToken) {
+        return res.status(400).json({ error: "Google Calendar integration not enabled or not connected" });
       }
       
       const calendarId = integration.targetCalendarId || "primary";
       
-      // Get appointments that need syncing (optionally incremental based on lastSyncAt)
+      // Get appointments that need syncing
       const appointments = await storage.getAppointmentsForSync(organisationId, integration.lastSyncAt ?? undefined);
       
       let synced = 0;
@@ -2468,10 +2540,10 @@ export async function registerRoutes(
           
           if (apt.externalEventId) {
             // Update existing event
-            const existingEvent = await googleCalendar.getCalendarEvent(calendarId, apt.externalEventId);
+            const existingEvent = await googleCalendar.getCalendarEvent(integration, calendarId, apt.externalEventId);
             
             if (existingEvent) {
-              const result = await googleCalendar.updateCalendarEvent({
+              const result = await googleCalendar.updateCalendarEvent(integration, {
                 calendarId,
                 eventId: apt.externalEventId,
                 summary: title,
@@ -2489,7 +2561,7 @@ export async function registerRoutes(
               });
             } else {
               // Event was deleted, recreate
-              const result = await googleCalendar.createCalendarEvent({
+              const result = await googleCalendar.createCalendarEvent(integration, {
                 calendarId,
                 summary: title,
                 description,
@@ -2510,7 +2582,7 @@ export async function registerRoutes(
             }
           } else {
             // Create new event
-            const result = await googleCalendar.createCalendarEvent({
+            const result = await googleCalendar.createCalendarEvent(integration, {
               calendarId,
               summary: title,
               description,
