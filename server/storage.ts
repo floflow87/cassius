@@ -247,7 +247,7 @@ export interface IStorage {
   createCalendarIntegration(organisationId: string, data: InsertCalendarIntegration): Promise<CalendarIntegration>;
   updateCalendarIntegration(organisationId: string, id: string, data: Partial<InsertCalendarIntegration>): Promise<CalendarIntegration | undefined>;
   getAppointmentsForSync(organisationId: string): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]>;
-  updateAppointmentSync(id: string, data: { externalProvider?: string; externalCalendarId?: string; externalEventId?: string; externalEtag?: string; syncStatus?: string; lastSyncedAt?: Date; syncError?: string | null }): Promise<void>;
+  updateAppointmentSync(organisationId: string, id: string, data: { externalProvider?: string; externalCalendarId?: string; externalEventId?: string; externalEtag?: string; syncStatus?: string; lastSyncedAt?: Date; syncError?: string | null }): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3512,7 +3512,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async updateAppointmentSync(id: string, data: { 
+  async updateAppointmentSync(organisationId: string, id: string, data: { 
     externalProvider?: string; 
     externalCalendarId?: string; 
     externalEventId?: string; 
@@ -3521,18 +3521,21 @@ export class DatabaseStorage implements IStorage {
     lastSyncedAt?: Date; 
     syncError?: string | null;
   }): Promise<void> {
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    if (data.externalProvider !== undefined) updateData.externalProvider = data.externalProvider;
+    if (data.externalCalendarId !== undefined) updateData.externalCalendarId = data.externalCalendarId;
+    if (data.externalEventId !== undefined) updateData.externalEventId = data.externalEventId;
+    if (data.externalEtag !== undefined) updateData.externalEtag = data.externalEtag;
+    if (data.syncStatus !== undefined) updateData.syncStatus = data.syncStatus;
+    if (data.lastSyncedAt !== undefined) updateData.lastSyncedAt = data.lastSyncedAt;
+    if (data.syncError !== undefined) updateData.syncError = data.syncError;
+    
     await db.update(appointments)
-      .set({
-        externalProvider: data.externalProvider,
-        externalCalendarId: data.externalCalendarId,
-        externalEventId: data.externalEventId,
-        externalEtag: data.externalEtag,
-        syncStatus: data.syncStatus as any,
-        lastSyncedAt: data.lastSyncedAt,
-        syncError: data.syncError,
-        updatedAt: new Date(),
-      })
-      .where(eq(appointments.id, id));
+      .set(updateData)
+      .where(and(
+        eq(appointments.id, id),
+        eq(appointments.organisationId, organisationId)
+      ));
   }
 }
 

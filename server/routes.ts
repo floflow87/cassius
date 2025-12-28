@@ -2441,7 +2441,7 @@ export async function registerRoutes(
                 cassiusAppointmentId: apt.id,
               });
               
-              await storage.updateAppointmentSync(apt.id, {
+              await storage.updateAppointmentSync(organisationId, apt.id, {
                 syncStatus: "SYNCED",
                 externalEtag: result.etag,
                 lastSyncedAt: new Date(),
@@ -2458,7 +2458,7 @@ export async function registerRoutes(
                 cassiusAppointmentId: apt.id,
               });
               
-              await storage.updateAppointmentSync(apt.id, {
+              await storage.updateAppointmentSync(organisationId, apt.id, {
                 externalProvider: "google",
                 externalCalendarId: calendarId,
                 externalEventId: result.eventId,
@@ -2479,7 +2479,7 @@ export async function registerRoutes(
               cassiusAppointmentId: apt.id,
             });
             
-            await storage.updateAppointmentSync(apt.id, {
+            await storage.updateAppointmentSync(organisationId, apt.id, {
               externalProvider: "google",
               externalCalendarId: calendarId,
               externalEventId: result.eventId,
@@ -2493,7 +2493,7 @@ export async function registerRoutes(
           synced++;
         } catch (error: any) {
           console.error(`Error syncing appointment ${apt.id}:`, error);
-          await storage.updateAppointmentSync(apt.id, {
+          await storage.updateAppointmentSync(organisationId, apt.id, {
             syncStatus: "ERROR",
             syncError: error.message || "Unknown error",
           });

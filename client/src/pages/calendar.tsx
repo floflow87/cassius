@@ -11,7 +11,8 @@ import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay, parse } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Filter, User, Plus, Check, Pencil, X, Search, Copy, AlertTriangle, ExternalLink, RotateCcw } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Filter, User, Plus, Check, Pencil, X, Search, Copy, AlertTriangle, ExternalLink, RotateCcw, Settings } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CalendarAppointment, CalendarFilters, Patient } from "@shared/types";
@@ -1295,6 +1298,16 @@ export default function CalendarPage() {
     },
   });
   
+  const { data: googleStatus } = useQuery<{ connected: boolean; syncEnabled: boolean; lastSyncTime?: string; errorCount?: number }>({
+    queryKey: ["/api/integrations/google/status"],
+    queryFn: async () => {
+      const res = await fetch("/api/integrations/google/status", { credentials: "include" });
+      if (!res.ok) return { connected: false, syncEnabled: false };
+      return res.json();
+    },
+    staleTime: 60000,
+  });
+  
   const events = useMemo(() => {
     let filteredAppointments = appointments;
     
@@ -1506,6 +1519,38 @@ export default function CalendarPage() {
                 </Button>
               ))}
             </div>
+            
+            {googleStatus?.connected && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link href="/settings/integrations/google-calendar">
+                    <Button variant="ghost" size="icon" className="relative" data-testid="button-google-calendar-status">
+                      <SiGoogle className={`h-4 w-4 ${googleStatus.syncEnabled ? "text-muted-foreground" : "text-muted-foreground/50"}`} />
+                      {googleStatus.syncEnabled ? (
+                        googleStatus.errorCount && googleStatus.errorCount > 0 ? (
+                          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground">
+                            {googleStatus.errorCount > 9 ? "9+" : googleStatus.errorCount}
+                          </span>
+                        ) : (
+                          <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500" />
+                        )
+                      ) : (
+                        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-muted-foreground/30" />
+                      )}
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {!googleStatus.syncEnabled
+                      ? "Google Calendar connecté (sync désactivé)"
+                      : googleStatus.errorCount && googleStatus.errorCount > 0
+                        ? `Google Calendar sync actif (${googleStatus.errorCount} erreur${googleStatus.errorCount > 1 ? "s" : ""})`
+                        : "Google Calendar sync actif"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            )}
             
             <Button 
               onClick={() => {
