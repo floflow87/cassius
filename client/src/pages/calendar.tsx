@@ -166,6 +166,23 @@ interface CalendarSidebarProps {
 function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, onFiltersChange }: CalendarSidebarProps) {
   const [filtersOpen, setFiltersOpen] = useState(true);
   
+  // Load saved state from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("calendar-filters-open");
+      if (saved !== null) {
+        setFiltersOpen(saved === "true");
+      }
+    }
+  }, []);
+  
+  const handleFiltersOpenChange = (open: boolean) => {
+    setFiltersOpen(open);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("calendar-filters-open", String(open));
+    }
+  };
+  
   const toggleType = (type: string) => {
     const newTypes = filters.types.includes(type)
       ? filters.types.filter(t => t !== type)
@@ -196,7 +213,7 @@ function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, on
       />
       
       <div className="border-t">
-        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <Collapsible open={filtersOpen} onOpenChange={handleFiltersOpenChange}>
           <CollapsibleTrigger asChild>
             <button
               className="flex items-center justify-between w-full px-3 py-3 hover-elevate"
@@ -1208,7 +1225,7 @@ export default function CalendarPage() {
   const events = useMemo(() => {
     return appointments.map(apt => ({
       id: apt.id,
-      title: apt.title || `${apt.patientPrenom} ${apt.patientNom}`,
+      title: apt.title || (apt.patientPrenom && apt.patientNom ? `${apt.patientPrenom} ${apt.patientNom}` : "Nouveau rdv"),
       start: apt.dateStart,
       end: apt.dateEnd || undefined,
       extendedProps: {
@@ -1301,7 +1318,7 @@ export default function CalendarPage() {
         {eventInfo.view.type !== "dayGridMonth" && (
           <div className="text-white/80 truncate">
             {patientPrenom} {patientNom}
-            {isq !== null && ` • ISQ ${isq}`}
+            {isq !== null && isq !== undefined && ` • ISQ ${isq}`}
           </div>
         )}
       </div>

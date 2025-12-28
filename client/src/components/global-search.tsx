@@ -233,12 +233,9 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
           onFocus={() => setIsFocused(true)}
           onKeyDown={handleKeyDown}
           placeholder="Rechercher..."
-          className="pl-9 pr-16 w-64"
+          className="pl-9 w-64"
           data-testid="input-global-search"
         />
-        <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-          <span className="text-xs">⌘</span>K
-        </kbd>
       </div>
 
       {showDropdown && (

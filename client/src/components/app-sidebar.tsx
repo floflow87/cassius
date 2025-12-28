@@ -108,7 +108,7 @@ export function AppSidebar() {
                     className="h-5 w-auto brightness-0 invert shrink-0"
                   />
                 ) : item.lucideIcon && (
-                  <item.lucideIcon className="h-5 w-5 text-white shrink-0" />
+                  <item.lucideIcon className="h-5 w-5 text-white shrink-0" strokeWidth={2.5} />
                 )}
                 {isExpanded && (
                   <span className="text-sm font-medium text-white truncate">
