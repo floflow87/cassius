@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,7 +11,8 @@ import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay, parse } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, User, Plus, Check, Pencil, X, Search } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Filter, User, Plus, Check, Pencil, X, Search } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -61,6 +62,13 @@ interface MiniCalendarProps {
 
 function MiniCalendar({ selectedDate, onDateSelect, appointments }: MiniCalendarProps) {
   const [viewMonth, setViewMonth] = useState(selectedDate);
+  
+  // Sync viewMonth when selectedDate changes to a different month (e.g., from main calendar navigation)
+  useEffect(() => {
+    if (!isSameMonth(selectedDate, viewMonth)) {
+      setViewMonth(selectedDate);
+    }
+  }, [selectedDate]);
   
   const monthStart = startOfMonth(viewMonth);
   const monthEnd = endOfMonth(viewMonth);
@@ -156,6 +164,8 @@ interface CalendarSidebarProps {
 }
 
 function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, onFiltersChange }: CalendarSidebarProps) {
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  
   const toggleType = (type: string) => {
     const newTypes = filters.types.includes(type)
       ? filters.types.filter(t => t !== type)
@@ -175,6 +185,7 @@ function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, on
   };
   
   const hasFilters = filters.types.length > 0 || filters.statuses.length > 0;
+  const filterCount = filters.types.length + filters.statuses.length;
   
   return (
     <div className="w-64 border-r bg-muted/30 flex flex-col shrink-0" data-testid="calendar-sidebar">
@@ -184,65 +195,85 @@ function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, on
         appointments={appointments}
       />
       
-      <div className="border-t px-3 py-3">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Filter className="h-4 w-4" />
-            Filtres
-          </div>
-          {hasFilters && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-6 px-2 text-xs"
-              onClick={clearFilters}
-              data-testid="button-clear-filters"
+      <div className="border-t">
+        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <CollapsibleTrigger asChild>
+            <button
+              className="flex items-center justify-between w-full px-3 py-3 hover-elevate"
+              data-testid="button-toggle-filters"
             >
-              Effacer
-            </Button>
-          )}
-        </div>
-        
-        <div className="space-y-4">
-          <div>
-            <Label className="text-xs text-muted-foreground mb-2 block">Type de rendez-vous</Label>
-            <div className="space-y-1.5">
-              {appointmentTypes.map(type => (
-                <label 
-                  key={type.value}
-                  className="flex items-center gap-2 cursor-pointer"
-                  data-testid={`filter-type-${type.value}`}
-                >
-                  <Checkbox
-                    checked={filters.types.includes(type.value)}
-                    onCheckedChange={() => toggleType(type.value)}
-                  />
-                  <span className={`w-2 h-2 rounded-full ${type.color}`} />
-                  <span className="text-sm">{type.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Filter className="h-4 w-4" />
+                Filtres
+                {filterCount > 0 && (
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                    {filterCount}
+                  </Badge>
+                )}
+              </div>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${filtersOpen ? "" : "-rotate-90"}`} />
+            </button>
+          </CollapsibleTrigger>
           
-          <div>
-            <Label className="text-xs text-muted-foreground mb-2 block">Statut</Label>
-            <div className="space-y-1.5">
-              {appointmentStatuses.map(status => (
-                <label 
-                  key={status.value}
-                  className="flex items-center gap-2 cursor-pointer"
-                  data-testid={`filter-status-${status.value}`}
-                >
-                  <Checkbox
-                    checked={filters.statuses.includes(status.value)}
-                    onCheckedChange={() => toggleStatus(status.value)}
-                  />
-                  <span className="text-sm">{status.label}</span>
-                </label>
-              ))}
+          <CollapsibleContent>
+            <div className="px-3 pb-3">
+              {hasFilters && (
+                <div className="flex justify-end mb-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 px-2 text-xs"
+                    onClick={clearFilters}
+                    data-testid="button-clear-filters"
+                  >
+                    Effacer
+                  </Button>
+                </div>
+              )}
+              
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Type de rendez-vous</Label>
+                  <div className="space-y-1.5">
+                    {appointmentTypes.map(type => (
+                      <label 
+                        key={type.value}
+                        className="flex items-center gap-2 cursor-pointer"
+                        data-testid={`filter-type-${type.value}`}
+                      >
+                        <Checkbox
+                          checked={filters.types.includes(type.value)}
+                          onCheckedChange={() => toggleType(type.value)}
+                        />
+                        <span className={`w-2 h-2 rounded-full ${type.color}`} />
+                        <span className="text-sm">{type.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Statut</Label>
+                  <div className="space-y-1.5">
+                    {appointmentStatuses.map(status => (
+                      <label 
+                        key={status.value}
+                        className="flex items-center gap-2 cursor-pointer"
+                        data-testid={`filter-status-${status.value}`}
+                      >
+                        <Checkbox
+                          checked={filters.statuses.includes(status.value)}
+                          onCheckedChange={() => toggleStatus(status.value)}
+                        />
+                        <span className="text-sm">{status.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     </div>
   );
@@ -871,11 +902,24 @@ interface QuickCreateDialogProps {
 
 function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreateDialogProps) {
   const { toast } = useToast();
+  const [patientSearch, setPatientSearch] = useState("");
+  const [patientDropdownOpen, setPatientDropdownOpen] = useState(false);
+  const patientInputRef = useRef<HTMLInputElement>(null);
   
   const { data: patients, isLoading: patientsLoading } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
     enabled: open,
   });
+  
+  const filteredPatients = useMemo(() => {
+    if (!patients) return [];
+    if (!patientSearch.trim()) return patients;
+    const query = patientSearch.toLowerCase();
+    return patients.filter(p => 
+      `${p.prenom} ${p.nom}`.toLowerCase().includes(query) ||
+      `${p.nom} ${p.prenom}`.toLowerCase().includes(query)
+    );
+  }, [patients, patientSearch]);
   
   const form = useForm<QuickCreateFormData>({
     resolver: zodResolver(quickCreateFormSchema),
@@ -888,6 +932,11 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
       description: "",
     },
   });
+  
+  const watchedPatientId = form.watch("patientId");
+  const selectedPatient = useMemo(() => {
+    return patients?.find(p => p.id === watchedPatientId);
+  }, [patients, watchedPatientId]);
   
   const createMutation = useMutation({
     mutationFn: async (data: QuickCreateFormData) => {
@@ -936,26 +985,69 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Patient</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <div className="relative">
                     <FormControl>
-                      <SelectTrigger data-testid="select-patient">
-                        <SelectValue placeholder="Sélectionner un patient" />
-                      </SelectTrigger>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        {selectedPatient ? (
+                          <button 
+                            type="button"
+                            className="flex items-center justify-between h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm pl-9 cursor-pointer text-left"
+                            onClick={() => {
+                              field.onChange("");
+                              setPatientSearch("");
+                              setTimeout(() => patientInputRef.current?.focus(), 0);
+                            }}
+                            data-testid="selected-patient-display"
+                          >
+                            <span>{selectedPatient.prenom} {selectedPatient.nom}</span>
+                            <X className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                        ) : (
+                          <Input
+                            ref={patientInputRef}
+                            placeholder="Rechercher un patient..."
+                            value={patientSearch}
+                            onChange={(e) => {
+                              setPatientSearch(e.target.value);
+                              setPatientDropdownOpen(true);
+                            }}
+                            onFocus={() => setPatientDropdownOpen(true)}
+                            onBlur={() => setTimeout(() => setPatientDropdownOpen(false), 200)}
+                            className="pl-9"
+                            data-testid="input-patient-search"
+                          />
+                        )}
+                      </div>
                     </FormControl>
-                    <SelectContent>
-                      {patientsLoading ? (
-                        <SelectItem value="_loading" disabled>Chargement...</SelectItem>
-                      ) : patients?.length === 0 ? (
-                        <SelectItem value="_empty" disabled>Aucun patient</SelectItem>
-                      ) : (
-                        patients?.map(p => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.prenom} {p.nom}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                    
+                    {patientDropdownOpen && !selectedPatient && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 max-h-48 overflow-auto" data-testid="patient-dropdown">
+                        {patientsLoading ? (
+                          <div className="p-3 text-sm text-muted-foreground text-center">Chargement...</div>
+                        ) : filteredPatients.length === 0 ? (
+                          <div className="p-3 text-sm text-muted-foreground text-center">Aucun patient trouvé</div>
+                        ) : (
+                          filteredPatients.slice(0, 10).map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 text-sm hover-elevate flex items-center gap-2"
+                              onClick={() => {
+                                field.onChange(p.id);
+                                setPatientSearch("");
+                                setPatientDropdownOpen(false);
+                              }}
+                              data-testid={`patient-option-${p.id}`}
+                            >
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span>{p.prenom} {p.nom}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
