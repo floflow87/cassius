@@ -51,7 +51,7 @@ interface PageHeaderProps {
 }
 
 function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   
   const getPageInfo = () => {
     if (location === "/patients" || location.startsWith("/patients/")) {
@@ -117,7 +117,7 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
           size="icon" 
           className="text-muted-foreground" 
           data-testid="button-calendar"
-          onClick={() => window.location.href = "/calendar"}
+          onClick={() => setLocation("/calendar")}
         >
           <Calendar className="h-5 w-5" />
         </Button>
