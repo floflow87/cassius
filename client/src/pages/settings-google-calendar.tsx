@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { ArrowLeft, Calendar, Check, AlertTriangle, RefreshCw, Unplug, Settings2, Eye } from "lucide-react";
+import { Link, useSearch } from "wouter";
+import { ArrowLeft, Calendar, Check, AlertTriangle, RefreshCw, Unplug, Settings2, Eye, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface GoogleStatus {
   connected: boolean;
+  configured: boolean;
   email?: string;
   error?: string;
   integration?: {
@@ -36,6 +37,36 @@ interface GoogleCalendar {
 export default function GoogleCalendarIntegration() {
   const { toast } = useToast();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>("");
+  const [isConnecting, setIsConnecting] = useState(false);
+  const searchParams = useSearch();
+  
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    const success = params.get("success");
+    const error = params.get("error");
+    
+    if (success === "connected") {
+      toast({ 
+        title: "Google Calendar connecté", 
+        description: "Votre compte Google a été lié avec succès." 
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
+    } else if (error) {
+      const errorMessages: Record<string, string> = {
+        oauth_denied: "Vous avez refusé l'accès à Google Calendar.",
+        missing_params: "Paramètres OAuth manquants.",
+        invalid_state: "Session expirée ou invalide. Veuillez réessayer.",
+        token_exchange_failed: "Erreur lors de l'authentification. Veuillez réessayer.",
+      };
+      toast({ 
+        title: "Erreur de connexion", 
+        description: errorMessages[error] || "Une erreur est survenue.",
+        variant: "destructive" 
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [searchParams, toast]);
   
   const { data: status, isLoading: statusLoading } = useQuery<GoogleStatus>({
     queryKey: ["/api/integrations/google/status"],
@@ -46,6 +77,25 @@ export default function GoogleCalendarIntegration() {
     queryKey: ["/api/integrations/google/calendars"],
     enabled: status?.connected === true,
     retry: false,
+  });
+  
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("GET", "/api/integrations/google/connect");
+      const data = await response.json();
+      return data as { authUrl: string };
+    },
+    onSuccess: (data) => {
+      window.location.href = data.authUrl;
+    },
+    onError: (error: any) => {
+      setIsConnecting(false);
+      toast({ 
+        title: "Erreur", 
+        description: error.message || "Impossible de démarrer la connexion.",
+        variant: "destructive" 
+      });
+    },
   });
   
   const updateIntegrationMutation = useMutation({
@@ -99,6 +149,11 @@ export default function GoogleCalendarIntegration() {
     },
   });
   
+  const handleConnect = () => {
+    setIsConnecting(true);
+    connectMutation.mutate();
+  };
+  
   const handleCalendarChange = (calendarId: string) => {
     const calendar = calendars.find(c => c.id === calendarId);
     setSelectedCalendarId(calendarId);
@@ -113,6 +168,7 @@ export default function GoogleCalendarIntegration() {
   };
   
   const isConnected = status?.connected === true;
+  const isConfigured = status?.configured !== false;
   const integration = status?.integration;
   const currentCalendarId = selectedCalendarId || integration?.targetCalendarId || "";
   
@@ -214,18 +270,31 @@ export default function GoogleCalendarIntegration() {
                   </div>
                 )}
                 
-                <p className="text-sm text-muted-foreground">
-                  Pour connecter Google Calendar, utilisez le panneau "Intégrations" de Replit (icône puzzle dans la barre latérale) et configurez le connecteur Google Calendar.
-                </p>
+                {!isConfigured && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      L'intégration Google Calendar n'est pas configurée. Contactez l'administrateur pour configurer les identifiants OAuth.
+                    </p>
+                  </div>
+                )}
                 
                 <div className="flex gap-2 flex-wrap">
                   <Button 
-                    variant="outline"
-                    onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] })}
-                    data-testid="button-refresh-status"
+                    onClick={handleConnect}
+                    disabled={!isConfigured || isConnecting || connectMutation.isPending}
+                    data-testid="button-connect-google"
                   >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Vérifier la connexion
+                    {(isConnecting || connectMutation.isPending) ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Connexion en cours...
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Connecter Google Calendar
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

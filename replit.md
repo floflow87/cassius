@@ -113,25 +113,35 @@ Implant tracking uses `implants` (catalog) and `surgery_implants` (placement dat
     - Custom CSS styling for FullCalendar matching the design system with dark mode support.
     - Navigation: Sidebar link and header calendar button.
     - Google Calendar sync indicator in header showing connection status.
-- **Google Calendar Integration**:
-    - One-way sync: Cassius appointments automatically sync to Google Calendar (Phase A).
-    - Multi-tenant architecture: supports organisation-level (default) and user-level integrations.
+- **Google Calendar Integration (OAuth 2.0)**:
+    - One-way sync: Cassius appointments automatically sync to Google Calendar.
+    - **Standard OAuth 2.0 implementation** (production-ready, replaces Replit connector):
+        - OAuth tokens (access_token, refresh_token) stored in `calendar_integrations` table.
+        - Automatic token refresh when tokens expire (5-minute buffer).
+        - CSRF protection via HMAC-signed state parameter (15-minute expiry).
+    - Multi-tenant architecture: Each organization stores their own OAuth credentials.
         - Org-level: `userId=null`, shared across all users in organisation.
         - User-level: `userId` set, overrides org-level for that specific user (Phase B ready).
-        - Priority selection: user-level > org-level via `getActiveIntegrationForAppointment()`.
+    - Required environment variables:
+        - `GOOGLE_CLIENT_ID` - OAuth client ID from Google Cloud Console.
+        - `GOOGLE_CLIENT_SECRET` - OAuth client secret from Google Cloud Console.
+        - `GOOGLE_REDIRECT_URI` - Callback URL (e.g., `https://your-app.replit.app/api/integrations/google/callback`).
+        - `APP_BASE_URL` - Base URL for redirects (e.g., `https://your-app.replit.app`).
     - Settings page at `/settings/integrations/google-calendar` for configuration.
-    - Backend: `server/googleCalendar.ts` for API interactions using Replit connector.
+    - Backend: `server/googleCalendar.ts` for OAuth flow and API interactions.
     - Database:
-        - `calendar_integrations` table with multi-tenant support (`userId` column, unique constraint).
+        - `calendar_integrations` table with OAuth token columns: `accessToken`, `refreshToken`, `tokenExpiresAt`, `scope`, `providerUserEmail`.
         - `appointment_external_links` table for future V2 multi-calendar mapping.
         - Integration-level sync tracking: `syncErrorCount`, `lastSyncError`, `lastSyncAt`.
     - Appointments track sync status via `externalEventId`, `syncStatus`, `lastSyncedAt`, `syncError` fields.
     - API endpoints:
+        - `GET /api/integrations/google/connect` - Generate OAuth authorization URL.
+        - `GET /api/integrations/google/callback` - Handle OAuth callback, exchange code for tokens.
         - `GET /api/integrations/google/status` - Connection status and integration info.
         - `GET /api/integrations/google/calendars` - List available calendars.
         - `PATCH /api/integrations/google/settings` - Update integration settings.
         - `POST /api/integrations/google/sync-now` - Trigger manual sync.
-        - `DELETE /api/integrations/google/disconnect` - Remove integration.
+        - `DELETE /api/integrations/google/disconnect` - Clear tokens and disconnect.
     - Features: Connect/disconnect Google account, select target calendar, enable/disable sync, manual sync trigger, error display.
     - Events created with `[Cassius]` prefix and extendedProperties.cassiusAppointmentId for identification.
 - **Settings Pages**:
