@@ -1,0 +1,204 @@
+Voici un prompt Replit unique (copie-colle) pour finir le calendrier “niveau pro” avant Google Calendar : quick actions, statuts, conflits, agenda view, perf, préparation sync, et flags → calendrier.
+
+⸻
+
+Prompt Replit — Calendrier “Pro” V1.5 avant Google Calendar (Doctolib-like)
+
+Contexte
+
+Nous avons une première version solide de /calendar avec navigation stable (anchorDate + view).
+Avant d’intégrer Google Calendar, je veux une V1.5 “production-ready” : actions rapides, statuts, gestion des conflits, vue agenda, perf et préparation du modèle de sync.
+
+Important : ne pas implémenter OAuth Google ici. On prépare l’architecture seulement.
+
+⸻
+
+Objectifs (DoD global)
+	1.	Le calendrier est utilisable au quotidien : création/édition rapide, statuts, détails clairs
+	2.	Les conflits de planning sont détectés et signalés
+	3.	Une vue “Agenda” (liste) est disponible et filtrable
+	4.	Perf : fetch par range, drawer lazy, pas de re-render massif
+	5.	Préparer Google sync côté DB + UI (sans l’activer)
+	6.	Les flags critiques remontent visuellement sur les RDV (indicateur + filtre)
+
+⸻
+
+1) Modèle RDV unique + statuts
+
+Backend / DB
+
+S’assurer que la table RDV (appointments/rendez_vous) contient :
+	•	status enum : upcoming | completed | cancelled
+	•	completed_at (nullable)
+	•	cancelled_at (nullable)
+	•	cancel_reason (nullable, V1 optionnel)
+
+Règles :
+	•	On ne supprime pas un RDV (sauf admin) → on passe en cancelled
+	•	“Terminer” un RDV = status completed + completed_at=now()
+
+API
+	•	PATCH /api/appointments/:id supporte :
+	•	status update (completed/cancelled)
+	•	completed_at / cancelled_at auto côté serveur
+
+⸻
+
+2) Drawer RDV “premium” + quick actions
+
+UI
+
+Dans le drawer (clic sur un event), afficher :
+	•	patient (cliquable → fiche patient)
+	•	type (badge)
+	•	date/heure + durée
+	•	statut (badge)
+	•	rattachement :
+	•	acte (lien)
+	•	implant (lien)
+	•	notes (preview)
+	•	indicateur sync (voir §6)
+
+Quick actions (obligatoires)
+	•	Éditer (modal)
+	•	Terminer (status=completed)
+	•	Annuler (status=cancelled, avec confirmation)
+	•	Dupliquer (crée un RDV identique, avec date/heure modifiable)
+	•	Créer une note liée au RDV (ouvre modal note préremplie)
+
+✅ DoD : ces actions mettent à jour le calendrier sans refresh navigateur (optimistic update + rollback si erreur).
+
+⸻
+
+3) Création rapide + édition robuste
+	•	Clic sur un slot vide → modal “Nouveau RDV”
+	•	Préremplir : start_at, end_at (durée par défaut configurable)
+	•	Autocomplete patient + option “créer patient”
+	•	Optionnel : rattacher à acte/implant
+
+Sauvegarde :
+	•	insertion optimiste dans l’UI
+	•	toast succès / erreur
+
+⸻
+
+4) Conflits / chevauchements (Doctolib-like)
+
+Détection
+
+Détecter chevauchement sur :
+	•	même praticien (created_by) (si multi user) OU à défaut même organisation
+	•	optionnel : même patient
+
+Implémentation
+
+Lors de create/update (drag/resize inclus), calculer si overlap avec un autre RDV upcoming sur la même plage.
+
+Affichage
+	•	Sur l’event : afficher un petit badge “Conflit” (warning)
+	•	Tooltip au hover : “Chevauchement avec {patient} à {heure}”
+	•	Filtre “Afficher conflits” dans la sidebar
+
+⚠️ V1 : ne pas bloquer, seulement signaler.
+
+⸻
+
+5) Vue “Agenda” (liste) + mini UX pro
+
+Agenda view
+
+Ajouter une vue “Agenda” :
+	•	liste groupée par jour
+	•	tri par heure
+	•	filtres actifs identiques aux autres vues
+	•	affichage compact :
+	•	heure
+	•	patient
+	•	type
+	•	statut
+	•	icône conflit
+	•	icône flag critique
+
+UX
+	•	ligne “Maintenant” sur jour/semaine
+	•	scroll auto vers “maintenant” :
+	•	uniquement au premier rendu quand on est sur la période “aujourd’hui”
+	•	ne jamais recentrer à chaque refetch
+
+⸻
+
+6) Préparer Google Calendar (sans l’implémenter)
+
+DB
+
+Ajouter champs (nullable) dans appointments :
+	•	external_provider (ex: “google”)
+	•	external_calendar_id
+	•	external_event_id
+	•	sync_status enum : none | pending | synced | error
+	•	last_synced_at (nullable)
+	•	external_etag (nullable)
+	•	sync_error (nullable)
+
+Par défaut :
+	•	sync_status = "none"
+
+UI
+
+Dans le drawer + sur l’event (petit icon discret) :
+	•	afficher un indicateur “Sync: none” (ou caché si tu préfères)
+	•	prévoir un espace UI futur “Connecter Google” mais NE PAS l’implémenter
+
+⸻
+
+7) Flags → calendrier (valeur Cassius)
+
+Règle
+
+Un RDV doit exposer un champ calculé hasCriticalFlag si :
+	•	le patient lié a un flag critical actif
+	•	OU l’acte/implant lié a un flag critical actif
+
+Backend
+
+Dans GET /api/appointments?from&to... inclure :
+	•	hasCriticalFlag
+	•	criticalFlagLabel (optionnel)
+
+⚠️ Faire ça en batch (pas de N+1) :
+	•	récupérer flags critiques des patients/implants/actes inclus dans la plage
+
+UI
+	•	afficher une petite icône d’alerte sur l’event si hasCriticalFlag
+	•	ajouter filtre “RDV à risque” dans sidebar
+
+⸻
+
+8) Performance & stabilité
+	•	Fetch events uniquement sur range visible (from/to)
+	•	Cache client par (range+filters)
+	•	Drawer lazy :
+	•	le listing n’embarque que patient minimal
+	•	le détail complet est fetch au clic
+	•	Empêcher re-render massif :
+	•	memo sur event components
+	•	stable keys
+	•	Skeleton loaders au chargement range
+
+⸻
+
+Tests d’acceptation
+	1.	Naviguer semaine prochaine → rester sur la semaine, créer RDV → rester sur la semaine
+	2.	Drag un RDV → update immédiat + rollback si erreur
+	3.	Resize → update durée + toast
+	4.	Annuler / Terminer → statut change + style event change
+	5.	Créer deux RDV qui se chevauchent → badge conflit + filtre conflits
+	6.	Vue agenda liste cohérente avec vue semaine
+	7.	Patient avec flag critical → RDV affiche icône + filtre “à risque” fonctionne
+	8.	Champs sync présents en DB et visibles côté API (sans OAuth)
+
+⸻
+
+Tu peux l’envoyer tel quel.
+
+Si tu veux que ce soit encore plus “Google Calendar”, je peux te faire un prompt V2 “raccourcis clavier + sélection drag pour créer + multi-calendars (praticiens)” — mais ce prompt-là te donne déjà une V1.5 ultra clean avant l’intégration Google.

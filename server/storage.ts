@@ -2186,12 +2186,37 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateAppointment(organisationId: string, id: string, data: Partial<InsertAppointment>): Promise<Appointment | undefined> {
+  async updateAppointment(organisationId: string, id: string, data: Partial<InsertAppointment> & { status?: string; cancelReason?: string | null }): Promise<Appointment | undefined> {
+    const now = new Date();
+    
+    // Build the update object with auto-managed timestamps for status changes
+    const updateData: Record<string, unknown> = {
+      ...data,
+      updatedAt: now,
+    };
+    
+    // Auto-set completedAt when status changes to COMPLETED
+    if (data.status === "COMPLETED") {
+      updateData.completedAt = now;
+      updateData.cancelledAt = null;
+      updateData.cancelReason = null;
+    }
+    
+    // Auto-set cancelledAt when status changes to CANCELLED
+    if (data.status === "CANCELLED") {
+      updateData.cancelledAt = now;
+      updateData.completedAt = null;
+    }
+    
+    // Reset timestamps when status goes back to UPCOMING
+    if (data.status === "UPCOMING") {
+      updateData.completedAt = null;
+      updateData.cancelledAt = null;
+      updateData.cancelReason = null;
+    }
+    
     const [updated] = await db.update(appointments)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(and(
         eq(appointments.id, id),
         eq(appointments.organisationId, organisationId)

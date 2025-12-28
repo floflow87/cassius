@@ -64,6 +64,12 @@ export const appointmentStatusEnum = pgEnum("appointment_status", [
   "COMPLETED",
   "CANCELLED"
 ]);
+export const syncStatusEnum = pgEnum("sync_status", [
+  "NONE",
+  "PENDING",
+  "SYNCED",
+  "ERROR"
+]);
 export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
 export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
 export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"]);
@@ -394,6 +400,18 @@ export const appointments = pgTable("appointments", {
   dateEnd: timestamp("date_end"),
   isq: real("isq"),
   radioId: varchar("radio_id").references(() => radios.id, { onDelete: "set null" }),
+  // Status timestamps
+  completedAt: timestamp("completed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
+  // Google Calendar sync preparation (future feature)
+  externalProvider: text("external_provider"),
+  externalCalendarId: text("external_calendar_id"),
+  externalEventId: text("external_event_id"),
+  syncStatus: syncStatusEnum("sync_status").default("NONE").notNull(),
+  lastSyncedAt: timestamp("last_synced_at"),
+  externalEtag: text("external_etag"),
+  syncError: text("sync_error"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -564,6 +582,14 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({
   organisationId: true,
   createdAt: true,
   updatedAt: true,
+  // Auto-managed status timestamps
+  completedAt: true,
+  cancelledAt: true,
+  // Sync fields are auto-managed
+  syncStatus: true,
+  lastSyncedAt: true,
+  externalEtag: true,
+  syncError: true,
 }).extend({
   dateStart: z.coerce.date(),
   dateEnd: z.coerce.date().nullable().optional(),
@@ -580,7 +606,11 @@ export const updateAppointmentSchema = z.object({
   operationId: z.string().nullable().optional(),
   surgeryImplantId: z.string().nullable().optional(),
   radioId: z.string().nullable().optional(),
+  cancelReason: z.string().nullable().optional(),
 });
+
+export const syncStatusValues = ["NONE", "PENDING", "SYNCED", "ERROR"] as const;
+export type SyncStatus = typeof syncStatusValues[number];
 
 export const appointmentTypeValues = ["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"] as const;
 export type AppointmentType = typeof appointmentTypeValues[number];
