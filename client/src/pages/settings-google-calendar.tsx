@@ -177,8 +177,7 @@ export default function GoogleCalendarIntegration() {
                 )}
                 
                 <p className="text-sm text-muted-foreground">
-                  La connexion Google Calendar est gérée via les paramètres Replit. 
-                  Si vous voyez ce message, veuillez reconnecter l'intégration dans les paramètres de l'application.
+                  Cliquez sur le bouton ci-dessous pour connecter votre compte Google et activer la synchronisation.
                 </p>
               </div>
             )}
