@@ -214,7 +214,7 @@ function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, on
   const filterCount = filters.types.length + filters.statuses.length + (filters.showOnlyAtRisk ? 1 : 0);
   
   return (
-    <div className="w-64 border-r bg-muted/30 flex flex-col shrink-0" data-testid="calendar-sidebar">
+    <div className="w-64 border-r bg-white dark:bg-gray-950 flex flex-col shrink-0" data-testid="calendar-sidebar">
       <MiniCalendar 
         selectedDate={selectedDate} 
         onDateSelect={onDateSelect}
