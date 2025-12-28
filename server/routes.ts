@@ -2328,14 +2328,23 @@ export async function registerRoutes(
 
   // ============================================
   // Google Calendar Integration Routes
+  // Multi-tenant architecture: supports org-level (default) and user-level integrations
+  // - Org-level: userId=null, shared across all users in organisation
+  // - User-level: userId set, overrides org-level for that specific user
+  // Phase A: Org-level integration, infrastructure ready for user-level
   // ============================================
 
   app.get("/api/integrations/google/status", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    
+    // Multi-tenant support: defaults to org-level (userId=undefined)
+    // Phase B: Add scope=user query param to check user-level integration
+    // For security, userId is always derived from JWT, never from client input
 
     try {
       const status = await googleCalendar.getGoogleCalendarStatus();
+      // Currently org-level only; user-level infrastructure ready in storage layer
       const integration = await storage.getCalendarIntegration(organisationId);
       
       res.json({
@@ -2348,6 +2357,8 @@ export async function registerRoutes(
           targetCalendarId: integration.targetCalendarId,
           targetCalendarName: integration.targetCalendarName,
           lastSyncAt: integration.lastSyncAt,
+          syncErrorCount: integration.syncErrorCount,
+          lastSyncError: integration.lastSyncError,
         } : null,
       });
     } catch (error: any) {
@@ -2369,6 +2380,8 @@ export async function registerRoutes(
   app.patch("/api/integrations/google/settings", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    
+    // Phase A: org-level only. Phase B will derive userId from authenticated JWT.
 
     try {
       const { isEnabled, targetCalendarId, targetCalendarName } = req.body;
@@ -2378,6 +2391,7 @@ export async function registerRoutes(
       if (!integration) {
         integration = await storage.createCalendarIntegration(organisationId, {
           organisationId,
+          userId: null, // Org-level integration
           provider: "google",
           isEnabled: isEnabled ?? true,
           targetCalendarId: targetCalendarId || null,
@@ -2398,9 +2412,35 @@ export async function registerRoutes(
     }
   });
 
+  // Disconnect Google Calendar integration (delete integration record)
+  app.delete("/api/integrations/google/disconnect", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    // Phase A: org-level only. Phase B will derive userId from authenticated JWT.
+
+    try {
+      const integration = await storage.getCalendarIntegration(organisationId);
+      
+      if (!integration) {
+        return res.status(404).json({ error: "No integration found" });
+      }
+      
+      // Delete the integration record
+      await storage.deleteCalendarIntegration(organisationId, integration.id);
+      
+      res.json({ success: true, message: "Google Calendar integration disconnected" });
+    } catch (error: any) {
+      console.error("Error disconnecting integration:", error);
+      res.status(500).json({ error: error.message || "Failed to disconnect" });
+    }
+  });
+
   app.post("/api/integrations/google/sync-now", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    
+    // Phase A: org-level only. Phase B will derive userId from authenticated JWT.
 
     try {
       const integration = await storage.getCalendarIntegration(organisationId);
@@ -2411,8 +2451,8 @@ export async function registerRoutes(
       
       const calendarId = integration.targetCalendarId || "primary";
       
-      // Get all upcoming appointments that need syncing
-      const appointments = await storage.getAppointmentsForSync(organisationId);
+      // Get appointments that need syncing (optionally incremental based on lastSyncAt)
+      const appointments = await storage.getAppointmentsForSync(organisationId, integration.lastSyncAt ?? undefined);
       
       let synced = 0;
       let errors = 0;
@@ -2501,10 +2541,12 @@ export async function registerRoutes(
         }
       }
       
-      // Update last sync timestamp
+      // Update integration sync status
       if (integration) {
-        await storage.updateCalendarIntegration(organisationId, integration.id, {
+        await storage.updateIntegrationSyncStatus(organisationId, integration.id, {
           lastSyncAt: new Date(),
+          syncErrorCount: errors,
+          lastSyncError: errors > 0 ? `${errors} appointment(s) failed to sync` : null,
         });
       }
       

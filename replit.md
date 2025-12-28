@@ -114,13 +114,25 @@ Implant tracking uses `implants` (catalog) and `surgery_implants` (placement dat
     - Navigation: Sidebar link and header calendar button.
     - Google Calendar sync indicator in header showing connection status.
 - **Google Calendar Integration**:
-    - One-way sync: Cassius appointments automatically sync to Google Calendar.
+    - One-way sync: Cassius appointments automatically sync to Google Calendar (Phase A).
+    - Multi-tenant architecture: supports organisation-level (default) and user-level integrations.
+        - Org-level: `userId=null`, shared across all users in organisation.
+        - User-level: `userId` set, overrides org-level for that specific user (Phase B ready).
+        - Priority selection: user-level > org-level via `getActiveIntegrationForAppointment()`.
     - Settings page at `/settings/integrations/google-calendar` for configuration.
     - Backend: `server/googleCalendar.ts` for API interactions using Replit connector.
-    - Database: `calendar_integrations` table stores organization-level settings.
+    - Database:
+        - `calendar_integrations` table with multi-tenant support (`userId` column, unique constraint).
+        - `appointment_external_links` table for future V2 multi-calendar mapping.
+        - Integration-level sync tracking: `syncErrorCount`, `lastSyncError`, `lastSyncAt`.
     - Appointments track sync status via `externalEventId`, `syncStatus`, `lastSyncedAt`, `syncError` fields.
-    - API endpoints: `GET /api/integrations/google/status`, `GET /api/integrations/google/calendars`, `POST /api/integrations/google/settings`, `POST /api/integrations/google/sync-now`.
-    - Features: Connect/disconnect Google account, select target calendar, enable/disable sync, manual sync trigger.
+    - API endpoints:
+        - `GET /api/integrations/google/status` - Connection status and integration info.
+        - `GET /api/integrations/google/calendars` - List available calendars.
+        - `PATCH /api/integrations/google/settings` - Update integration settings.
+        - `POST /api/integrations/google/sync-now` - Trigger manual sync.
+        - `DELETE /api/integrations/google/disconnect` - Remove integration.
+    - Features: Connect/disconnect Google account, select target calendar, enable/disable sync, manual sync trigger, error display.
     - Events created with `[Cassius]` prefix and extendedProperties.cassiusAppointmentId for identification.
 - **Settings Pages**:
     - 2-column layout with sidebar navigation (Profile, Organization, Integrations, Security).

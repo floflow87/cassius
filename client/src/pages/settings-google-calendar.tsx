@@ -22,6 +22,8 @@ interface GoogleStatus {
     targetCalendarId: string | null;
     targetCalendarName: string | null;
     lastSyncAt: string | null;
+    syncErrorCount?: number;
+    lastSyncError?: string | null;
   };
 }
 
@@ -66,7 +68,7 @@ export default function GoogleCalendarIntegration() {
     onSuccess: (data: any) => {
       toast({ 
         title: "Synchronisation terminée", 
-        description: `${data.synced || 0} événement(s) synchronisé(s)` 
+        description: `${data.synced || 0} événement(s) synchronisé(s)${data.errors > 0 ? `, ${data.errors} erreur(s)` : ''}` 
       });
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
@@ -74,6 +76,23 @@ export default function GoogleCalendarIntegration() {
     onError: (error: any) => {
       toast({ 
         title: "Erreur de synchronisation", 
+        description: error.message || "Une erreur est survenue",
+        variant: "destructive" 
+      });
+    },
+  });
+  
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", "/api/integrations/google/disconnect");
+    },
+    onSuccess: () => {
+      toast({ title: "Intégration déconnectée" });
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erreur lors de la déconnexion", 
         description: error.message || "Une erreur est survenue",
         variant: "destructive" 
       });
@@ -150,6 +169,13 @@ export default function GoogleCalendarIntegration() {
                   </div>
                 )}
                 
+                {integration?.lastSyncError && (
+                  <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="h-4 w-4" />
+                    {integration.lastSyncError}
+                  </div>
+                )}
+                
                 <div className="flex gap-2 pt-2">
                   <Button 
                     variant="outline" 
@@ -160,6 +186,18 @@ export default function GoogleCalendarIntegration() {
                   >
                     <RefreshCw className={`h-4 w-4 mr-2 ${syncNowMutation.isPending ? "animate-spin" : ""}`} />
                     Synchroniser maintenant
+                  </Button>
+                  
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => disconnectMutation.mutate()}
+                    disabled={disconnectMutation.isPending}
+                    className="text-muted-foreground"
+                    data-testid="button-disconnect"
+                  >
+                    <Unplug className="h-4 w-4 mr-2" />
+                    Déconnecter
                   </Button>
                 </div>
               </div>
