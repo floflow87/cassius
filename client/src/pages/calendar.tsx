@@ -1000,7 +1000,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
               control={form.control}
               name="patientId"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="relative z-50">
                   <FormLabel>Patient</FormLabel>
                   <div className="relative">
                     <FormControl>
