@@ -11,7 +11,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, User, Plus, Check } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, User, Plus, Check, Pencil, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -248,6 +248,19 @@ function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, on
   );
 }
 
+const editFormSchema = z.object({
+  title: z.string().min(1, "Titre requis"),
+  type: z.enum(["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"]),
+  status: z.enum(["UPCOMING", "COMPLETED", "CANCELLED"]),
+  dateStart: z.string(),
+  timeStart: z.string(),
+  timeEnd: z.string().optional(),
+  description: z.string().optional(),
+  isq: z.string().optional(),
+});
+
+type EditFormData = z.infer<typeof editFormSchema>;
+
 interface AppointmentDrawerProps {
   appointmentId: string | null;
   open: boolean;
@@ -264,8 +277,45 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
     enabled: !!appointmentId && open,
   });
   
+  const form = useForm<EditFormData>({
+    resolver: zodResolver(editFormSchema),
+    defaultValues: {
+      title: "",
+      type: "CONSULTATION",
+      status: "UPCOMING",
+      dateStart: "",
+      timeStart: "09:00",
+      timeEnd: "",
+      description: "",
+      isq: "",
+    },
+  });
+  
+  // Reset form when appointment data loads or editing starts
+  const startEditing = () => {
+    if (appointment) {
+      const dateStart = new Date(appointment.dateStart);
+      form.reset({
+        title: appointment.title || "",
+        type: appointment.type as EditFormData["type"],
+        status: appointment.status as EditFormData["status"],
+        dateStart: format(dateStart, "yyyy-MM-dd"),
+        timeStart: format(dateStart, "HH:mm"),
+        timeEnd: appointment.dateEnd ? format(new Date(appointment.dateEnd), "HH:mm") : "",
+        description: appointment.description || "",
+        isq: appointment.isq?.toString() || "",
+      });
+    }
+    setIsEditing(true);
+  };
+  
+  const cancelEditing = () => {
+    setIsEditing(false);
+    form.reset();
+  };
+  
   const updateMutation = useMutation({
-    mutationFn: async (data: Partial<AppointmentWithDetails>) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       return apiRequest("PATCH", `/api/appointments/${appointmentId}`, data);
     },
     onSuccess: () => {
@@ -302,19 +352,46 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
     updateMutation.mutate({ status: "CANCELLED" });
   };
   
+  const onSubmitEdit = (data: EditFormData) => {
+    const dateStart = new Date(`${data.dateStart}T${data.timeStart}`).toISOString();
+    const dateEnd = data.timeEnd ? new Date(`${data.dateStart}T${data.timeEnd}`).toISOString() : null;
+    
+    updateMutation.mutate({
+      title: data.title,
+      type: data.type,
+      status: data.status,
+      dateStart,
+      dateEnd,
+      description: data.description || null,
+      isq: data.isq ? parseInt(data.isq, 10) : null,
+    });
+  };
+  
   if (!open) return null;
   
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+    <Sheet open={open} onOpenChange={(o) => { if (!o) { setIsEditing(false); onClose(); }}}>
       <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle data-testid="drawer-appointment-title">
-            {isLoading ? <Skeleton className="h-6 w-48" /> : appointment?.title || "Rendez-vous"}
-          </SheetTitle>
+          <div className="flex items-center justify-between">
+            <SheetTitle data-testid="drawer-appointment-title">
+              {isLoading ? <Skeleton className="h-6 w-48" /> : (isEditing ? "Modifier le rendez-vous" : (appointment?.title || "Rendez-vous"))}
+            </SheetTitle>
+            {!isLoading && appointment && !isEditing && (
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={startEditing}
+                data-testid="button-edit-appointment"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
           <SheetDescription>
             {isLoading ? (
               <Skeleton className="h-4 w-32" />
-            ) : appointment ? (
+            ) : appointment && !isEditing ? (
               <span className="flex items-center gap-2">
                 <Badge className={getStatusBadge(appointment.status)} variant="secondary">
                   {appointmentStatuses.find(s => s.value === appointment.status)?.label}
@@ -323,6 +400,8 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
                   {appointmentTypes.find(t => t.value === appointment.type)?.label}
                 </Badge>
               </span>
+            ) : isEditing ? (
+              <span className="text-muted-foreground">Modifiez les informations du rendez-vous</span>
             ) : null}
           </SheetDescription>
         </SheetHeader>
@@ -332,6 +411,163 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
           </div>
+        ) : appointment && isEditing ? (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmitEdit)} className="space-y-4 py-6">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Titre</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Titre du rendez-vous" data-testid="input-edit-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {appointmentTypes.map(t => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Statut</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-status">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {appointmentStatuses.map(s => (
+                            <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="dateStart"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} data-testid="input-edit-date" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="timeStart"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Heure début</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} data-testid="input-edit-time-start" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="timeEnd"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Heure fin</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} data-testid="input-edit-time-end" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="isq"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ISQ</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" max="100" {...field} placeholder="Valeur ISQ (optionnel)" data-testid="input-edit-isq" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="Notes (optionnel)" rows={3} data-testid="input-edit-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  type="submit" 
+                  className="flex-1"
+                  disabled={updateMutation.isPending}
+                  data-testid="button-save-edit"
+                >
+                  {updateMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+                </Button>
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  onClick={cancelEditing}
+                  data-testid="button-cancel-edit"
+                >
+                  Annuler
+                </Button>
+              </div>
+            </form>
+          </Form>
         ) : appointment ? (
           <div className="py-6 space-y-6">
             <div className="space-y-3">
