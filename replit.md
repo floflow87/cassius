@@ -112,6 +112,20 @@ Implant tracking uses `implants` (catalog) and `surgery_implants` (placement dat
     - QuickCreateDialog: Inline form for rapid appointment creation with patient selection.
     - Custom CSS styling for FullCalendar matching the design system with dark mode support.
     - Navigation: Sidebar link and header calendar button.
+    - Google Calendar sync indicator in header showing connection status.
+- **Google Calendar Integration**:
+    - One-way sync: Cassius appointments automatically sync to Google Calendar.
+    - Settings page at `/settings/integrations/google-calendar` for configuration.
+    - Backend: `server/googleCalendar.ts` for API interactions using Replit connector.
+    - Database: `calendar_integrations` table stores organization-level settings.
+    - Appointments track sync status via `externalEventId`, `syncStatus`, `lastSyncedAt`, `syncError` fields.
+    - API endpoints: `GET /api/integrations/google/status`, `GET /api/integrations/google/calendars`, `POST /api/integrations/google/settings`, `POST /api/integrations/google/sync-now`.
+    - Features: Connect/disconnect Google account, select target calendar, enable/disable sync, manual sync trigger.
+    - Events created with `[Cassius]` prefix and extendedProperties.cassiusAppointmentId for identification.
+- **Settings Pages**:
+    - 2-column layout with sidebar navigation (Profile, Organization, Integrations, Security).
+    - `/settings/integrations` lists available integrations as cards.
+    - Integration configuration pages under `/settings/integrations/{provider}`.
 
 ## External Dependencies
 

@@ -21,19 +21,19 @@ function SettingsSidebar() {
             (section.url !== "/settings" && location.startsWith(section.url));
           
           return (
-            <Link key={section.url} href={section.url}>
-              <a 
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                  isActive 
-                    ? "bg-primary/10 text-primary font-medium" 
-                    : "text-muted-foreground hover-elevate"
-                )}
-                data-testid={`settings-nav-${section.title.toLowerCase()}`}
-              >
-                <section.icon className="h-4 w-4" />
-                {section.title}
-              </a>
+            <Link 
+              key={section.url} 
+              href={section.url}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                isActive 
+                  ? "bg-primary/10 text-primary font-medium" 
+                  : "text-muted-foreground hover-elevate"
+              )}
+              data-testid={`settings-nav-${section.title.toLowerCase()}`}
+            >
+              <section.icon className="h-4 w-4" />
+              {section.title}
             </Link>
           );
         })}
