@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -485,6 +485,10 @@ export default function DocumentsPage() {
     },
   });
 
+  useEffect(() => {
+    setSelectedFiles(new Set());
+  }, [currentFolder.type, currentFolder.id, searchQuery]);
+
   const deleteMutation = useMutation({
     mutationFn: async ({ id, sourceType }: { id: string; sourceType: 'document' | 'radio' }) => {
       const endpoint = sourceType === 'radio' ? `/api/radios/${id}` : `/api/documents/${id}`;
@@ -759,10 +763,10 @@ export default function DocumentsPage() {
           <Breadcrumb path={currentPath} onNavigate={handleNavigate} />
           
           <div className="flex items-center gap-2">
-            {selectedFiles.size > 0 && (
+            {getSelectedFilesData().length > 0 && (
               <div className="flex items-center gap-2 mr-2 pr-2 border-r">
                 <span className="text-sm text-muted-foreground">
-                  {selectedFiles.size} sélectionné{selectedFiles.size > 1 ? 's' : ''}
+                  {getSelectedFilesData().length} sélectionné{getSelectedFilesData().length > 1 ? 's' : ''}
                 </span>
                 <Button
                   variant="outline"
@@ -1022,11 +1026,11 @@ export default function DocumentsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
-              Supprimer {selectedFiles.size} fichier{selectedFiles.size > 1 ? 's' : ''}
+              Supprimer {getSelectedFilesData().length} fichier{getSelectedFilesData().length > 1 ? 's' : ''}
             </DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground">
-            Êtes-vous sûr de vouloir supprimer {selectedFiles.size} fichier{selectedFiles.size > 1 ? 's' : ''} ? Cette action est irréversible.
+            Êtes-vous sûr de vouloir supprimer {getSelectedFilesData().length} fichier{getSelectedFilesData().length > 1 ? 's' : ''} ? Cette action est irréversible.
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkDeleteConfirm(false)}>
