@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, FolderClosed } from "lucide-react";
+import { ChevronLeft, ChevronRight, FolderClosed, Calendar } from "lucide-react";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
 import logoFull from "@assets/logo_Cassius_Plan_de_travail_1_copie_1765897934649.png";
@@ -38,6 +38,7 @@ const menuItems: MenuItem[] = [
   { title: "Implants", url: "/implants", icon: implantsIcon },
   { title: "Actes", url: "/actes", icon: actesIcon },
   { title: "Documents", url: "/documents", lucideIcon: FolderClosed },
+  { title: "Calendrier", url: "/calendar", lucideIcon: Calendar },
   { title: "Statistiques", url: "/stats", icon: statsIcon },
 ];
 
