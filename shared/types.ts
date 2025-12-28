@@ -663,6 +663,33 @@ export interface DocumentFilters {
   pageSize?: number;
 }
 
+// Calendar types
+export interface CalendarFilters {
+  start: string; // ISO date string
+  end: string;   // ISO date string
+  types?: string[];
+  statuses?: string[];
+  patientId?: string;
+  operationId?: string;
+}
+
+export interface CalendarAppointment {
+  id: string;
+  patientId: string;
+  operationId: string | null;
+  surgeryImplantId: string | null;
+  type: string;
+  status: string;
+  title: string;
+  description: string | null;
+  dateStart: Date;
+  dateEnd: Date | null;
+  isq: number | null;
+  patientNom: string;
+  patientPrenom: string;
+  hasCriticalFlag?: boolean;
+}
+
 // Unified file type that can represent both documents and radios
 export type FileSourceType = 'document' | 'radio';
 

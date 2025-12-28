@@ -195,6 +195,7 @@ export interface IStorage {
   // Appointment methods (unified RDV)
   getAllAppointments(organisationId: string, status?: string): Promise<Appointment[]>;
   getAllAppointmentsWithPatient(organisationId: string, status?: string): Promise<AppointmentWithPatient[]>;
+  getCalendarAppointments(organisationId: string, filters: import('../shared/types').CalendarFilters): Promise<import('../shared/types').CalendarAppointment[]>;
   getAppointment(organisationId: string, id: string): Promise<Appointment | undefined>;
   getAppointmentWithDetails(organisationId: string, id: string): Promise<AppointmentWithDetails | undefined>;
   getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]>;
@@ -2089,6 +2090,61 @@ export class DatabaseStorage implements IStorage {
       patientNom: r.patientNom,
       patientPrenom: r.patientPrenom,
     }));
+  }
+
+  async getCalendarAppointments(organisationId: string, filters: import('../shared/types').CalendarFilters): Promise<import('../shared/types').CalendarAppointment[]> {
+    const conditions = [eq(appointments.organisationId, organisationId)];
+    
+    // Date range filtering
+    if (filters.start) {
+      conditions.push(gte(appointments.dateStart, new Date(filters.start)));
+    }
+    if (filters.end) {
+      conditions.push(lte(appointments.dateStart, new Date(filters.end)));
+    }
+    
+    // Type filtering
+    if (filters.types && filters.types.length > 0) {
+      conditions.push(inArray(appointments.type, filters.types as any));
+    }
+    
+    // Status filtering
+    if (filters.statuses && filters.statuses.length > 0) {
+      conditions.push(inArray(appointments.status, filters.statuses as any));
+    }
+    
+    // Patient filtering
+    if (filters.patientId) {
+      conditions.push(eq(appointments.patientId, filters.patientId));
+    }
+    
+    // Operation filtering
+    if (filters.operationId) {
+      conditions.push(eq(appointments.operationId, filters.operationId));
+    }
+    
+    const result = await db
+      .select({
+        id: appointments.id,
+        patientId: appointments.patientId,
+        operationId: appointments.operationId,
+        surgeryImplantId: appointments.surgeryImplantId,
+        type: appointments.type,
+        status: appointments.status,
+        title: appointments.title,
+        description: appointments.description,
+        dateStart: appointments.dateStart,
+        dateEnd: appointments.dateEnd,
+        isq: appointments.isq,
+        patientNom: patients.nom,
+        patientPrenom: patients.prenom,
+      })
+      .from(appointments)
+      .innerJoin(patients, eq(appointments.patientId, patients.id))
+      .where(and(...conditions))
+      .orderBy(appointments.dateStart);
+    
+    return result;
   }
 
   async getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]> {

@@ -1964,6 +1964,35 @@ export async function registerRoutes(
     }
   });
   
+  // Get calendar appointments with date range filtering
+  app.get("/api/appointments/calendar", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { start, end, types, statuses, patientId, operationId } = req.query;
+      
+      if (!start || !end) {
+        return res.status(400).json({ error: "start and end date parameters are required" });
+      }
+      
+      const filters = {
+        start: start as string,
+        end: end as string,
+        types: types ? (Array.isArray(types) ? types as string[] : [types as string]) : undefined,
+        statuses: statuses ? (Array.isArray(statuses) ? statuses as string[] : [statuses as string]) : undefined,
+        patientId: patientId as string | undefined,
+        operationId: operationId as string | undefined,
+      };
+      
+      const appointmentsList = await storage.getCalendarAppointments(organisationId, filters);
+      res.json(appointmentsList);
+    } catch (error) {
+      console.error("Error fetching calendar appointments:", error);
+      res.status(500).json({ error: "Failed to fetch calendar appointments" });
+    }
+  });
+  
   app.get("/api/patients/:patientId/appointments", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
