@@ -69,13 +69,18 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0 overflow-visible">
       <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center h-16 px-4 border-b">
-        <div className="flex items-center justify-center w-full">
+        <a 
+          href="/dashboard" 
+          onClick={handleNavClick("/dashboard")}
+          className="flex items-center justify-center w-full cursor-pointer"
+          data-testid="link-logo-home"
+        >
           {isExpanded ? (
             <img src={logoFull} alt="Cassius" className="h-8 w-auto" />
           ) : (
             <img src={logoIcon} alt="Cassius" className="h-8 w-8 shrink-0" />
           )}
-        </div>
+        </a>
       </SidebarHeader>
 
       <SidebarContent className="bg-primary px-0 py-0">

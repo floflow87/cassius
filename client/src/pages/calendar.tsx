@@ -736,11 +736,12 @@ export default function CalendarPage() {
     });
   }, [updateMutation]);
   
-  const handleDatesSet = useCallback((info: { start: Date; end: Date }) => {
+  const handleDatesSet = useCallback((info: { start: Date; end: Date; view: { currentStart: Date } }) => {
     setDateRange({
       start: format(info.start, "yyyy-MM-dd"),
       end: format(info.end, "yyyy-MM-dd"),
     });
+    setSelectedDate(info.view.currentStart);
   }, []);
   
   const handleMiniCalendarSelect = useCallback((date: Date) => {
