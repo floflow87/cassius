@@ -1,0 +1,174 @@
+Contexte
+Sur la page /calendar, quand je navigue (semaine précédente/suivante, mois précédent/suivant) ou quand je change de vue (jour/semaine/mois), l’UI revient automatiquement à la semaine/jour/mois en cours (aujourd’hui), au lieu de rester sur la période sélectionnée.
+Le comportement attendu : la date “ancre” (anchor date) et la vue choisie doivent être persistées tant que l’utilisateur ne clique pas “Aujourd’hui”.
+
+Cause probable
+
+currentDate / selectedDate est recalculé depuis new Date() à chaque render
+
+ou un useEffect remet la date à today quand les events arrivent / quand les filtres changent
+
+ou la vue est contrôlée par un state mais réinitialisée au re-mount
+
+ou la navigation dépend des query params mais ils ne sont pas utilisés (ou reset)
+
+Objectifs (DoD)
+
+La navigation Prev/Next change correctement la période affichée.
+
+Le changement de vue (Jour/Semaine/Mois/Agenda) ne reset pas la date.
+
+Les fetchs s’alignent sur la période affichée (from/to).
+
+La date ancre et la vue restent stables quand :
+
+les events se chargent
+
+les filtres changent
+
+un RDV est créé/édité
+
+Le bouton “Aujourd’hui” est le seul qui ramène explicitement à la date du jour.
+
+Implémentation demandée
+A) Introduire un state unique et source de vérité
+
+Créer dans CalendarPage :
+
+view (enum: day/week/month/agenda)
+
+anchorDate (Date) → date pivot pour la navigation
+
+range dérivé de (view, anchorDate) → rangeStart, rangeEnd
+
+Règle stricte :
+
+anchorDate n’est initialisée à new Date() qu’une seule fois (au mount)
+
+ensuite, jamais de setAnchorDate(new Date()) sauf action “Aujourd’hui”
+
+Exemple logique :
+
+handleToday() → setAnchorDate(today)
+
+handlePrev() :
+
+view=week → anchorDate - 7 jours
+
+view=month → anchorDate - 1 mois
+
+view=day → anchorDate - 1 jour
+
+handleNext() symétrique
+
+handleViewChange(newView) :
+
+setView(newView)
+
+ne change pas anchorDate
+
+B) Retirer tout useEffect qui reset la date
+
+Auditer useEffect / useMemo :
+
+si un effet dépend de events / filters et fait setAnchorDate(new Date()) → supprimer
+
+si un effet recale la vue au “current week” → supprimer
+
+si la page se remount (key change) lors de navigation → stopper le remount
+
+C) Stabiliser la navigation via URL (recommandé)
+
+Persister view + anchorDate dans les query params :
+
+/calendar?view=week&date=2026-01-12
+
+Au mount :
+
+lire view et date depuis URL si présents
+
+sinon default week + today
+
+À chaque changement view/anchorDate :
+
+mettre à jour l’URL (replace, pas push si tu veux éviter pollution historique)
+
+DoD : un refresh du navigateur garde la même semaine/mois.
+
+D) Fetch basé sur range, pas sur today
+
+La query /api/appointments?from&to doit être basée sur rangeStart/rangeEnd calculés depuis anchorDate, pas depuis new Date().
+
+E) Tests manuels à valider
+
+Aller sur mois précédent → rester sur ce mois même après chargement events
+
+Créer un RDV dans une semaine future → rester sur cette semaine
+
+Changer filtre → rester sur la même semaine
+
+Changer vue semaine → mois → semaine : conserver la date pivot
+
+2) Prochain prompt d’amélioration — Calendrier “Doctolib-level” (sans Google)
+
+Contexte
+La navigation est corrigée. On veut maintenant améliorer l’UX pour rendre le calendrier digne d’un outil pro, rapide et agréable.
+
+Améliorations demandées (ordre priorisé)
+A) Drawer RDV premium
+
+clic RDV ouvre un drawer stable avec :
+
+patient + liens (patient/acte/implant)
+
+statut (à venir/terminé/annulé)
+
+notes
+
+actions : éditer, terminer, annuler, dupliquer
+
+ajouter skeleton dans drawer pendant chargement détail
+
+B) Création rapide “slot click”
+
+clic sur une case vide → modal “Nouveau RDV”
+
+préremplir date/heure + durée (configurable)
+
+autocomplete patient + option “créer patient”
+
+rattachement acte/implant optionnel
+
+C) Drag & drop + resize (si pas déjà)
+
+déplacer un RDV (update start/end)
+
+resize pour durée
+
+optimistic update + rollback
+
+si conflit (chevauchement) : afficher warning (pas blocage V1)
+
+D) Mode “Agenda” (liste)
+
+vue liste filtrable :
+
+aujourd’hui / semaine / mois
+
+group by date
+
+recherche rapide + filtres
+
+E) Intégration flags
+
+si patient/acte/implant lié a un flag critique :
+
+afficher un petit indicateur (icône) sur l’événement
+
+filtre “Afficher RDV à risque”
+
+F) Préparer la sync Google (sans la faire)
+
+ajouter les champs DB external_provider, external_event_id, sync_status
+
+mais ne brancher aucun OAuth maintenant

@@ -1039,7 +1039,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
                     </FormControl>
                     
                     {patientDropdownOpen && !selectedPatient && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 max-h-48 overflow-auto" data-testid="patient-dropdown">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-[100] max-h-48 overflow-auto" data-testid="patient-dropdown">
                         {patientsLoading ? (
                           <div className="p-3 text-sm text-muted-foreground text-center">Chargement...</div>
                         ) : filteredPatients.length === 0 ? (
