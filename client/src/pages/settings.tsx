@@ -1,51 +1,12 @@
-import { Route, Switch, useLocation, Link } from "wouter";
+import { useState } from "react";
+import { useLocation } from "wouter";
 import { User, Building2, Plug, Shield } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-const settingsSections = [
-  { title: "Profil", url: "/settings/profile", icon: User },
-  { title: "Organisation", url: "/settings/organization", icon: Building2 },
-  { title: "Intégrations", url: "/settings/integrations", icon: Plug },
-  { title: "Sécurité", url: "/settings/security", icon: Shield },
-];
-
-function SettingsSidebar() {
-  const [location] = useLocation();
-  
-  return (
-    <div className="w-56 border-r bg-muted/30 flex flex-col shrink-0 p-4" data-testid="settings-sidebar">
-      <h2 className="text-lg font-semibold mb-4">Paramètres</h2>
-      <nav className="space-y-1">
-        {settingsSections.map((section) => {
-          const isActive = location === section.url || 
-            (section.url !== "/settings" && location.startsWith(section.url));
-          
-          return (
-            <Link 
-              key={section.url} 
-              href={section.url}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                isActive 
-                  ? "bg-primary/10 text-primary font-medium" 
-                  : "text-muted-foreground hover-elevate"
-              )}
-              data-testid={`settings-nav-${section.title.toLowerCase()}`}
-            >
-              <section.icon className="h-4 w-4" />
-              {section.title}
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
-  );
-}
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import SettingsIntegrationsPage from "./settings-integrations";
 
 function ProfileSettings() {
   return (
-    <div className="p-6" data-testid="settings-profile">
-      <h1 className="text-2xl font-semibold mb-6">Profil</h1>
+    <div data-testid="settings-profile">
       <p className="text-muted-foreground">Gérez vos informations personnelles.</p>
     </div>
   );
@@ -53,8 +14,7 @@ function ProfileSettings() {
 
 function OrganizationSettings() {
   return (
-    <div className="p-6" data-testid="settings-organization">
-      <h1 className="text-2xl font-semibold mb-6">Organisation</h1>
+    <div data-testid="settings-organization">
       <p className="text-muted-foreground">Paramètres de votre cabinet.</p>
     </div>
   );
@@ -62,29 +22,82 @@ function OrganizationSettings() {
 
 function SecuritySettings() {
   return (
-    <div className="p-6" data-testid="settings-security">
-      <h1 className="text-2xl font-semibold mb-6">Sécurité</h1>
+    <div data-testid="settings-security">
       <p className="text-muted-foreground">Gérez la sécurité de votre compte.</p>
     </div>
   );
 }
 
 export default function SettingsPage() {
+  const [location] = useLocation();
+  
+  const getInitialTab = () => {
+    if (location.startsWith("/settings/integrations")) return "integrations";
+    if (location === "/settings/profile") return "profile";
+    if (location === "/settings/organization") return "organization";
+    if (location === "/settings/security") return "security";
+    return "profile";
+  };
+  
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+
   return (
-    <div className="flex h-full">
-      <SettingsSidebar />
-      <div className="flex-1 overflow-auto">
-        <Switch>
-          <Route path="/settings/profile" component={ProfileSettings} />
-          <Route path="/settings/organization" component={OrganizationSettings} />
-          <Route path="/settings/security" component={SecuritySettings} />
-          <Route path="/settings">
-            <div className="p-6" data-testid="settings-home">
-              <h1 className="text-2xl font-semibold mb-6">Paramètres</h1>
-              <p className="text-muted-foreground">Sélectionnez une catégorie dans le menu de gauche.</p>
-            </div>
-          </Route>
-        </Switch>
+    <div className="h-full overflow-auto">
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-6">Paramètres</h1>
+        
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="bg-transparent p-0 h-auto gap-6 border-b-0">
+            <TabsTrigger 
+              value="profile" 
+              className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+              data-testid="tab-profile"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Profil
+            </TabsTrigger>
+            <TabsTrigger 
+              value="organization" 
+              className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+              data-testid="tab-organization"
+            >
+              <Building2 className="h-4 w-4 mr-2" />
+              Organisation
+            </TabsTrigger>
+            <TabsTrigger 
+              value="integrations" 
+              className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+              data-testid="tab-integrations"
+            >
+              <Plug className="h-4 w-4 mr-2" />
+              Intégrations
+            </TabsTrigger>
+            <TabsTrigger 
+              value="security" 
+              className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+              data-testid="tab-security"
+            >
+              <Shield className="h-4 w-4 mr-2" />
+              Sécurité
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="profile" className="mt-6">
+            <ProfileSettings />
+          </TabsContent>
+          
+          <TabsContent value="organization" className="mt-6">
+            <OrganizationSettings />
+          </TabsContent>
+          
+          <TabsContent value="integrations" className="mt-6">
+            <SettingsIntegrationsPage embedded />
+          </TabsContent>
+          
+          <TabsContent value="security" className="mt-6">
+            <SecuritySettings />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

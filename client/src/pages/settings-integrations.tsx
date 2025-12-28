@@ -43,16 +43,23 @@ const integrations: IntegrationCard[] = [
   },
 ];
 
-function IntegrationsList() {
+function IntegrationsList({ embedded = false }: { embedded?: boolean }) {
   const { data: googleStatus, isLoading } = useQuery<{ connected: boolean; email?: string; lastSyncAt?: string }>({
     queryKey: ["/api/integrations/google/status"],
     retry: false,
   });
   
   return (
-    <div className="p-6" data-testid="settings-integrations">
-      <h1 className="text-2xl font-semibold mb-2">Intégrations</h1>
-      <p className="text-muted-foreground mb-6">Connectez Cassius à vos outils préférés.</p>
+    <div className={embedded ? "" : "p-6"} data-testid="settings-integrations">
+      {!embedded && (
+        <>
+          <h1 className="text-2xl font-semibold mb-2">Intégrations</h1>
+          <p className="text-muted-foreground mb-6">Connectez Cassius à vos outils préférés.</p>
+        </>
+      )}
+      {embedded && (
+        <p className="text-muted-foreground mb-6">Connectez Cassius à vos outils préférés.</p>
+      )}
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {integrations.map((integration) => {
@@ -124,11 +131,21 @@ function IntegrationsList() {
   );
 }
 
-export default function IntegrationsPage() {
+interface IntegrationsPageProps {
+  embedded?: boolean;
+}
+
+export default function IntegrationsPage({ embedded = false }: IntegrationsPageProps) {
+  if (embedded) {
+    return <IntegrationsList embedded />;
+  }
+  
   return (
     <Switch>
       <Route path="/settings/integrations/google-calendar" component={GoogleCalendarIntegration} />
-      <Route path="/settings/integrations" component={IntegrationsList} />
+      <Route path="/settings/integrations">
+        <IntegrationsList />
+      </Route>
     </Switch>
   );
 }
