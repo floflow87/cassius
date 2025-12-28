@@ -20,6 +20,8 @@ import ActesPage from "@/pages/actes";
 import ActeDetailsPage from "@/pages/acte-details";
 import DocumentsPage from "@/pages/documents";
 import CalendarPage from "@/pages/calendar";
+import SettingsPage from "@/pages/settings";
+import IntegrationsPage from "@/pages/settings-integrations";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import { apiRequest } from "@/lib/queryClient";
@@ -189,6 +191,10 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/actes/:id" component={ActeDetailsPage} />
       <Route path="/documents" component={DocumentsPage} />
       <Route path="/calendar" component={CalendarPage} />
+      <Route path="/settings/integrations/:rest*" component={IntegrationsPage} />
+      <Route path="/settings/integrations" component={IntegrationsPage} />
+      <Route path="/settings/:section" component={SettingsPage} />
+      <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );

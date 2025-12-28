@@ -49,6 +49,9 @@ import {
   type FlagWithEntity,
   type AppointmentWithPatient,
   type DocumentWithDetails,
+  calendarIntegrations,
+  type CalendarIntegration,
+  type InsertCalendarIntegration,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -238,6 +241,13 @@ export interface IStorage {
   getPatientFlagSummary(organisationId: string, patientId: string): Promise<{ topFlag?: TopFlag; activeFlagCount: number }>;
   getAllPatientFlagSummaries(organisationId: string): Promise<Map<string, { topFlag?: TopFlag; activeFlagCount: number }>>;
   getSurgeryImplantFlagSummary(organisationId: string, surgeryImplantId: string): Promise<{ topFlag?: TopFlag; activeFlagCount: number }>;
+  
+  // Calendar integration methods
+  getCalendarIntegration(organisationId: string): Promise<CalendarIntegration | undefined>;
+  createCalendarIntegration(organisationId: string, data: InsertCalendarIntegration): Promise<CalendarIntegration>;
+  updateCalendarIntegration(organisationId: string, id: string, data: Partial<InsertCalendarIntegration>): Promise<CalendarIntegration | undefined>;
+  getAppointmentsForSync(organisationId: string): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]>;
+  updateAppointmentSync(id: string, data: { externalProvider?: string; externalCalendarId?: string; externalEventId?: string; externalEtag?: string; syncStatus?: string; lastSyncedAt?: Date; syncError?: string | null }): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3451,6 +3461,78 @@ export class DatabaseStorage implements IStorage {
       }
       throw err;
     }
+  }
+
+  // ========== CALENDAR INTEGRATION ==========
+  async getCalendarIntegration(organisationId: string): Promise<CalendarIntegration | undefined> {
+    const [integration] = await db.select().from(calendarIntegrations)
+      .where(and(
+        eq(calendarIntegrations.organisationId, organisationId),
+        eq(calendarIntegrations.provider, "google")
+      ))
+      .limit(1);
+    return integration;
+  }
+
+  async createCalendarIntegration(organisationId: string, data: InsertCalendarIntegration): Promise<CalendarIntegration> {
+    const [integration] = await db.insert(calendarIntegrations)
+      .values({ ...data, organisationId })
+      .returning();
+    return integration;
+  }
+
+  async updateCalendarIntegration(organisationId: string, id: string, data: Partial<InsertCalendarIntegration>): Promise<CalendarIntegration | undefined> {
+    const [integration] = await db.update(calendarIntegrations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(
+        eq(calendarIntegrations.id, id),
+        eq(calendarIntegrations.organisationId, organisationId)
+      ))
+      .returning();
+    return integration;
+  }
+
+  async getAppointmentsForSync(organisationId: string): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]> {
+    const result = await db.select({
+      appointment: appointments,
+      patient: {
+        nom: patients.nom,
+        prenom: patients.prenom,
+      },
+    }).from(appointments)
+      .leftJoin(patients, eq(appointments.patientId, patients.id))
+      .where(and(
+        eq(appointments.organisationId, organisationId),
+        eq(appointments.status, "UPCOMING")
+      ));
+    
+    return result.map(r => ({
+      ...r.appointment,
+      patient: r.patient ? { nom: r.patient.nom, prenom: r.patient.prenom } : undefined,
+    }));
+  }
+
+  async updateAppointmentSync(id: string, data: { 
+    externalProvider?: string; 
+    externalCalendarId?: string; 
+    externalEventId?: string; 
+    externalEtag?: string; 
+    syncStatus?: string; 
+    lastSyncedAt?: Date; 
+    syncError?: string | null;
+  }): Promise<void> {
+    await db.update(appointments)
+      .set({
+        externalProvider: data.externalProvider,
+        externalCalendarId: data.externalCalendarId,
+        externalEventId: data.externalEventId,
+        externalEtag: data.externalEtag,
+        syncStatus: data.syncStatus as any,
+        lastSyncedAt: data.lastSyncedAt,
+        syncError: data.syncError,
+        updatedAt: new Date(),
+      })
+      .where(eq(appointments.id, id));
   }
 }
 

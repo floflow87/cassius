@@ -439,6 +439,34 @@ export const appointmentsRelations = relations(appointments, ({ one }) => ({
   }),
 }));
 
+// Table calendar_integrations - Organisation-level Google Calendar settings
+export const calendarIntegrations = pgTable("calendar_integrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  provider: text("provider").default("google").notNull(),
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  targetCalendarId: text("target_calendar_id"),
+  targetCalendarName: text("target_calendar_name"),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const calendarIntegrationsRelations = relations(calendarIntegrations, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [calendarIntegrations.organisationId],
+    references: [organisations.id],
+  }),
+}));
+
+export const insertCalendarIntegrationSchema = createInsertSchema(calendarIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCalendarIntegration = z.infer<typeof insertCalendarIntegrationSchema>;
+export type CalendarIntegration = typeof calendarIntegrations.$inferSelect;
+
 // Table flags - Clinical alerts and warnings
 export const flags = pgTable("flags", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
