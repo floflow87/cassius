@@ -19,6 +19,7 @@ import ImplantsPage from "@/pages/implants";
 import ActesPage from "@/pages/actes";
 import ActeDetailsPage from "@/pages/acte-details";
 import DocumentsPage from "@/pages/documents";
+import CalendarPage from "@/pages/calendar";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import { apiRequest } from "@/lib/queryClient";
@@ -74,6 +75,9 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
     if (location === "/documents") {
       return { title: "Documents", subtitle: null };
     }
+    if (location === "/calendar") {
+      return { title: "Calendrier", subtitle: null };
+    }
     return { title: "Cassius", subtitle: null };
   };
 
@@ -108,7 +112,13 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
         <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-notifications">
           <Bell className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-calendar">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="text-muted-foreground" 
+          data-testid="button-calendar"
+          onClick={() => window.location.href = "/calendar"}
+        >
           <Calendar className="h-5 w-5" />
         </Button>
         
@@ -178,6 +188,7 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       </Route>
       <Route path="/actes/:id" component={ActeDetailsPage} />
       <Route path="/documents" component={DocumentsPage} />
+      <Route path="/calendar" component={CalendarPage} />
       <Route component={NotFound} />
     </Switch>
   );
