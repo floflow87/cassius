@@ -76,7 +76,7 @@ import type {
   UnifiedFile,
 } from "@shared/types";
 import { db, pool } from "./db";
-import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL } from "drizzle-orm";
+import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL, isNull, not } from "drizzle-orm";
 
 export type PatientSummary = {
   patients: Patient[];
@@ -2144,7 +2144,49 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(appointments.dateStart);
     
-    return result;
+    if (result.length === 0) {
+      return [];
+    }
+    
+    // Batch fetch critical flags for all patients in the result
+    const patientIds = [...new Set(result.map(r => r.patientId))];
+    const implantIds = result.map(r => r.surgeryImplantId).filter(Boolean) as string[];
+    
+    // Get critical flags for patients and implants
+    const criticalFlagsResult = await db
+      .select({
+        entityId: flags.entityId,
+        entityType: flags.entityType,
+      })
+      .from(flags)
+      .where(and(
+        eq(flags.organisationId, organisationId),
+        eq(flags.level, "CRITICAL"),
+        isNull(flags.resolvedAt),
+        or(
+          and(eq(flags.entityType, "PATIENT"), inArray(flags.entityId, patientIds)),
+          ...(implantIds.length > 0 ? [and(eq(flags.entityType, "IMPLANT"), inArray(flags.entityId, implantIds))] : [])
+        )
+      ));
+    
+    // Build sets for quick lookup
+    const patientsWithCriticalFlags = new Set<string>();
+    const implantsWithCriticalFlags = new Set<string>();
+    
+    for (const flag of criticalFlagsResult) {
+      if (flag.entityType === "PATIENT") {
+        patientsWithCriticalFlags.add(flag.entityId);
+      } else if (flag.entityType === "IMPLANT") {
+        implantsWithCriticalFlags.add(flag.entityId);
+      }
+    }
+    
+    // Return appointments with hasCriticalFlag
+    return result.map(apt => ({
+      ...apt,
+      hasCriticalFlag: patientsWithCriticalFlags.has(apt.patientId) || 
+        (apt.surgeryImplantId ? implantsWithCriticalFlags.has(apt.surgeryImplantId) : false),
+    }));
   }
 
   async getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]> {
@@ -2233,6 +2275,42 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return result.length > 0;
+  }
+
+  async getAppointmentById(organisationId: string, id: string): Promise<Appointment | undefined> {
+    const [appointment] = await db.select().from(appointments)
+      .where(and(
+        eq(appointments.id, id),
+        eq(appointments.organisationId, organisationId)
+      ));
+    return appointment || undefined;
+  }
+
+  async getAppointmentConflicts(
+    organisationId: string,
+    start: Date,
+    end: Date,
+    excludeId?: string
+  ): Promise<Appointment[]> {
+    // Find overlapping appointments (UPCOMING only)
+    // Overlap: A.start < B.end AND A.end > B.start
+    const conditions = [
+      eq(appointments.organisationId, organisationId),
+      eq(appointments.status, "UPCOMING"),
+      lt(appointments.dateStart, end),
+      or(
+        isNull(appointments.dateEnd),
+        gt(appointments.dateEnd, start)
+      ),
+    ];
+    
+    if (excludeId) {
+      conditions.push(not(eq(appointments.id, excludeId)));
+    }
+    
+    return db.select().from(appointments)
+      .where(and(...conditions))
+      .orderBy(appointments.dateStart);
   }
 
   // ========== DOCUMENTS ==========

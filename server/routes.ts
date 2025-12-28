@@ -2093,6 +2093,67 @@ export async function registerRoutes(
     }
   });
 
+  // Duplicate appointment
+  app.post("/api/appointments/:id/duplicate", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const { dateStart, dateEnd } = req.body;
+      
+      // Get original appointment
+      const original = await storage.getAppointmentById(organisationId, id);
+      if (!original) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      
+      // Create duplicate with new dates
+      const duplicateData = {
+        patientId: original.patientId,
+        operationId: original.operationId,
+        surgeryImplantId: original.surgeryImplantId,
+        type: original.type,
+        title: original.title,
+        description: original.description,
+        dateStart: dateStart ? new Date(dateStart) : original.dateStart,
+        dateEnd: dateEnd ? new Date(dateEnd) : original.dateEnd,
+        isq: original.isq,
+        radioId: original.radioId,
+      };
+      
+      const duplicate = await storage.createAppointment(organisationId, duplicateData);
+      res.status(201).json(duplicate);
+    } catch (error) {
+      console.error("Error duplicating appointment:", error);
+      res.status(500).json({ error: "Failed to duplicate appointment" });
+    }
+  });
+
+  // Check for conflicts/overlaps
+  app.get("/api/appointments/conflicts", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { start, end, excludeId } = req.query;
+      if (!start || !end) {
+        return res.status(400).json({ error: "start and end dates required" });
+      }
+      
+      const conflicts = await storage.getAppointmentConflicts(
+        organisationId,
+        new Date(start as string),
+        new Date(end as string),
+        excludeId as string | undefined
+      );
+      res.json(conflicts);
+    } catch (error) {
+      console.error("Error checking conflicts:", error);
+      res.status(500).json({ error: "Failed to check conflicts" });
+    }
+  });
+
   // ========== SAVED FILTERS ==========
   app.get("/api/saved-filters/:pageType", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

@@ -11,7 +11,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay, parse } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Filter, User, Plus, Check, Pencil, X, Search } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Filter, User, Plus, Check, Pencil, X, Search, Copy, AlertTriangle, ExternalLink, RotateCcw } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -586,12 +586,30 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
     },
   });
   
+  const duplicateMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/appointments/${appointmentId}/duplicate`, {});
+    },
+    onSuccess: () => {
+      toast({ title: "Rendez-vous dupliqué" });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      onUpdated();
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la duplication", variant: "destructive" });
+    },
+  });
+  
   const markComplete = () => {
     updateMutation.mutate({ status: "COMPLETED" });
   };
   
   const markCancelled = () => {
     updateMutation.mutate({ status: "CANCELLED" });
+  };
+  
+  const markUpcoming = () => {
+    updateMutation.mutate({ status: "UPCOMING" });
   };
   
   const onSubmitEdit = (data: EditFormData) => {
@@ -830,9 +848,14 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
                 <div className="flex items-start gap-3">
                   <User className="h-5 w-5 text-muted-foreground mt-0.5" />
                   <div>
-                    <div className="font-medium">
+                    <a 
+                      href={`/patients/${appointment.patient.id}`}
+                      className="font-medium hover:underline flex items-center gap-1"
+                      data-testid="link-patient-profile"
+                    >
                       {appointment.patient.prenom} {appointment.patient.nom}
-                    </div>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
                     {appointment.patient.telephone && (
                       <div className="text-sm text-muted-foreground">{appointment.patient.telephone}</div>
                     )}
@@ -855,39 +878,64 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
               )}
             </div>
             
-            {appointment.status === "UPCOMING" && (
-              <div className="flex gap-2 pt-4 border-t">
-                <Button 
-                  variant="default" 
-                  className="flex-1"
-                  onClick={markComplete}
-                  disabled={updateMutation.isPending}
-                  data-testid="button-mark-complete"
-                >
-                  <Check className="h-4 w-4 mr-2" />
-                  Terminer
-                </Button>
+            <div className="flex flex-col gap-3 pt-4 border-t">
+              {appointment.status === "UPCOMING" && (
+                <div className="flex gap-2">
+                  <Button 
+                    variant="default" 
+                    className="flex-1"
+                    onClick={markComplete}
+                    disabled={updateMutation.isPending}
+                    data-testid="button-mark-complete"
+                  >
+                    <Check className="h-4 w-4 mr-2" />
+                    Terminer
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={markCancelled}
+                    disabled={updateMutation.isPending}
+                    data-testid="button-mark-cancelled"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Annuler
+                  </Button>
+                </div>
+              )}
+              
+              {(appointment.status === "COMPLETED" || appointment.status === "CANCELLED") && (
                 <Button 
                   variant="outline" 
-                  onClick={markCancelled}
+                  onClick={markUpcoming}
                   disabled={updateMutation.isPending}
-                  data-testid="button-mark-cancelled"
+                  data-testid="button-reopen"
                 >
-                  Annuler
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Réouvrir
+                </Button>
+              )}
+              
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => duplicateMutation.mutate()}
+                  disabled={duplicateMutation.isPending}
+                  data-testid="button-duplicate-appointment"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Dupliquer
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => deleteMutation.mutate()}
+                  disabled={deleteMutation.isPending}
+                  data-testid="button-delete-appointment"
+                >
+                  Supprimer
                 </Button>
               </div>
-            )}
-            
-            <div className="pt-2">
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={() => deleteMutation.mutate()}
-                disabled={deleteMutation.isPending}
-                data-testid="button-delete-appointment"
-              >
-                Supprimer le rendez-vous
-              </Button>
             </div>
           </div>
         ) : (
@@ -1238,6 +1286,7 @@ export default function CalendarPage() {
         patientNom: apt.patientNom,
         patientPrenom: apt.patientPrenom,
         isq: apt.isq,
+        hasCriticalFlag: apt.hasCriticalFlag,
       },
       backgroundColor: getAppointmentColor(apt.type).replace("bg-", ""),
       borderColor: "transparent",
@@ -1321,7 +1370,7 @@ export default function CalendarPage() {
   };
   
   const renderEventContent = (eventInfo: EventContentArg) => {
-    const { type, status, patientNom, patientPrenom, isq } = eventInfo.event.extendedProps;
+    const { type, status, patientNom, patientPrenom, isq, hasCriticalFlag } = eventInfo.event.extendedProps;
     const start = eventInfo.event.start;
     const end = eventInfo.event.end;
     
@@ -1335,14 +1384,19 @@ export default function CalendarPage() {
     const showTime = durationMinutes >= 45 && eventInfo.view.type !== "dayGridMonth" && eventInfo.view.type !== "listWeek";
     
     return (
-      <div className="p-1 text-xs overflow-hidden" data-testid={`calendar-event-${eventInfo.event.id}`}>
+      <div className="p-1 text-xs overflow-hidden relative" data-testid={`calendar-event-${eventInfo.event.id}`}>
+        {hasCriticalFlag && (
+          <div className="absolute top-0 right-0 p-0.5" title="Alerte critique">
+            <AlertTriangle className="h-3 w-3 text-yellow-300" />
+          </div>
+        )}
         {showTime && start && (
           <div className="text-white/70 text-[10px]">
             {format(start, "HH:mm")}
             {end && ` - ${format(end, "HH:mm")}`}
           </div>
         )}
-        <div className="font-medium truncate text-white">
+        <div className="font-medium truncate text-white pr-4">
           {eventInfo.event.title}
         </div>
         {eventInfo.view.type !== "dayGridMonth" && durationMinutes >= 30 && (
