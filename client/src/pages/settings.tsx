@@ -7,7 +7,7 @@ import SettingsIntegrationsPage from "./settings-integrations";
 function ProfileSettings() {
   return (
     <div data-testid="settings-profile">
-      <p className="text-muted-foreground">Gérez vos informations personnelles.</p>
+      <p className="text-sm text-muted-foreground">Gérez vos informations personnelles.</p>
     </div>
   );
 }
@@ -15,7 +15,7 @@ function ProfileSettings() {
 function OrganizationSettings() {
   return (
     <div data-testid="settings-organization">
-      <p className="text-muted-foreground">Paramètres de votre cabinet.</p>
+      <p className="text-sm text-muted-foreground">Paramètres de votre cabinet.</p>
     </div>
   );
 }
@@ -23,7 +23,7 @@ function OrganizationSettings() {
 function SecuritySettings() {
   return (
     <div data-testid="settings-security">
-      <p className="text-muted-foreground">Gérez la sécurité de votre compte.</p>
+      <p className="text-sm text-muted-foreground">Gérez la sécurité de votre compte.</p>
     </div>
   );
 }
@@ -44,8 +44,6 @@ export default function SettingsPage() {
   return (
     <div className="h-full overflow-auto">
       <div className="p-6">
-        <h1 className="text-2xl font-semibold mb-6">Paramètres</h1>
-        
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="bg-transparent p-0 h-auto gap-6 border-b-0">
             <TabsTrigger 

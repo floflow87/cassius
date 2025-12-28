@@ -80,6 +80,9 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
     if (location === "/calendar") {
       return { title: "Calendrier", subtitle: null };
     }
+    if (location.startsWith("/settings")) {
+      return { title: "Paramètres", subtitle: null };
+    }
     return { title: "Cassius", subtitle: null };
   };
 
@@ -191,8 +194,12 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/actes/:id" component={ActeDetailsPage} />
       <Route path="/documents" component={DocumentsPage} />
       <Route path="/calendar" component={CalendarPage} />
-      <Route path="/settings/integrations/:rest*" component={IntegrationsPage} />
-      <Route path="/settings/integrations" component={IntegrationsPage} />
+      <Route path="/settings/integrations/:rest*">
+        <IntegrationsPage />
+      </Route>
+      <Route path="/settings/integrations">
+        <IntegrationsPage />
+      </Route>
       <Route path="/settings/:section" component={SettingsPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
