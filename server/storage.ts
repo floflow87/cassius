@@ -242,12 +242,15 @@ export interface IStorage {
   getAllPatientFlagSummaries(organisationId: string): Promise<Map<string, { topFlag?: TopFlag; activeFlagCount: number }>>;
   getSurgeryImplantFlagSummary(organisationId: string, surgeryImplantId: string): Promise<{ topFlag?: TopFlag; activeFlagCount: number }>;
   
-  // Calendar integration methods
-  getCalendarIntegration(organisationId: string): Promise<CalendarIntegration | undefined>;
+  // Calendar integration methods (multi-tenant: org-level or user-level)
+  getCalendarIntegration(organisationId: string, userId?: string): Promise<CalendarIntegration | undefined>;
+  getActiveIntegrationForAppointment(organisationId: string, assignedUserId?: string | null): Promise<CalendarIntegration | undefined>;
   createCalendarIntegration(organisationId: string, data: InsertCalendarIntegration): Promise<CalendarIntegration>;
   updateCalendarIntegration(organisationId: string, id: string, data: Partial<InsertCalendarIntegration>): Promise<CalendarIntegration | undefined>;
-  getAppointmentsForSync(organisationId: string): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]>;
+  deleteCalendarIntegration(organisationId: string, id: string): Promise<boolean>;
+  getAppointmentsForSync(organisationId: string, lastSyncAt?: Date): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]>;
   updateAppointmentSync(organisationId: string, id: string, data: { externalProvider?: string; externalCalendarId?: string; externalEventId?: string; externalEtag?: string; syncStatus?: string; lastSyncedAt?: Date; syncError?: string | null }): Promise<void>;
+  updateIntegrationSyncStatus(organisationId: string, id: string, data: { lastSyncAt?: Date; syncErrorCount?: number; lastSyncError?: string | null }): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3463,15 +3466,44 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // ========== CALENDAR INTEGRATION ==========
-  async getCalendarIntegration(organisationId: string): Promise<CalendarIntegration | undefined> {
+  // ========== CALENDAR INTEGRATION (multi-tenant) ==========
+  
+  // Get integration for org (if userId is null) or specific user
+  async getCalendarIntegration(organisationId: string, userId?: string): Promise<CalendarIntegration | undefined> {
+    const conditions = [
+      eq(calendarIntegrations.organisationId, organisationId),
+      eq(calendarIntegrations.provider, "google")
+    ];
+    
+    if (userId) {
+      conditions.push(eq(calendarIntegrations.userId, userId));
+    } else {
+      conditions.push(sql`${calendarIntegrations.userId} IS NULL`);
+    }
+    
     const [integration] = await db.select().from(calendarIntegrations)
-      .where(and(
-        eq(calendarIntegrations.organisationId, organisationId),
-        eq(calendarIntegrations.provider, "google")
-      ))
+      .where(and(...conditions))
       .limit(1);
     return integration;
+  }
+  
+  // Priority: user-level > org-level integration
+  async getActiveIntegrationForAppointment(organisationId: string, assignedUserId?: string | null): Promise<CalendarIntegration | undefined> {
+    // First, try user-level integration if assignedUserId is provided
+    if (assignedUserId) {
+      const userIntegration = await this.getCalendarIntegration(organisationId, assignedUserId);
+      if (userIntegration && userIntegration.isEnabled && userIntegration.targetCalendarId) {
+        return userIntegration;
+      }
+    }
+    
+    // Fallback to org-level integration
+    const orgIntegration = await this.getCalendarIntegration(organisationId);
+    if (orgIntegration && orgIntegration.isEnabled && orgIntegration.targetCalendarId) {
+      return orgIntegration;
+    }
+    
+    return undefined;
   }
 
   async createCalendarIntegration(organisationId: string, data: InsertCalendarIntegration): Promise<CalendarIntegration> {
@@ -3491,8 +3523,38 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return integration;
   }
+  
+  async deleteCalendarIntegration(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(calendarIntegrations)
+      .where(and(
+        eq(calendarIntegrations.id, id),
+        eq(calendarIntegrations.organisationId, organisationId)
+      ))
+      .returning({ id: calendarIntegrations.id });
+    return result.length > 0;
+  }
 
-  async getAppointmentsForSync(organisationId: string): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]> {
+  async getAppointmentsForSync(organisationId: string, lastSyncAt?: Date): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]> {
+    const conditions = [
+      eq(appointments.organisationId, organisationId),
+    ];
+    
+    // Get appointments that need sync:
+    // 1. UPCOMING status (new/modified)
+    // 2. OR sync_status is PENDING or ERROR
+    // 3. OR updated since lastSyncAt
+    if (lastSyncAt) {
+      conditions.push(
+        or(
+          eq(appointments.status, "UPCOMING"),
+          inArray(appointments.syncStatus, ["PENDING", "ERROR"]),
+          gte(appointments.updatedAt, lastSyncAt)
+        )!
+      );
+    } else {
+      conditions.push(eq(appointments.status, "UPCOMING"));
+    }
+    
     const result = await db.select({
       appointment: appointments,
       patient: {
@@ -3501,10 +3563,7 @@ export class DatabaseStorage implements IStorage {
       },
     }).from(appointments)
       .leftJoin(patients, eq(appointments.patientId, patients.id))
-      .where(and(
-        eq(appointments.organisationId, organisationId),
-        eq(appointments.status, "UPCOMING")
-      ));
+      .where(and(...conditions));
     
     return result.map(r => ({
       ...r.appointment,
@@ -3535,6 +3594,24 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(appointments.id, id),
         eq(appointments.organisationId, organisationId)
+      ));
+  }
+  
+  async updateIntegrationSyncStatus(organisationId: string, id: string, data: { 
+    lastSyncAt?: Date; 
+    syncErrorCount?: number; 
+    lastSyncError?: string | null;
+  }): Promise<void> {
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    if (data.lastSyncAt !== undefined) updateData.lastSyncAt = data.lastSyncAt;
+    if (data.syncErrorCount !== undefined) updateData.syncErrorCount = data.syncErrorCount;
+    if (data.lastSyncError !== undefined) updateData.lastSyncError = data.lastSyncError;
+    
+    await db.update(calendarIntegrations)
+      .set(updateData)
+      .where(and(
+        eq(calendarIntegrations.id, id),
+        eq(calendarIntegrations.organisationId, organisationId)
       ));
   }
 }
