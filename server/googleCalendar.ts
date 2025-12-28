@@ -135,7 +135,15 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
   };
 }
 
-export async function getGoogleCalendarClient(integration: StoredIntegration): Promise<calendar_v3.Calendar> {
+interface CalendarClientResult {
+  client: calendar_v3.Calendar;
+  refreshedTokens?: {
+    accessToken: string;
+    expiresAt: Date;
+  };
+}
+
+export async function getGoogleCalendarClient(integration: StoredIntegration): Promise<CalendarClientResult> {
   if (!integration.accessToken || !integration.refreshToken) {
     throw new Error('Google Calendar not connected');
   }
@@ -146,13 +154,14 @@ export async function getGoogleCalendarClient(integration: StoredIntegration): P
   const needsRefresh = !integration.tokenExpiresAt || 
     new Date(integration.tokenExpiresAt).getTime() < Date.now() + 5 * 60 * 1000;
   
+  let refreshedTokens: { accessToken: string; expiresAt: Date } | undefined;
+  
   if (needsRefresh) {
-    const refreshed = await refreshAccessToken(integration.refreshToken);
+    refreshedTokens = await refreshAccessToken(integration.refreshToken);
     oauth2Client.setCredentials({
-      access_token: refreshed.accessToken,
+      access_token: refreshedTokens.accessToken,
       refresh_token: integration.refreshToken,
     });
-    // Note: Caller should update the stored token with refreshed values
   } else {
     oauth2Client.setCredentials({
       access_token: integration.accessToken,
@@ -160,7 +169,10 @@ export async function getGoogleCalendarClient(integration: StoredIntegration): P
     });
   }
   
-  return google.calendar({ version: 'v3', auth: oauth2Client });
+  return {
+    client: google.calendar({ version: 'v3', auth: oauth2Client }),
+    refreshedTokens,
+  };
 }
 
 export function isConfigured(): boolean {
@@ -196,7 +208,7 @@ export async function getGoogleCalendarStatus(integration: StoredIntegration | n
   }
   
   try {
-    const client = await getGoogleCalendarClient(integration);
+    const { client } = await getGoogleCalendarClient(integration);
     await client.settings.get({ setting: 'timezone' });
     
     return {
@@ -212,15 +224,23 @@ export async function getGoogleCalendarStatus(integration: StoredIntegration | n
   }
 }
 
-export async function listCalendars(integration: StoredIntegration): Promise<Array<{ id: string; summary: string; primary: boolean }>> {
-  const client = await getGoogleCalendarClient(integration);
+interface ListCalendarsResult {
+  calendars: Array<{ id: string; summary: string; primary: boolean }>;
+  refreshedTokens?: { accessToken: string; expiresAt: Date };
+}
+
+export async function listCalendars(integration: StoredIntegration): Promise<ListCalendarsResult> {
+  const { client, refreshedTokens } = await getGoogleCalendarClient(integration);
   const response = await client.calendarList.list();
   
-  return (response.data.items || []).map(cal => ({
-    id: cal.id || '',
-    summary: cal.summary || 'Sans nom',
-    primary: cal.primary || false,
-  }));
+  return {
+    calendars: (response.data.items || []).map(cal => ({
+      id: cal.id || '',
+      summary: cal.summary || 'Sans nom',
+      primary: cal.primary || false,
+    })),
+    refreshedTokens,
+  };
 }
 
 export interface CreateEventParams {
@@ -232,8 +252,14 @@ export interface CreateEventParams {
   cassiusAppointmentId: string;
 }
 
-export async function createCalendarEvent(integration: StoredIntegration, params: CreateEventParams): Promise<{ eventId: string; etag: string }> {
-  const client = await getGoogleCalendarClient(integration);
+interface CreateEventResult {
+  eventId: string;
+  etag: string;
+  refreshedTokens?: { accessToken: string; expiresAt: Date };
+}
+
+export async function createCalendarEvent(integration: StoredIntegration, params: CreateEventParams): Promise<CreateEventResult> {
+  const { client, refreshedTokens } = await getGoogleCalendarClient(integration);
   
   const event: calendar_v3.Schema$Event = {
     summary: params.summary,
@@ -261,6 +287,7 @@ export async function createCalendarEvent(integration: StoredIntegration, params
   return {
     eventId: response.data.id || '',
     etag: response.data.etag || '',
+    refreshedTokens,
   };
 }
 
@@ -274,8 +301,13 @@ export interface UpdateEventParams {
   cassiusAppointmentId: string;
 }
 
-export async function updateCalendarEvent(integration: StoredIntegration, params: UpdateEventParams): Promise<{ etag: string }> {
-  const client = await getGoogleCalendarClient(integration);
+interface UpdateEventResult {
+  etag: string;
+  refreshedTokens?: { accessToken: string; expiresAt: Date };
+}
+
+export async function updateCalendarEvent(integration: StoredIntegration, params: UpdateEventParams): Promise<UpdateEventResult> {
+  const { client, refreshedTokens } = await getGoogleCalendarClient(integration);
   
   const event: calendar_v3.Schema$Event = {
     summary: params.summary,
@@ -303,11 +335,16 @@ export async function updateCalendarEvent(integration: StoredIntegration, params
 
   return {
     etag: response.data.etag || '',
+    refreshedTokens,
   };
 }
 
-export async function deleteCalendarEvent(integration: StoredIntegration, calendarId: string, eventId: string): Promise<void> {
-  const client = await getGoogleCalendarClient(integration);
+interface DeleteEventResult {
+  refreshedTokens?: { accessToken: string; expiresAt: Date };
+}
+
+export async function deleteCalendarEvent(integration: StoredIntegration, calendarId: string, eventId: string): Promise<DeleteEventResult> {
+  const { client, refreshedTokens } = await getGoogleCalendarClient(integration);
   
   try {
     await client.events.delete({
@@ -319,20 +356,27 @@ export async function deleteCalendarEvent(integration: StoredIntegration, calend
       throw error;
     }
   }
+  
+  return { refreshedTokens };
 }
 
-export async function getCalendarEvent(integration: StoredIntegration, calendarId: string, eventId: string): Promise<calendar_v3.Schema$Event | null> {
-  const client = await getGoogleCalendarClient(integration);
+interface GetEventResult {
+  event: calendar_v3.Schema$Event | null;
+  refreshedTokens?: { accessToken: string; expiresAt: Date };
+}
+
+export async function getCalendarEvent(integration: StoredIntegration, calendarId: string, eventId: string): Promise<GetEventResult> {
+  const { client, refreshedTokens } = await getGoogleCalendarClient(integration);
   
   try {
     const response = await client.events.get({
       calendarId,
       eventId,
     });
-    return response.data;
+    return { event: response.data, refreshedTokens };
   } catch (error: any) {
     if (error.code === 404) {
-      return null;
+      return { event: null, refreshedTokens };
     }
     throw error;
   }

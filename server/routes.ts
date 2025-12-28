@@ -2448,7 +2448,16 @@ export async function registerRoutes(
       if (!integration || !integration.accessToken) {
         return res.status(400).json({ error: "Google Calendar not connected" });
       }
-      const calendars = await googleCalendar.listCalendars(integration);
+      const { calendars, refreshedTokens } = await googleCalendar.listCalendars(integration);
+      
+      // Persist refreshed tokens if any
+      if (refreshedTokens) {
+        await storage.updateCalendarIntegration(organisationId, integration.id, {
+          accessToken: refreshedTokens.accessToken,
+          tokenExpiresAt: refreshedTokens.expiresAt,
+        });
+      }
+      
       res.json(calendars);
     } catch (error: any) {
       console.error("Error listing calendars:", error);
@@ -2528,6 +2537,18 @@ export async function registerRoutes(
       
       let synced = 0;
       let errors = 0;
+      let tokensRefreshed = false;
+      
+      // Helper to persist refreshed tokens
+      const persistRefreshedTokens = async (refreshedTokens?: { accessToken: string; expiresAt: Date }) => {
+        if (refreshedTokens && !tokensRefreshed) {
+          tokensRefreshed = true;
+          await storage.updateCalendarIntegration(organisationId, integration.id, {
+            accessToken: refreshedTokens.accessToken,
+            tokenExpiresAt: refreshedTokens.expiresAt,
+          });
+        }
+      };
       
       for (const apt of appointments) {
         try {
@@ -2540,9 +2561,10 @@ export async function registerRoutes(
           
           if (apt.externalEventId) {
             // Update existing event
-            const existingEvent = await googleCalendar.getCalendarEvent(integration, calendarId, apt.externalEventId);
+            const getResult = await googleCalendar.getCalendarEvent(integration, calendarId, apt.externalEventId);
+            await persistRefreshedTokens(getResult.refreshedTokens);
             
-            if (existingEvent) {
+            if (getResult.event) {
               const result = await googleCalendar.updateCalendarEvent(integration, {
                 calendarId,
                 eventId: apt.externalEventId,
@@ -2552,6 +2574,7 @@ export async function registerRoutes(
                 end: endDate,
                 cassiusAppointmentId: apt.id,
               });
+              await persistRefreshedTokens(result.refreshedTokens);
               
               await storage.updateAppointmentSync(organisationId, apt.id, {
                 syncStatus: "SYNCED",
@@ -2569,6 +2592,7 @@ export async function registerRoutes(
                 end: endDate,
                 cassiusAppointmentId: apt.id,
               });
+              await persistRefreshedTokens(result.refreshedTokens);
               
               await storage.updateAppointmentSync(organisationId, apt.id, {
                 externalProvider: "google",
@@ -2590,6 +2614,7 @@ export async function registerRoutes(
               end: endDate,
               cassiusAppointmentId: apt.id,
             });
+            await persistRefreshedTokens(result.refreshedTokens);
             
             await storage.updateAppointmentSync(organisationId, apt.id, {
               externalProvider: "google",
@@ -2614,13 +2639,11 @@ export async function registerRoutes(
       }
       
       // Update integration sync status
-      if (integration) {
-        await storage.updateIntegrationSyncStatus(organisationId, integration.id, {
-          lastSyncAt: new Date(),
-          syncErrorCount: errors,
-          lastSyncError: errors > 0 ? `${errors} appointment(s) failed to sync` : null,
-        });
-      }
+      await storage.updateIntegrationSyncStatus(organisationId, integration.id, {
+        lastSyncAt: new Date(),
+        syncErrorCount: errors,
+        lastSyncError: errors > 0 ? `${errors} appointment(s) failed to sync` : null,
+      });
       
       res.json({ synced, errors, total: appointments.length });
     } catch (error: any) {
