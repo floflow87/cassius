@@ -192,6 +192,18 @@ export interface EnvCheckResult {
   hasStateSecret: boolean;
   expectedVariables: string[];
   missingVariables: string[];
+  appBaseUrl?: string;
+  googleRedirectUri?: string;
+}
+
+// Mask a URL to show only the domain portion for security
+function maskUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.host}/...`;
+  } catch {
+    return url.length > 20 ? `${url.substring(0, 20)}...` : url;
+  }
 }
 
 export function checkEnvVariables(): EnvCheckResult {
@@ -224,6 +236,8 @@ export function checkEnvVariables(): EnvCheckResult {
     hasStateSecret,
     expectedVariables,
     missingVariables,
+    appBaseUrl: process.env.APP_BASE_URL ? maskUrl(process.env.APP_BASE_URL) : undefined,
+    googleRedirectUri: process.env.GOOGLE_REDIRECT_URI ? maskUrl(process.env.GOOGLE_REDIRECT_URI) : undefined,
   };
 }
 

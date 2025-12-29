@@ -2415,7 +2415,7 @@ export async function registerRoutes(
         });
       }
 
-      res.redirect(`${baseUrl}/settings/integrations/google-calendar?success=connected`);
+      res.redirect(`${baseUrl}/settings/integrations/google-calendar?connected=1`);
     } catch (error: any) {
       console.error("OAuth callback error:", error);
       res.redirect(`${baseUrl}/settings/integrations/google-calendar?error=token_exchange_failed`);

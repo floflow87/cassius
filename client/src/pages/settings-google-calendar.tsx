@@ -42,6 +42,8 @@ interface EnvCheckResult {
   hasStateSecret: boolean;
   expectedVariables: string[];
   missingVariables: string[];
+  appBaseUrl?: string;
+  googleRedirectUri?: string;
 }
 
 export default function GoogleCalendarIntegration() {
@@ -52,10 +54,10 @@ export default function GoogleCalendarIntegration() {
   
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
-    const success = params.get("success");
+    const connected = params.get("connected");
     const error = params.get("error");
     
-    if (success === "connected") {
+    if (connected === "1") {
       toast({ 
         title: "Google Calendar connecté", 
         description: "Votre compte Google a été lié avec succès." 
@@ -89,11 +91,17 @@ export default function GoogleCalendarIntegration() {
     retry: false,
   });
   
-  // Admin-only env check - only fetch when not configured
-  const { data: envCheck } = useQuery<EnvCheckResult>({
+  // Admin-only env check - fetch to show environment info (returns null for non-admins)
+  const { data: envCheck } = useQuery<EnvCheckResult | null>({
     queryKey: ["/api/integrations/google/env-check"],
-    enabled: status?.configured === false,
+    enabled: status !== undefined,
     retry: false,
+    queryFn: async () => {
+      const res = await fetch("/api/integrations/google/env-check", { credentials: "include" });
+      if (res.status === 403) return null; // Non-admin, silently return null
+      if (!res.ok) return null; // Other errors, silently return null
+      return res.json();
+    },
   });
   
   const connectMutation = useMutation({
@@ -305,6 +313,42 @@ export default function GoogleCalendarIntegration() {
                         </ul>
                       </div>
                     )}
+                    
+                    {envCheck && (envCheck.appBaseUrl || envCheck.googleRedirectUri) && (
+                      <div className="pt-2 border-t border-amber-200 dark:border-amber-800">
+                        <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
+                          Configuration actuelle :
+                        </p>
+                        <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
+                          {envCheck.appBaseUrl && (
+                            <li><span className="text-muted-foreground">APP_BASE_URL:</span> <span className="font-mono text-xs">{envCheck.appBaseUrl}</span></li>
+                          )}
+                          {envCheck.googleRedirectUri && (
+                            <li><span className="text-muted-foreground">GOOGLE_REDIRECT_URI:</span> <span className="font-mono text-xs">{envCheck.googleRedirectUri}</span></li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {isConfigured && envCheck && (envCheck.appBaseUrl || envCheck.googleRedirectUri) && (
+                  <div className="p-3 bg-muted/50 border rounded-md">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Environnement actuel :</p>
+                    <ul className="text-sm space-y-1">
+                      {envCheck.appBaseUrl && (
+                        <li className="flex items-center gap-2">
+                          <span className="text-muted-foreground">APP_BASE_URL:</span>
+                          <Badge variant="secondary" className="font-mono text-xs">{envCheck.appBaseUrl}</Badge>
+                        </li>
+                      )}
+                      {envCheck.googleRedirectUri && (
+                        <li className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Redirect URI:</span>
+                          <Badge variant="secondary" className="font-mono text-xs">{envCheck.googleRedirectUri}</Badge>
+                        </li>
+                      )}
+                    </ul>
                   </div>
                 )}
                 

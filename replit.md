@@ -122,6 +122,22 @@ Implant tracking uses `implants` (catalog) and `surgery_implants` (placement dat
     - Multi-tenant architecture: Each organization stores their own OAuth credentials.
         - Org-level: `userId=null`, shared across all users in organisation.
         - User-level: `userId` set, overrides org-level for that specific user (Phase B ready).
+    - **Multi-Environment Setup (Prod/Staging)**:
+        - Each environment (production, staging) requires its own OAuth credentials.
+        - Google Cloud Console setup:
+            1. Create separate OAuth 2.0 credentials for each environment.
+            2. Add environment-specific redirect URIs to each credential:
+                - Production: `https://app.cassiuspro.com/api/integrations/google/callback`
+                - Staging: `https://staging.cassiuspro.com/api/integrations/google/callback`
+        - Environment variables per environment:
+            - `GOOGLE_CLIENT_ID` - Environment-specific OAuth client ID.
+            - `GOOGLE_CLIENT_SECRET` - Environment-specific OAuth client secret.
+            - `GOOGLE_REDIRECT_URI` - Must match the callback URL for that environment.
+            - `APP_BASE_URL` - Base URL for that environment (used for post-OAuth redirects).
+        - The `/api/integrations/google/env-check` endpoint (admin-only) shows:
+            - Which variables are configured.
+            - Masked URLs for `APP_BASE_URL` and `GOOGLE_REDIRECT_URI` to verify correct environment.
+        - OAuth callback redirects to `${APP_BASE_URL}/settings/integrations/google-calendar?connected=1`.
     - Required environment variables:
         - `GOOGLE_CLIENT_ID` - OAuth client ID from Google Cloud Console.
         - `GOOGLE_CLIENT_SECRET` - OAuth client secret from Google Cloud Console.
@@ -138,6 +154,7 @@ Implant tracking uses `implants` (catalog) and `surgery_implants` (placement dat
         - `GET /api/integrations/google/connect` - Generate OAuth authorization URL.
         - `GET /api/integrations/google/callback` - Handle OAuth callback, exchange code for tokens.
         - `GET /api/integrations/google/status` - Connection status and integration info.
+        - `GET /api/integrations/google/env-check` - Admin-only endpoint showing env vars status and masked URLs.
         - `GET /api/integrations/google/calendars` - List available calendars.
         - `PATCH /api/integrations/google/settings` - Update integration settings.
         - `POST /api/integrations/google/sync-now` - Trigger manual sync.
