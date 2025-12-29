@@ -184,6 +184,49 @@ export function isConfigured(): boolean {
   }
 }
 
+export interface EnvCheckResult {
+  hasGoogleClientId: boolean;
+  hasGoogleClientSecret: boolean;
+  hasGoogleRedirectUri: boolean;
+  hasAppBaseUrl: boolean;
+  hasStateSecret: boolean;
+  expectedVariables: string[];
+  missingVariables: string[];
+}
+
+export function checkEnvVariables(): EnvCheckResult {
+  const expectedVariables = [
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET', 
+    'GOOGLE_REDIRECT_URI',
+    'APP_BASE_URL',
+    'SESSION_SECRET',
+  ];
+
+  const hasGoogleClientId = !!process.env.GOOGLE_CLIENT_ID;
+  const hasGoogleClientSecret = !!process.env.GOOGLE_CLIENT_SECRET;
+  const hasGoogleRedirectUri = !!process.env.GOOGLE_REDIRECT_URI;
+  const hasAppBaseUrl = !!process.env.APP_BASE_URL;
+  const hasStateSecret = !!process.env.SESSION_SECRET;
+
+  const missingVariables: string[] = [];
+  if (!hasGoogleClientId) missingVariables.push('GOOGLE_CLIENT_ID');
+  if (!hasGoogleClientSecret) missingVariables.push('GOOGLE_CLIENT_SECRET');
+  if (!hasGoogleRedirectUri) missingVariables.push('GOOGLE_REDIRECT_URI');
+  if (!hasAppBaseUrl) missingVariables.push('APP_BASE_URL');
+  if (!hasStateSecret) missingVariables.push('SESSION_SECRET');
+
+  return {
+    hasGoogleClientId,
+    hasGoogleClientSecret,
+    hasGoogleRedirectUri,
+    hasAppBaseUrl,
+    hasStateSecret,
+    expectedVariables,
+    missingVariables,
+  };
+}
+
 export async function getGoogleCalendarStatus(integration: StoredIntegration | null): Promise<{
   connected: boolean;
   configured: boolean;

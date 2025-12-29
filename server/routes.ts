@@ -2331,6 +2331,18 @@ export async function registerRoutes(
   // Multi-tenant: Each organization stores their own OAuth tokens
   // ============================================
 
+  // Admin-only endpoint to check environment configuration
+  app.get("/api/integrations/google/env-check", requireJwtOrSession, async (req, res) => {
+    // Check for admin role
+    const user = req.user;
+    if (!user || user.role !== 'ADMIN') {
+      return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+    }
+
+    const envCheck = googleCalendar.checkEnvVariables();
+    res.json(envCheck);
+  });
+
   // Initiate OAuth flow - redirects to Google consent screen
   app.get("/api/integrations/google/connect", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

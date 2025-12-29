@@ -34,6 +34,16 @@ interface GoogleCalendar {
   primary: boolean;
 }
 
+interface EnvCheckResult {
+  hasGoogleClientId: boolean;
+  hasGoogleClientSecret: boolean;
+  hasGoogleRedirectUri: boolean;
+  hasAppBaseUrl: boolean;
+  hasStateSecret: boolean;
+  expectedVariables: string[];
+  missingVariables: string[];
+}
+
 export default function GoogleCalendarIntegration() {
   const { toast } = useToast();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>("");
@@ -76,6 +86,13 @@ export default function GoogleCalendarIntegration() {
   const { data: calendars = [], isLoading: calendarsLoading } = useQuery<GoogleCalendar[]>({
     queryKey: ["/api/integrations/google/calendars"],
     enabled: status?.connected === true,
+    retry: false,
+  });
+  
+  // Admin-only env check - only fetch when not configured
+  const { data: envCheck } = useQuery<EnvCheckResult>({
+    queryKey: ["/api/integrations/google/env-check"],
+    enabled: status?.configured === false,
     retry: false,
   });
   
@@ -271,10 +288,23 @@ export default function GoogleCalendarIntegration() {
                 )}
                 
                 {!isConfigured && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md">
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md space-y-2">
                     <p className="text-sm text-amber-800 dark:text-amber-200">
                       L'intégration Google Calendar n'est pas configurée. Contactez l'administrateur pour configurer les identifiants OAuth.
                     </p>
+                    
+                    {envCheck && envCheck.missingVariables.length > 0 && (
+                      <div className="pt-2 border-t border-amber-200 dark:border-amber-800">
+                        <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
+                          Variables manquantes :
+                        </p>
+                        <ul className="list-disc list-inside text-sm text-amber-700 dark:text-amber-300">
+                          {envCheck.missingVariables.map((variable) => (
+                            <li key={variable} className="font-mono text-xs">{variable}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
                 
