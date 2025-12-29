@@ -49,3 +49,6 @@ APP_ENV = "development"
 
 [userenv.production]
 APP_ENV = "production"
+
+[userenv.shared]
+APP_BASE_URL = "https://cassius-dental.replit.app"
