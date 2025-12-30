@@ -40,7 +40,7 @@ args = "npm run dev"
 waitForPort = 5000
 
 [agent]
-integrations = ["javascript_database:1.0.0", "javascript_object_storage:1.0.0"]
+integrations = ["javascript_database:1.0.0", "javascript_object_storage:1.0.0", "google-calendar:1.0.0"]
 
 [userenv]
 
@@ -49,3 +49,6 @@ APP_ENV = "development"
 
 [userenv.production]
 APP_ENV = "production"
+
+[userenv.shared]
+APP_BASE_URL = "https://cassius-dental.replit.app"

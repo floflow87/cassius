@@ -49,6 +49,9 @@ import {
   type FlagWithEntity,
   type AppointmentWithPatient,
   type DocumentWithDetails,
+  calendarIntegrations,
+  type CalendarIntegration,
+  type InsertCalendarIntegration,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -73,9 +76,10 @@ import type {
   DocumentTree,
   DocumentTreeNode,
   DocumentFilters,
+  UnifiedFile,
 } from "@shared/types";
 import { db, pool } from "./db";
-import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL } from "drizzle-orm";
+import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL, isNull, not } from "drizzle-orm";
 
 export type PatientSummary = {
   patients: Patient[];
@@ -194,6 +198,7 @@ export interface IStorage {
   // Appointment methods (unified RDV)
   getAllAppointments(organisationId: string, status?: string): Promise<Appointment[]>;
   getAllAppointmentsWithPatient(organisationId: string, status?: string): Promise<AppointmentWithPatient[]>;
+  getCalendarAppointments(organisationId: string, filters: import('../shared/types').CalendarFilters): Promise<import('../shared/types').CalendarAppointment[]>;
   getAppointment(organisationId: string, id: string): Promise<Appointment | undefined>;
   getAppointmentWithDetails(organisationId: string, id: string): Promise<AppointmentWithDetails | undefined>;
   getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]>;
@@ -236,6 +241,16 @@ export interface IStorage {
   getPatientFlagSummary(organisationId: string, patientId: string): Promise<{ topFlag?: TopFlag; activeFlagCount: number }>;
   getAllPatientFlagSummaries(organisationId: string): Promise<Map<string, { topFlag?: TopFlag; activeFlagCount: number }>>;
   getSurgeryImplantFlagSummary(organisationId: string, surgeryImplantId: string): Promise<{ topFlag?: TopFlag; activeFlagCount: number }>;
+  
+  // Calendar integration methods (multi-tenant: org-level or user-level)
+  getCalendarIntegration(organisationId: string, userId?: string): Promise<CalendarIntegration | undefined>;
+  getActiveIntegrationForAppointment(organisationId: string, assignedUserId?: string | null): Promise<CalendarIntegration | undefined>;
+  createCalendarIntegration(organisationId: string, data: InsertCalendarIntegration): Promise<CalendarIntegration>;
+  updateCalendarIntegration(organisationId: string, id: string, data: Partial<InsertCalendarIntegration>): Promise<CalendarIntegration | undefined>;
+  deleteCalendarIntegration(organisationId: string, id: string): Promise<boolean>;
+  getAppointmentsForSync(organisationId: string, lastSyncAt?: Date): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]>;
+  updateAppointmentSync(organisationId: string, id: string, data: { externalProvider?: string; externalCalendarId?: string; externalEventId?: string; externalEtag?: string; syncStatus?: string; lastSyncedAt?: Date; syncError?: string | null }): Promise<void>;
+  updateIntegrationSyncStatus(organisationId: string, id: string, data: { lastSyncAt?: Date; syncErrorCount?: number; lastSyncError?: string | null }): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2090,6 +2105,103 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async getCalendarAppointments(organisationId: string, filters: import('../shared/types').CalendarFilters): Promise<import('../shared/types').CalendarAppointment[]> {
+    const conditions = [eq(appointments.organisationId, organisationId)];
+    
+    // Date range filtering
+    if (filters.start) {
+      conditions.push(gte(appointments.dateStart, new Date(filters.start)));
+    }
+    if (filters.end) {
+      conditions.push(lte(appointments.dateStart, new Date(filters.end)));
+    }
+    
+    // Type filtering
+    if (filters.types && filters.types.length > 0) {
+      conditions.push(inArray(appointments.type, filters.types as any));
+    }
+    
+    // Status filtering
+    if (filters.statuses && filters.statuses.length > 0) {
+      conditions.push(inArray(appointments.status, filters.statuses as any));
+    }
+    
+    // Patient filtering
+    if (filters.patientId) {
+      conditions.push(eq(appointments.patientId, filters.patientId));
+    }
+    
+    // Operation filtering
+    if (filters.operationId) {
+      conditions.push(eq(appointments.operationId, filters.operationId));
+    }
+    
+    const result = await db
+      .select({
+        id: appointments.id,
+        patientId: appointments.patientId,
+        operationId: appointments.operationId,
+        surgeryImplantId: appointments.surgeryImplantId,
+        type: appointments.type,
+        status: appointments.status,
+        title: appointments.title,
+        description: appointments.description,
+        dateStart: appointments.dateStart,
+        dateEnd: appointments.dateEnd,
+        isq: appointments.isq,
+        patientNom: patients.nom,
+        patientPrenom: patients.prenom,
+      })
+      .from(appointments)
+      .innerJoin(patients, eq(appointments.patientId, patients.id))
+      .where(and(...conditions))
+      .orderBy(appointments.dateStart);
+    
+    if (result.length === 0) {
+      return [];
+    }
+    
+    // Batch fetch critical flags for all patients in the result
+    const patientIds = [...new Set(result.map(r => r.patientId))];
+    const implantIds = result.map(r => r.surgeryImplantId).filter(Boolean) as string[];
+    
+    // Get critical flags for patients and implants
+    const criticalFlagsResult = await db
+      .select({
+        entityId: flags.entityId,
+        entityType: flags.entityType,
+      })
+      .from(flags)
+      .where(and(
+        eq(flags.organisationId, organisationId),
+        eq(flags.level, "CRITICAL"),
+        isNull(flags.resolvedAt),
+        or(
+          and(eq(flags.entityType, "PATIENT"), inArray(flags.entityId, patientIds)),
+          ...(implantIds.length > 0 ? [and(eq(flags.entityType, "IMPLANT"), inArray(flags.entityId, implantIds))] : [])
+        )
+      ));
+    
+    // Build sets for quick lookup
+    const patientsWithCriticalFlags = new Set<string>();
+    const implantsWithCriticalFlags = new Set<string>();
+    
+    for (const flag of criticalFlagsResult) {
+      if (flag.entityType === "PATIENT") {
+        patientsWithCriticalFlags.add(flag.entityId);
+      } else if (flag.entityType === "IMPLANT") {
+        implantsWithCriticalFlags.add(flag.entityId);
+      }
+    }
+    
+    // Return appointments with hasCriticalFlag
+    return result.map(apt => ({
+      ...apt,
+      hasCriticalFlag: patientsWithCriticalFlags.has(apt.patientId) || 
+        (apt.surgeryImplantId ? implantsWithCriticalFlags.has(apt.surgeryImplantId) : false),
+    }));
+  }
+
   async getPatientAppointments(organisationId: string, patientId: string): Promise<Appointment[]> {
     return db.select().from(appointments)
       .where(and(
@@ -2129,12 +2241,37 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateAppointment(organisationId: string, id: string, data: Partial<InsertAppointment>): Promise<Appointment | undefined> {
+  async updateAppointment(organisationId: string, id: string, data: Partial<InsertAppointment> & { status?: string; cancelReason?: string | null }): Promise<Appointment | undefined> {
+    const now = new Date();
+    
+    // Build the update object with auto-managed timestamps for status changes
+    const updateData: Record<string, unknown> = {
+      ...data,
+      updatedAt: now,
+    };
+    
+    // Auto-set completedAt when status changes to COMPLETED
+    if (data.status === "COMPLETED") {
+      updateData.completedAt = now;
+      updateData.cancelledAt = null;
+      updateData.cancelReason = null;
+    }
+    
+    // Auto-set cancelledAt when status changes to CANCELLED
+    if (data.status === "CANCELLED") {
+      updateData.cancelledAt = now;
+      updateData.completedAt = null;
+    }
+    
+    // Reset timestamps when status goes back to UPCOMING
+    if (data.status === "UPCOMING") {
+      updateData.completedAt = null;
+      updateData.cancelledAt = null;
+      updateData.cancelReason = null;
+    }
+    
     const [updated] = await db.update(appointments)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(and(
         eq(appointments.id, id),
         eq(appointments.organisationId, organisationId)
@@ -2151,6 +2288,42 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return result.length > 0;
+  }
+
+  async getAppointmentById(organisationId: string, id: string): Promise<Appointment | undefined> {
+    const [appointment] = await db.select().from(appointments)
+      .where(and(
+        eq(appointments.id, id),
+        eq(appointments.organisationId, organisationId)
+      ));
+    return appointment || undefined;
+  }
+
+  async getAppointmentConflicts(
+    organisationId: string,
+    start: Date,
+    end: Date,
+    excludeId?: string
+  ): Promise<Appointment[]> {
+    // Find overlapping appointments (UPCOMING only)
+    // Overlap: A.start < B.end AND A.end > B.start
+    const conditions = [
+      eq(appointments.organisationId, organisationId),
+      eq(appointments.status, "UPCOMING"),
+      lt(appointments.dateStart, end),
+      or(
+        isNull(appointments.dateEnd),
+        gt(appointments.dateEnd, start)
+      ),
+    ];
+    
+    if (excludeId) {
+      conditions.push(not(eq(appointments.id, excludeId)));
+    }
+    
+    return db.select().from(appointments)
+      .where(and(...conditions))
+      .orderBy(appointments.dateStart);
   }
 
   // ========== DOCUMENTS ==========
@@ -2173,29 +2346,42 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDocumentTree(organisationId: string): Promise<DocumentTree> {
+    // Combine documents and radios for unified file tree
     const result = await pool.query(`
-      WITH patient_counts AS (
-        SELECT d.patient_id, p.nom, p.prenom, COUNT(*) as count
-        FROM documents d
-        JOIN patients p ON d.patient_id = p.id
-        WHERE d.organisation_id = $1 AND d.patient_id IS NOT NULL
-        GROUP BY d.patient_id, p.nom, p.prenom
+      WITH all_files AS (
+        -- Documents
+        SELECT patient_id, operation_id FROM documents WHERE organisation_id = $1
+        UNION ALL
+        -- Radios
+        SELECT patient_id, operation_id FROM radios WHERE organisation_id = $1
+      ),
+      patient_counts AS (
+        SELECT f.patient_id, p.nom, p.prenom, COUNT(*) as count
+        FROM all_files f
+        JOIN patients p ON f.patient_id = p.id
+        WHERE f.patient_id IS NOT NULL
+        GROUP BY f.patient_id, p.nom, p.prenom
       ),
       operation_counts AS (
-        SELECT d.operation_id, o.type_intervention, o.date_operation, p.nom as patient_nom, p.prenom as patient_prenom, p.id as patient_id, COUNT(*) as count
-        FROM documents d
-        JOIN operations o ON d.operation_id = o.id
+        SELECT f.operation_id, o.type_intervention, o.date_operation, p.nom as patient_nom, p.prenom as patient_prenom, p.id as patient_id, COUNT(*) as count
+        FROM all_files f
+        JOIN operations o ON f.operation_id = o.id
         JOIN patients p ON o.patient_id = p.id
-        WHERE d.organisation_id = $1 AND d.operation_id IS NOT NULL
-        GROUP BY d.operation_id, o.type_intervention, o.date_operation, p.nom, p.prenom, p.id
+        WHERE f.operation_id IS NOT NULL
+        GROUP BY f.operation_id, o.type_intervention, o.date_operation, p.nom, p.prenom, p.id
       ),
       unclassified_count AS (
-        SELECT COUNT(*) as count FROM documents
-        WHERE organisation_id = $1 AND patient_id IS NULL
+        SELECT COUNT(*) as count FROM (
+          SELECT id FROM documents WHERE organisation_id = $1 AND patient_id IS NULL
+          UNION ALL
+          SELECT id FROM radios WHERE organisation_id = $1 AND patient_id IS NULL
+        ) unclassified
       ),
       total_count AS (
-        SELECT COUNT(*) as count FROM documents
-        WHERE organisation_id = $1
+        SELECT (
+          (SELECT COUNT(*) FROM documents WHERE organisation_id = $1) +
+          (SELECT COUNT(*) FROM radios WHERE organisation_id = $1)
+        ) as count
       )
       SELECT 
         (SELECT json_agg(json_build_object('id', patient_id, 'name', nom || ' ' || prenom, 'type', 'patient', 'count', count, 'patientId', patient_id)) FROM patient_counts) as patients,
@@ -2315,6 +2501,193 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return result.length > 0;
+  }
+
+  async getUnifiedFiles(organisationId: string, filters: DocumentFilters): Promise<{ files: UnifiedFile[]; totalCount: number }> {
+    const { scope, patientId, operationId, q, from, to, sort = 'date', sortDir = 'desc', page = 1, pageSize = 25 } = filters;
+    const offset = (page - 1) * pageSize;
+    
+    // Build WHERE conditions for documents
+    let docWhere = `d.organisation_id = $1`;
+    let radioWhere = `r.organisation_id = $1`;
+    const params: (string | Date)[] = [organisationId];
+    let paramIndex = 2;
+
+    if (scope === 'patients' && !patientId) {
+      docWhere += ` AND d.patient_id IS NOT NULL`;
+      radioWhere += ` AND r.patient_id IS NOT NULL`;
+    } else if (scope === 'operations' && !operationId) {
+      docWhere += ` AND d.operation_id IS NOT NULL`;
+      radioWhere += ` AND r.operation_id IS NOT NULL`;
+    } else if (scope === 'unclassified') {
+      docWhere += ` AND d.patient_id IS NULL`;
+      radioWhere += ` AND r.patient_id IS NULL`;
+    }
+
+    if (patientId) {
+      docWhere += ` AND d.patient_id = $${paramIndex}`;
+      radioWhere += ` AND r.patient_id = $${paramIndex}`;
+      params.push(patientId);
+      paramIndex++;
+    }
+    if (operationId) {
+      docWhere += ` AND d.operation_id = $${paramIndex}`;
+      radioWhere += ` AND r.operation_id = $${paramIndex}`;
+      params.push(operationId);
+      paramIndex++;
+    }
+    if (q) {
+      docWhere += ` AND (d.title ILIKE $${paramIndex} OR d.file_name ILIKE $${paramIndex})`;
+      radioWhere += ` AND (r.title ILIKE $${paramIndex} OR r.file_name ILIKE $${paramIndex})`;
+      params.push(`%${q}%`);
+      paramIndex++;
+    }
+    if (from) {
+      docWhere += ` AND d.created_at >= $${paramIndex}`;
+      radioWhere += ` AND r.created_at >= $${paramIndex}`;
+      params.push(from);
+      paramIndex++;
+    }
+    if (to) {
+      docWhere += ` AND d.created_at <= $${paramIndex}`;
+      radioWhere += ` AND r.created_at <= $${paramIndex}`;
+      params.push(to);
+      paramIndex++;
+    }
+
+    // Determine sort column
+    const sortColumn = sort === 'name' ? 'title' 
+      : sort === 'size' ? 'size_bytes' 
+      : sort === 'type' ? 'mime_type'
+      : 'created_at';
+    const sortDirection = sortDir === 'asc' ? 'ASC' : 'DESC';
+
+    // Query combining documents and radios
+    const query = `
+      WITH unified AS (
+        SELECT 
+          d.id,
+          'document' as source_type,
+          d.title,
+          d.file_name,
+          d.file_path,
+          d.mime_type,
+          d.size_bytes,
+          d.tags,
+          d.patient_id,
+          d.operation_id,
+          d.created_at,
+          d.created_by,
+          NULL as radio_type,
+          NULL as radio_date,
+          NULL as implant_id
+        FROM documents d
+        WHERE ${docWhere}
+        
+        UNION ALL
+        
+        SELECT 
+          r.id,
+          'radio' as source_type,
+          r.title,
+          r.file_name,
+          r.file_path,
+          r.mime_type,
+          r.size_bytes,
+          NULL as tags,
+          r.patient_id,
+          r.operation_id,
+          r.created_at,
+          r.created_by,
+          r.type as radio_type,
+          r.date as radio_date,
+          r.implant_id
+        FROM radios r
+        WHERE ${radioWhere}
+      )
+      SELECT 
+        u.*,
+        p.id as p_id, p.nom as p_nom, p.prenom as p_prenom, p.date_naissance as p_date_naissance, p.sexe as p_sexe,
+        o.id as o_id, o.date_operation as o_date_operation, o.type_intervention as o_type_intervention, o.patient_id as o_patient_id
+      FROM unified u
+      LEFT JOIN patients p ON u.patient_id = p.id
+      LEFT JOIN operations o ON u.operation_id = o.id
+      ORDER BY u.${sortColumn} ${sortDirection}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    params.push(pageSize.toString(), offset.toString());
+
+    // Count query
+    const countQuery = `
+      SELECT (
+        (SELECT COUNT(*) FROM documents d WHERE ${docWhere}) +
+        (SELECT COUNT(*) FROM radios r WHERE ${radioWhere})
+      ) as total
+    `;
+
+    const [filesResult, countResult] = await Promise.all([
+      pool.query(query, params),
+      pool.query(countQuery, params.slice(0, paramIndex - 1))
+    ]);
+
+    const files: UnifiedFile[] = filesResult.rows.map(row => ({
+      id: row.id,
+      sourceType: row.source_type as 'document' | 'radio',
+      title: row.title,
+      fileName: row.file_name,
+      filePath: row.file_path,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes ? Number(row.size_bytes) : null,
+      tags: row.tags,
+      patientId: row.patient_id,
+      operationId: row.operation_id,
+      createdAt: new Date(row.created_at),
+      createdBy: row.created_by,
+      radioType: row.radio_type,
+      radioDate: row.radio_date,
+      implantId: row.implant_id,
+      patient: row.p_id ? {
+        id: row.p_id,
+        organisationId,
+        nom: row.p_nom,
+        prenom: row.p_prenom,
+        dateNaissance: row.p_date_naissance,
+        sexe: row.p_sexe,
+        telephone: null,
+        email: null,
+        adresse: null,
+        codePostal: null,
+        ville: null,
+        pays: null,
+        allergies: null,
+        traitement: null,
+        conditions: null,
+        contexteMedical: null,
+        statut: null,
+        createdAt: new Date(),
+      } : undefined,
+      operation: row.o_id ? {
+        id: row.o_id,
+        patientId: row.o_patient_id,
+        dateOperation: row.o_date_operation,
+        typeIntervention: row.o_type_intervention,
+        typeChirurgieTemps: null,
+        typeChirurgieApproche: null,
+        greffeOsseuse: null,
+        typeGreffe: null,
+        greffeQuantite: null,
+        greffeLocalisation: null,
+        typeMiseEnCharge: null,
+        conditionsMedicalesPreop: null,
+        notesPerop: null,
+        observationsPostop: null,
+      } : undefined,
+    }));
+
+    return {
+      files,
+      totalCount: Number(countResult.rows[0]?.total || 0),
+    };
   }
 
   // ========== SAVED FILTERS ==========
@@ -3091,6 +3464,155 @@ export class DatabaseStorage implements IStorage {
       }
       throw err;
     }
+  }
+
+  // ========== CALENDAR INTEGRATION (multi-tenant) ==========
+  
+  // Get integration for org (if userId is null) or specific user
+  async getCalendarIntegration(organisationId: string, userId?: string): Promise<CalendarIntegration | undefined> {
+    const conditions = [
+      eq(calendarIntegrations.organisationId, organisationId),
+      eq(calendarIntegrations.provider, "google")
+    ];
+    
+    if (userId) {
+      conditions.push(eq(calendarIntegrations.userId, userId));
+    } else {
+      conditions.push(sql`${calendarIntegrations.userId} IS NULL`);
+    }
+    
+    const [integration] = await db.select().from(calendarIntegrations)
+      .where(and(...conditions))
+      .limit(1);
+    return integration;
+  }
+  
+  // Priority: user-level > org-level integration
+  async getActiveIntegrationForAppointment(organisationId: string, assignedUserId?: string | null): Promise<CalendarIntegration | undefined> {
+    // First, try user-level integration if assignedUserId is provided
+    if (assignedUserId) {
+      const userIntegration = await this.getCalendarIntegration(organisationId, assignedUserId);
+      if (userIntegration && userIntegration.isEnabled && userIntegration.targetCalendarId) {
+        return userIntegration;
+      }
+    }
+    
+    // Fallback to org-level integration
+    const orgIntegration = await this.getCalendarIntegration(organisationId);
+    if (orgIntegration && orgIntegration.isEnabled && orgIntegration.targetCalendarId) {
+      return orgIntegration;
+    }
+    
+    return undefined;
+  }
+
+  async createCalendarIntegration(organisationId: string, data: InsertCalendarIntegration): Promise<CalendarIntegration> {
+    const [integration] = await db.insert(calendarIntegrations)
+      .values({ ...data, organisationId })
+      .returning();
+    return integration;
+  }
+
+  async updateCalendarIntegration(organisationId: string, id: string, data: Partial<InsertCalendarIntegration>): Promise<CalendarIntegration | undefined> {
+    const [integration] = await db.update(calendarIntegrations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(
+        eq(calendarIntegrations.id, id),
+        eq(calendarIntegrations.organisationId, organisationId)
+      ))
+      .returning();
+    return integration;
+  }
+  
+  async deleteCalendarIntegration(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(calendarIntegrations)
+      .where(and(
+        eq(calendarIntegrations.id, id),
+        eq(calendarIntegrations.organisationId, organisationId)
+      ))
+      .returning({ id: calendarIntegrations.id });
+    return result.length > 0;
+  }
+
+  async getAppointmentsForSync(organisationId: string, lastSyncAt?: Date): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]> {
+    const conditions = [
+      eq(appointments.organisationId, organisationId),
+    ];
+    
+    // Get appointments that need sync:
+    // 1. UPCOMING status (new/modified)
+    // 2. OR sync_status is PENDING or ERROR
+    // 3. OR updated since lastSyncAt
+    if (lastSyncAt) {
+      conditions.push(
+        or(
+          eq(appointments.status, "UPCOMING"),
+          inArray(appointments.syncStatus, ["PENDING", "ERROR"]),
+          gte(appointments.updatedAt, lastSyncAt)
+        )!
+      );
+    } else {
+      conditions.push(eq(appointments.status, "UPCOMING"));
+    }
+    
+    const result = await db.select({
+      appointment: appointments,
+      patient: {
+        nom: patients.nom,
+        prenom: patients.prenom,
+      },
+    }).from(appointments)
+      .leftJoin(patients, eq(appointments.patientId, patients.id))
+      .where(and(...conditions));
+    
+    return result.map(r => ({
+      ...r.appointment,
+      patient: r.patient ? { nom: r.patient.nom, prenom: r.patient.prenom } : undefined,
+    }));
+  }
+
+  async updateAppointmentSync(organisationId: string, id: string, data: { 
+    externalProvider?: string; 
+    externalCalendarId?: string; 
+    externalEventId?: string; 
+    externalEtag?: string; 
+    syncStatus?: string; 
+    lastSyncedAt?: Date; 
+    syncError?: string | null;
+  }): Promise<void> {
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    if (data.externalProvider !== undefined) updateData.externalProvider = data.externalProvider;
+    if (data.externalCalendarId !== undefined) updateData.externalCalendarId = data.externalCalendarId;
+    if (data.externalEventId !== undefined) updateData.externalEventId = data.externalEventId;
+    if (data.externalEtag !== undefined) updateData.externalEtag = data.externalEtag;
+    if (data.syncStatus !== undefined) updateData.syncStatus = data.syncStatus;
+    if (data.lastSyncedAt !== undefined) updateData.lastSyncedAt = data.lastSyncedAt;
+    if (data.syncError !== undefined) updateData.syncError = data.syncError;
+    
+    await db.update(appointments)
+      .set(updateData)
+      .where(and(
+        eq(appointments.id, id),
+        eq(appointments.organisationId, organisationId)
+      ));
+  }
+  
+  async updateIntegrationSyncStatus(organisationId: string, id: string, data: { 
+    lastSyncAt?: Date; 
+    syncErrorCount?: number; 
+    lastSyncError?: string | null;
+  }): Promise<void> {
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    if (data.lastSyncAt !== undefined) updateData.lastSyncAt = data.lastSyncAt;
+    if (data.syncErrorCount !== undefined) updateData.syncErrorCount = data.syncErrorCount;
+    if (data.lastSyncError !== undefined) updateData.lastSyncError = data.lastSyncError;
+    
+    await db.update(calendarIntegrations)
+      .set(updateData)
+      .where(and(
+        eq(calendarIntegrations.id, id),
+        eq(calendarIntegrations.organisationId, organisationId)
+      ));
   }
 }
 

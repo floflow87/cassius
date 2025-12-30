@@ -1,0 +1,240 @@
+Contexte
+
+Nous voulons intégrer Google Calendar dans Cassius avec une UX premium.
+L’intégration doit être accessible via Paramètres → Intégrations.
+La synchronisation doit être Phase A : Cassius → Google (sortante uniquement) :
+
+RDV créés/édités/annulés dans Cassius → événements Google Calendar
+
+Pas encore de sync entrante (Google → Cassius) pour cette phase
+
+1) Créer la page Paramètres
+Routes
+
+/settings (page principale)
+
+/settings/integrations (rubrique intégrations)
+
+/settings/integrations/google-calendar (détail)
+
+UI
+
+Layout settings en 2 colonnes :
+
+Sidebar gauche : sections (Profil, Organisation, Intégrations, Sécurité)
+
+Contenu à droite
+
+DoD
+
+Navigation stable, persistance layout, responsive.
+
+2) Page “Intégrations”
+
+Afficher une liste de cartes :
+
+Google Calendar (connecté ou non)
+
+(placeholder V2) Doctolib, Gmail, etc.
+
+Carte Google :
+
+statut : “Non connecté” / “Connecté”
+
+dernier sync : date (si dispo)
+
+bouton : “Configurer” (ouvre détail)
+
+3) Intégration Google Calendar — UX attendue (premium)
+Écran détail /settings/integrations/google-calendar
+
+Bloc 1 — Connexion
+
+Si non connecté :
+
+bouton primaire “Connecter Google Calendar”
+
+texte court expliquant ce qui sera synchronisé
+
+Si connecté :
+
+afficher :
+
+compte Google (email si dispo)
+
+calendrier cible (nom + id)
+
+statut : OK / Erreur
+
+dernier sync : date/heure
+
+boutons :
+
+“Déconnecter”
+
+“Synchroniser maintenant”
+
+“Changer de calendrier”
+
+Bloc 2 — Options de synchronisation
+
+Toggle “Synchroniser les RDV Cassius vers Google”
+
+Choix du calendrier cible :
+
+dropdown listant les calendriers Google accessibles
+
+option par défaut : “Primary”
+
+Bloc 3 — Mapping événement (affichage)
+
+Prévisualisation du titre d’event :
+
+[Cassius] {Type} — {Patient}
+
+Description :
+
+lien interne vers Cassius (si possible)
+
+infos utiles (sans données trop sensibles si on veut rester prudent)
+
+Bloc 4 — Gestion erreurs
+
+Si event sync error :
+
+message lisible
+
+action “Réessayer”
+
+log technique côté serveur
+
+4) Backend — OAuth Google (server-side)
+Endpoints
+
+GET /api/integrations/google/status
+
+GET /api/integrations/google/connect → redirect OAuth consent
+
+GET /api/integrations/google/callback → échange code → tokens
+
+POST /api/integrations/google/disconnect
+
+POST /api/integrations/google/sync-now
+
+GET /api/integrations/google/calendars → liste calendriers (après connexion)
+
+Sécurité
+
+stocker access_token + refresh_token côté serveur uniquement
+
+chiffrer tokens au repos (ou au minimum les garder côté DB hors front)
+
+refresh automatique quand token expire
+
+scopes minimaux nécessaires pour écrire dans calendar
+
+5) Data model (DB)
+
+Créer tables/champs pour stocker l’intégration :
+
+calendar_integrations
+
+id
+
+organisation_id
+
+provider = "google"
+
+google_user_id
+
+google_email (si possible)
+
+access_token (encrypted)
+
+refresh_token (encrypted)
+
+token_expiry
+
+calendar_id (target)
+
+is_enabled (bool)
+
+last_sync_at
+
+created_at / updated_at
+
+appointment_external_links
+
+appointment_id
+
+provider = "google"
+
+external_calendar_id
+
+external_event_id
+
+etag (optionnel)
+
+sync_status ("none"|"pending"|"synced"|"error")
+
+last_synced_at
+
+last_error (nullable)
+
+6) Sync Phase A : Cassius → Google
+Déclencheurs
+
+À chaque mutation RDV Cassius :
+
+create appointment → créer event Google si intégration active
+
+update appointment → patch event Google
+
+cancel/delete appointment → supprimer ou mettre “cancelled” côté Google
+
+Règles
+
+Un RDV Cassius correspond à 0..1 event Google (via external link)
+
+Si l’event Google a disparu (404) :
+
+recréer et mettre à jour le link
+
+Anti-boucle (préparer Phase B)
+
+Ajouter extendedProperties.private.cassiusAppointmentId = <appointmentId> sur l’event Google, même si Phase B n’est pas encore implémentée.
+
+Performance
+
+ne pas sync en bloc à chaque vue
+
+sync au fil de l’eau + bouton “Sync now” pour rattrapage
+
+7) UI Calendrier — Indication “Google connecté”
+
+Sur /calendar :
+
+petit badge discret “Google connecté” (dans toolbar)
+
+si erreur d’intégration : warning “Sync Google en erreur” avec lien vers settings
+
+8) Critères d’acceptation
+
+Je vais dans /settings/integrations/google-calendar
+
+Je connecte Google via OAuth
+
+Je choisis un calendrier cible
+
+Je crée/modifie/annule un RDV dans Cassius → l’event est créé/maj/supprimé dans Google Calendar
+
+Je peux déconnecter proprement
+
+Aucun token n’apparaît côté client
+
+Statuts sync visibles + erreurs réessayables
+
+Note importante (phase suivante)
+
+Ne pas implémenter Google → Cassius maintenant.
+On prépare les champs + extendedProperties, mais on reste sur Cassius → Google uniquement.

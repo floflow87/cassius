@@ -299,3 +299,96 @@
     inset: -1px;
   }
 }
+
+/* FullCalendar custom styling */
+.fc {
+  --fc-border-color: hsl(var(--border));
+  --fc-today-bg-color: hsl(var(--primary) / 0.05);
+  --fc-neutral-bg-color: hsl(var(--muted));
+  --fc-page-bg-color: transparent;
+  --fc-button-bg-color: hsl(var(--primary));
+  --fc-button-border-color: hsl(var(--primary));
+  --fc-button-hover-bg-color: hsl(var(--primary) / 0.9);
+  --fc-button-hover-border-color: hsl(var(--primary) / 0.9);
+  --fc-button-active-bg-color: hsl(var(--primary) / 0.8);
+  --fc-button-active-border-color: hsl(var(--primary) / 0.8);
+  --fc-event-bg-color: hsl(var(--primary));
+  --fc-event-border-color: transparent;
+  --fc-event-text-color: white;
+  --fc-list-event-hover-bg-color: hsl(var(--muted));
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.fc .fc-col-header-cell {
+  background: hsl(var(--muted));
+  padding: 0.5rem 0;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.fc .fc-daygrid-day-number,
+.fc .fc-col-header-cell-cushion {
+  color: hsl(var(--foreground));
+  text-decoration: none;
+}
+
+.fc .fc-timegrid-slot-label {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.fc .fc-event {
+  border-radius: 0.25rem;
+  border: none;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.fc .fc-event:hover {
+  filter: brightness(0.9);
+}
+
+.fc .fc-daygrid-event-dot {
+  display: none;
+}
+
+.fc .fc-list-event:hover td {
+  background: hsl(var(--muted));
+}
+
+.fc .fc-scrollgrid {
+  border: none;
+}
+
+.fc .fc-scrollgrid td,
+.fc .fc-scrollgrid th {
+  border-color: hsl(var(--border));
+}
+
+.fc-theme-standard .fc-scrollgrid {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.fc .fc-now-indicator-line {
+  border-color: hsl(var(--destructive));
+}
+
+.fc .fc-now-indicator-arrow {
+  border-color: hsl(var(--destructive));
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+/* Dark mode support */
+.dark .fc {
+  --fc-border-color: hsl(var(--border));
+  --fc-today-bg-color: hsl(var(--primary) / 0.1);
+  --fc-neutral-bg-color: hsl(var(--muted));
+}

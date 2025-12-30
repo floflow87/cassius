@@ -1,0 +1,70 @@
+Prompt — Remplacer le connecteur Replit par OAuth Google “in-app” (multi-tenant)
+
+Contexte
+Cassius est une application multi-tenant. Chaque organisation/utilisateur doit pouvoir connecter son propre compte Google Calendar depuis l’UI Cassius (page /settings/integrations/google-calendar).
+
+L’intégration actuelle utilise le connecteur Google Calendar Replit (icône puzzle). Cette approche est inacceptable car :
+	•	elle est liée à l’environnement Replit (pas dispo en prod Render),
+	•	elle ne permet pas un onboarding par tenant,
+	•	elle connecte un compte Google “global”, pas par utilisateur/organisation.
+
+Objectif
+Supprimer toute dépendance au connecteur Replit et implémenter une intégration Google Calendar via OAuth 2.0 standard, côté serveur Cassius.
+
+⸻
+
+1) OAuth standard dans Cassius (server-side)
+
+Créer les endpoints :
+	•	GET /api/integrations/google/connect
+	•	génère l’URL OAuth Google
+	•	inclut un state signé (orgId, userId, redirect)
+	•	GET /api/integrations/google/callback
+	•	échange code contre tokens
+	•	stocke access_token, refresh_token, expiry en DB (table calendar_integrations)
+	•	GET /api/integrations/google/status
+	•	GET /api/integrations/google/calendars
+	•	POST /api/integrations/google/disconnect
+	•	POST /api/integrations/google/sync-now
+
+Le tout doit dériver org/user depuis la session JWT (aucun userId fourni par le client).
+
+⸻
+
+2) Secrets et config (Render + Replit)
+
+Ajouter variables d’env (par environnement) :
+	•	GOOGLE_CLIENT_ID
+	•	GOOGLE_CLIENT_SECRET
+	•	GOOGLE_REDIRECT_URI (ex: https:///api/integrations/google/callback)
+	•	APP_BASE_URL (pour liens)
+
+⚠️ Ne jamais stocker tokens dans env vars.
+
+⸻
+
+3) UI Settings
+
+Sur /settings/integrations/google-calendar :
+	•	bouton “Connecter Google”
+	•	appelle /api/integrations/google/connect et redirige l’utilisateur
+	•	après callback : afficher état connecté + choix du calendrier + toggle sync
+
+Supprimer le bouton “Vérifier la connexion” lié au connecteur Replit.
+
+⸻
+
+4) Sync Phase A (Cassius → Google)
+
+Quand un RDV est créé/modifié/annulé dans Cassius :
+	•	si intégration active pour ce tenant → créer/maj/supprimer event Google
+	•	stocker external_event_id + sync_status
+
+⸻
+
+5) Critères d’acceptation
+	•	L’intégration fonctionne sur Render (prod), sans Replit puzzle
+	•	Deux organisations différentes peuvent connecter deux comptes Google différents
+	•	Créer un RDV Cassius crée un event dans le Google Calendar choisi
+	•	Modifier/annuler met à jour Google Calendar
+	•	Déconnexion coupe la sync

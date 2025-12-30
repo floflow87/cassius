@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum, bigint, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum, bigint, integer, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -63,6 +63,12 @@ export const appointmentStatusEnum = pgEnum("appointment_status", [
   "UPCOMING",
   "COMPLETED",
   "CANCELLED"
+]);
+export const syncStatusEnum = pgEnum("sync_status", [
+  "NONE",
+  "PENDING",
+  "SYNCED",
+  "ERROR"
 ]);
 export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
 export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
@@ -394,6 +400,18 @@ export const appointments = pgTable("appointments", {
   dateEnd: timestamp("date_end"),
   isq: real("isq"),
   radioId: varchar("radio_id").references(() => radios.id, { onDelete: "set null" }),
+  // Status timestamps
+  completedAt: timestamp("completed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
+  // Google Calendar sync preparation (future feature)
+  externalProvider: text("external_provider"),
+  externalCalendarId: text("external_calendar_id"),
+  externalEventId: text("external_event_id"),
+  syncStatus: syncStatusEnum("sync_status").default("NONE").notNull(),
+  lastSyncedAt: timestamp("last_synced_at"),
+  externalEtag: text("external_etag"),
+  syncError: text("sync_error"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -420,6 +438,85 @@ export const appointmentsRelations = relations(appointments, ({ one }) => ({
     references: [radios.id],
   }),
 }));
+
+// Table calendar_integrations - Multi-tenant (org-level or user-level) Calendar settings
+export const calendarIntegrations = pgTable("calendar_integrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").default("google").notNull(),
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  targetCalendarId: text("target_calendar_id"),
+  targetCalendarName: text("target_calendar_name"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  scope: text("scope"),
+  providerUserEmail: text("provider_user_email"),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncErrorCount: integer("sync_error_count").default(0).notNull(),
+  lastSyncError: text("last_sync_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("calendar_integrations_org_provider_user_idx").on(table.organisationId, table.provider, table.userId),
+]);
+
+export const calendarIntegrationsRelations = relations(calendarIntegrations, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [calendarIntegrations.organisationId],
+    references: [organisations.id],
+  }),
+  user: one(users, {
+    fields: [calendarIntegrations.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertCalendarIntegrationSchema = createInsertSchema(calendarIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCalendarIntegration = z.infer<typeof insertCalendarIntegrationSchema>;
+export type CalendarIntegration = typeof calendarIntegrations.$inferSelect;
+
+// Table appointment_external_links - External calendar event mappings (for V2 multi-calendar support)
+export const appointmentExternalLinks = pgTable("appointment_external_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: "cascade" }),
+  integrationId: varchar("integration_id").notNull().references(() => calendarIntegrations.id, { onDelete: "cascade" }),
+  provider: text("provider").default("google").notNull(),
+  externalCalendarId: text("external_calendar_id").notNull(),
+  externalEventId: text("external_event_id").notNull(),
+  etag: text("etag"),
+  syncStatus: syncStatusEnum("sync_status").default("NONE").notNull(),
+  lastSyncedAt: timestamp("last_synced_at"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("appointment_external_links_appt_integration_idx").on(table.appointmentId, table.integrationId),
+]);
+
+export const appointmentExternalLinksRelations = relations(appointmentExternalLinks, ({ one }) => ({
+  appointment: one(appointments, {
+    fields: [appointmentExternalLinks.appointmentId],
+    references: [appointments.id],
+  }),
+  integration: one(calendarIntegrations, {
+    fields: [appointmentExternalLinks.integrationId],
+    references: [calendarIntegrations.id],
+  }),
+}));
+
+export const insertAppointmentExternalLinkSchema = createInsertSchema(appointmentExternalLinks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAppointmentExternalLink = z.infer<typeof insertAppointmentExternalLinkSchema>;
+export type AppointmentExternalLink = typeof appointmentExternalLinks.$inferSelect;
 
 // Table flags - Clinical alerts and warnings
 export const flags = pgTable("flags", {
@@ -564,6 +661,14 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({
   organisationId: true,
   createdAt: true,
   updatedAt: true,
+  // Auto-managed status timestamps
+  completedAt: true,
+  cancelledAt: true,
+  // Sync fields are auto-managed
+  syncStatus: true,
+  lastSyncedAt: true,
+  externalEtag: true,
+  syncError: true,
 }).extend({
   dateStart: z.coerce.date(),
   dateEnd: z.coerce.date().nullable().optional(),
@@ -580,7 +685,11 @@ export const updateAppointmentSchema = z.object({
   operationId: z.string().nullable().optional(),
   surgeryImplantId: z.string().nullable().optional(),
   radioId: z.string().nullable().optional(),
+  cancelReason: z.string().nullable().optional(),
 });
+
+export const syncStatusValues = ["NONE", "PENDING", "SYNCED", "ERROR"] as const;
+export type SyncStatus = typeof syncStatusValues[number];
 
 export const appointmentTypeValues = ["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"] as const;
 export type AppointmentType = typeof appointmentTypeValues[number];

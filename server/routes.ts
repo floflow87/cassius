@@ -5,6 +5,7 @@ import { requireJwtOrSession } from "./jwtMiddleware";
 import * as supabaseStorage from "./supabaseStorage";
 import { getTopSlowestEndpoints, getTopDbHeavyEndpoints, getAllStats, clearStats } from "./instrumentation";
 import { runFlagDetection } from "./flagEngine";
+import * as googleCalendar from "./googleCalendar";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -1402,7 +1403,7 @@ export async function registerRoutes(
     }
   });
 
-  // Get filtered/paginated documents list
+  // Get filtered/paginated documents list (legacy - documents only)
   app.get("/api/documents", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -1427,6 +1428,33 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching documents:", error);
       res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
+  // Get unified files list (documents + radios combined)
+  app.get("/api/files", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const filters = {
+        scope: req.query.scope as 'patients' | 'operations' | 'unclassified' | 'all' | undefined,
+        patientId: req.query.patientId as string | undefined,
+        operationId: req.query.operationId as string | undefined,
+        q: req.query.q as string | undefined,
+        from: req.query.from as string | undefined,
+        to: req.query.to as string | undefined,
+        sort: req.query.sort as 'name' | 'date' | 'type' | 'size' | undefined,
+        sortDir: req.query.sortDir as 'asc' | 'desc' | undefined,
+        page: req.query.page ? parseInt(req.query.page as string) : undefined,
+        pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string) : undefined,
+      };
+      
+      const result = await storage.getUnifiedFiles(organisationId, filters);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching unified files:", error);
+      res.status(500).json({ error: "Failed to fetch files" });
     }
   });
 
@@ -1937,6 +1965,35 @@ export async function registerRoutes(
     }
   });
   
+  // Get calendar appointments with date range filtering
+  app.get("/api/appointments/calendar", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { start, end, types, statuses, patientId, operationId } = req.query;
+      
+      if (!start || !end) {
+        return res.status(400).json({ error: "start and end date parameters are required" });
+      }
+      
+      const filters = {
+        start: start as string,
+        end: end as string,
+        types: types ? (Array.isArray(types) ? types as string[] : [types as string]) : undefined,
+        statuses: statuses ? (Array.isArray(statuses) ? statuses as string[] : [statuses as string]) : undefined,
+        patientId: patientId as string | undefined,
+        operationId: operationId as string | undefined,
+      };
+      
+      const appointmentsList = await storage.getCalendarAppointments(organisationId, filters);
+      res.json(appointmentsList);
+    } catch (error) {
+      console.error("Error fetching calendar appointments:", error);
+      res.status(500).json({ error: "Failed to fetch calendar appointments" });
+    }
+  });
+  
   app.get("/api/patients/:patientId/appointments", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -2034,6 +2091,67 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting appointment:", error);
       res.status(500).json({ error: "Failed to delete appointment" });
+    }
+  });
+
+  // Duplicate appointment
+  app.post("/api/appointments/:id/duplicate", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const { dateStart, dateEnd } = req.body;
+      
+      // Get original appointment
+      const original = await storage.getAppointmentById(organisationId, id);
+      if (!original) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      
+      // Create duplicate with new dates
+      const duplicateData = {
+        patientId: original.patientId,
+        operationId: original.operationId,
+        surgeryImplantId: original.surgeryImplantId,
+        type: original.type,
+        title: original.title,
+        description: original.description,
+        dateStart: dateStart ? new Date(dateStart) : original.dateStart,
+        dateEnd: dateEnd ? new Date(dateEnd) : original.dateEnd,
+        isq: original.isq,
+        radioId: original.radioId,
+      };
+      
+      const duplicate = await storage.createAppointment(organisationId, duplicateData);
+      res.status(201).json(duplicate);
+    } catch (error) {
+      console.error("Error duplicating appointment:", error);
+      res.status(500).json({ error: "Failed to duplicate appointment" });
+    }
+  });
+
+  // Check for conflicts/overlaps
+  app.get("/api/appointments/conflicts", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { start, end, excludeId } = req.query;
+      if (!start || !end) {
+        return res.status(400).json({ error: "start and end dates required" });
+      }
+      
+      const conflicts = await storage.getAppointmentConflicts(
+        organisationId,
+        new Date(start as string),
+        new Date(end as string),
+        excludeId as string | undefined
+      );
+      res.json(conflicts);
+    } catch (error) {
+      console.error("Error checking conflicts:", error);
+      res.status(500).json({ error: "Failed to check conflicts" });
     }
   });
 
@@ -2205,6 +2323,344 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error running flag detection:", error);
       res.status(500).json({ error: "Failed to run flag detection" });
+    }
+  });
+
+  // ============================================
+  // Google Calendar Integration Routes - OAuth 2.0
+  // Multi-tenant: Each organization stores their own OAuth tokens
+  // ============================================
+
+  // Admin-only endpoint to check environment configuration
+  app.get("/api/integrations/google/env-check", requireJwtOrSession, async (req, res) => {
+    // Check for admin role
+    const user = req.user;
+    if (!user || user.role !== 'ADMIN') {
+      return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+    }
+
+    const envCheck = googleCalendar.checkEnvVariables();
+    res.json(envCheck);
+  });
+
+  // Initiate OAuth flow - redirects to Google consent screen
+  app.get("/api/integrations/google/connect", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      if (!googleCalendar.isConfigured()) {
+        return res.status(500).json({ 
+          error: "Google OAuth non configuré. Contactez l'administrateur." 
+        });
+      }
+
+      const authUrl = googleCalendar.generateAuthUrl(organisationId);
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error("Error generating auth URL:", error);
+      res.status(500).json({ error: error.message || "Failed to initiate OAuth" });
+    }
+  });
+
+  // OAuth callback - handles the redirect from Google
+  app.get("/api/integrations/google/callback", async (req, res) => {
+    const { code, state, error: oauthError } = req.query;
+    const baseUrl = process.env.APP_BASE_URL || '';
+
+    if (oauthError) {
+      console.error("OAuth error:", oauthError);
+      return res.redirect(`${baseUrl}/settings/integrations/google-calendar?error=oauth_denied`);
+    }
+
+    if (!code || !state) {
+      return res.redirect(`${baseUrl}/settings/integrations/google-calendar?error=missing_params`);
+    }
+
+    // Verify signed state
+    const stateData = googleCalendar.verifySignedState(state as string);
+    if (!stateData) {
+      return res.redirect(`${baseUrl}/settings/integrations/google-calendar?error=invalid_state`);
+    }
+
+    const { organisationId } = stateData;
+
+    try {
+      // Exchange code for tokens
+      const tokens = await googleCalendar.exchangeCodeForTokens(code as string);
+
+      // Store or update integration with tokens
+      let integration = await storage.getCalendarIntegration(organisationId);
+
+      if (integration) {
+        await storage.updateCalendarIntegration(organisationId, integration.id, {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          tokenExpiresAt: tokens.expiresAt,
+          scope: tokens.scope,
+          providerUserEmail: tokens.email,
+          isEnabled: true,
+        });
+      } else {
+        await storage.createCalendarIntegration(organisationId, {
+          organisationId,
+          userId: null,
+          provider: "google",
+          isEnabled: true,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          tokenExpiresAt: tokens.expiresAt,
+          scope: tokens.scope,
+          providerUserEmail: tokens.email,
+        });
+      }
+
+      res.redirect(`${baseUrl}/settings/integrations/google-calendar?connected=1`);
+    } catch (error: any) {
+      console.error("OAuth callback error:", error);
+      res.redirect(`${baseUrl}/settings/integrations/google-calendar?error=token_exchange_failed`);
+    }
+  });
+
+  app.get("/api/integrations/google/status", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const integration = await storage.getCalendarIntegration(organisationId);
+      const status = await googleCalendar.getGoogleCalendarStatus(integration || null);
+      
+      res.json({
+        connected: status.connected,
+        configured: status.configured,
+        email: integration?.providerUserEmail || undefined,
+        error: status.error,
+        integration: integration ? {
+          id: integration.id,
+          isEnabled: integration.isEnabled,
+          targetCalendarId: integration.targetCalendarId,
+          targetCalendarName: integration.targetCalendarName,
+          lastSyncAt: integration.lastSyncAt,
+          syncErrorCount: integration.syncErrorCount,
+          lastSyncError: integration.lastSyncError,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error("Error getting Google status:", error);
+      res.json({ connected: false, configured: googleCalendar.isConfigured(), error: error.message });
+    }
+  });
+
+  app.get("/api/integrations/google/calendars", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const integration = await storage.getCalendarIntegration(organisationId);
+      if (!integration || !integration.accessToken) {
+        return res.status(400).json({ error: "Google Calendar not connected" });
+      }
+      const { calendars, refreshedTokens } = await googleCalendar.listCalendars(integration);
+      
+      // Persist refreshed tokens if any
+      if (refreshedTokens) {
+        await storage.updateCalendarIntegration(organisationId, integration.id, {
+          accessToken: refreshedTokens.accessToken,
+          tokenExpiresAt: refreshedTokens.expiresAt,
+        });
+      }
+      
+      res.json(calendars);
+    } catch (error: any) {
+      console.error("Error listing calendars:", error);
+      res.status(500).json({ error: error.message || "Failed to list calendars" });
+    }
+  });
+
+  app.patch("/api/integrations/google/settings", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { isEnabled, targetCalendarId, targetCalendarName } = req.body;
+      
+      let integration = await storage.getCalendarIntegration(organisationId);
+      
+      if (!integration) {
+        return res.status(404).json({ error: "No integration found. Please connect first." });
+      }
+
+      integration = await storage.updateCalendarIntegration(organisationId, integration.id, {
+        isEnabled: isEnabled ?? integration.isEnabled,
+        targetCalendarId: targetCalendarId !== undefined ? targetCalendarId : integration.targetCalendarId,
+        targetCalendarName: targetCalendarName !== undefined ? targetCalendarName : integration.targetCalendarName,
+      });
+      
+      res.json(integration);
+    } catch (error: any) {
+      console.error("Error updating integration settings:", error);
+      res.status(500).json({ error: error.message || "Failed to update settings" });
+    }
+  });
+
+  // Disconnect Google Calendar integration (clear tokens)
+  app.delete("/api/integrations/google/disconnect", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const integration = await storage.getCalendarIntegration(organisationId);
+      
+      if (!integration) {
+        return res.status(404).json({ error: "No integration found" });
+      }
+      
+      // Clear tokens but keep the record for settings
+      await storage.updateCalendarIntegration(organisationId, integration.id, {
+        accessToken: null,
+        refreshToken: null,
+        tokenExpiresAt: null,
+        providerUserEmail: null,
+        isEnabled: false,
+      });
+      
+      res.json({ success: true, message: "Google Calendar disconnected" });
+    } catch (error: any) {
+      console.error("Error disconnecting integration:", error);
+      res.status(500).json({ error: error.message || "Failed to disconnect" });
+    }
+  });
+
+  app.post("/api/integrations/google/sync-now", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const integration = await storage.getCalendarIntegration(organisationId);
+      
+      if (!integration || !integration.isEnabled || !integration.accessToken) {
+        return res.status(400).json({ error: "Google Calendar integration not enabled or not connected" });
+      }
+      
+      const calendarId = integration.targetCalendarId || "primary";
+      
+      // Get appointments that need syncing
+      const appointments = await storage.getAppointmentsForSync(organisationId, integration.lastSyncAt ?? undefined);
+      
+      let synced = 0;
+      let errors = 0;
+      let tokensRefreshed = false;
+      
+      // Helper to persist refreshed tokens
+      const persistRefreshedTokens = async (refreshedTokens?: { accessToken: string; expiresAt: Date }) => {
+        if (refreshedTokens && !tokensRefreshed) {
+          tokensRefreshed = true;
+          await storage.updateCalendarIntegration(organisationId, integration.id, {
+            accessToken: refreshedTokens.accessToken,
+            tokenExpiresAt: refreshedTokens.expiresAt,
+          });
+        }
+      };
+      
+      for (const apt of appointments) {
+        try {
+          const patient = apt.patient;
+          const title = `[Cassius] ${apt.type} - ${patient?.prenom || ""} ${patient?.nom || ""}`.trim();
+          const description = `Rendez-vous Cassius\nType: ${apt.type}\nPatient: ${patient?.prenom || ""} ${patient?.nom || ""}`;
+          
+          const startDate = new Date(apt.dateStart);
+          const endDate = apt.dateEnd ? new Date(apt.dateEnd) : new Date(startDate.getTime() + 30 * 60 * 1000);
+          
+          if (apt.externalEventId) {
+            // Update existing event
+            const getResult = await googleCalendar.getCalendarEvent(integration, calendarId, apt.externalEventId);
+            await persistRefreshedTokens(getResult.refreshedTokens);
+            
+            if (getResult.event) {
+              const result = await googleCalendar.updateCalendarEvent(integration, {
+                calendarId,
+                eventId: apt.externalEventId,
+                summary: title,
+                description,
+                start: startDate,
+                end: endDate,
+                cassiusAppointmentId: apt.id,
+              });
+              await persistRefreshedTokens(result.refreshedTokens);
+              
+              await storage.updateAppointmentSync(organisationId, apt.id, {
+                syncStatus: "SYNCED",
+                externalEtag: result.etag,
+                lastSyncedAt: new Date(),
+                syncError: null,
+              });
+            } else {
+              // Event was deleted, recreate
+              const result = await googleCalendar.createCalendarEvent(integration, {
+                calendarId,
+                summary: title,
+                description,
+                start: startDate,
+                end: endDate,
+                cassiusAppointmentId: apt.id,
+              });
+              await persistRefreshedTokens(result.refreshedTokens);
+              
+              await storage.updateAppointmentSync(organisationId, apt.id, {
+                externalProvider: "google",
+                externalCalendarId: calendarId,
+                externalEventId: result.eventId,
+                externalEtag: result.etag,
+                syncStatus: "SYNCED",
+                lastSyncedAt: new Date(),
+                syncError: null,
+              });
+            }
+          } else {
+            // Create new event
+            const result = await googleCalendar.createCalendarEvent(integration, {
+              calendarId,
+              summary: title,
+              description,
+              start: startDate,
+              end: endDate,
+              cassiusAppointmentId: apt.id,
+            });
+            await persistRefreshedTokens(result.refreshedTokens);
+            
+            await storage.updateAppointmentSync(organisationId, apt.id, {
+              externalProvider: "google",
+              externalCalendarId: calendarId,
+              externalEventId: result.eventId,
+              externalEtag: result.etag,
+              syncStatus: "SYNCED",
+              lastSyncedAt: new Date(),
+              syncError: null,
+            });
+          }
+          
+          synced++;
+        } catch (error: any) {
+          console.error(`Error syncing appointment ${apt.id}:`, error);
+          await storage.updateAppointmentSync(organisationId, apt.id, {
+            syncStatus: "ERROR",
+            syncError: error.message || "Unknown error",
+          });
+          errors++;
+        }
+      }
+      
+      // Update integration sync status
+      await storage.updateIntegrationSyncStatus(organisationId, integration.id, {
+        lastSyncAt: new Date(),
+        syncErrorCount: errors,
+        lastSyncError: errors > 0 ? `${errors} appointment(s) failed to sync` : null,
+      });
+      
+      res.json({ synced, errors, total: appointments.length });
+    } catch (error: any) {
+      console.error("Error during sync:", error);
+      res.status(500).json({ error: error.message || "Sync failed" });
     }
   });
 

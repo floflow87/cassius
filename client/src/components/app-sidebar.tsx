@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, FolderClosed } from "lucide-react";
+import { ChevronLeft, ChevronRight, FolderClosed, Calendar } from "lucide-react";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
 import logoFull from "@assets/logo_Cassius_Plan_de_travail_1_copie_1765897934649.png";
@@ -38,6 +38,7 @@ const menuItems: MenuItem[] = [
   { title: "Implants", url: "/implants", icon: implantsIcon },
   { title: "Actes", url: "/actes", icon: actesIcon },
   { title: "Documents", url: "/documents", lucideIcon: FolderClosed },
+  { title: "Calendrier", url: "/calendar", lucideIcon: Calendar },
   { title: "Statistiques", url: "/stats", icon: statsIcon },
 ];
 
@@ -68,13 +69,18 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0 overflow-visible">
       <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center h-16 px-4 border-b">
-        <div className="flex items-center justify-center w-full">
+        <a 
+          href="/dashboard" 
+          onClick={handleNavClick("/dashboard")}
+          className="flex items-center justify-center w-full cursor-pointer"
+          data-testid="link-logo-home"
+        >
           {isExpanded ? (
             <img src={logoFull} alt="Cassius" className="h-8 w-auto" />
           ) : (
             <img src={logoIcon} alt="Cassius" className="h-8 w-8 shrink-0" />
           )}
-        </div>
+        </a>
       </SidebarHeader>
 
       <SidebarContent className="bg-primary px-0 py-0">
@@ -102,7 +108,7 @@ export function AppSidebar() {
                     className="h-5 w-auto brightness-0 invert shrink-0"
                   />
                 ) : item.lucideIcon && (
-                  <item.lucideIcon className="h-5 w-5 text-white shrink-0" />
+                  <item.lucideIcon className="h-5 w-5 text-white shrink-0" strokeWidth={2.5} />
                 )}
                 {isExpanded && (
                   <span className="text-sm font-medium text-white truncate">

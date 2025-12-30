@@ -1,0 +1,328 @@
+Contexte
+
+Nous voulons créer une page /calendar accessible depuis l’icône calendrier de la topbar.
+Cette page doit être au niveau UX d’un Google Calendar / Doctolib : rapide, stable, multi-vues, drag & drop, création rapide, filtres, statut, liens patient/acte/implant, et prête pour sync Google Calendar plus tard.
+
+Le calendrier doit afficher les RDV Cassius (rendez_vous / appointments) comme source de vérité.
+
+Objectifs UX (non négociables)
+
+Vues : Jour / Semaine / Mois / Agenda (liste)
+
+Navigation fluide : aujourd’hui, suivant/précédent, mini calendrier
+
+Création rapide : clic sur slot = création RDV pré-remplie (date/heure)
+
+Drag & drop : déplacer un RDV, redimensionner sa durée (resize)
+
+Multi-filtres : praticien (si multi user), type, statut, patient, flags
+
+Détails “drawer” : clic event → panneau latéral avec actions
+
+Conflits / chevauchements : affichage clair (warning) + règles
+
+Performance : virtualisation si besoin, fetch par plage de dates, skeletons, pas de reflow/layout jump
+
+UI / Layout
+Accès
+
+Icône calendrier topbar → route /calendar
+
+Layout global (3 colonnes, style Doctolib)
+
+Colonne gauche (fixe) :
+
+Mini calendrier (mois)
+
+Filtres (accordéon) :
+
+Types : Consultation / Suivi / Chirurgie / Contrôle / Autre
+
+Statuts : À venir / Terminé / Annulé
+
+Flags : Critique / Warning / Info (si flags liés aux RDV)
+
+Patients (autocomplete)
+
+Actes (autocomplete)
+
+Toggle : “Afficher uniquement mes RDV” (si multi user)
+
+Colonne centrale (main) :
+
+Toolbar calendrier :
+
+Boutons : Aujourd’hui, <, >, titre période (ex: “10–16 fév 2026”)
+
+Switch vue : Jour / Semaine / Mois / Agenda
+
+Zoom densité : 10 min / 15 min / 30 min / 60 min
+
+Grille calendrier :
+
+vue Semaine = default
+
+heures 07:00 → 20:00 (configurable)
+
+ligne “Maintenant”
+
+Colonne droite (drawer) :
+
+Détails RDV sélectionné + actions
+
+Comportements
+A) Chargement des données
+
+Fetch par plage de dates :
+
+GET /api/appointments?from=...&to=...&filters=...
+
+Ne jamais charger “tout l’historique” d’un coup
+
+Cache client par plage (ex: semaine) + invalidation sur mutations
+
+B) Création rapide
+
+Clic sur un slot vide (ou click+drag pour durée) :
+
+ouvre modal “Nouveau RDV”
+
+champs :
+
+patient (autocomplete + possibilité “créer patient”)
+
+type
+
+date/heure début + durée
+
+rattachement acte / implant (optionnel)
+
+notes
+
+tags/badges (optionnel)
+
+À la création :
+
+insertion optimiste UI + rollback si erreur
+
+C) Drag & drop / Resize
+
+Drag un RDV → update start/end
+
+Resize (tirer le bas) → change duration
+
+Backend : PATCH /api/appointments/:id avec start/end
+
+Gestion collision :
+
+V1 : autoriser chevauchement mais afficher un warning (badge)
+
+V2 : blocage configurable (param “interdire chevauchement”)
+
+D) Affichage événement (Design)
+
+Chaque event affiche :
+
+couleur par type (DS)
+
+patient (nom)
+
+type
+
+indicateur statut (annulé barré / terminé)
+
+icône flag si critique
+
+tooltip au hover : détails (acte, implant, notes courtes)
+
+E) Drawer détails (clic sur event)
+
+Panneau droite :
+
+Titre : Patient + type
+
+Infos :
+
+date/heure + durée
+
+statut
+
+praticien (si multi)
+
+lié à : patient / acte / implant (liens cliquables)
+
+notes
+
+flags
+
+Actions :
+
+éditer
+
+marquer comme terminé
+
+annuler
+
+dupliquer
+
+créer note (liée au RDV)
+
+“ouvrir fiche patient”
+
+“ouvrir acte”
+
+Modèle de données (base)
+Table appointments (ou rendez_vous)
+
+Champs minimum :
+
+id (uuid)
+
+organisation_id
+
+patient_id (nullable si RDV non lié — mais éviter)
+
+act_id (nullable)
+
+implant_instance_id (nullable)
+
+title (optionnel, sinon auto)
+
+type (enum)
+
+status (upcoming/completed/cancelled)
+
+start_at (timestamp)
+
+end_at (timestamp)
+
+description (text)
+
+tags (json ou pivot table)
+
+created_by (user_id)
+
+created_at / updated_at
+
+Index :
+
+(organisation_id, start_at)
+
+(patient_id, start_at)
+
+(act_id, start_at)
+
+API attendue
+Listing
+
+GET /api/appointments
+Query :
+
+from, to
+
+type[], status[]
+
+patientId (optionnel)
+
+actId (optionnel)
+
+flags (optionnel)
+Return :
+
+liste RDV + metadata (patient name minimal pour display)
+
+Create
+
+POST /api/appointments
+Body : patientId, type, startAt, endAt, actId?, implantId?, description?
+
+Update (drag/resize/edit)
+
+PATCH /api/appointments/:id
+Body : startAt?, endAt?, type?, status?, patientId?, actId?, implantId?, description?
+
+Delete/Cancel
+
+DELETE /api/appointments/:id (ou status=cancelled)
+
+Flags et RDV (intégration)
+
+Ajouter un champ calculé hasCriticalFlag sur un RDV si :
+
+patient lié a un flag critique
+
+ou implant/acte lié a un flag critique
+
+Permettre filtre “Afficher RDV à risque”
+
+Tech Front (important)
+
+Utiliser un composant calendrier sérieux avec :
+
+week/day grid
+
+drag & drop
+
+resize
+
+timezone
+
+events virtualization
+
+Architecture :
+
+CalendarPage
+
+CalendarSidebarFilters
+
+CalendarToolbar
+
+CalendarGrid
+
+AppointmentDrawer
+
+AppointmentModal
+
+State management :
+
+query key basée sur (from,to,filters)
+
+invalidation propre après mutations
+
+optimistic updates sur drag/resize
+
+UX excellence (comme Doctolib)
+
+Skeleton au chargement + pas de disparition layout (sidebar/topbar restent)
+
+Scroll automatique vers “now” en vue semaine
+
+Ligne “maintenant”
+
+“Créneaux libres” visibles si mode cabinet (option V2)
+
+Raccourcis clavier :
+
+N = nouveau RDV
+
+/ = focus search patient
+
+← → pour naviguer semaines
+
+Critères d’acceptation
+
+/calendar accessible topbar, stable, rapide
+
+Vues Jour/Semaine/Mois/Agenda opérationnelles
+
+Clic slot = création RDV préremplie
+
+Drag & resize fonctionnent (persistés DB)
+
+Filtres avancés + mini calendrier fonctionnels
+
+Drawer détails complet avec liens patient/acte/implant
+
+Aucun layout “clignote” pendant chargement
+
+Performant : fetch par plage + cache + lazy rendering

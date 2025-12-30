@@ -1,0 +1,139 @@
+ontexte
+Nous avons une première intégration Google Calendar (sync sortante Cassius → Google) avec :
+
+calendar_integrations (org-level)
+
+colonnes sync sur appointments
+
+indicateur de statut dans le header du calendrier
+
+Mais Cassius est multi-tenant et doit supporter (au minimum) un fonctionnement robuste et extensible.
+
+1) Multi-tenant : supporter ORG-level ET préparer USER-level (sans refactor)
+
+Modifier calendar_integrations :
+
+ajouter user_id nullable
+
+ajouter contrainte unique :
+
+(organisation_id, provider, user_id)
+
+(avec user_id null autorisé pour mode ORG)
+
+l’intégration active à utiliser est :
+
+si appointment a assigned_user_id et qu’il existe une intégration user-level → utiliser celle-ci
+
+sinon fallback sur intégration org-level
+
+sécuriser toutes queries avec organisation_id et (si user-level) user_id
+
+✅ DoD : plusieurs utilisateurs d’une même org peuvent connecter chacun leur Google sans se marcher dessus (même si V1 UI ne le met pas encore en avant).
+
+2) Ajouter une table de mapping (préparer la V2) — option recommandée
+
+Créer appointment_external_links :
+
+appointment_id
+
+provider
+
+external_calendar_id
+
+external_event_id
+
+etag (nullable)
+
+sync_status
+
+last_synced_at
+
+last_error
+
+Dans V1, on peut continuer à utiliser les colonnes sur appointments, mais écrire aussi le mapping (ou au minimum préparer la table).
+
+3) OAuth complet côté Cassius (si pas déjà fait)
+
+Implémenter endpoints :
+
+GET /api/integrations/google/connect
+
+GET /api/integrations/google/callback
+
+GET /api/integrations/google/status
+
+GET /api/integrations/google/calendars
+
+POST /api/integrations/google/disconnect
+
+POST /api/integrations/google/sync-now
+
+Exigences :
+
+state signé contenant orgId + userId
+
+stocker access_token + refresh_token en DB (jamais côté client)
+
+refresh automatique des tokens
+
+scopes minimaux pour créer/modifier/supprimer des events
+
+4) Sync Phase A robuste (idempotent, anti-doublon)
+
+À chaque mutation appointment :
+
+si integration active + sync enabled :
+
+si external_event_id existe → PATCH event
+
+sinon → CREATE event + stocker external_event_id
+
+si Google renvoie 404 (event supprimé) :
+
+recréer l’event et mettre à jour external_event_id
+
+si erreur (401/403/5xx) :
+
+sync_status=error + last_error
+
+bouton “Réessayer” et “Sync now” doivent fonctionner
+
+Ajouter extendedProperties.private.cassiusAppointmentId = appointmentId à l’event Google.
+
+5) Backlog sync (Sync now)
+
+getAppointmentsForSync doit retourner :
+
+appointments créés/modifiés depuis last_sync_at
+
+ou en sync_status in (pending, error)
+et les synchroniser en batch avec rate-limit raisonnable.
+
+6) UI Settings → Integrations Google Calendar (si pas complet)
+
+Page /settings/integrations/google-calendar :
+
+Connecter/déconnecter
+
+choisir calendar_id cible
+
+toggle enable sync
+
+afficher erreurs + bouton “Sync now”
+
+(bonus) afficher si org-level ou user-level
+
+Acceptance tests
+
+Créer RDV → event Google créé (pas doublon)
+
+Modifier RDV → event Google mis à jour
+
+Annuler RDV → event supprimé ou marqué annulé
+
+Désactiver sync → plus de sync
+
+Réactiver + “Sync now” → rattrape les RDV non sync
+
+Multi-tenant : deux users connectent deux Googles → chacun sync ses RDV assignés

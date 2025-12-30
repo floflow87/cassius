@@ -19,6 +19,9 @@ import ImplantsPage from "@/pages/implants";
 import ActesPage from "@/pages/actes";
 import ActeDetailsPage from "@/pages/acte-details";
 import DocumentsPage from "@/pages/documents";
+import CalendarPage from "@/pages/calendar";
+import SettingsPage from "@/pages/settings";
+import IntegrationsPage from "@/pages/settings-integrations";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import { apiRequest } from "@/lib/queryClient";
@@ -50,7 +53,7 @@ interface PageHeaderProps {
 }
 
 function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   
   const getPageInfo = () => {
     if (location === "/patients" || location.startsWith("/patients/")) {
@@ -73,6 +76,12 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
     }
     if (location === "/documents") {
       return { title: "Documents", subtitle: null };
+    }
+    if (location === "/calendar") {
+      return { title: "Calendrier", subtitle: null };
+    }
+    if (location.startsWith("/settings")) {
+      return { title: "Paramètres", subtitle: null };
     }
     return { title: "Cassius", subtitle: null };
   };
@@ -108,7 +117,13 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
         <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-notifications">
           <Bell className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-calendar">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="text-muted-foreground" 
+          data-testid="button-calendar"
+          onClick={() => setLocation("/calendar")}
+        >
           <Calendar className="h-5 w-5" />
         </Button>
         
@@ -178,6 +193,15 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       </Route>
       <Route path="/actes/:id" component={ActeDetailsPage} />
       <Route path="/documents" component={DocumentsPage} />
+      <Route path="/calendar" component={CalendarPage} />
+      <Route path="/settings/integrations/:rest*">
+        <IntegrationsPage />
+      </Route>
+      <Route path="/settings/integrations">
+        <IntegrationsPage />
+      </Route>
+      <Route path="/settings/:section" component={SettingsPage} />
+      <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );
