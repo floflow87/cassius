@@ -2608,14 +2608,12 @@ export async function registerRoutes(
         return res.json({ ...result, message: "Aucun rendez-vous à synchroniser" });
       }
 
-      let tokensRefreshed = false;
-      let currentAccessToken = integration.accessToken;
+      let lastPersistedToken = integration.accessToken;
       
-      // Helper to persist refreshed tokens and update local reference
+      // Helper to persist refreshed tokens - stores every new token (handles multiple refreshes per sync)
       const persistRefreshedTokens = async (refreshedTokens?: { accessToken: string; expiresAt: Date }) => {
-        if (refreshedTokens && !tokensRefreshed) {
-          tokensRefreshed = true;
-          currentAccessToken = refreshedTokens.accessToken;
+        if (refreshedTokens && refreshedTokens.accessToken !== lastPersistedToken) {
+          lastPersistedToken = refreshedTokens.accessToken;
           console.log(`[SYNC] Token refreshed, persisting to database`);
           await storage.updateCalendarIntegration(organisationId, integration.id, {
             accessToken: refreshedTokens.accessToken,
@@ -2634,10 +2632,14 @@ export async function registerRoutes(
         const patient = apt.patient;
         const patientName = patient ? `${patient.prenom || ""} ${patient.nom || ""}`.trim() : "Patient inconnu";
         
-        // Skip appointments without required data
+        // Fail appointments without required data (don't skip - that's misleading)
         if (!apt.dateStart) {
-          console.log(`[SYNC] Skipping apt=${apt.id}: no dateStart`);
-          result.skipped++;
+          console.log(`[SYNC] Failing apt=${apt.id}: no dateStart`);
+          result.failed++;
+          result.failures.push({
+            appointmentId: apt.id,
+            reason: "Date de début manquante",
+          });
           await storage.updateAppointmentSync(organisationId, apt.id, {
             syncStatus: "ERROR",
             syncError: "Date de début manquante",

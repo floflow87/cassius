@@ -160,19 +160,10 @@ export default function GoogleCalendarIntegration() {
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
     },
-    onError: async (error: any) => {
-      // Try to parse error response
-      let errorMessage = error.message || "Une erreur est survenue";
-      let step = "";
-      
-      // If error is a Response, try to get JSON
-      if (error instanceof Response || (error && typeof error.json === 'function')) {
-        try {
-          const data = await error.json();
-          errorMessage = data.message || data.error || errorMessage;
-          step = data.step ? ` (étape: ${data.step})` : "";
-        } catch {}
-      }
+    onError: (error: any) => {
+      // apiRequest throws already-parsed error objects with message property
+      const errorMessage = error?.message || "Une erreur est survenue";
+      const step = error?.step ? ` (étape: ${error.step})` : "";
       
       toast({ 
         title: "Erreur de synchronisation", 
