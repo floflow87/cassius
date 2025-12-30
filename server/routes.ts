@@ -2535,49 +2535,138 @@ export async function registerRoutes(
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
+    // Structured sync result
+    interface SyncFailure { appointmentId: string; reason: string; googleCode?: string }
+    const result = {
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      failures: [] as SyncFailure[],
+      total: 0,
+    };
+
+    console.log(`[SYNC] Starting sync for org=${organisationId}`);
+
     try {
+      // Step 1: Get integration
+      console.log(`[SYNC] Step 1: Fetching calendar integration`);
       const integration = await storage.getCalendarIntegration(organisationId);
       
-      if (!integration || !integration.isEnabled || !integration.accessToken) {
-        return res.status(400).json({ error: "Google Calendar integration not enabled or not connected" });
+      if (!integration) {
+        console.log(`[SYNC] No integration found for org=${organisationId}`);
+        return res.status(400).json({ 
+          error: "INTEGRATION_NOT_FOUND",
+          message: "Aucune intégration Google Calendar trouvée. Veuillez d'abord connecter votre compte Google.",
+          step: "fetch_integration",
+        });
       }
-      
+
+      if (!integration.isEnabled) {
+        console.log(`[SYNC] Integration disabled for org=${organisationId}`);
+        return res.status(400).json({ 
+          error: "INTEGRATION_DISABLED",
+          message: "L'intégration Google Calendar est désactivée.",
+          step: "check_enabled",
+        });
+      }
+
+      if (!integration.accessToken) {
+        console.log(`[SYNC] No access token for org=${organisationId}`);
+        return res.status(400).json({ 
+          error: "NOT_CONNECTED",
+          message: "Google Calendar n'est pas connecté. Veuillez vous reconnecter.",
+          step: "check_tokens",
+        });
+      }
+
+      if (!integration.refreshToken) {
+        console.log(`[SYNC] No refresh token for org=${organisationId} - needs reconsent`);
+        return res.status(400).json({ 
+          error: "NEED_RECONSENT",
+          message: "Le token de rafraîchissement est manquant. Veuillez déconnecter et reconnecter Google Calendar.",
+          step: "check_refresh_token",
+        });
+      }
+
       const calendarId = integration.targetCalendarId || "primary";
-      
-      // Get appointments that need syncing
+      console.log(`[SYNC] Using calendarId=${calendarId}, lastSyncAt=${integration.lastSyncAt}`);
+
+      // Step 2: Get appointments to sync
+      console.log(`[SYNC] Step 2: Fetching appointments to sync`);
       const appointments = await storage.getAppointmentsForSync(organisationId, integration.lastSyncAt ?? undefined);
-      
-      let synced = 0;
-      let errors = 0;
+      result.total = appointments.length;
+      console.log(`[SYNC] Found ${appointments.length} appointment(s) to sync`);
+
+      if (appointments.length === 0) {
+        console.log(`[SYNC] No appointments to sync`);
+        await storage.updateIntegrationSyncStatus(organisationId, integration.id, {
+          lastSyncAt: new Date(),
+          syncErrorCount: 0,
+          lastSyncError: null,
+        });
+        return res.json({ ...result, message: "Aucun rendez-vous à synchroniser" });
+      }
+
       let tokensRefreshed = false;
+      let currentAccessToken = integration.accessToken;
       
-      // Helper to persist refreshed tokens
+      // Helper to persist refreshed tokens and update local reference
       const persistRefreshedTokens = async (refreshedTokens?: { accessToken: string; expiresAt: Date }) => {
         if (refreshedTokens && !tokensRefreshed) {
           tokensRefreshed = true;
+          currentAccessToken = refreshedTokens.accessToken;
+          console.log(`[SYNC] Token refreshed, persisting to database`);
           await storage.updateCalendarIntegration(organisationId, integration.id, {
             accessToken: refreshedTokens.accessToken,
             tokenExpiresAt: refreshedTokens.expiresAt,
           });
+          // Update the integration object for subsequent calls
+          integration.accessToken = refreshedTokens.accessToken;
+          integration.tokenExpiresAt = refreshedTokens.expiresAt;
         }
       };
+
+      // Step 3: Sync each appointment
+      console.log(`[SYNC] Step 3: Syncing appointments one by one`);
       
       for (const apt of appointments) {
+        const patient = apt.patient;
+        const patientName = patient ? `${patient.prenom || ""} ${patient.nom || ""}`.trim() : "Patient inconnu";
+        
+        // Skip appointments without required data
+        if (!apt.dateStart) {
+          console.log(`[SYNC] Skipping apt=${apt.id}: no dateStart`);
+          result.skipped++;
+          await storage.updateAppointmentSync(organisationId, apt.id, {
+            syncStatus: "ERROR",
+            syncError: "Date de début manquante",
+          });
+          continue;
+        }
+
         try {
-          const patient = apt.patient;
-          const title = `[Cassius] ${apt.type} - ${patient?.prenom || ""} ${patient?.nom || ""}`.trim();
-          const description = `Rendez-vous Cassius\nType: ${apt.type}\nPatient: ${patient?.prenom || ""} ${patient?.nom || ""}`;
+          const title = `[Cassius] ${apt.type} - ${patientName}`;
+          const description = [
+            `Rendez-vous Cassius`,
+            `Type: ${apt.type}`,
+            `Patient: ${patientName}`,
+            apt.description ? `Notes: ${apt.description}` : null,
+          ].filter(Boolean).join("\n");
           
           const startDate = new Date(apt.dateStart);
           const endDate = apt.dateEnd ? new Date(apt.dateEnd) : new Date(startDate.getTime() + 30 * 60 * 1000);
-          
+
           if (apt.externalEventId) {
-            // Update existing event
+            // Check if event exists
+            console.log(`[SYNC] Checking existing event apt=${apt.id}, eventId=${apt.externalEventId}`);
             const getResult = await googleCalendar.getCalendarEvent(integration, calendarId, apt.externalEventId);
             await persistRefreshedTokens(getResult.refreshedTokens);
             
             if (getResult.event) {
-              const result = await googleCalendar.updateCalendarEvent(integration, {
+              // Update existing event
+              console.log(`[SYNC] Updating event apt=${apt.id}`);
+              const updateResult = await googleCalendar.updateCalendarEvent(integration, {
                 calendarId,
                 eventId: apt.externalEventId,
                 summary: title,
@@ -2586,17 +2675,19 @@ export async function registerRoutes(
                 end: endDate,
                 cassiusAppointmentId: apt.id,
               });
-              await persistRefreshedTokens(result.refreshedTokens);
+              await persistRefreshedTokens(updateResult.refreshedTokens);
               
               await storage.updateAppointmentSync(organisationId, apt.id, {
                 syncStatus: "SYNCED",
-                externalEtag: result.etag,
+                externalEtag: updateResult.etag,
                 lastSyncedAt: new Date(),
                 syncError: null,
               });
+              result.updated++;
             } else {
               // Event was deleted, recreate
-              const result = await googleCalendar.createCalendarEvent(integration, {
+              console.log(`[SYNC] Event deleted, recreating apt=${apt.id}`);
+              const createResult = await googleCalendar.createCalendarEvent(integration, {
                 calendarId,
                 summary: title,
                 description,
@@ -2604,21 +2695,23 @@ export async function registerRoutes(
                 end: endDate,
                 cassiusAppointmentId: apt.id,
               });
-              await persistRefreshedTokens(result.refreshedTokens);
+              await persistRefreshedTokens(createResult.refreshedTokens);
               
               await storage.updateAppointmentSync(organisationId, apt.id, {
                 externalProvider: "google",
                 externalCalendarId: calendarId,
-                externalEventId: result.eventId,
-                externalEtag: result.etag,
+                externalEventId: createResult.eventId,
+                externalEtag: createResult.etag,
                 syncStatus: "SYNCED",
                 lastSyncedAt: new Date(),
                 syncError: null,
               });
+              result.created++;
             }
           } else {
             // Create new event
-            const result = await googleCalendar.createCalendarEvent(integration, {
+            console.log(`[SYNC] Creating new event apt=${apt.id}`);
+            const createResult = await googleCalendar.createCalendarEvent(integration, {
               calendarId,
               summary: title,
               description,
@@ -2626,41 +2719,93 @@ export async function registerRoutes(
               end: endDate,
               cassiusAppointmentId: apt.id,
             });
-            await persistRefreshedTokens(result.refreshedTokens);
+            await persistRefreshedTokens(createResult.refreshedTokens);
             
             await storage.updateAppointmentSync(organisationId, apt.id, {
               externalProvider: "google",
               externalCalendarId: calendarId,
-              externalEventId: result.eventId,
-              externalEtag: result.etag,
+              externalEventId: createResult.eventId,
+              externalEtag: createResult.etag,
               syncStatus: "SYNCED",
               lastSyncedAt: new Date(),
               syncError: null,
             });
+            result.created++;
+          }
+        } catch (error: any) {
+          console.error(`[SYNC] Error syncing apt=${apt.id}:`, error);
+          
+          // Parse Google API error
+          let reason = error.message || "Erreur inconnue";
+          let googleCode: string | undefined;
+          
+          if (error.code) {
+            googleCode = String(error.code);
+            if (error.code === 401) {
+              reason = "Token expiré ou invalide";
+            } else if (error.code === 403) {
+              reason = "Permissions insuffisantes sur le calendrier";
+            } else if (error.code === 404) {
+              reason = "Calendrier non trouvé";
+            } else if (error.code === 429) {
+              reason = "Limite de requêtes Google atteinte";
+            }
           }
           
-          synced++;
-        } catch (error: any) {
-          console.error(`Error syncing appointment ${apt.id}:`, error);
           await storage.updateAppointmentSync(organisationId, apt.id, {
             syncStatus: "ERROR",
-            syncError: error.message || "Unknown error",
+            syncError: reason,
           });
-          errors++;
+          
+          result.failed++;
+          result.failures.push({
+            appointmentId: apt.id,
+            reason,
+            googleCode,
+          });
+        }
+      }
+
+      // Step 4: Update integration status
+      console.log(`[SYNC] Step 4: Updating integration status - created=${result.created}, updated=${result.updated}, skipped=${result.skipped}, failed=${result.failed}`);
+      await storage.updateIntegrationSyncStatus(organisationId, integration.id, {
+        lastSyncAt: new Date(),
+        syncErrorCount: result.failed,
+        lastSyncError: result.failed > 0 ? `${result.failed} rendez-vous en erreur` : null,
+      });
+
+      console.log(`[SYNC] Sync completed successfully`);
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error(`[SYNC] Fatal error during sync:`, error);
+      
+      // Parse error for better response
+      let errorCode = "SYNC_FAILED";
+      let message = error.message || "Erreur lors de la synchronisation";
+      let step = "unknown";
+      let googleCode: string | undefined;
+      
+      if (error.code) {
+        googleCode = String(error.code);
+        if (error.code === 401) {
+          errorCode = "TOKEN_INVALID";
+          message = "Token d'accès invalide. Veuillez reconnecter Google Calendar.";
+          step = "google_auth";
+        } else if (error.code === 403) {
+          errorCode = "INSUFFICIENT_PERMISSIONS";
+          message = "Permissions insuffisantes. Veuillez reconnecter Google Calendar avec les bons scopes.";
+          step = "google_auth";
         }
       }
       
-      // Update integration sync status
-      await storage.updateIntegrationSyncStatus(organisationId, integration.id, {
-        lastSyncAt: new Date(),
-        syncErrorCount: errors,
-        lastSyncError: errors > 0 ? `${errors} appointment(s) failed to sync` : null,
+      res.status(500).json({ 
+        error: errorCode,
+        message,
+        step,
+        googleCode,
+        details: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
-      
-      res.json({ synced, errors, total: appointments.length });
-    } catch (error: any) {
-      console.error("Error during sync:", error);
-      res.status(500).json({ error: error.message || "Sync failed" });
     }
   });
 

@@ -138,20 +138,45 @@ export default function GoogleCalendarIntegration() {
   
   const syncNowMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/integrations/google/sync-now");
+      const response = await apiRequest("POST", "/api/integrations/google/sync-now");
+      return response.json();
     },
     onSuccess: (data: any) => {
+      // Build summary message
+      const parts: string[] = [];
+      if (data.created > 0) parts.push(`${data.created} créé(s)`);
+      if (data.updated > 0) parts.push(`${data.updated} mis à jour`);
+      if (data.skipped > 0) parts.push(`${data.skipped} ignoré(s)`);
+      if (data.failed > 0) parts.push(`${data.failed} en erreur`);
+      
+      const summary = parts.length > 0 ? parts.join(", ") : data.message || "Aucun changement";
+      
       toast({ 
-        title: "Synchronisation terminée", 
-        description: `${data.synced || 0} événement(s) synchronisé(s)${data.errors > 0 ? `, ${data.errors} erreur(s)` : ''}` 
+        title: data.failed > 0 ? "Synchronisation partielle" : "Synchronisation terminée",
+        description: summary,
+        variant: data.failed > 0 ? "destructive" : "default",
       });
+      
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
     },
-    onError: (error: any) => {
+    onError: async (error: any) => {
+      // Try to parse error response
+      let errorMessage = error.message || "Une erreur est survenue";
+      let step = "";
+      
+      // If error is a Response, try to get JSON
+      if (error instanceof Response || (error && typeof error.json === 'function')) {
+        try {
+          const data = await error.json();
+          errorMessage = data.message || data.error || errorMessage;
+          step = data.step ? ` (étape: ${data.step})` : "";
+        } catch {}
+      }
+      
       toast({ 
         title: "Erreur de synchronisation", 
-        description: error.message || "Une erreur est survenue",
+        description: `${errorMessage}${step}`,
         variant: "destructive" 
       });
     },
