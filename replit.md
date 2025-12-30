@@ -157,7 +157,12 @@ Implant tracking uses `implants` (catalog) and `surgery_implants` (placement dat
         - `GET /api/integrations/google/env-check` - Admin-only endpoint showing env vars status and masked URLs.
         - `GET /api/integrations/google/calendars` - List available calendars.
         - `PATCH /api/integrations/google/settings` - Update integration settings.
-        - `POST /api/integrations/google/sync-now` - Trigger manual sync.
+        - `POST /api/integrations/google/sync-now` - Trigger manual sync with structured response:
+            - Returns `{ created, updated, skipped, failed, failures[], total, message? }`.
+            - Individual failure tracking with `{ appointmentId, reason, googleCode? }`.
+            - Structured logging with `[SYNC]` prefix for debugging.
+            - Explicit error codes: `INTEGRATION_NOT_FOUND`, `NOT_CONNECTED`, `TOKEN_INVALID`, etc.
+            - Google API error parsing: 401 (expired), 403 (permissions), 404 (calendar not found), 429 (rate limit).
         - `DELETE /api/integrations/google/disconnect` - Clear tokens and disconnect.
     - Features: Connect/disconnect Google account, select target calendar, enable/disable sync, manual sync trigger, error display.
     - Events created with `[Cassius]` prefix and extendedProperties.cassiusAppointmentId for identification.
