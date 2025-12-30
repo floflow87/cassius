@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum, bigint, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -15,9 +15,13 @@ export const organisationsRelations = relations(organisations, ({ many }) => ({
   patients: many(patients),
   operations: many(operations),
   implants: many(implants),
+  surgeryImplants: many(surgeryImplants),
   visites: many(visites),
+  appointments: many(appointments),
   radios: many(radios),
   protheses: many(protheses),
+  documents: many(documents),
+  flags: many(flags),
 }));
 
 export const sexeEnum = pgEnum("sexe", ["HOMME", "FEMME"]);
@@ -43,6 +47,46 @@ export const roleEnum = pgEnum("role", ["CHIRURGIEN", "ASSISTANT", "ADMIN"]);
 // Enums pour les prothèses supra-implantaires
 export const typeProtheseEnum = pgEnum("type_prothese", ["VISSEE", "SCELLEE"]);
 export const typePilierEnum = pgEnum("type_pilier", ["DROIT", "ANGULE", "MULTI_UNIT"]);
+export const typeNoteTagEnum = pgEnum("type_note_tag", ["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"]);
+export const typeRendezVousTagEnum = pgEnum("type_rdv_tag", ["CONSULTATION", "SUIVI", "CHIRURGIE"]);
+
+// Enums pour les rendez-vous unifiés (appointments)
+export const appointmentTypeEnum = pgEnum("appointment_type", [
+  "CONSULTATION",
+  "SUIVI", 
+  "CHIRURGIE",
+  "CONTROLE",
+  "URGENCE",
+  "AUTRE"
+]);
+export const appointmentStatusEnum = pgEnum("appointment_status", [
+  "UPCOMING",
+  "COMPLETED",
+  "CANCELLED"
+]);
+export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
+export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
+export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"]);
+
+export const savedFilterPageTypeEnum = pgEnum("saved_filter_page_type", ["patients", "implants", "actes"]);
+
+// Flag system enums
+export const flagLevelEnum = pgEnum("flag_level", ["CRITICAL", "WARNING", "INFO"]);
+export const flagEntityTypeEnum = pgEnum("flag_entity_type", ["PATIENT", "OPERATION", "IMPLANT"]);
+export const flagTypeEnum = pgEnum("flag_type", [
+  // Critical (clinical)
+  "ISQ_LOW",
+  "ISQ_DECLINING",
+  "LOW_SUCCESS_RATE",
+  // Warning (follow-up)
+  "NO_RECENT_ISQ",
+  "NO_POSTOP_FOLLOWUP",
+  "NO_RECENT_APPOINTMENT",
+  // Info (coherence)
+  "IMPLANT_NO_OPERATION",
+  "MISSING_DOCUMENT",
+  "INCOMPLETE_DATA"
+]);
 
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -58,8 +102,10 @@ export const patients = pgTable("patients", {
   ville: text("ville"),
   pays: text("pays"),
   allergies: text("allergies"),
-  medicaments: text("medicaments"),
+  traitement: text("traitement"),
+  conditions: text("conditions"),
   contexteMedical: text("contexte_medical"),
+  statut: statutPatientEnum("statut").default("ACTIF"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -69,9 +115,10 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
     references: [organisations.id],
   }),
   operations: many(operations),
-  implants: many(implants),
   radios: many(radios),
   visites: many(visites),
+  appointments: many(appointments),
+  documents: many(documents),
 }));
 
 export const operations = pgTable("operations", {
@@ -101,29 +148,21 @@ export const operationsRelations = relations(operations, ({ one, many }) => ({
     fields: [operations.patientId],
     references: [patients.id],
   }),
-  implants: many(implants),
+  surgeryImplants: many(surgeryImplants),
   radios: many(radios),
 }));
 
+// Table implants - référentiel/catalogue d'implants (informations produit uniquement)
 export const implants = pgTable("implants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
-  operationId: varchar("operation_id").notNull().references(() => operations.id, { onDelete: "cascade" }),
-  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  typeImplant: typeImplantEnum("type_implant").default("IMPLANT").notNull(),
   marque: text("marque").notNull(),
   referenceFabricant: text("reference_fabricant"),
   diametre: real("diametre").notNull(),
   longueur: real("longueur").notNull(),
-  siteFdi: text("site_fdi").notNull(),
-  positionImplant: positionImplantEnum("position_implant"),
-  typeOs: typeOsEnum("type_os"),
-  miseEnChargePrevue: typeMiseEnChargeEnum("mise_en_charge_prevue"),
-  isqPose: real("isq_pose"),
-  isq2m: real("isq_2m"),
-  isq3m: real("isq_3m"),
-  isq6m: real("isq_6m"),
-  statut: statutImplantEnum("statut").default("EN_SUIVI").notNull(),
-  datePose: date("date_pose").notNull(),
+  lot: text("lot"), // Numéro de lot fabricant
+  notes: text("notes"), // Notes générales sur ce type d'implant
 });
 
 export const implantsRelations = relations(implants, ({ one, many }) => ({
@@ -131,17 +170,54 @@ export const implantsRelations = relations(implants, ({ one, many }) => ({
     fields: [implants.organisationId],
     references: [organisations.id],
   }),
-  operation: one(operations, {
-    fields: [implants.operationId],
-    references: [operations.id],
-  }),
-  patient: one(patients, {
-    fields: [implants.patientId],
-    references: [patients.id],
-  }),
+  surgeryImplants: many(surgeryImplants),
   radios: many(radios),
   visites: many(visites),
   protheses: many(protheses),
+}));
+
+// Table de liaison surgery_implants - représente un implant posé lors d'une chirurgie
+export const surgeryImplants = pgTable("surgery_implants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  surgeryId: varchar("surgery_id").notNull().references(() => operations.id, { onDelete: "cascade" }),
+  implantId: varchar("implant_id").notNull().references(() => implants.id, { onDelete: "cascade" }),
+  // Champs de pose
+  siteFdi: text("site_fdi").notNull(),
+  positionImplant: positionImplantEnum("position_implant"),
+  typeOs: typeOsEnum("type_os"),
+  miseEnCharge: typeMiseEnChargeEnum("mise_en_charge"),
+  // Informations greffe spécifique à cet implant
+  greffeOsseuse: boolean("greffe_osseuse").default(false),
+  typeGreffe: text("type_greffe"),
+  // Temps chirurgical
+  typeChirurgieTemps: typeChirurgieTempsEnum("type_chirurgie_temps"),
+  // Mesures ISQ
+  isqPose: real("isq_pose"),
+  isq2m: real("isq_2m"),
+  isq3m: real("isq_3m"),
+  isq6m: real("isq_6m"),
+  // Score de perte osseuse (0-5, où 0=excellent, 5=critique)
+  boneLossScore: integer("bone_loss_score"),
+  // Statut et dates
+  statut: statutImplantEnum("statut").default("EN_SUIVI").notNull(),
+  datePose: date("date_pose").notNull(),
+  notes: text("notes"),
+});
+
+export const surgeryImplantsRelations = relations(surgeryImplants, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [surgeryImplants.organisationId],
+    references: [organisations.id],
+  }),
+  surgery: one(operations, {
+    fields: [surgeryImplants.surgeryId],
+    references: [operations.id],
+  }),
+  implant: one(implants, {
+    fields: [surgeryImplants.implantId],
+    references: [implants.id],
+  }),
 }));
 
 export const radios = pgTable("radios", {
@@ -151,8 +227,15 @@ export const radios = pgTable("radios", {
   operationId: varchar("operation_id").references(() => operations.id, { onDelete: "set null" }),
   implantId: varchar("implant_id").references(() => implants.id, { onDelete: "set null" }),
   type: typeRadioEnum("type").notNull(),
-  url: text("url").notNull(),
+  title: text("title").notNull(),
+  filePath: text("file_path"), // Supabase Storage path (nullable for legacy data)
+  url: text("url"), // Legacy Replit Object Storage URL (kept for backward compatibility)
+  mimeType: text("mime_type"),
+  sizeBytes: bigint("size_bytes", { mode: "number" }),
+  fileName: text("file_name"),
   date: date("date").notNull(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const radiosRelations = relations(radios, ({ one }) => ({
@@ -227,6 +310,33 @@ export const prothesesRelations = relations(protheses, ({ one }) => ({
   }),
 }));
 
+// Table notes patients
+export const notes = pgTable("notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tag: typeNoteTagEnum("tag"),
+  contenu: text("contenu").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const notesRelations = relations(notes, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [notes.organisationId],
+    references: [organisations.id],
+  }),
+  patient: one(patients, {
+    fields: [notes.patientId],
+    references: [patients.id],
+  }),
+  user: one(users, {
+    fields: [notes.userId],
+    references: [users.id],
+  }),
+}));
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organisationId: varchar("organisation_id").references(() => organisations.id, { onDelete: "cascade" }),
@@ -240,6 +350,151 @@ export const users = pgTable("users", {
 export const usersRelations = relations(users, ({ one }) => ({
   organisation: one(organisations, {
     fields: [users.organisationId],
+    references: [organisations.id],
+  }),
+}));
+
+// Table rendez-vous patients
+export const rendezVous = pgTable("rendez_vous", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  titre: text("titre").notNull(),
+  description: text("description"),
+  date: date("date").notNull(),
+  heureDebut: text("heure_debut").notNull(),
+  heureFin: text("heure_fin").notNull(),
+  tag: typeRendezVousTagEnum("tag").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const rendezVousRelations = relations(rendezVous, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [rendezVous.organisationId],
+    references: [organisations.id],
+  }),
+  patient: one(patients, {
+    fields: [rendezVous.patientId],
+    references: [patients.id],
+  }),
+}));
+
+// Table appointments - RDV cliniques unifiés (remplace visites + rendez_vous)
+export const appointments = pgTable("appointments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  operationId: varchar("operation_id").references(() => operations.id, { onDelete: "set null" }),
+  surgeryImplantId: varchar("surgery_implant_id").references(() => surgeryImplants.id, { onDelete: "set null" }),
+  type: appointmentTypeEnum("type").notNull(),
+  status: appointmentStatusEnum("status").default("UPCOMING").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  dateStart: timestamp("date_start").notNull(),
+  dateEnd: timestamp("date_end"),
+  isq: real("isq"),
+  radioId: varchar("radio_id").references(() => radios.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const appointmentsRelations = relations(appointments, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [appointments.organisationId],
+    references: [organisations.id],
+  }),
+  patient: one(patients, {
+    fields: [appointments.patientId],
+    references: [patients.id],
+  }),
+  operation: one(operations, {
+    fields: [appointments.operationId],
+    references: [operations.id],
+  }),
+  surgeryImplant: one(surgeryImplants, {
+    fields: [appointments.surgeryImplantId],
+    references: [surgeryImplants.id],
+  }),
+  radio: one(radios, {
+    fields: [appointments.radioId],
+    references: [radios.id],
+  }),
+}));
+
+// Table flags - Clinical alerts and warnings
+export const flags = pgTable("flags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  level: flagLevelEnum("level").notNull(),
+  type: flagTypeEnum("type").notNull(),
+  label: text("label").notNull(),
+  description: text("description"),
+  entityType: flagEntityTypeEnum("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by").references(() => users.id, { onDelete: "set null" }),
+});
+
+export const flagsRelations = relations(flags, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [flags.organisationId],
+    references: [organisations.id],
+  }),
+  resolvedByUser: one(users, {
+    fields: [flags.resolvedBy],
+    references: [users.id],
+  }),
+}));
+
+// Table documents patients (PDF, etc.)
+export const documents = pgTable("documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").references(() => patients.id, { onDelete: "cascade" }),
+  operationId: varchar("operation_id").references(() => operations.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  filePath: text("file_path").notNull(),
+  mimeType: text("mime_type"),
+  sizeBytes: bigint("size_bytes", { mode: "number" }),
+  fileName: text("file_name"),
+  tags: text("tags").array(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const documentsRelations = relations(documents, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [documents.organisationId],
+    references: [organisations.id],
+  }),
+  patient: one(patients, {
+    fields: [documents.patientId],
+    references: [patients.id],
+  }),
+  operation: one(operations, {
+    fields: [documents.operationId],
+    references: [operations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [documents.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// Table savedFilters - filtres avancés sauvegardés par page
+export const savedFilters = pgTable("saved_filters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  pageType: savedFilterPageTypeEnum("page_type").notNull(),
+  filterData: text("filter_data").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const savedFiltersRelations = relations(savedFilters, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [savedFilters.organisationId],
     references: [organisations.id],
   }),
 }));
@@ -260,9 +515,19 @@ export const insertImplantSchema = createInsertSchema(implants).omit({
   organisationId: true,
 });
 
+export const insertSurgeryImplantSchema = createInsertSchema(surgeryImplants).omit({
+  id: true,
+  organisationId: true,
+});
+
 export const insertRadioSchema = createInsertSchema(radios).omit({
   id: true,
   organisationId: true,
+  createdAt: true,
+});
+
+export const updateRadioSchema = z.object({
+  title: z.string().optional(),
 });
 
 export const insertVisiteSchema = createInsertSchema(visites).omit({
@@ -278,6 +543,102 @@ export const insertProtheseSchema = createInsertSchema(protheses).omit({
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+});
+
+export const insertNoteSchema = createInsertSchema(notes).omit({
+  id: true,
+  organisationId: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRendezVousSchema = createInsertSchema(rendezVous).omit({
+  id: true,
+  organisationId: true,
+  createdAt: true,
+});
+
+export const insertAppointmentSchema = createInsertSchema(appointments).omit({
+  id: true,
+  organisationId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  dateStart: z.coerce.date(),
+  dateEnd: z.coerce.date().nullable().optional(),
+});
+
+export const updateAppointmentSchema = z.object({
+  type: z.enum(["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"]).optional(),
+  status: z.enum(["UPCOMING", "COMPLETED", "CANCELLED"]).optional(),
+  title: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  dateStart: z.coerce.date().optional(),
+  dateEnd: z.coerce.date().nullable().optional(),
+  isq: z.number().nullable().optional(),
+  operationId: z.string().nullable().optional(),
+  surgeryImplantId: z.string().nullable().optional(),
+  radioId: z.string().nullable().optional(),
+});
+
+export const appointmentTypeValues = ["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"] as const;
+export type AppointmentType = typeof appointmentTypeValues[number];
+
+export const appointmentStatusValues = ["UPCOMING", "COMPLETED", "CANCELLED"] as const;
+export type AppointmentStatus = typeof appointmentStatusValues[number];
+
+// Flag schemas and types
+export const insertFlagSchema = createInsertSchema(flags).omit({
+  id: true,
+  organisationId: true,
+  createdAt: true,
+  resolvedAt: true,
+  resolvedBy: true,
+});
+
+export const flagLevelValues = ["CRITICAL", "WARNING", "INFO"] as const;
+export type FlagLevel = typeof flagLevelValues[number];
+
+export const flagEntityTypeValues = ["PATIENT", "OPERATION", "IMPLANT"] as const;
+export type FlagEntityType = typeof flagEntityTypeValues[number];
+
+export const flagTypeValues = [
+  "ISQ_LOW",
+  "ISQ_DECLINING",
+  "LOW_SUCCESS_RATE",
+  "NO_RECENT_ISQ",
+  "NO_POSTOP_FOLLOWUP",
+  "NO_RECENT_APPOINTMENT",
+  "IMPLANT_NO_OPERATION",
+  "MISSING_DOCUMENT",
+  "INCOMPLETE_DATA"
+] as const;
+export type FlagType = typeof flagTypeValues[number];
+
+export const insertDocumentSchema = createInsertSchema(documents).omit({
+  id: true,
+  organisationId: true,
+  createdAt: true,
+});
+
+export const insertSavedFilterSchema = createInsertSchema(savedFilters).omit({
+  id: true,
+  organisationId: true,
+  createdAt: true,
+});
+
+export const savedFilterPageTypeValues = ["patients", "implants", "actes"] as const;
+export type SavedFilterPageType = typeof savedFilterPageTypeValues[number];
+
+export const documentTagValues = ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"] as const;
+export type DocumentTag = typeof documentTagValues[number];
+
+export const updateDocumentSchema = z.object({
+  title: z.string().min(1).optional(),
+  tags: z.array(z.enum(documentTagValues)).optional(),
+  patientId: z.string().nullable().optional(),
+  operationId: z.string().nullable().optional(),
 });
 
 export const insertOrganisationSchema = createInsertSchema(organisations).omit({
@@ -297,6 +658,15 @@ export type Operation = typeof operations.$inferSelect;
 export type InsertImplant = z.infer<typeof insertImplantSchema>;
 export type Implant = typeof implants.$inferSelect;
 
+export type ImplantWithStats = Implant & {
+  poseCount: number;
+  lastPoseDate: string | null;
+  successRate: number | null;
+};
+
+export type InsertSurgeryImplant = z.infer<typeof insertSurgeryImplantSchema>;
+export type SurgeryImplant = typeof surgeryImplants.$inferSelect;
+
 export type InsertRadio = z.infer<typeof insertRadioSchema>;
 export type Radio = typeof radios.$inferSelect;
 
@@ -308,3 +678,56 @@ export type Prothese = typeof protheses.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export type InsertNote = z.infer<typeof insertNoteSchema>;
+export type Note = typeof notes.$inferSelect;
+
+export type InsertRendezVous = z.infer<typeof insertRendezVousSchema>;
+export type RendezVous = typeof rendezVous.$inferSelect;
+
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+export type Appointment = typeof appointments.$inferSelect;
+
+export type InsertFlag = z.infer<typeof insertFlagSchema>;
+export type Flag = typeof flags.$inferSelect;
+
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type Document = typeof documents.$inferSelect;
+
+export type InsertSavedFilter = z.infer<typeof insertSavedFilterSchema>;
+export type SavedFilter = typeof savedFilters.$inferSelect;
+
+// Extended types for API responses
+export interface SurgeryImplantWithDetails extends SurgeryImplant {
+  implant: Implant;
+  surgery?: Operation;
+  patient?: Patient;
+}
+
+export interface OperationWithImplants extends Operation {
+  surgeryImplants: SurgeryImplantWithDetails[];
+}
+
+export interface AppointmentWithDetails extends Appointment {
+  patient?: Patient;
+  operation?: Operation;
+  surgeryImplant?: SurgeryImplant & { implant: Implant };
+  radio?: Radio;
+}
+
+export interface FlagWithEntity extends Flag {
+  entityName?: string;
+  patientId?: string;
+  patientNom?: string;
+  patientPrenom?: string;
+}
+
+export interface AppointmentWithPatient extends Appointment {
+  patientNom: string;
+  patientPrenom: string;
+}
+
+export interface DocumentWithDetails extends Document {
+  patient?: Patient;
+  operation?: Operation;
+}

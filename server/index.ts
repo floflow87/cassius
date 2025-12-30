@@ -3,6 +3,16 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
+import { 
+  createRequestContext, 
+  runWithContext, 
+  recordEndpointStats, 
+  formatContextSummary,
+  getTopSlowestEndpoints,
+  getTopDbHeavyEndpoints,
+  getAllStats,
+  clearStats
+} from "./instrumentation";
 
 const app = express();
 const httpServer = createServer(app);
@@ -37,29 +47,45 @@ export function log(message: string, source = "express") {
 }
 
 app.use((req, res, next) => {
-  const start = Date.now();
+  const context = createRequestContext();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let responseSize = 0;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
     capturedJsonResponse = bodyJson;
+    const jsonStr = JSON.stringify(bodyJson);
+    responseSize = jsonStr.length;
+    const duration = Date.now() - context.startTime;
+    res.setHeader('X-Response-Time', `${duration}ms`);
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
   res.on("finish", () => {
-    const duration = Date.now() - start;
+    const duration = Date.now() - context.startTime;
+    
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      recordEndpointStats(req.method, path, context);
+      
+      const summary = formatContextSummary(context);
+      let logLine = `${req.method} ${path} ${res.statusCode} ${summary}`;
+      if (responseSize > 0) {
+        logLine += ` size=${Math.round(responseSize / 1024)}KB`;
+      }
+      
+      if (duration > 500) {
+        logLine += ' [SLOW]';
+      }
+      if (context.dbQueries.length > 10) {
+        logLine += ' [MANY_QUERIES]';
       }
 
       log(logLine);
     }
   });
 
-  next();
+  runWithContext(context, () => next());
 });
 
 (async () => {

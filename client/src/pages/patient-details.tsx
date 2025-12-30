@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import {
@@ -10,20 +10,34 @@ import {
   User,
   Activity,
   FileImage,
+  FileText,
   ClipboardList,
   Pencil,
   AlertTriangle,
   Pill,
   Heart,
   CheckCircle,
+  Check,
   Image as ImageIcon,
   Stethoscope,
   MapPin,
+  MoreVertical,
+  Trash2,
+  Loader2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
+  LayoutGrid,
+  LayoutList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PatientDetailsSkeleton } from "@/components/page-skeletons";
+import { FlagList, CompactFlagList, TopFlagSummary, FlagsTooltipBadge } from "@/components/flag-badge";
+import type { Flag } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Sheet,
@@ -42,33 +56,171 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { OperationForm } from "@/components/operation-form";
 import { ImplantCard } from "@/components/implant-card";
 import { RadioCard } from "@/components/radio-card";
 import { RadioUploadForm } from "@/components/radio-upload-form";
+import { DocumentCard } from "@/components/document-card";
+import { DocumentUploadForm } from "@/components/document-upload-form";
+import { AppointmentCard } from "@/components/appointment-card";
+import { AppointmentForm } from "@/components/appointment-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Patient, Operation, Implant, Radio, Visite } from "@shared/schema";
+import type { Patient, Operation, Implant, Radio, Visite, Note, RendezVous, Document, SurgeryImplantWithDetails, OperationWithImplants, Appointment } from "@shared/schema";
+
+interface SurgeryImplantWithVisites extends SurgeryImplantWithDetails {
+  visites?: Visite[];
+  latestIsq?: { value: number; label: string };
+  topFlag?: { type: string; level: "CRITICAL" | "WARNING" | "INFO"; label: string };
+  activeFlagCount?: number;
+}
 
 interface PatientWithDetails extends Patient {
-  operations: (Operation & { implants: Implant[] })[];
-  implants: (Implant & { visites: Visite[] })[];
+  operations: OperationWithImplants[];
+  surgeryImplants: SurgeryImplantWithVisites[];
   radios: Radio[];
+  topFlag?: { type: string; level: "CRITICAL" | "WARNING" | "INFO"; label: string };
+  activeFlagCount?: number;
 }
+
+type ImplantSortDirection = "asc" | "desc" | null;
+type ImplantColumnId = "marque" | "dimensions" | "position" | "site" | "typeOs" | "greffe" | "chirurgie" | "miseEnCharge" | "isq" | "flag" | "situation" | "operation" | "datePose";
+
+interface ImplantColumnConfig {
+  id: ImplantColumnId;
+  label: string;
+  width?: string;
+  sortable: boolean;
+}
+
+const defaultImplantColumns: ImplantColumnConfig[] = [
+  { id: "marque", label: "Marque / Réf.", width: "min-w-40", sortable: true },
+  { id: "dimensions", label: "Dimensions", width: "min-w-24", sortable: true },
+  { id: "position", label: "Position", width: "min-w-28", sortable: true },
+  { id: "site", label: "Site(s)", width: "min-w-20", sortable: true },
+  { id: "typeOs", label: "Type d'os", width: "min-w-24", sortable: true },
+  { id: "greffe", label: "Greffe", width: "min-w-16", sortable: true },
+  { id: "chirurgie", label: "Chirurgie", width: "min-w-20", sortable: true },
+  { id: "miseEnCharge", label: "Mise en charge", width: "min-w-28", sortable: true },
+  { id: "isq", label: "ISQ", width: "min-w-24", sortable: true },
+  { id: "flag", label: "Alertes", width: "min-w-20", sortable: false },
+  { id: "situation", label: "Situation", width: "min-w-28", sortable: true },
+  { id: "operation", label: "Opération", width: "min-w-32", sortable: true },
+];
+
+const IMPLANT_VIEW_MODE_KEY = "cassius_patient_implants_view_mode";
+const IMPLANT_COLUMNS_KEY = "cassius_patient_implants_columns";
+const IMPLANT_SORT_KEY = "cassius_patient_implants_sort";
+
+// Operation table columns
+type OperationSortDirection = "asc" | "desc" | null;
+type OperationColumnId = "date" | "typeIntervention" | "implants" | "chirurgie" | "greffe" | "miseEnCharge" | "reussite";
+
+interface OperationColumnConfig {
+  id: OperationColumnId;
+  label: string;
+  width?: string;
+  sortable: boolean;
+}
+
+const defaultOperationColumns: OperationColumnConfig[] = [
+  { id: "date", label: "Date", width: "min-w-28", sortable: true },
+  { id: "typeIntervention", label: "Type d'intervention", width: "min-w-40", sortable: true },
+  { id: "implants", label: "Implants", width: "min-w-20", sortable: true },
+  { id: "chirurgie", label: "Chirurgie", width: "min-w-32", sortable: true },
+  { id: "greffe", label: "Greffe", width: "min-w-24", sortable: true },
+  { id: "miseEnCharge", label: "Mise en charge", width: "min-w-28", sortable: true },
+  { id: "reussite", label: "Réussite", width: "min-w-24", sortable: true },
+];
+
+const OPERATION_COLUMNS_KEY = "cassius_patient_operations_columns";
+const OPERATION_SORT_KEY = "cassius_patient_operations_sort";
 
 export default function PatientDetailsPage() {
   const [, params] = useRoute("/patients/:id");
   const patientId = params?.id;
   const [operationDialogOpen, setOperationDialogOpen] = useState(false);
   const [radioDialogOpen, setRadioDialogOpen] = useState(false);
+  const [docDialogOpen, setDocDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { toast } = useToast();
+  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
 
   const { data: patient, isLoading } = useQuery<PatientWithDetails>({
     queryKey: ["/api/patients", patientId],
     enabled: !!patientId,
   });
+
+  // Query for all patient flags (including implant-level flags)
+  const { data: allPatientFlagsData } = useQuery<{ patientFlags: Flag[]; implantFlagsById: Record<string, Flag[]> }>({
+    queryKey: ["/api/patients", patientId, "flags"],
+    queryFn: async () => {
+      const res = await fetch(`/api/patients/${patientId}/flags`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch flags");
+      return res.json();
+    },
+    enabled: !!patientId,
+  });
+  const patientFlags = allPatientFlagsData?.patientFlags ?? [];
+  const implantFlagsById = allPatientFlagsData?.implantFlagsById ?? {};
+
+  // Mutation pour mettre à jour le statut patient
+  const updateStatusMutation = useMutation({
+    mutationFn: async (statut: string) => {
+      const res = await apiRequest("PATCH", `/api/patients/${patientId}`, { statut });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      toast({ title: "Statut mis a jour", description: "Le statut du patient a ete modifie." });
+      setStatusPopoverOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le statut.", variant: "destructive" });
+    },
+  });
+
+  // Documents query
+  const documentsQuery = useQuery<(Document & { signedUrl?: string | null })[]>({
+    queryKey: ["/api/patients", patientId, "documents"],
+    enabled: !!patientId,
+  });
+  const documents = documentsQuery.data;
 
   const [editForm, setEditForm] = useState({
     nom: "",
@@ -81,10 +233,600 @@ export default function PatientDetailsPage() {
     codePostal: "",
     ville: "",
     pays: "",
-    allergies: "",
-    medicaments: "",
-    contexteMedical: "",
   });
+
+  const [medicalDialogOpen, setMedicalDialogOpen] = useState(false);
+  const [medicalForm, setMedicalForm] = useState({
+    contexteMedical: "",
+    allergies: "",
+    traitement: "",
+    conditions: "",
+  });
+
+  // Notes state
+  type NoteTag = "CONSULTATION" | "CHIRURGIE" | "SUIVI" | "COMPLICATION" | "ADMINISTRATIVE";
+  interface NoteWithUser extends Note {
+    user: { nom: string | null; prenom: string | null };
+  }
+  const [noteContent, setNoteContent] = useState("");
+  const [selectedTag, setSelectedTag] = useState<NoteTag | null>(null);
+  const [editingNote, setEditingNote] = useState<NoteWithUser | null>(null);
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
+
+  const { data: patientNotes = [], isLoading: notesLoading } = useQuery<NoteWithUser[]>({
+    queryKey: ["/api/patients", patientId, "notes"],
+    enabled: !!patientId,
+  });
+
+  // Implants table view state
+  const [implantViewMode, setImplantViewMode] = useState<"table" | "cards">(() => {
+    try {
+      const saved = localStorage.getItem(IMPLANT_VIEW_MODE_KEY);
+      if (saved === "table" || saved === "cards") return saved;
+    } catch {}
+    return "table";
+  });
+
+  const [implantColumns, setImplantColumns] = useState<ImplantColumnConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(IMPLANT_COLUMNS_KEY);
+      if (saved) {
+        const savedOrder = JSON.parse(saved) as ImplantColumnId[];
+        const orderedColumns = savedOrder.map(id => defaultImplantColumns.find(c => c.id === id)!).filter(Boolean);
+        const missingColumns = defaultImplantColumns.filter(c => !savedOrder.includes(c.id));
+        return [...orderedColumns, ...missingColumns];
+      }
+    } catch {}
+    return defaultImplantColumns;
+  });
+
+  const [implantSortColumn, setImplantSortColumn] = useState<ImplantColumnId | null>(() => {
+    try {
+      const saved = localStorage.getItem(IMPLANT_SORT_KEY);
+      if (saved) {
+        const { column } = JSON.parse(saved);
+        return column;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [implantSortDirection, setImplantSortDirection] = useState<ImplantSortDirection>(() => {
+    try {
+      const saved = localStorage.getItem(IMPLANT_SORT_KEY);
+      if (saved) {
+        const { direction } = JSON.parse(saved);
+        return direction;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [draggedImplantColumn, setDraggedImplantColumn] = useState<ImplantColumnId | null>(null);
+  const [dragOverImplantColumn, setDragOverImplantColumn] = useState<ImplantColumnId | null>(null);
+
+  // Implant type filter state
+  type ImplantTypeFilter = "all" | "IMPLANT" | "MINI_IMPLANT";
+  const IMPLANT_TYPE_FILTER_KEY = "cassius_implant_type_filter";
+  const [implantTypeFilter, setImplantTypeFilter] = useState<ImplantTypeFilter>(() => {
+    try {
+      const saved = localStorage.getItem(IMPLANT_TYPE_FILTER_KEY);
+      if (saved === "all" || saved === "IMPLANT" || saved === "MINI_IMPLANT") return saved;
+    } catch {}
+    return "all";
+  });
+
+  // Persist implant view preferences
+  useEffect(() => {
+    try {
+      localStorage.setItem(IMPLANT_VIEW_MODE_KEY, implantViewMode);
+    } catch {}
+  }, [implantViewMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(IMPLANT_COLUMNS_KEY, JSON.stringify(implantColumns.map(c => c.id)));
+    } catch {}
+  }, [implantColumns]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(IMPLANT_SORT_KEY, JSON.stringify({ column: implantSortColumn, direction: implantSortDirection }));
+    } catch {}
+  }, [implantSortColumn, implantSortDirection]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(IMPLANT_TYPE_FILTER_KEY, implantTypeFilter);
+    } catch {}
+  }, [implantTypeFilter]);
+
+  // Filter implants by type
+  const filteredSurgeryImplants = (patient?.surgeryImplants || []).filter((si) => {
+    if (implantTypeFilter === "all") return true;
+    return si.implant?.typeImplant === implantTypeFilter;
+  });
+
+  // Implant table handlers
+  const handleImplantSort = useCallback((columnId: ImplantColumnId) => {
+    if (implantSortColumn === columnId) {
+      if (implantSortDirection === "asc") {
+        setImplantSortDirection("desc");
+      } else if (implantSortDirection === "desc") {
+        setImplantSortColumn(null);
+        setImplantSortDirection(null);
+      }
+    } else {
+      setImplantSortColumn(columnId);
+      setImplantSortDirection("asc");
+    }
+  }, [implantSortColumn, implantSortDirection]);
+
+  const handleImplantDragStart = useCallback((e: React.DragEvent, columnId: ImplantColumnId) => {
+    setDraggedImplantColumn(columnId);
+    e.dataTransfer.effectAllowed = "move";
+  }, []);
+
+  const handleImplantDragOver = useCallback((e: React.DragEvent, columnId: ImplantColumnId) => {
+    e.preventDefault();
+    if (draggedImplantColumn && draggedImplantColumn !== columnId) {
+      setDragOverImplantColumn(columnId);
+    }
+  }, [draggedImplantColumn]);
+
+  const handleImplantDrop = useCallback((e: React.DragEvent, targetColumnId: ImplantColumnId) => {
+    e.preventDefault();
+    if (draggedImplantColumn && draggedImplantColumn !== targetColumnId) {
+      const newColumns = [...implantColumns];
+      const draggedIndex = newColumns.findIndex(c => c.id === draggedImplantColumn);
+      const dropIndex = newColumns.findIndex(c => c.id === targetColumnId);
+      
+      if (draggedIndex !== -1 && dropIndex !== -1) {
+        const [removed] = newColumns.splice(draggedIndex, 1);
+        newColumns.splice(dropIndex, 0, removed);
+        setImplantColumns(newColumns);
+      }
+    }
+    setDraggedImplantColumn(null);
+    setDragOverImplantColumn(null);
+  }, [draggedImplantColumn, implantColumns]);
+
+  const handleImplantDragEnd = useCallback(() => {
+    setDraggedImplantColumn(null);
+    setDragOverImplantColumn(null);
+  }, []);
+
+  const renderImplantSortIcon = useCallback((columnId: ImplantColumnId) => {
+    if (implantSortColumn !== columnId) {
+      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
+    }
+    if (implantSortDirection === "asc") {
+      return <ArrowUp className="h-3 w-3 ml-1" />;
+    }
+    return <ArrowDown className="h-3 w-3 ml-1" />;
+  }, [implantSortColumn, implantSortDirection]);
+
+  // Operation table state
+  const [operationColumns, setOperationColumns] = useState<OperationColumnConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(OPERATION_COLUMNS_KEY);
+      if (saved) {
+        const savedOrder = JSON.parse(saved) as OperationColumnId[];
+        const orderedColumns = savedOrder.map(id => defaultOperationColumns.find(c => c.id === id)!).filter(Boolean);
+        const missingColumns = defaultOperationColumns.filter(c => !savedOrder.includes(c.id));
+        return [...orderedColumns, ...missingColumns];
+      }
+    } catch {}
+    return defaultOperationColumns;
+  });
+
+  const [operationSortColumn, setOperationSortColumn] = useState<OperationColumnId | null>(() => {
+    try {
+      const saved = localStorage.getItem(OPERATION_SORT_KEY);
+      if (saved) {
+        const { column } = JSON.parse(saved);
+        return column;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [operationSortDirection, setOperationSortDirection] = useState<OperationSortDirection>(() => {
+    try {
+      const saved = localStorage.getItem(OPERATION_SORT_KEY);
+      if (saved) {
+        const { direction } = JSON.parse(saved);
+        return direction;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [draggedOperationColumn, setDraggedOperationColumn] = useState<OperationColumnId | null>(null);
+  const [dragOverOperationColumn, setDragOverOperationColumn] = useState<OperationColumnId | null>(null);
+
+  // Persist operation preferences
+  useEffect(() => {
+    try {
+      localStorage.setItem(OPERATION_COLUMNS_KEY, JSON.stringify(operationColumns.map(c => c.id)));
+    } catch {}
+  }, [operationColumns]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(OPERATION_SORT_KEY, JSON.stringify({ column: operationSortColumn, direction: operationSortDirection }));
+    } catch {}
+  }, [operationSortColumn, operationSortDirection]);
+
+  // Operation table handlers
+  const handleOperationSort = useCallback((columnId: OperationColumnId) => {
+    if (operationSortColumn === columnId) {
+      if (operationSortDirection === "asc") {
+        setOperationSortDirection("desc");
+      } else if (operationSortDirection === "desc") {
+        setOperationSortColumn(null);
+        setOperationSortDirection(null);
+      }
+    } else {
+      setOperationSortColumn(columnId);
+      setOperationSortDirection("asc");
+    }
+  }, [operationSortColumn, operationSortDirection]);
+
+  const handleOperationDragStart = useCallback((e: React.DragEvent, columnId: OperationColumnId) => {
+    setDraggedOperationColumn(columnId);
+    e.dataTransfer.effectAllowed = "move";
+  }, []);
+
+  const handleOperationDragOver = useCallback((e: React.DragEvent, columnId: OperationColumnId) => {
+    e.preventDefault();
+    if (draggedOperationColumn && draggedOperationColumn !== columnId) {
+      setDragOverOperationColumn(columnId);
+    }
+  }, [draggedOperationColumn]);
+
+  const handleOperationDrop = useCallback((e: React.DragEvent, targetColumnId: OperationColumnId) => {
+    e.preventDefault();
+    if (draggedOperationColumn && draggedOperationColumn !== targetColumnId) {
+      const newColumns = [...operationColumns];
+      const draggedIndex = newColumns.findIndex(c => c.id === draggedOperationColumn);
+      const dropIndex = newColumns.findIndex(c => c.id === targetColumnId);
+      
+      if (draggedIndex !== -1 && dropIndex !== -1) {
+        const [removed] = newColumns.splice(draggedIndex, 1);
+        newColumns.splice(dropIndex, 0, removed);
+        setOperationColumns(newColumns);
+      }
+    }
+    setDraggedOperationColumn(null);
+    setDragOverOperationColumn(null);
+  }, [draggedOperationColumn, operationColumns]);
+
+  const handleOperationDragEnd = useCallback(() => {
+    setDraggedOperationColumn(null);
+    setDragOverOperationColumn(null);
+  }, []);
+
+  const renderOperationSortIcon = useCallback((columnId: OperationColumnId) => {
+    if (operationSortColumn !== columnId) {
+      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
+    }
+    if (operationSortDirection === "asc") {
+      return <ArrowUp className="h-3 w-3 ml-1" />;
+    }
+    return <ArrowDown className="h-3 w-3 ml-1" />;
+  }, [operationSortColumn, operationSortDirection]);
+
+  // Calculate success rate for an operation
+  const getOperationSuccessRate = useCallback((operation: OperationWithImplants) => {
+    const implants = operation.surgeryImplants || [];
+    if (implants.length === 0) return null;
+    
+    const successfulImplants = implants.filter(si => 
+      si.statut === "SUCCES" || si.statut === "EN_SUIVI"
+    ).length;
+    
+    return Math.round((successfulImplants / implants.length) * 100);
+  }, []);
+
+  // Get success rate badge styling
+  const getSuccessRateBadge = useCallback((rate: number | null) => {
+    if (rate === null) return { className: "bg-gray-100 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400", label: "-" };
+    
+    if (rate >= 80) {
+      return { className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400", label: `${rate}%` };
+    } else if (rate >= 60) {
+      return { className: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400", label: `${rate}%` };
+    } else {
+      return { className: "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400", label: `${rate}%` };
+    }
+  }, []);
+
+  // Sort operations for table
+  const getSortedOperations = useCallback((operations: OperationWithImplants[]) => {
+    if (!operationSortColumn || !operationSortDirection) return operations;
+
+    return [...operations].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (operationSortColumn) {
+        case "date":
+          comparison = new Date(a.dateOperation || 0).getTime() - new Date(b.dateOperation || 0).getTime();
+          break;
+        case "typeIntervention":
+          comparison = (a.typeIntervention || "").localeCompare(b.typeIntervention || "");
+          break;
+        case "implants":
+          comparison = (a.surgeryImplants?.length || 0) - (b.surgeryImplants?.length || 0);
+          break;
+        case "chirurgie":
+          comparison = (a.typeChirurgieTemps || "").localeCompare(b.typeChirurgieTemps || "");
+          break;
+        case "greffe":
+          comparison = (a.greffeOsseuse ? 1 : 0) - (b.greffeOsseuse ? 1 : 0);
+          break;
+        case "miseEnCharge":
+          comparison = (a.typeMiseEnCharge || "").localeCompare(b.typeMiseEnCharge || "");
+          break;
+        case "reussite":
+          const rateA = getOperationSuccessRate(a) ?? -1;
+          const rateB = getOperationSuccessRate(b) ?? -1;
+          comparison = rateA - rateB;
+          break;
+      }
+      
+      return operationSortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [operationSortColumn, operationSortDirection, getOperationSuccessRate]);
+
+  // Format date as dd/mm/yyyy
+  const formatDateCompact = (date: string) => {
+    const d = new Date(date);
+    return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+  };
+
+  // Render operation cell content
+  const renderOperationCellContent = useCallback((columnId: OperationColumnId, operation: OperationWithImplants) => {
+    switch (columnId) {
+      case "date":
+        return formatDateCompact(operation.dateOperation);
+      case "typeIntervention":
+        return getInterventionLabel(operation.typeIntervention);
+      case "implants":
+        const sites = operation.surgeryImplants?.map(si => si.siteFdi).join(", ") || "";
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Badge variant="secondary" className="font-mono cursor-help">
+                  {operation.surgeryImplants?.length || 0}
+                </Badge>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{sites || "Aucun implant"}</TooltipContent>
+          </Tooltip>
+        );
+      case "chirurgie":
+        if (!operation.typeChirurgieTemps) return "-";
+        return (
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-0">
+            {operation.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : "2 temps"}
+          </Badge>
+        );
+      case "greffe":
+        return operation.greffeOsseuse ? (operation.typeGreffe || "Oui") : "-";
+      case "miseEnCharge":
+        if (!operation.typeMiseEnCharge) return "-";
+        return (
+          <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 border-0">
+            {operation.typeMiseEnCharge.charAt(0) + operation.typeMiseEnCharge.slice(1).toLowerCase()}
+          </Badge>
+        );
+      case "reussite":
+        const rate = getOperationSuccessRate(operation);
+        const badge = getSuccessRateBadge(rate);
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${badge.className}`}>
+            {badge.label}
+          </span>
+        );
+      default:
+        return "-";
+    }
+  }, [getOperationSuccessRate, getSuccessRateBadge]);
+
+  // Rendez-vous state
+  type RdvTag = "CONSULTATION" | "SUIVI" | "CHIRURGIE";
+  const [rdvDialogOpen, setRdvDialogOpen] = useState(false);
+  const [timelineRadioViewerId, setTimelineRadioViewerId] = useState<string | null>(null);
+  const [rdvForm, setRdvForm] = useState({
+    titre: "",
+    description: "",
+    date: "",
+    heureDebut: "09:00",
+    heureFin: "09:30",
+    tag: "CONSULTATION" as RdvTag,
+  });
+  const [editingRdv, setEditingRdv] = useState<RendezVous | null>(null);
+  const [deleteRdvId, setDeleteRdvId] = useState<string | null>(null);
+
+  const { data: patientRdvs = [], isLoading: rdvsLoading } = useQuery<RendezVous[]>({
+    queryKey: ["/api/patients", patientId, "rendez-vous"],
+    enabled: !!patientId,
+  });
+
+  // Unified Appointments (new system)
+  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery<Appointment[]>({
+    queryKey: ["/api/patients", patientId, "appointments"],
+    enabled: !!patientId,
+  });
+  const upcomingAppointments = appointments.filter((a) => a.status === "UPCOMING").sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
+  const completedAppointments = appointments.filter((a) => a.status === "COMPLETED" || a.status === "CANCELLED").sort((a, b) => new Date(b.dateStart).getTime() - new Date(a.dateStart).getTime());
+
+  const createRdvMutation = useMutation({
+    mutationFn: async (data: typeof rdvForm) => {
+      return apiRequest("POST", `/api/patients/${patientId}/rendez-vous`, {
+        patientId,
+        titre: data.titre,
+        description: data.description || null,
+        date: data.date,
+        heureDebut: data.heureDebut,
+        heureFin: data.heureFin,
+        tag: data.tag,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "rendez-vous"] });
+      setRdvDialogOpen(false);
+      setRdvForm({ titre: "", description: "", date: "", heureDebut: "09:00", heureFin: "09:30", tag: "CONSULTATION" });
+      toast({ title: "Rendez-vous créé", description: "Le rendez-vous a été ajouté.", variant: "success" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de créer le rendez-vous.", variant: "destructive" });
+    },
+  });
+
+  const updateRdvMutation = useMutation({
+    mutationFn: async (data: { id: string } & typeof rdvForm) => {
+      return apiRequest("PATCH", `/api/rendez-vous/${data.id}`, {
+        titre: data.titre,
+        description: data.description || null,
+        date: data.date,
+        heureDebut: data.heureDebut,
+        heureFin: data.heureFin,
+        tag: data.tag,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "rendez-vous"] });
+      setEditingRdv(null);
+      toast({ title: "Rendez-vous modifié", description: "Le rendez-vous a été mis à jour.", variant: "success" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le rendez-vous.", variant: "destructive" });
+    },
+  });
+
+  const deleteRdvMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/rendez-vous/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "rendez-vous"] });
+      setDeleteRdvId(null);
+      toast({ title: "Rendez-vous supprimé", description: "Le rendez-vous a été supprimé.", variant: "success" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de supprimer le rendez-vous.", variant: "destructive" });
+    },
+  });
+
+  const getRdvTagConfig = (tag: RdvTag) => {
+    const configs: Record<RdvTag, { label: string; className: string; borderColor: string }> = {
+      CONSULTATION: { label: "Consultation", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400", borderColor: "border-l-orange-500" },
+      SUIVI: { label: "Suivi", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", borderColor: "border-l-green-500" },
+      CHIRURGIE: { label: "Chirurgie", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", borderColor: "border-l-red-500" },
+    };
+    return configs[tag];
+  };
+
+  const formatRdvDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const upcomingRdvs = patientRdvs.filter((r) => new Date(r.date) >= today).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const pastRdvs = patientRdvs.filter((r) => new Date(r.date) < today).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const createNoteMutation = useMutation({
+    mutationFn: async (data: { contenu: string; tag: NoteTag | null }) => {
+      return apiRequest("POST", `/api/patients/${patientId}/notes`, {
+        patientId,
+        contenu: data.contenu,
+        tag: data.tag,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
+      setNoteContent("");
+      setSelectedTag(null);
+      toast({ title: "Note ajoutée", description: "La note a été créée avec succès.", variant: "success" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de créer la note.", variant: "destructive" });
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async (data: { id: string; contenu: string; tag: NoteTag | null }) => {
+      return apiRequest("PATCH", `/api/notes/${data.id}`, {
+        contenu: data.contenu,
+        tag: data.tag,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
+      setEditingNote(null);
+      toast({ title: "Note modifiée", description: "La note a été mise à jour.", variant: "success" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier la note.", variant: "destructive" });
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/notes/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
+      setDeleteNoteId(null);
+      toast({ title: "Note supprimée", description: "La note a été supprimée.", variant: "success" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de supprimer la note.", variant: "destructive" });
+    },
+  });
+
+  const handleAddNote = () => {
+    if (!noteContent.trim()) return;
+    createNoteMutation.mutate({ contenu: noteContent, tag: selectedTag });
+  };
+
+  const handleUpdateNote = () => {
+    if (!editingNote || !editingNote.contenu.trim()) return;
+    updateNoteMutation.mutate({
+      id: editingNote.id,
+      contenu: editingNote.contenu,
+      tag: editingNote.tag as NoteTag | null,
+    });
+  };
+
+  const getTagConfig = (tag: NoteTag | null) => {
+    const configs: Record<NoteTag, { label: string; className: string }> = {
+      CONSULTATION: { label: "Consultation", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
+      CHIRURGIE: { label: "Chirurgie", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+      SUIVI: { label: "Suivi", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+      COMPLICATION: { label: "Complication", className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
+      ADMINISTRATIVE: { label: "Administrative", className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400" },
+    };
+    return tag ? configs[tag] : null;
+  };
+
+  const formatNoteDatetime = (date: Date | string) => {
+    const d = new Date(date);
+    return d.toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }) + " à " + d.toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const updatePatientMutation = useMutation({
     mutationFn: async (data: typeof editForm) => {
@@ -96,12 +838,35 @@ export default function PatientDetailsPage() {
       toast({
         title: "Patient mis à jour",
         description: "Les informations du patient ont été enregistrées.",
+        variant: "success",
       });
     },
     onError: () => {
       toast({
         title: "Erreur",
         description: "Impossible de mettre à jour le patient.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateMedicalMutation = useMutation({
+    mutationFn: async (data: typeof medicalForm) => {
+      return apiRequest("PATCH", `/api/patients/${patientId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      setMedicalDialogOpen(false);
+      toast({
+        title: "Contexte médical mis à jour",
+        description: "Les informations médicales ont été enregistrées.",
+        variant: "success",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le contexte médical.",
         variant: "destructive",
       });
     },
@@ -120,17 +885,31 @@ export default function PatientDetailsPage() {
         codePostal: patient.codePostal || "",
         ville: patient.ville || "",
         pays: patient.pays || "",
-        allergies: patient.allergies || "",
-        medicaments: patient.medicaments || "",
-        contexteMedical: patient.contexteMedical || "",
       });
       setEditDialogOpen(true);
+    }
+  };
+
+  const openMedicalDialog = () => {
+    if (patient) {
+      setMedicalForm({
+        contexteMedical: patient.contexteMedical || "",
+        allergies: patient.allergies || "",
+        traitement: patient.traitement || "",
+        conditions: patient.conditions || "",
+      });
+      setMedicalDialogOpen(true);
     }
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updatePatientMutation.mutate(editForm);
+  };
+
+  const handleMedicalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateMedicalMutation.mutate(medicalForm);
   };
 
   const calculateAge = (dateNaissance: string) => {
@@ -194,14 +973,178 @@ export default function PatientDetailsPage() {
     return labels[type] || type;
   };
 
+  const getSituationFromSiteFdi = (siteFdi: string | null) => {
+    if (!siteFdi) return "-";
+    const firstDigit = siteFdi.charAt(0);
+    if (firstDigit === "1" || firstDigit === "2") return "Maxillaire";
+    if (firstDigit === "3" || firstDigit === "4") return "Mandibulaire";
+    return "-";
+  };
+
+  const getPositionLabel = (position: string | null) => {
+    const labels: Record<string, string> = {
+      CRESTAL: "Crestal",
+      SOUS_CRESTAL: "Sous-crestal",
+      SUPRA_CRESTAL: "Supra-crestal",
+    };
+    return position ? labels[position] || position : "-";
+  };
+
+  const getMiseEnChargeLabel = (miseEnCharge: string | null) => {
+    const labels: Record<string, string> = {
+      IMMEDIATE: "Immédiate",
+      PRECOCE: "Précoce",
+      DIFFEREE: "Différée",
+    };
+    return miseEnCharge ? labels[miseEnCharge] || miseEnCharge : "-";
+  };
+
+  const getChirurgieTempsLabel = (type: string | null) => {
+    const labels: Record<string, string> = {
+      UN_TEMPS: "1T",
+      DEUX_TEMPS: "2T",
+    };
+    return type ? labels[type] || type : "-";
+  };
+
+  // Sort implants for table view
+  const sortImplants = useCallback((implantsToSort: SurgeryImplantWithVisites[]) => {
+    if (!implantSortColumn || !implantSortDirection) return implantsToSort;
+
+    return [...implantsToSort].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (implantSortColumn) {
+        case "site":
+          comparison = (a.siteFdi || "").localeCompare(b.siteFdi || "");
+          break;
+        case "marque":
+          comparison = (a.implant?.marque || "").localeCompare(b.implant?.marque || "");
+          break;
+        case "dimensions":
+          const dimA = (a.implant?.diametre || 0) * 100 + (a.implant?.longueur || 0);
+          const dimB = (b.implant?.diametre || 0) * 100 + (b.implant?.longueur || 0);
+          comparison = dimA - dimB;
+          break;
+        case "datePose":
+          comparison = new Date(a.datePose || 0).getTime() - new Date(b.datePose || 0).getTime();
+          break;
+        case "isq":
+          const isqValA = a.latestIsq?.value || 0;
+          const isqValB = b.latestIsq?.value || 0;
+          comparison = isqValA - isqValB;
+          break;
+        case "position":
+          comparison = (a.positionImplant || "").localeCompare(b.positionImplant || "");
+          break;
+        case "typeOs":
+          comparison = (a.typeOs || "").localeCompare(b.typeOs || "");
+          break;
+        case "greffe":
+          comparison = (a.greffeOsseuse ? 1 : 0) - (b.greffeOsseuse ? 1 : 0);
+          break;
+        case "chirurgie":
+          comparison = (a.typeChirurgieTemps || "").localeCompare(b.typeChirurgieTemps || "");
+          break;
+        case "miseEnCharge":
+          comparison = (a.miseEnCharge || "").localeCompare(b.miseEnCharge || "");
+          break;
+        case "situation":
+          comparison = getSituationFromSiteFdi(a.siteFdi).localeCompare(getSituationFromSiteFdi(b.siteFdi));
+          break;
+        case "operation":
+          comparison = new Date(a.datePose || 0).getTime() - new Date(b.datePose || 0).getTime();
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      return implantSortDirection === "desc" ? -comparison : comparison;
+    });
+  }, [implantSortColumn, implantSortDirection]);
+
+  // Render implant table cell content
+  const renderImplantCellContent = useCallback((columnId: ImplantColumnId, surgeryImplant: SurgeryImplantWithVisites) => {
+    switch (columnId) {
+      case "site":
+        return (
+          <span className="font-mono font-medium">{surgeryImplant.siteFdi || "-"}</span>
+        );
+      case "marque":
+        return (
+          <div>
+            <div className="text-sm font-medium">{surgeryImplant.implant?.marque || "-"}</div>
+            <div className="text-xs text-muted-foreground">{surgeryImplant.implant?.referenceFabricant || "-"}</div>
+          </div>
+        );
+      case "dimensions":
+        return (
+          <span className="text-sm">
+            {surgeryImplant.implant?.diametre} x {surgeryImplant.implant?.longueur}mm
+          </span>
+        );
+      case "datePose":
+        return (
+          <span className="text-sm text-muted-foreground">
+            {surgeryImplant.datePose ? formatDateShort(surgeryImplant.datePose) : "-"}
+          </span>
+        );
+      case "isq":
+        const latestIsq = surgeryImplant.latestIsq;
+        if (!latestIsq) return <span className="text-muted-foreground">-</span>;
+        const isqClassName = latestIsq.value >= 70 
+          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-0" 
+          : latestIsq.value >= 60 
+            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-0" 
+            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-0";
+        return (
+          <div className="flex items-center gap-1">
+            <Badge className={`font-mono ${isqClassName}`}>
+              {latestIsq.value}
+            </Badge>
+            <span className="text-xs text-muted-foreground">{latestIsq.label}</span>
+          </div>
+        );
+      case "flag":
+        const implantFlags = implantFlagsById[surgeryImplant.id] || [];
+        if (implantFlags.length > 0) {
+          return <FlagsTooltipBadge flags={implantFlags} />;
+        }
+        return (
+          <TopFlagSummary 
+            topFlag={surgeryImplant.topFlag} 
+            activeFlagCount={surgeryImplant.activeFlagCount} 
+          />
+        );
+      case "position":
+        return <span className="text-sm">{getPositionLabel(surgeryImplant.positionImplant)}</span>;
+      case "typeOs":
+        return <span className="text-sm font-mono">{surgeryImplant.typeOs || "-"}</span>;
+      case "greffe":
+        return surgeryImplant.greffeOsseuse ? (
+          <Check className="h-4 w-4 text-green-600" />
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      case "chirurgie":
+        return <span className="text-sm">{getChirurgieTempsLabel(surgeryImplant.typeChirurgieTemps)}</span>;
+      case "miseEnCharge":
+        return <span className="text-sm">{getMiseEnChargeLabel(surgeryImplant.miseEnCharge)}</span>;
+      case "situation":
+        return <span className="text-sm">{getSituationFromSiteFdi(surgeryImplant.siteFdi)}</span>;
+      case "operation":
+        return (
+          <div className="text-sm">
+            <div>{formatDateShort(surgeryImplant.datePose)}</div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  }, [implantFlagsById]);
+
   if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+    return <PatientDetailsSkeleton />;
   }
 
   if (!patient) {
@@ -220,10 +1163,10 @@ export default function PatientDetailsPage() {
     );
   }
 
-  const implantCount = patient.implants?.length || 0;
+  const implantCount = patient.surgeryImplants?.length || 0;
   const operationCount = patient.operations?.length || 0;
   const radioCount = patient.radios?.length || 0;
-  const visiteCount = patient.implants?.reduce((acc, imp) => acc + (imp.visites?.length || 0), 0) || 0;
+  const visiteCount = completedAppointments.length;
 
   const sortedOperations = [...(patient.operations || [])].sort(
     (a, b) => new Date(b.dateOperation).getTime() - new Date(a.dateOperation).getTime()
@@ -232,10 +1175,13 @@ export default function PatientDetailsPage() {
   interface TimelineEvent {
     id: string;
     date: Date;
-    type: "operation" | "radio" | "visite";
+    type: "operation" | "radio" | "visite" | "rdv" | "document";
     title: string;
     description?: string;
     badges?: string[];
+    badgeClassName?: string;
+    radioId?: string;
+    documentId?: string;
   }
 
   const timelineEvents: TimelineEvent[] = [];
@@ -246,8 +1192,8 @@ export default function PatientDetailsPage() {
       date: new Date(op.dateOperation),
       type: "operation",
       title: getInterventionLabel(op.typeIntervention),
-      description: op.notesPerop || `${op.implants?.length || 0} implant(s)`,
-      badges: op.implants?.slice(0, 3).map(imp => `Site ${imp.siteFdi}`),
+      description: op.notesPerop || `${op.surgeryImplants?.length || 0} implant(s)`,
+      badges: op.surgeryImplants?.slice(0, 3).map(imp => `Site ${imp.siteFdi}`),
     });
   });
 
@@ -256,12 +1202,13 @@ export default function PatientDetailsPage() {
       id: `radio-${radio.id}`,
       date: new Date(radio.date),
       type: "radio",
-      title: getRadioLabel(radio.type),
+      title: radio.title || getRadioLabel(radio.type),
       description: "Voir l'image",
+      radioId: radio.id,
     });
   });
 
-  patient.implants?.forEach((imp) => {
+  patient.surgeryImplants?.forEach((imp) => {
     imp.visites?.forEach((visite) => {
       timelineEvents.push({
         id: `visite-${visite.id}`,
@@ -274,15 +1221,66 @@ export default function PatientDetailsPage() {
     });
   });
 
+  // Ajouter les documents à la timeline
+  const TAG_LABELS_DOC: Record<string, string> = {
+    DEVIS: "Devis",
+    CONSENTEMENT: "Consentement",
+    COMPTE_RENDU: "Compte-rendu",
+    ASSURANCE: "Assurance",
+    AUTRE: "Autre",
+  };
+  
+  documents?.forEach((doc) => {
+    const primaryTag = doc.tags?.[0];
+    timelineEvents.push({
+      id: `doc-${doc.id}`,
+      date: new Date(doc.createdAt),
+      type: "document",
+      title: doc.title || "Document",
+      description: "Voir le document",
+      badges: primaryTag ? [TAG_LABELS_DOC[primaryTag] || primaryTag] : undefined,
+      documentId: doc.id,
+    });
+  });
+
+  // Ajouter les rendez-vous passés à la timeline (depuis appointments)
+  completedAppointments.forEach((apt) => {
+    const aptDate = new Date(apt.dateStart);
+    // Seulement les rendez-vous avec une date passée
+    if (aptDate <= today) {
+      const typeLabel = apt.type === "CONSULTATION" ? "Consultation" : 
+                        apt.type === "SUIVI" ? "Suivi" : 
+                        apt.type === "CHIRURGIE" ? "Chirurgie" :
+                        apt.type === "CONTROLE" ? "Contrôle" :
+                        apt.type === "URGENCE" ? "Urgence" : "Autre";
+      const typeClassName = apt.type === "CONSULTATION" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : 
+                            apt.type === "SUIVI" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : 
+                            apt.type === "CHIRURGIE" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" :
+                            "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300";
+      timelineEvents.push({
+        id: `apt-${apt.id}`,
+        date: aptDate,
+        type: "rdv",
+        title: apt.title,
+        description: apt.description || typeLabel,
+        badges: [typeLabel],
+        badgeClassName: typeClassName,
+      });
+    }
+  });
+
   timelineEvents.sort((a, b) => b.date.getTime() - a.date.getTime());
 
   const oldestOperationYear = sortedOperations.length > 0
     ? new Date(sortedOperations[sortedOperations.length - 1].dateOperation).getFullYear()
     : null;
 
-  const successRate = implantCount > 0 
-    ? Math.round((patient.implants?.filter(i => i.statut === "SUCCES").length || 0) / implantCount * 100)
-    : 0;
+  // Calculate success rate based on implants with definitive outcomes (SUCCES or ECHEC)
+  const definitiveImplants = patient.surgeryImplants?.filter(i => i.statut === "SUCCES" || i.statut === "ECHEC") || [];
+  const successfulImplants = definitiveImplants.filter(i => i.statut === "SUCCES").length;
+  const successRate = definitiveImplants.length > 0 
+    ? Math.round((successfulImplants / definitiveImplants.length) * 100)
+    : 100; // Default to 100% if no definitive outcomes yet
 
   return (
     <div className="p-6 space-y-4 bg-muted/30 min-h-full">
@@ -293,9 +1291,102 @@ export default function PatientDetailsPage() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold" data-testid="text-patient-name">
-            {patient.prenom} {patient.nom}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold" data-testid="text-patient-name">
+              {patient.prenom} {patient.nom}
+            </h1>
+            <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Badge 
+                  variant="default" 
+                  className={`cursor-pointer ${
+                    patient.statut === "ARCHIVE" 
+                      ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" 
+                      : patient.statut === "INACTIF"
+                      ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                      : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  }`}
+                  data-testid="badge-patient-status"
+                >
+                  {patient.statut === "ARCHIVE" ? "Archive" : patient.statut === "INACTIF" ? "Inactif" : "Actif"}
+                </Badge>
+              </PopoverTrigger>
+              <PopoverContent className="w-40 p-2" align="start">
+                <div className="space-y-1">
+                  <Button
+                    variant={patient.statut === "ACTIF" || !patient.statut ? "secondary" : "ghost"}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => updateStatusMutation.mutate("ACTIF")}
+                    disabled={updateStatusMutation.isPending}
+                    data-testid="status-option-actif"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-green-500 mr-2" />
+                    Actif
+                  </Button>
+                  <Button
+                    variant={patient.statut === "INACTIF" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => updateStatusMutation.mutate("INACTIF")}
+                    disabled={updateStatusMutation.isPending}
+                    data-testid="status-option-inactif"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-orange-500 mr-2" />
+                    Inactif
+                  </Button>
+                  <Button
+                    variant={patient.statut === "ARCHIVE" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => updateStatusMutation.mutate("ARCHIVE")}
+                    disabled={updateStatusMutation.isPending}
+                    data-testid="status-option-archive"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-gray-500 mr-2" />
+                    Archive
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            {patientFlags.length > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge 
+                    variant="secondary" 
+                    className="bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 cursor-help gap-1"
+                    data-testid="badge-patient-alerts"
+                  >
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>{patientFlags.length} alerte{patientFlags.length > 1 ? 's' : ''}</span>
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-sm">
+                  <div className="space-y-2">
+                    {patientFlags.map((flag) => {
+                      const levelConfig: Record<string, { label: string; className: string }> = {
+                        CRITICAL: { label: "Critique", className: "text-red-500" },
+                        WARNING: { label: "Attention", className: "text-orange-500" },
+                        INFO: { label: "Info", className: "text-blue-500" },
+                      };
+                      const config = levelConfig[flag.level] || levelConfig.INFO;
+                      return (
+                        <div key={flag.id} className="flex items-start gap-2">
+                          <AlertTriangle className={`w-3 h-3 mt-0.5 ${config.className}`} />
+                          <div>
+                            <p className="font-medium text-sm">{flag.label}</p>
+                            {flag.description && (
+                              <p className="text-xs text-muted-foreground">{flag.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             {calculateAge(patient.dateNaissance)} ans - Depuis {new Date(patient.createdAt).getFullYear()}
           </p>
@@ -316,7 +1407,7 @@ export default function PatientDetailsPage() {
             className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
             data-testid="tab-implants"
           >
-            Implants ({implantCount})
+            Implants <span className="text-xs italic ml-1">({implantCount})</span>
           </TabsTrigger>
           <TabsTrigger 
             value="operations" 
@@ -331,6 +1422,13 @@ export default function PatientDetailsPage() {
             data-testid="tab-radios"
           >
             Radiographies
+          </TabsTrigger>
+          <TabsTrigger 
+            value="documents" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-documents"
+          >
+            Documents
           </TabsTrigger>
           <TabsTrigger 
             value="visits" 
@@ -521,39 +1619,6 @@ export default function PatientDetailsPage() {
                         data-testid="input-edit-pays"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="allergies">Allergies</Label>
-                      <Textarea
-                        id="allergies"
-                        value={editForm.allergies}
-                        onChange={(e) => setEditForm({ ...editForm, allergies: e.target.value })}
-                        placeholder="Pénicilline, latex..."
-                        rows={2}
-                        data-testid="input-edit-allergies"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="medicaments">Médicaments</Label>
-                      <Textarea
-                        id="medicaments"
-                        value={editForm.medicaments}
-                        onChange={(e) => setEditForm({ ...editForm, medicaments: e.target.value })}
-                        placeholder="Traitements en cours..."
-                        rows={2}
-                        data-testid="input-edit-medicaments"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="contexteMedical">Conditions médicales</Label>
-                      <Textarea
-                        id="contexteMedical"
-                        value={editForm.contexteMedical}
-                        onChange={(e) => setEditForm({ ...editForm, contexteMedical: e.target.value })}
-                        placeholder="Diabète, hypertension..."
-                        rows={2}
-                        data-testid="input-edit-contexte-medical"
-                      />
-                    </div>
                     <div className="flex justify-end gap-3 pt-4">
                       <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
                         Annuler
@@ -570,12 +1635,21 @@ export default function PatientDetailsPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-base font-medium">Contexte médical</CardTitle>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" onClick={openMedicalDialog} data-testid="button-edit-medical">
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/50 border-l-4 border-blue-400">
+                    <ClipboardList className="h-4 w-4 text-blue-500 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Contexte médical</p>
+                      <p className="text-xs text-muted-foreground">
+                        {patient.contexteMedical || "Aucun contexte renseigné"}
+                      </p>
+                    </div>
+                  </div>
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/50 border-l-4 border-red-400">
                     <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
                     <div>
@@ -588,9 +1662,9 @@ export default function PatientDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/50 border-l-4 border-amber-400">
                     <Pill className="h-4 w-4 text-amber-600 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Médicaments</p>
+                      <p className="text-sm font-medium">Traitement</p>
                       <p className="text-xs text-muted-foreground">
-                        {patient.medicaments || "Aucun traitement en cours"}
+                        {patient.traitement || "Aucun traitement en cours"}
                       </p>
                     </div>
                   </div>
@@ -599,12 +1673,74 @@ export default function PatientDetailsPage() {
                     <div>
                       <p className="text-sm font-medium">Conditions</p>
                       <p className="text-xs text-muted-foreground">
-                        {patient.contexteMedical || "Aucune condition signalée"}
+                        {patient.conditions || "Aucune condition signalée"}
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+
+              <Sheet open={medicalDialogOpen} onOpenChange={setMedicalDialogOpen}>
+                <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>Contexte médical</SheetTitle>
+                  </SheetHeader>
+                  <form onSubmit={handleMedicalSubmit} className="mt-6 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="contexteMedical">Contexte médical</Label>
+                      <Textarea
+                        id="contexteMedical"
+                        value={medicalForm.contexteMedical}
+                        onChange={(e) => setMedicalForm({ ...medicalForm, contexteMedical: e.target.value })}
+                        placeholder="Antécédents médicaux généraux..."
+                        rows={3}
+                        data-testid="input-edit-contexte-medical"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="allergies">Allergies</Label>
+                      <Textarea
+                        id="allergies"
+                        value={medicalForm.allergies}
+                        onChange={(e) => setMedicalForm({ ...medicalForm, allergies: e.target.value })}
+                        placeholder="Ex: Pénicilline, latex..."
+                        rows={2}
+                        data-testid="input-edit-allergies"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="traitement">Traitement</Label>
+                      <Textarea
+                        id="traitement"
+                        value={medicalForm.traitement}
+                        onChange={(e) => setMedicalForm({ ...medicalForm, traitement: e.target.value })}
+                        placeholder="Médicaments en cours..."
+                        rows={2}
+                        data-testid="input-edit-traitement"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="conditions">Conditions</Label>
+                      <Textarea
+                        id="conditions"
+                        value={medicalForm.conditions}
+                        onChange={(e) => setMedicalForm({ ...medicalForm, conditions: e.target.value })}
+                        placeholder="Diabète, hypertension..."
+                        rows={2}
+                        data-testid="input-edit-conditions"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button type="button" variant="outline" onClick={() => setMedicalDialogOpen(false)}>
+                        Annuler
+                      </Button>
+                      <Button type="submit" disabled={updateMedicalMutation.isPending} data-testid="button-save-medical">
+                        {updateMedicalMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+                      </Button>
+                    </div>
+                  </form>
+                </SheetContent>
+              </Sheet>
 
               <Card>
                 <CardHeader className="pb-3">
@@ -634,7 +1770,12 @@ export default function PatientDetailsPage() {
                     <ClipboardList className="h-4 w-4 text-primary" />
                     Enregistrer un acte
                   </Button>
-                  <Button variant="ghost" className="w-full justify-start gap-3">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start gap-3"
+                    onClick={() => setAppointmentDialogOpen(true)}
+                    data-testid="button-plan-visit"
+                  >
                     <Calendar className="h-4 w-4 text-primary" />
                     Planifier une visite
                   </Button>
@@ -653,7 +1794,7 @@ export default function PatientDetailsPage() {
                         <RadioUploadForm
                           patientId={patient.id}
                           operations={patient.operations || []}
-                          implants={patient.implants || []}
+                          surgeryImplants={patient.surgeryImplants || []}
                           onSuccess={() => setRadioDialogOpen(false)}
                         />
                       </div>
@@ -735,17 +1876,35 @@ export default function PatientDetailsPage() {
                         const getEventIcon = () => {
                           switch (event.type) {
                             case "operation":
-                              return <Activity className="h-4 w-4 text-primary" />;
+                              return <Activity className="h-4 w-4 text-orange-500" />;
                             case "radio":
-                              return <ImageIcon className="h-4 w-4 text-primary" />;
+                              return <ImageIcon className="h-4 w-4 text-blue-500" />;
                             case "visite":
-                              return <Stethoscope className="h-4 w-4 text-primary" />;
+                              return <Stethoscope className="h-4 w-4 text-green-500" />;
+                            case "rdv":
+                              return <Calendar className="h-4 w-4 text-primary" />;
+                            case "document":
+                              return <FileText className="h-4 w-4 text-purple-500" />;
+                          }
+                        };
+                        const getEventBgColor = () => {
+                          switch (event.type) {
+                            case "operation":
+                              return "bg-orange-100 dark:bg-orange-900/30";
+                            case "radio":
+                              return "bg-blue-100 dark:bg-blue-900/30";
+                            case "visite":
+                              return "bg-green-100 dark:bg-green-900/30";
+                            case "rdv":
+                              return "bg-primary/10";
+                            case "document":
+                              return "bg-purple-100 dark:bg-purple-900/30";
                           }
                         };
                         return (
                           <div key={event.id} className="flex gap-4">
                             <div className="flex flex-col items-center">
-                              <div className="p-2 rounded-full bg-primary/10">
+                              <div className={`p-2 rounded-full ${getEventBgColor()}`}>
                                 {getEventIcon()}
                               </div>
                               {index < Math.min(timelineEvents.length - 1, 3) && (
@@ -756,15 +1915,37 @@ export default function PatientDetailsPage() {
                               <div className="flex items-start justify-between gap-2">
                                 <div>
                                   <p className="font-medium text-sm">{event.title}</p>
-                                  {event.description && (
+                                  {event.description && event.radioId ? (
+                                    <button 
+                                      className="text-xs text-primary hover:underline mt-0.5 text-left"
+                                      onClick={() => setTimelineRadioViewerId(event.radioId!)}
+                                      data-testid={`button-view-radio-${event.radioId}`}
+                                    >
+                                      {event.description}
+                                    </button>
+                                  ) : event.description && event.documentId ? (
+                                    <button 
+                                      className="text-xs text-primary hover:underline mt-0.5 text-left"
+                                      onClick={() => {
+                                        setActiveTab("documents");
+                                      }}
+                                      data-testid={`button-view-document-${event.documentId}`}
+                                    >
+                                      {event.description}
+                                    </button>
+                                  ) : event.description ? (
                                     <p className="text-xs text-muted-foreground mt-0.5">
                                       {event.description}
                                     </p>
-                                  )}
+                                  ) : null}
                                   {event.badges && event.badges.length > 0 && (
                                     <div className="flex gap-2 mt-2 flex-wrap">
                                       {event.badges.map((badge, i) => (
-                                        <Badge key={i} variant="outline" className="text-xs">
+                                        <Badge 
+                                          key={i} 
+                                          variant="outline" 
+                                          className={`text-xs ${event.badgeClassName || ""}`}
+                                        >
                                           {badge}
                                         </Badge>
                                       ))}
@@ -825,30 +2006,42 @@ export default function PatientDetailsPage() {
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {patient.implants?.slice(0, 4).map((implant) => (
-                        <div key={implant.id} className="border rounded-md p-4">
+                      {patient.surgeryImplants?.slice(0, 4).map((surgeryImplant) => (
+                        <div key={surgeryImplant.id} className="border rounded-md p-4">
                           <div className="flex items-center justify-between mb-3">
-                            <span className="font-medium">Site {implant.siteFdi}</span>
-                            {getStatusBadge(implant.statut)}
+                            <span className="font-medium">Site {surgeryImplant.siteFdi}</span>
+                            {getStatusBadge(surgeryImplant.statut)}
                           </div>
                           <div className="grid grid-cols-2 gap-y-2 text-sm">
                             <div>
                               <span className="text-muted-foreground text-xs">Marque:</span>
-                              <p>{implant.marque}</p>
+                              <p>{surgeryImplant.implant.marque}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground text-xs">Dimensions:</span>
-                              <p>{implant.diametre} x {implant.longueur}mm</p>
+                              <p>{surgeryImplant.implant.diametre} x {surgeryImplant.implant.longueur}mm</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground text-xs">Date pose:</span>
-                              <p>{formatDateShort(implant.datePose)}</p>
+                              <p>{formatDateShort(surgeryImplant.datePose)}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground text-xs">ISQ actuel:</span>
-                              <p className="text-primary font-medium">
-                                {implant.isq6m || implant.isq3m || implant.isq2m || implant.isqPose || "-"}
-                              </p>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-primary font-medium cursor-help underline decoration-dotted">
+                                    {surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose || "-"}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs">
+                                  <div className="space-y-1">
+                                    <p><span className="text-muted-foreground">Pose:</span> {surgeryImplant.isqPose ?? "-"}</p>
+                                    {surgeryImplant.isq2m != null && <p><span className="text-muted-foreground">2 mois:</span> {surgeryImplant.isq2m}</p>}
+                                    {surgeryImplant.isq3m != null && <p><span className="text-muted-foreground">3 mois:</span> {surgeryImplant.isq3m}</p>}
+                                    {surgeryImplant.isq6m != null && <p><span className="text-muted-foreground">6 mois:</span> {surgeryImplant.isq6m}</p>}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
                             </div>
                           </div>
                         </div>
@@ -873,11 +2066,121 @@ export default function PatientDetailsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {patient.implants?.map((implant) => (
-                <ImplantCard key={implant.id} implant={implant} patientId={patient.id} />
-              ))}
-            </div>
+            <>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center border rounded-md p-0.5">
+                    <Button
+                      variant={implantTypeFilter === "all" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setImplantTypeFilter("all")}
+                      data-testid="button-filter-all"
+                    >
+                      Tous
+                    </Button>
+                    <Button
+                      variant={implantTypeFilter === "IMPLANT" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setImplantTypeFilter("IMPLANT")}
+                      data-testid="button-filter-implants"
+                    >
+                      Implants
+                    </Button>
+                    <Button
+                      variant={implantTypeFilter === "MINI_IMPLANT" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setImplantTypeFilter("MINI_IMPLANT")}
+                      data-testid="button-filter-mini-implants"
+                    >
+                      Mini-implants
+                    </Button>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 border rounded-md p-0.5">
+                  <Button
+                    variant={implantViewMode === "table" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setImplantViewMode("table")}
+                    data-testid="button-view-table"
+                  >
+                    <LayoutList className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={implantViewMode === "cards" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setImplantViewMode("cards")}
+                    data-testid="button-view-cards"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {implantViewMode === "table" ? (
+                <Card>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border-gray bg-border-gray">
+                          {implantColumns.map((column) => (
+                            <th
+                              key={column.id}
+                              draggable
+                              onDragStart={(e) => handleImplantDragStart(e, column.id)}
+                              onDragOver={(e) => handleImplantDragOver(e, column.id)}
+                              onDrop={(e) => handleImplantDrop(e, column.id)}
+                              onDragEnd={handleImplantDragEnd}
+                              className={`px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-move select-none ${column.width || ""} ${dragOverImplantColumn === column.id ? "bg-primary/10" : ""}`}
+                            >
+                              <div className="flex items-center gap-1">
+                                <GripVertical className="h-3 w-3 opacity-40" />
+                                {column.sortable ? (
+                                  <button
+                                    onClick={() => handleImplantSort(column.id)}
+                                    className="flex items-center hover:text-foreground transition-colors"
+                                    data-testid={`button-sort-${column.id}`}
+                                  >
+                                    {column.label}
+                                    {renderImplantSortIcon(column.id)}
+                                  </button>
+                                ) : (
+                                  <span>{column.label}</span>
+                                )}
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortImplants(filteredSurgeryImplants).map((surgeryImplant) => (
+                          <tr
+                            key={surgeryImplant.id}
+                            className="border-b last:border-b-0 hover-elevate cursor-pointer"
+                            onClick={() => window.location.href = `/patients/${patient.id}/implants/${surgeryImplant.id}`}
+                            data-testid={`row-implant-${surgeryImplant.id}`}
+                          >
+                            {implantColumns.map((column) => (
+                              <td key={column.id} className={`px-4 py-3 ${column.width || ""}`}>
+                                {renderImplantCellContent(column.id, surgeryImplant)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredSurgeryImplants.map((surgeryImplant) => (
+                    <ImplantCard key={surgeryImplant.id} surgeryImplant={surgeryImplant} patientId={patient.id} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
 
@@ -887,7 +2190,7 @@ export default function PatientDetailsPage() {
               <SheetTrigger asChild>
                 <Button data-testid="button-new-operation">
                   <Plus className="h-4 w-4 mr-2" />
-                  Nouvelle opération
+                  Nouvel acte
                 </Button>
               </SheetTrigger>
               <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
@@ -915,60 +2218,56 @@ export default function PatientDetailsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
-              {patient.operations?.map((operation) => (
-                <Card key={operation.id} data-testid={`card-operation-${operation.id}`}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <CardTitle className="text-base">
-                          {getInterventionLabel(operation.typeIntervention)}
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(operation.dateOperation)}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="font-mono">
-                        {operation.implants?.length || 0} implant{(operation.implants?.length || 0) !== 1 ? "s" : ""}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-2">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      {operation.typeChirurgieTemps && (
-                        <div>
-                          <span className="text-muted-foreground">Temps: </span>
-                          {operation.typeChirurgieTemps === "UN_TEMPS" ? "1 temps" : "2 temps"}
-                        </div>
-                      )}
-                      {operation.typeChirurgieApproche && (
-                        <div>
-                          <span className="text-muted-foreground">Approche: </span>
-                          {operation.typeChirurgieApproche === "LAMBEAU" ? "Lambeau" : "Flapless"}
-                        </div>
-                      )}
-                      {operation.typeMiseEnCharge && (
-                        <div>
-                          <span className="text-muted-foreground">Mise en charge: </span>
-                          {operation.typeMiseEnCharge.charAt(0) + operation.typeMiseEnCharge.slice(1).toLowerCase()}
-                        </div>
-                      )}
-                      {operation.greffeOsseuse && (
-                        <div>
-                          <span className="text-muted-foreground">Greffe: </span>
-                          {operation.typeGreffe || "Oui"}
-                        </div>
-                      )}
-                    </div>
-                    {operation.notesPerop && (
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-xs text-muted-foreground uppercase mb-1">Notes per-op</p>
-                        <p className="text-sm">{operation.notesPerop}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border-gray bg-border-gray">
+                      {operationColumns.map((column) => (
+                        <th
+                          key={column.id}
+                          className={`text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider ${column.width || ""} ${dragOverOperationColumn === column.id ? "bg-primary/10" : ""}`}
+                          draggable
+                          onDragStart={(e) => handleOperationDragStart(e, column.id)}
+                          onDragOver={(e) => handleOperationDragOver(e, column.id)}
+                          onDragEnd={handleOperationDragEnd}
+                          onDrop={(e) => handleOperationDrop(e, column.id)}
+                        >
+                          <div className="flex items-center gap-1 cursor-grab active:cursor-grabbing">
+                            <GripVertical className="h-3 w-3 opacity-40" />
+                            <button
+                              onClick={() => column.sortable && handleOperationSort(column.id)}
+                              className="flex items-center hover:text-foreground transition-colors"
+                              data-testid={`sort-operation-${column.id}`}
+                            >
+                              {column.label}
+                              {column.sortable && renderOperationSortIcon(column.id)}
+                            </button>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getSortedOperations(patient.operations || []).map((operation) => (
+                      <tr
+                        key={operation.id}
+                        className="border-b border-border-gray/50 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                        data-testid={`row-operation-${operation.id}`}
+                        onClick={() => {
+                          window.location.href = `/patients/${patient.id}/operations/${operation.id}`;
+                        }}
+                      >
+                        {operationColumns.map((column) => (
+                          <td key={column.id} className="px-4 py-3">
+                            {renderOperationCellContent(column.id, operation)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </TabsContent>
@@ -977,7 +2276,7 @@ export default function PatientDetailsPage() {
           <div className="flex justify-end">
             <Sheet open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" data-testid="button-new-radio">
+                <Button data-testid="button-new-radio">
                   <Plus className="h-4 w-4 mr-2" />
                   Ajouter une radio
                 </Button>
@@ -990,7 +2289,7 @@ export default function PatientDetailsPage() {
                   <RadioUploadForm
                     patientId={patient.id}
                     operations={patient.operations || []}
-                    implants={patient.implants || []}
+                    surgeryImplants={patient.surgeryImplants || []}
                     onSuccess={() => setRadioDialogOpen(false)}
                   />
                 </div>
@@ -1009,38 +2308,434 @@ export default function PatientDetailsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {patient.radios?.map((radio) => (
-                <RadioCard key={radio.id} radio={radio} />
+                <RadioCard key={radio.id} radio={radio} patientId={patient.id} />
               ))}
             </div>
           )}
         </TabsContent>
 
-        <TabsContent value="visits" className="mt-4 space-y-4">
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Stethoscope className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Suivi & Visites</h3>
-              <p className="text-sm text-muted-foreground">
-                Les visites de suivi apparaîtront ici
-              </p>
-            </CardContent>
-          </Card>
+        <TabsContent value="documents" className="mt-4 space-y-4">
+          <div className="flex justify-end">
+            <Sheet open={docDialogOpen} onOpenChange={setDocDialogOpen}>
+              <SheetTrigger asChild>
+                <Button data-testid="button-new-document">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter un document
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Ajouter un document</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6">
+                  <DocumentUploadForm
+                    patientId={patient.id}
+                    onSuccess={() => setDocDialogOpen(false)}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {documentsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : !documents || documents.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Aucun document</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Ajoutez des documents PDF pour ce patient (devis, consentements, etc.)
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {documents.map((doc) => (
+                <DocumentCard key={doc.id} document={doc} patientId={patient.id} />
+              ))}
+            </div>
+          )}
         </TabsContent>
 
-        <TabsContent value="notes" className="mt-4 space-y-4">
+        <TabsContent value="visits" className="mt-4 space-y-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="text-lg font-semibold">Rendez-vous</h2>
+            <Sheet open={appointmentDialogOpen} onOpenChange={setAppointmentDialogOpen}>
+              <SheetTrigger asChild>
+                <Button data-testid="button-new-appointment">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nouveau rendez-vous
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-white dark:bg-zinc-900">
+                <SheetHeader>
+                  <SheetTitle>Nouveau rendez-vous</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6">
+                  <AppointmentForm
+                    patientId={patient.id}
+                    onSuccess={() => setAppointmentDialogOpen(false)}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {appointmentsLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : appointments.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Aucun rendez-vous</h3>
+                <p className="text-sm text-muted-foreground">
+                  Ajoutez un rendez-vous pour ce patient
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {upcomingAppointments.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-base font-medium text-muted-foreground">Rendez-vous a venir</h3>
+                  <div className="space-y-3">
+                    {upcomingAppointments.map((appointment) => (
+                      <AppointmentCard
+                        key={appointment.id}
+                        appointment={appointment}
+                        patientId={patient.id}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {completedAppointments.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-base font-medium text-muted-foreground">Historique</h3>
+                  <div className="space-y-3">
+                    {completedAppointments.map((appointment) => (
+                      <AppointmentCard
+                        key={appointment.id}
+                        appointment={appointment}
+                        patientId={patient.id}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="notes" className="mt-4 space-y-6">
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Notes</h3>
-              <p className="text-sm text-muted-foreground">
-                Aucune note pour ce patient
-              </p>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium">Ajouter une note</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {(["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"] as const).map((tag) => {
+                  const config = getTagConfig(tag);
+                  return (
+                    <Button
+                      key={tag}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                      className={`${selectedTag === tag ? config?.className : ""} ${selectedTag === tag ? "ring-2 ring-primary" : ""}`}
+                      data-testid={`button-tag-${tag.toLowerCase()}`}
+                    >
+                      {config?.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="note-content">Note</Label>
+                <Textarea
+                  id="note-content"
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  placeholder="Saisissez votre note ici..."
+                  rows={4}
+                  data-testid="input-note-content"
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button 
+                  onClick={handleAddNote} 
+                  disabled={!noteContent.trim() || createNoteMutation.isPending}
+                  data-testid="button-add-note"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter la note
+                </Button>
+              </div>
             </CardContent>
           </Card>
+
+          <div className="space-y-4">
+            <h3 className="text-base font-semibold">Historique</h3>
+            {notesLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-32 w-full" />
+                ))}
+              </div>
+            ) : (() => {
+              const allImplantFlagsFlat = Object.values(implantFlagsById).flat();
+              const allFlags = [...patientFlags, ...allImplantFlagsFlat];
+              
+              type TimelineItem = 
+                | { type: "note"; data: NoteWithUser; date: Date }
+                | { type: "flag"; data: Flag; date: Date };
+              
+              const timelineItems: TimelineItem[] = [
+                ...patientNotes.map(note => ({
+                  type: "note" as const,
+                  data: note,
+                  date: new Date(note.createdAt),
+                })),
+                ...allFlags.map(flag => ({
+                  type: "flag" as const,
+                  data: flag,
+                  date: new Date(flag.createdAt),
+                })),
+              ].sort((a, b) => b.date.getTime() - a.date.getTime());
+              
+              if (timelineItems.length === 0) {
+                return (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
+                      <p className="text-sm text-muted-foreground">
+                        Aucune note ou alerte pour ce patient
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              
+              const levelConfig: Record<string, { label: string; className: string; bgClassName: string }> = {
+                CRITICAL: { label: "Critique", className: "text-red-500", bgClassName: "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800" },
+                WARNING: { label: "Attention", className: "text-orange-500", bgClassName: "bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800" },
+                INFO: { label: "Info", className: "text-blue-500", bgClassName: "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800" },
+              };
+              
+              return (
+                <div className="space-y-4">
+                  {timelineItems.map((item, idx) => {
+                    if (item.type === "note") {
+                      const note = item.data;
+                      const tagConfig = getTagConfig(note.tag as any);
+                      const authorName = note.user.prenom && note.user.nom 
+                        ? `${note.user.prenom.charAt(0)}. ${note.user.nom}`
+                        : note.user.nom || "Utilisateur";
+                      
+                      return (
+                        <Card key={`note-${note.id}`} data-testid={`card-note-${note.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium text-sm">{authorName}</span>
+                                  {tagConfig && (
+                                    <Badge variant="secondary" className={`text-xs ${tagConfig.className}`}>
+                                      {tagConfig.label}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-3">
+                                  {formatNoteDatetime(note.createdAt)}
+                                </p>
+                                <p className="text-sm text-foreground whitespace-pre-wrap">
+                                  {note.contenu}
+                                </p>
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="shrink-0" data-testid={`button-note-menu-${note.id}`}>
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="bg-white dark:bg-zinc-900">
+                                  <DropdownMenuItem onClick={() => setEditingNote(note)} data-testid={`button-edit-note-${note.id}`}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Modifier
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => setDeleteNoteId(note.id)} 
+                                    className="text-destructive"
+                                    data-testid={`button-delete-note-${note.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Supprimer
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    } else {
+                      const flag = item.data;
+                      const config = levelConfig[flag.level] || levelConfig.INFO;
+                      
+                      return (
+                        <Card key={`flag-${flag.id}`} className={`border ${config.bgClassName}`} data-testid={`card-flag-${flag.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <AlertTriangle className={`h-4 w-4 mt-0.5 ${config.className}`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="secondary" className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                                    Alerte
+                                  </Badge>
+                                  <Badge variant="secondary" className={`text-xs ${
+                                    flag.level === "CRITICAL" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200" :
+                                    flag.level === "WARNING" ? "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200" :
+                                    "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                                  }`}>
+                                    {config.label}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  {formatNoteDatetime(flag.createdAt)}
+                                </p>
+                                <p className="font-medium text-sm">{flag.label}</p>
+                                {flag.description && (
+                                  <p className="text-sm text-muted-foreground mt-1">{flag.description}</p>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    }
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+
+          <Sheet open={!!editingNote} onOpenChange={(open) => !open && setEditingNote(null)}>
+            <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-white dark:bg-zinc-900">
+              <SheetHeader>
+                <SheetTitle>Modifier la note</SheetTitle>
+              </SheetHeader>
+              {editingNote && (
+                <div className="mt-6 space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {(["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"] as const).map((tag) => {
+                      const config = getTagConfig(tag);
+                      return (
+                        <Button
+                          key={tag}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingNote({ ...editingNote, tag: editingNote.tag === tag ? null : tag })}
+                          className={`${editingNote.tag === tag ? config?.className : ""} ${editingNote.tag === tag ? "ring-2 ring-primary" : ""}`}
+                        >
+                          {config?.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-note-content">Note</Label>
+                    <Textarea
+                      id="edit-note-content"
+                      value={editingNote.contenu}
+                      onChange={(e) => setEditingNote({ ...editingNote, contenu: e.target.value })}
+                      rows={6}
+                      data-testid="input-edit-note-content"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button variant="outline" onClick={() => setEditingNote(null)}>
+                      Annuler
+                    </Button>
+                    <Button onClick={handleUpdateNote} disabled={updateNoteMutation.isPending} data-testid="button-save-note">
+                      Enregistrer
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </SheetContent>
+          </Sheet>
+
+          <AlertDialog open={!!deleteNoteId} onOpenChange={(open) => !open && setDeleteNoteId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Supprimer la note</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Êtes-vous sûr de vouloir supprimer cette note ? Cette action est irréversible.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteNoteId && deleteNoteMutation.mutate(deleteNoteId)}
+                  className="bg-primary text-primary-foreground"
+                  data-testid="button-confirm-delete-note"
+                >
+                  Supprimer
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog aperçu radio depuis timeline */}
+      <Dialog open={!!timelineRadioViewerId} onOpenChange={(open) => !open && setTimelineRadioViewerId(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
+          {(() => {
+            const radio = patient.radios?.find(r => r.id === timelineRadioViewerId);
+            if (!radio) return null;
+            return (
+              <>
+                <DialogHeader className="p-4 border-b">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <DialogTitle className="flex items-center gap-2">
+                        <span>{radio.title || getRadioLabel(radio.type)}</span>
+                        <Badge variant="secondary">{getRadioLabel(radio.type)}</Badge>
+                      </DialogTitle>
+                      <DialogDescription className="text-sm text-muted-foreground">
+                        {formatDateShort(new Date(radio.date))}
+                      </DialogDescription>
+                    </div>
+                  </div>
+                </DialogHeader>
+                <div className="flex-1 overflow-auto bg-black/90 flex items-center justify-center min-h-[60vh]">
+                  {(radio as any).signedUrl || radio.url ? (
+                    <img
+                      src={(radio as any).signedUrl || radio.url}
+                      alt={radio.title || getRadioLabel(radio.type)}
+                      className="max-w-full max-h-[80vh] object-contain"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      <FileImage className="h-24 w-24 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

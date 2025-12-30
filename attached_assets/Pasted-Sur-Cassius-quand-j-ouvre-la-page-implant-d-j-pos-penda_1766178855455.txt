@@ -1,0 +1,62 @@
+Sur Cassius, quand j’ouvre la page “implant déjà posé”, pendant le chargement la sidebar et la topbar disparaissent puis reviennent. Il n’y a pas de skeleton ni loader. Je veux une UX fluide : le layout doit rester stable et le contenu doit charger de façon progressive.
+
+Objectif
+
+Rendre la sidebar + topbar persistantes (App Shell)
+
+Ajouter un loader/skeleton pour la page implant (et idéalement des loaders réutilisables)
+
+Empêcher tout “layout flicker” pendant les fetchs
+
+À implémenter
+
+App Shell persistant
+
+Créer/garantir un composant AppLayout qui contient Sidebar, Topbar, et une zone Main pour les pages.
+
+Sidebar et Topbar ne doivent jamais dépendre des fetchs de données de la page implant.
+
+Le router doit rendre la page implant via un Outlet (ou équivalent) dans Main.
+
+Loading state local (interdit de démonter le layout)
+
+Dans la page implant, remplacer tout return null ou fallback global par :
+
+Main affiche un loader/skeleton pendant le fetch,
+
+puis affiche la page complète une fois les données prêtes.
+
+Interdiction de mettre un <Suspense fallback=...> au niveau du layout/routing principal si cela masque sidebar/topbar.
+
+Skeleton minimal (v1)
+Créer un composant ImplantPageSkeleton affiché pendant le chargement :
+
+un titre (barre grise)
+
+2–3 cards (rectangles)
+
+un bloc “timeline/ISQ” en placeholder
+
+un bloc “documents/radios” en placeholder
+Le skeleton doit conserver les dimensions globales pour éviter les sauts de layout.
+
+Loader global non bloquant (optionnel mais recommandé)
+Ajouter une petite barre de chargement en haut de Main (ou sous la topbar) lors des navigations/fetchs, sans masquer l’UI.
+
+CSS/structure
+
+S’assurer que la structure AppLayout garde un min-height: 100vh
+
+Le layout grid/flex ne doit pas être conditionnel
+
+Main ne doit pas disparaître, seulement son contenu
+
+Acceptance criteria
+
+En naviguant vers la page implant : sidebar + topbar restent visibles en permanence.
+
+Pendant chargement : skeleton visible immédiatement (< 100ms), aucun écran blanc.
+
+Après chargement : affichage stable, pas de “flash” ni reflow important.
+
+Pas d’erreurs console liées à unmounted components / race conditions.

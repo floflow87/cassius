@@ -1,256 +1,625 @@
-import { useState } from "react";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { Activity, Search, Filter, ChevronRight, X } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { 
+  Plus, 
+  Search, 
+  Activity,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
+  Trash2,
+  X,
+} from "lucide-react";
+import { ImplantsAdvancedFilterDrawer, ImplantFilterChips, type ImplantFilterGroup } from "@/components/implants-advanced-filter-drawer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CatalogImplantsListSkeleton } from "@/components/page-skeletons";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { Implant, Patient } from "@shared/schema";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
+import { ImplantForm } from "@/components/implant-form";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { ImplantWithStats } from "@shared/schema";
 
-interface ImplantWithPatient extends Implant {
-  patient?: Patient;
+type SortDirection = "asc" | "desc" | null;
+type ColumnId = "marqueRef" | "dimensions" | "poseCount" | "successRate";
+
+interface ColumnConfig {
+  id: ColumnId;
+  label: string;
+  width?: string;
+  sortable: boolean;
 }
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  EN_SUIVI: { label: "En suivi", variant: "secondary" },
-  SUCCES: { label: "Succès", variant: "default" },
-  COMPLICATION: { label: "Complication", variant: "outline" },
-  ECHEC: { label: "Échec", variant: "destructive" },
+const columnWidths: Record<ColumnId, string> = {
+  marqueRef: "w-[30%]",
+  dimensions: "w-[25%]",
+  poseCount: "w-[22%]",
+  successRate: "w-[23%]",
 };
 
-const boneTypes = ["D1", "D2", "D3", "D4"];
-const statuses = ["EN_SUIVI", "SUCCES", "COMPLICATION", "ECHEC"];
+const defaultColumns: ColumnConfig[] = [
+  { id: "marqueRef", label: "Marque & Référence", sortable: true },
+  { id: "dimensions", label: "Diamètre × Longueur", sortable: true },
+  { id: "poseCount", label: "Nb de poses", sortable: true },
+  { id: "successRate", label: "Réussite moyenne", sortable: true },
+];
 
-export default function ImplantsPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
-  const [selectedBoneType, setSelectedBoneType] = useState<string>("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("");
-  const [selectedSite, setSelectedSite] = useState<string>("");
+const STORAGE_KEY_COLUMNS = "cassius_implants_columns_order";
+const STORAGE_KEY_SORT = "cassius_implants_sort";
 
-  const buildQueryString = () => {
-    const params = new URLSearchParams();
-    if (selectedBrand) params.set("marque", selectedBrand);
-    if (selectedBoneType) params.set("typeOs", selectedBoneType);
-    if (selectedStatus) params.set("statut", selectedStatus);
-    if (selectedSite) params.set("siteFdi", selectedSite);
-    return params.toString();
-  };
+interface ImplantsPageProps {
+  searchQuery?: string;
+  setSearchQuery?: (query: string) => void;
+}
 
-  const { data: implants, isLoading } = useQuery<ImplantWithPatient[]>({
-    queryKey: ["/api/implants", selectedBrand, selectedBoneType, selectedStatus, selectedSite],
+export default function ImplantsPage({ searchQuery: externalSearchQuery, setSearchQuery: externalSetSearchQuery }: ImplantsPageProps) {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [implantType, setImplantType] = useState<"implants" | "mini">("implants");
+  const [internalSearchQuery, setInternalSearchQuery] = useState("");
+  const searchQuery = externalSearchQuery ?? internalSearchQuery;
+  const setSearchQuery = externalSetSearchQuery ?? setInternalSearchQuery;
+  const itemsPerPage = 20;
+  
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<ImplantFilterGroup | null>(null);
+
+  const [columns, setColumns] = useState<ColumnConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_COLUMNS);
+      if (saved) {
+        const savedOrder = JSON.parse(saved) as ColumnId[];
+        const validIds = new Set(defaultColumns.map(c => c.id));
+        const validSavedOrder = savedOrder.filter(id => validIds.has(id));
+        if (validSavedOrder.length === defaultColumns.length) {
+          return validSavedOrder.map(id => defaultColumns.find(c => c.id === id)!);
+        }
+      }
+    } catch {}
+    localStorage.removeItem(STORAGE_KEY_COLUMNS);
+    return defaultColumns;
+  });
+
+  const [sortColumn, setSortColumn] = useState<ColumnId | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SORT);
+      if (saved) {
+        const { column } = JSON.parse(saved);
+        const validIds = new Set(defaultColumns.map(c => c.id));
+        if (validIds.has(column)) {
+          return column;
+        }
+      }
+    } catch {}
+    localStorage.removeItem(STORAGE_KEY_SORT);
+    return null;
+  });
+
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SORT);
+      if (saved) {
+        const { direction } = JSON.parse(saved);
+        return direction;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [draggedColumn, setDraggedColumn] = useState<ColumnId | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<ColumnId | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_COLUMNS, JSON.stringify(columns.map(c => c.id)));
+  }, [columns]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SORT, JSON.stringify({ column: sortColumn, direction: sortDirection }));
+  }, [sortColumn, sortDirection]);
+
+  const { data: implants, isLoading } = useQuery<ImplantWithStats[]>({
+    queryKey: ["/api/implants", implantType, advancedFilters ? JSON.stringify(advancedFilters) : null],
     queryFn: async () => {
-      const qs = buildQueryString();
-      const response = await fetch(`/api/implants${qs ? `?${qs}` : ""}`);
-      if (!response.ok) throw new Error("Failed to fetch implants");
-      return response.json();
+      if (advancedFilters && advancedFilters.rules.length > 0) {
+        const typeImplantValue = implantType === "implants" ? "IMPLANT" : "MINI_IMPLANT";
+        const res = await fetch("/api/catalog-implants/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ filters: advancedFilters, typeImplant: typeImplantValue }),
+        });
+        if (!res.ok) throw new Error("Failed to search implants");
+        return res.json();
+      }
+      const res = await fetch("/api/implants", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch implants");
+      return res.json();
     },
   });
 
-  const { data: brands } = useQuery<string[]>({
-    queryKey: ["/api/implants/brands"],
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results: { id: string; success: boolean }[] = [];
+      for (const id of ids) {
+        try {
+          await apiRequest("DELETE", `/api/catalog-implants/${id}`);
+          results.push({ id, success: true });
+        } catch {
+          results.push({ id, success: false });
+        }
+      }
+      return results;
+    },
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
+      const successCount = results.filter(r => r.success).length;
+      const failedCount = results.filter(r => !r.success).length;
+      const successIds = new Set(results.filter(r => r.success).map(r => r.id));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        successIds.forEach(id => next.delete(id));
+        return next;
+      });
+      setShowBulkDeleteDialog(false);
+      if (failedCount === 0) {
+        toast({
+          title: "Implants supprimés",
+          description: `${successCount} implant(s) supprimé(s) avec succès.`,
+          variant: "success",
+        });
+      } else if (successCount === 0) {
+        toast({
+          title: "Erreur",
+          description: "Aucun implant n'a pu être supprimé. Ces implants sont peut-être utilisés dans des interventions.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Suppression partielle",
+          description: `${successCount} implant(s) supprimé(s), ${failedCount} échec(s).`,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
+      toast({
+        title: "Erreur",
+        description: "Une erreur inattendue s'est produite.",
+        variant: "destructive",
+      });
+    },
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const filteredImplants = implants?.filter((implant) => {
-    if (!searchTerm) return true;
-    const query = searchTerm.toLowerCase();
+    const expectedType = implantType === "mini" ? "MINI_IMPLANT" : "IMPLANT";
+    if (implant.typeImplant && implant.typeImplant !== expectedType) {
+      return false;
+    }
+    if (!implant.typeImplant && implantType === "mini") {
+      return false;
+    }
+    
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
     return (
       implant.marque.toLowerCase().includes(query) ||
-      implant.siteFdi.toLowerCase().includes(query) ||
-      implant.patient?.nom.toLowerCase().includes(query) ||
-      implant.patient?.prenom.toLowerCase().includes(query) ||
       implant.referenceFabricant?.toLowerCase().includes(query)
     );
-  });
+  }) || [];
 
-  const hasActiveFilters = selectedBrand || selectedBoneType || selectedStatus || selectedSite;
+  const sortImplants = useCallback((implantsToSort: ImplantWithStats[]) => {
+    if (!sortColumn || !sortDirection) return implantsToSort;
 
-  const clearFilters = () => {
-    setSelectedBrand("");
-    setSelectedBoneType("");
-    setSelectedStatus("");
-    setSelectedSite("");
-    setSearchTerm("");
-  };
+    return [...implantsToSort].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortColumn) {
+        case "marqueRef":
+          comparison = a.marque.localeCompare(b.marque);
+          break;
+        case "dimensions":
+          comparison = (a.diametre * 100 + a.longueur) - (b.diametre * 100 + b.longueur);
+          break;
+        case "poseCount":
+          comparison = a.poseCount - b.poseCount;
+          break;
+        case "successRate":
+          comparison = (a.successRate ?? 0) - (b.successRate ?? 0);
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      return sortDirection === "desc" ? -comparison : comparison;
+    });
+  }, [sortColumn, sortDirection]);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+  const sortedImplants = sortImplants(filteredImplants);
+  const totalImplants = sortedImplants.length;
+  const totalPages = Math.ceil(totalImplants / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedImplants = sortedImplants.slice(startIndex, startIndex + itemsPerPage);
+
+  const currentPageIds = paginatedImplants.map(i => i.id);
+  const allCurrentPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selectedIds.has(id));
+  const someCurrentPageSelected = currentPageIds.some(id => selectedIds.has(id));
+
+  const handleSelectRow = (id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
     });
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) {
+        currentPageIds.forEach(id => next.add(id));
+      } else {
+        currentPageIds.forEach(id => next.delete(id));
+      }
+      return next;
+    });
+  };
+
+  const handleSort = (columnId: ColumnId) => {
+    if (sortColumn === columnId) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortColumn(null);
+        setSortDirection(null);
+      }
+    } else {
+      setSortColumn(columnId);
+      setSortDirection("asc");
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, columnId: ColumnId) => {
+    setDraggedColumn(columnId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, columnId: ColumnId) => {
+    e.preventDefault();
+    if (draggedColumn && draggedColumn !== columnId) {
+      setDragOverColumn(columnId);
+    }
+  };
+
+  const handleDragEnd = () => {
+    if (draggedColumn && dragOverColumn) {
+      const newColumns = [...columns];
+      const draggedIndex = newColumns.findIndex(c => c.id === draggedColumn);
+      const dropIndex = newColumns.findIndex(c => c.id === dragOverColumn);
+      
+      if (draggedIndex !== -1 && dropIndex !== -1) {
+        const [removed] = newColumns.splice(draggedIndex, 1);
+        newColumns.splice(dropIndex, 0, removed);
+        setColumns(newColumns);
+      }
+    }
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+  };
+
+  const renderSortIcon = (columnId: ColumnId) => {
+    if (sortColumn !== columnId) {
+      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
+    }
+    if (sortDirection === "asc") {
+      return <ArrowUp className="h-3 w-3 ml-1" />;
+    }
+    return <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
+  const renderCellContent = (columnId: ColumnId, implant: ImplantWithStats) => {
+    switch (columnId) {
+      case "marqueRef":
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center shrink-0">
+              <Activity className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-foreground">
+                {implant.marque}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Réf: {implant.referenceFabricant || "-"}
+              </span>
+            </div>
+          </div>
+        );
+      case "dimensions":
+        return (
+          <span className="text-sm text-muted-foreground">
+            {implant.diametre} × {implant.longueur} mm
+          </span>
+        );
+      case "poseCount":
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-foreground">
+              {implant.poseCount}
+            </span>
+            {implant.lastPoseDate && (
+              <span className="text-xs text-muted-foreground">
+                {new Date(implant.lastPoseDate).toLocaleDateString('fr-FR')}
+              </span>
+            )}
+          </div>
+        );
+      case "successRate":
+        if (implant.successRate === null) {
+          return <span className="text-sm text-muted-foreground">-</span>;
+        }
+        const rate = implant.successRate;
+        const colorClass = rate >= 90 ? "text-green-600" : rate >= 70 ? "text-yellow-600" : "text-red-600";
+        return (
+          <Badge variant="outline" className={colorClass}>
+            {rate.toFixed(1)}%
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
+
   if (isLoading) {
-    return (
-      <div className="p-6 space-y-4">
-        <div className="flex items-center justify-between mb-6">
-          <Skeleton className="h-8 w-32" />
-        </div>
-        <div className="flex gap-3 flex-wrap">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-9 w-32" />
-          ))}
-        </div>
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-24 w-full" />
-        ))}
-      </div>
-    );
+    return <CatalogImplantsListSkeleton />;
   }
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Implants</h1>
-        <p className="text-sm text-muted-foreground">
-          {filteredImplants?.length || 0} implant{(filteredImplants?.length || 0) !== 1 ? "s" : ""}
-        </p>
-      </div>
+      <div className="flex items-center gap-4 mb-5">
+        <CassiusSearchInput
+          placeholder="Rechercher par marque ou reference..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          icon={<Search className="h-4 w-4" />}
+          className="max-w-2xl"
+          data-testid="input-search-implants"
+        />
+        
+        <ImplantsAdvancedFilterDrawer
+          filters={advancedFilters}
+          onFiltersChange={setAdvancedFilters}
+          activeFilterCount={advancedFilters?.rules.length || 0}
+        />
 
-      <div className="mb-6 space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-              data-testid="input-search-implants"
-            />
-          </div>
-          <Filter className="h-4 w-4 text-muted-foreground" />
-        </div>
-
-        <div className="flex gap-3 flex-wrap">
-          <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-            <SelectTrigger className="w-40" data-testid="select-brand">
-              <SelectValue placeholder="Marque" />
-            </SelectTrigger>
-            <SelectContent>
-              {brands?.map((brand) => (
-                <SelectItem key={brand} value={brand}>
-                  {brand}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedBoneType} onValueChange={setSelectedBoneType}>
-            <SelectTrigger className="w-32" data-testid="select-bone-type">
-              <SelectValue placeholder="Type d'os" />
-            </SelectTrigger>
-            <SelectContent>
-              {boneTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-36" data-testid="select-status">
-              <SelectValue placeholder="Statut" />
-            </SelectTrigger>
-            <SelectContent>
-              {statuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {statusConfig[status]?.label || status}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Input
-            placeholder="Site FDI"
-            value={selectedSite}
-            onChange={(e) => setSelectedSite(e.target.value)}
-            className="w-28"
-            data-testid="input-site-fdi"
-          />
-
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
-              <X className="h-4 w-4 mr-1" />
-              Effacer
+        {selectedIds.size > 0 && (
+          <>
+            <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowBulkDeleteDialog(true)}
+              disabled={bulkDeleteMutation.isPending}
+              data-testid="button-bulk-delete"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Supprimer
             </Button>
-          )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedIds(new Set())}
+              data-testid="button-clear-selection"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Annuler
+            </Button>
+          </>
+        )}
+        
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetTrigger asChild>
+            <Button className="gap-2 shrink-0" data-testid="button-new-implant">
+              <Plus className="h-4 w-4" />
+              Nouvel implant
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="w-[540px] sm:max-w-[540px] overflow-y-auto bg-white dark:bg-gray-950">
+            <SheetHeader className="mb-6">
+              <SheetTitle>Nouvel implant</SheetTitle>
+              <p className="text-sm text-muted-foreground">
+                Ajoutez un implant au catalogue produit
+              </p>
+            </SheetHeader>
+            <ImplantForm 
+              onSuccess={() => {
+                setSheetOpen(false);
+                queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
+              }} 
+            />
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <Tabs value={implantType} onValueChange={(v) => setImplantType(v as "implants" | "mini")}>
+            <TabsList>
+              <TabsTrigger value="implants" data-testid="tab-implants">Implants</TabsTrigger>
+              <TabsTrigger value="mini" data-testid="tab-mini-implants">Mini-implants</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <span className="text-sm text-muted-foreground">{totalImplants} implant{totalImplants > 1 ? "s" : ""}</span>
+        </div>
+
+        <ImplantFilterChips
+          filters={advancedFilters}
+          onRemoveFilter={(ruleId) => {
+            if (!advancedFilters) return;
+            const updatedRules = advancedFilters.rules.filter(r => r.id !== ruleId);
+            if (updatedRules.length === 0) {
+              setAdvancedFilters(null);
+            } else {
+              setAdvancedFilters({ ...advancedFilters, rules: updatedRules });
+            }
+          }}
+          onClearAll={() => setAdvancedFilters(null)}
+        />
+      </div>
+
+      <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border-gray bg-border-gray">
+                <th className="w-12 px-4 py-2">
+                  <Checkbox
+                    checked={allCurrentPageSelected ? true : someCurrentPageSelected ? "indeterminate" : false}
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                    data-testid="checkbox-select-all-header"
+                  />
+                </th>
+                {columns.map((column) => (
+                  <th
+                    key={column.id}
+                    className={`text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider ${columnWidths[column.id]} ${dragOverColumn === column.id ? "bg-primary/10" : ""}`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, column.id)}
+                    onDragOver={(e) => handleDragOver(e, column.id)}
+                    onDragEnd={handleDragEnd}
+                    onDrop={handleDragEnd}
+                  >
+                    <div className="flex items-center gap-1 cursor-grab active:cursor-grabbing">
+                      <GripVertical className="h-3 w-3 opacity-40" />
+                      <button
+                        onClick={() => column.sortable && handleSort(column.id)}
+                        className="flex items-center hover:text-foreground transition-colors"
+                        data-testid={`sort-${column.id}`}
+                      >
+                        {column.label}
+                        {column.sortable && renderSortIcon(column.id)}
+                      </button>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedImplants.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 1} className="px-4 py-16">
+                    <div className="flex flex-col items-center justify-center">
+                      <Activity className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                      <h3 className="text-base font-medium mb-2 text-foreground">Aucun implant</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {searchQuery
+                          ? "Aucun implant ne correspond a votre recherche"
+                          : "Commencez par ajouter votre premier implant au catalogue"}
+                      </p>
+                      {!searchQuery && (
+                        <Button onClick={() => setSheetOpen(true)} data-testid="button-add-first-implant">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Ajouter un implant
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedImplants.map((implant) => (
+                  <tr 
+                    key={implant.id} 
+                    className={`border-b border-border-gray hover-elevate cursor-pointer ${selectedIds.has(implant.id) ? "bg-muted/50" : ""}`}
+                    onClick={() => setLocation(`/implants/${implant.id}`)}
+                    data-testid={`row-implant-${implant.id}`}
+                  >
+                    <td className="px-4 py-3">
+                      <Checkbox
+                        checked={selectedIds.has(implant.id)}
+                        onCheckedChange={(checked) => handleSelectRow(implant.id, !!checked)}
+                        onClick={(e) => e.stopPropagation()}
+                        data-testid={`checkbox-implant-${implant.id}`}
+                      />
+                    </td>
+                    {columns.map((column) => (
+                      <td key={column.id} className={`px-4 py-3 ${columnWidths[column.id]}`}>
+                        {renderCellContent(column.id, implant)}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {filteredImplants?.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Activity className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Aucun implant</h3>
-            <p className="text-sm text-muted-foreground">
-              {hasActiveFilters || searchTerm
-                ? "Aucun implant ne correspond à vos critères"
-                : "Aucun implant enregistré"}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {filteredImplants?.map((implant) => {
-            const status = statusConfig[implant.statut] || statusConfig.EN_SUIVI;
-            return (
-              <Link key={implant.id} href={`/patients/${implant.patientId}/implants/${implant.id}`}>
-                <Card className="hover-elevate cursor-pointer" data-testid={`card-implant-${implant.id}`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-muted text-muted-foreground font-mono font-medium text-lg shrink-0">
-                          {implant.siteFdi}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-medium truncate">
-                              {implant.marque}
-                            </h3>
-                            <Badge variant="secondary" className="text-xs font-mono">
-                              {implant.diametre}x{implant.longueur}mm
-                            </Badge>
-                            <Badge variant={status.variant} className="text-xs">
-                              {status.label}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
-                            {implant.patient && (
-                              <span>
-                                {implant.patient.prenom} {implant.patient.nom}
-                              </span>
-                            )}
-                            <span>{formatDate(implant.datePose)}</span>
-                            {implant.typeOs && (
-                              <span className="font-mono">{implant.typeOs}</span>
-                            )}
-                            {implant.isqPose && (
-                              <span className="font-mono">ISQ: {implant.isqPose}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <div className="flex items-center justify-end mt-4">
+        <CassiusPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalImplants}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+        />
+      </div>
+
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              Voulez-vous vraiment supprimer {selectedIds.size} implant(s) du catalogue ?
+              Cette action est irréversible. Les implants utilisés dans des interventions ne pourront pas être supprimés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleteMutation.isPending} data-testid="button-cancel-delete">
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+              disabled={bulkDeleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {bulkDeleteMutation.isPending ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

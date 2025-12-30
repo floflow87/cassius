@@ -1,9 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import type { Implant } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,10 +50,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const implantSchema = z.object({
-  marque: z.string().min(1, "La marque est requise"),
-  referenceFabricant: z.string().optional(),
-  diametre: z.number().min(0.1, "Le diamètre doit être positif"),
-  longueur: z.number().min(0.1, "La longueur doit être positive"),
+  catalogImplantId: z.string().min(1, "Sélectionnez un implant du catalogue"),
   siteFdi: z.string().min(1, "Le site FDI est requis"),
   positionImplant: z.enum(["CRESTAL", "SOUS_CRESTAL", "SUPRA_CRESTAL"]).optional(),
   typeOs: z.enum(["D1", "D2", "D3", "D4"]).optional(),
@@ -71,14 +83,35 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+interface DefaultImplant {
+  catalogImplantId: string;
+  siteFdi: string;
+}
+
 interface OperationFormProps {
   patientId: string;
   onSuccess?: () => void;
+  defaultImplant?: DefaultImplant;
 }
 
-export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
+export function OperationForm({ patientId, onSuccess, defaultImplant }: OperationFormProps) {
   const { toast } = useToast();
   const [accordionValue, setAccordionValue] = useState<string[]>(["procedure"]);
+  const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
+
+  const { data: catalogImplants = [], isLoading: isCatalogLoading, isError: isCatalogError } = useQuery<Implant[]>({
+    queryKey: ["/api/implants"],
+  });
+
+  useEffect(() => {
+    if (isCatalogError) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger le catalogue d'implants. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    }
+  }, [isCatalogError, toast]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -95,6 +128,20 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
     name: "implants",
   });
 
+  useEffect(() => {
+    if (defaultImplant && defaultImplant.catalogImplantId && fields.length === 0) {
+      append({
+        catalogImplantId: defaultImplant.catalogImplantId,
+        siteFdi: defaultImplant.siteFdi,
+        positionImplant: undefined,
+        typeOs: undefined,
+        miseEnChargePrevue: undefined,
+        isqPose: undefined,
+      });
+      setAccordionValue(["procedure", "implants"]);
+    }
+  }, [defaultImplant, append, fields.length]);
+
   const watchGreffeOsseuse = form.watch("greffeOsseuse");
 
   const mutation = useMutation({
@@ -110,6 +157,7 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
       toast({
         title: "Opération créée",
         description: "L'opération a été enregistrée avec succès.",
+        variant: "success",
       });
       onSuccess?.();
     },
@@ -123,15 +171,29 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
   });
 
   const onSubmit = (data: FormData) => {
-    mutation.mutate(data);
+    console.log("Form submitted with data:", data);
+    const enrichedData = {
+      ...data,
+      implants: data.implants.map((implant) => {
+        const catalogImplant = catalogImplants.find(
+          (c) => c.id === implant.catalogImplantId
+        );
+        return {
+          ...implant,
+          marque: catalogImplant?.marque || "",
+          referenceFabricant: catalogImplant?.referenceFabricant || "",
+          diametre: catalogImplant?.diametre || 0,
+          longueur: catalogImplant?.longueur || 0,
+          lot: catalogImplant?.lot || null,
+        };
+      }),
+    };
+    mutation.mutate(enrichedData as FormData);
   };
 
   const addImplant = () => {
     append({
-      marque: "",
-      referenceFabricant: "",
-      diametre: 4.0,
-      longueur: 10,
+      catalogImplantId: "",
       siteFdi: "",
       positionImplant: undefined,
       typeOs: undefined,
@@ -141,16 +203,32 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
     setAccordionValue([...accordionValue, "implants"]);
   };
 
+  const getImplantLabel = (implant: Implant) => {
+    return `${implant.marque} ${implant.referenceFabricant || ""} - Ø${implant.diametre}mm x ${implant.longueur}mm`.trim();
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+        console.log("Form validation errors:", errors);
+        if (errors.implants) {
+          if (!accordionValue.includes("implants")) {
+            setAccordionValue([...accordionValue, "implants"]);
+          }
+          toast({
+            title: "Erreur de validation",
+            description: "Veuillez remplir tous les champs requis pour les implants (Site FDI, sélection d'implant)",
+            variant: "destructive",
+          });
+        }
+      })} className="space-y-4">
         <Accordion
           type="multiple"
           value={accordionValue}
           onValueChange={setAccordionValue}
           className="w-full"
         >
-          <AccordionItem value="procedure">
+          <AccordionItem value="procedure" className="border border-primary/20 rounded-md px-4 mb-2">
             <AccordionTrigger className="text-base font-medium">
               Procédure
             </AccordionTrigger>
@@ -266,155 +344,7 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="greffe">
-            <AccordionTrigger className="text-base font-medium">
-              Greffe osseuse
-            </AccordionTrigger>
-            <AccordionContent className="space-y-4 pt-4">
-              <FormField
-                control={form.control}
-                name="greffeOsseuse"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                    <div className="space-y-0.5">
-                      <FormLabel>Greffe osseuse réalisée</FormLabel>
-                      <FormDescription>
-                        Indiquez si une greffe a été effectuée
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        data-testid="switch-greffe"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              {watchGreffeOsseuse && (
-                <div className="grid grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="typeGreffe"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Type de greffe</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Autogène, xénogreffe..."
-                            {...field}
-                            value={field.value || ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="greffeQuantite"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Quantité</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Ex: 0.5cc"
-                            {...field}
-                            value={field.value || ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="greffeLocalisation"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Localisation</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Ex: Vestibulaire 16"
-                            {...field}
-                            value={field.value || ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem value="notes">
-            <AccordionTrigger className="text-base font-medium">
-              Notes cliniques
-            </AccordionTrigger>
-            <AccordionContent className="space-y-4 pt-4">
-              <FormField
-                control={form.control}
-                name="conditionsMedicalesPreop"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Conditions pré-opératoires</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="État général du patient, médication..."
-                        className="min-h-[80px]"
-                        {...field}
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="notesPerop"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes per-opératoires</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Déroulement de l'intervention..."
-                        className="min-h-[80px]"
-                        {...field}
-                        value={field.value || ""}
-                        data-testid="textarea-notes-perop"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="observationsPostop"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Observations post-opératoires</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Suites opératoires, recommandations..."
-                        className="min-h-[80px]"
-                        {...field}
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem value="implants">
+          <AccordionItem value="implants" className="border border-primary/20 rounded-md px-4 mb-2">
             <AccordionTrigger className="text-base font-medium">
               Implants ({fields.length})
             </AccordionTrigger>
@@ -436,40 +366,107 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name={`implants.${index}.marque`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Marque</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Straumann, Nobel..."
-                                {...field}
-                                data-testid={`input-implant-marque-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`implants.${index}.referenceFabricant`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Référence</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Réf. fabricant"
-                                {...field}
-                                value={field.value || ""}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        name={`implants.${index}.catalogImplantId`}
+                        render={({ field }) => {
+                          const selectedImplant = catalogImplants.find(
+                            (impl) => impl.id === field.value
+                          );
+                          return (
+                            <FormItem className="flex flex-col">
+                              <FormLabel>Implant du catalogue</FormLabel>
+                              <Popover
+                                open={openPopoverIndex === index}
+                                onOpenChange={(open) =>
+                                  setOpenPopoverIndex(open ? index : null)
+                                }
+                              >
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      disabled={isCatalogLoading}
+                                      className={cn(
+                                        "justify-between w-full",
+                                        !field.value && "text-muted-foreground"
+                                      )}
+                                      data-testid={`button-select-implant-${index}`}
+                                    >
+                                      {isCatalogLoading ? (
+                                        <>
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          Chargement...
+                                        </>
+                                      ) : selectedImplant ? (
+                                        <span className="truncate">{getImplantLabel(selectedImplant)}</span>
+                                      ) : (
+                                        "Sélectionner un implant"
+                                      )}
+                                      {!isCatalogLoading && (
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      )}
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[400px] p-0" align="start">
+                                  <Command>
+                                    <CommandInput placeholder="Rechercher un implant..." />
+                                    <CommandList>
+                                      {isCatalogError ? (
+                                        <div className="p-4 text-sm text-destructive text-center">
+                                          Erreur lors du chargement du catalogue
+                                        </div>
+                                      ) : catalogImplants.length === 0 ? (
+                                        <div className="p-4 text-sm text-muted-foreground text-center">
+                                          Aucun implant dans le catalogue. Ajoutez des implants dans la section Catalogue.
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <CommandEmpty>Aucun implant trouvé</CommandEmpty>
+                                          <CommandGroup>
+                                            {catalogImplants.map((implant) => (
+                                              <CommandItem
+                                                key={implant.id}
+                                                value={getImplantLabel(implant)}
+                                                onSelect={() => {
+                                                  field.onChange(implant.id);
+                                                  setOpenPopoverIndex(null);
+                                                }}
+                                                data-testid={`option-implant-${implant.id}`}
+                                              >
+                                                <Check
+                                                  className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    field.value === implant.id
+                                                      ? "opacity-100"
+                                                      : "opacity-0"
+                                                  )}
+                                                />
+                                                <div className="flex flex-col">
+                                                  <span className="font-medium">
+                                                    {implant.marque} {implant.referenceFabricant}
+                                                  </span>
+                                                  <span className="text-sm text-muted-foreground">
+                                                    Ø{implant.diametre}mm x {implant.longueur}mm
+                                                    {implant.lot && ` - Lot: ${implant.lot}`}
+                                                  </span>
+                                                </div>
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                        </>
+                                      )}
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
                       <FormField
                         control={form.control}
@@ -491,44 +488,6 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
                     </div>
 
                     <div className="grid grid-cols-4 gap-4">
-                      <FormField
-                        control={form.control}
-                        name={`implants.${index}.diametre`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Diamètre (mm)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.1"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                                data-testid={`input-implant-diametre-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`implants.${index}.longueur`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Longueur (mm)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.5"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                                data-testid={`input-implant-longueur-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                       <FormField
                         control={form.control}
                         name={`implants.${index}.positionImplant`}
@@ -640,11 +599,165 @@ export function OperationForm({ patientId, onSuccess }: OperationFormProps) {
               </Button>
             </AccordionContent>
           </AccordionItem>
+
+          <AccordionItem value="greffe" className="border border-primary/20 rounded-md px-4 mb-2">
+            <AccordionTrigger className="text-base font-medium">
+              Greffe osseuse
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pt-4">
+              <FormField
+                control={form.control}
+                name="greffeOsseuse"
+                render={({ field }) => (
+                  <FormItem 
+                    className="flex flex-row items-center justify-between rounded-lg border p-3 cursor-pointer"
+                    onClick={() => field.onChange(!field.value)}
+                  >
+                    <div className="space-y-0.5 flex items-center gap-2">
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <FormLabel className="cursor-pointer">Greffe osseuse réalisée</FormLabel>
+                        <FormDescription>
+                          Indiquez si une greffe a été effectuée
+                        </FormDescription>
+                      </div>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-greffe"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {watchGreffeOsseuse && (
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="typeGreffe"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Type de greffe</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Autogène, xénogreffe..."
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="greffeQuantite"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantité</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Ex: 0.5cc"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="greffeLocalisation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Localisation</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Ex: Vestibulaire 16"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="notes" className="border border-primary/20 rounded-md px-4 mb-2">
+            <AccordionTrigger className="text-base font-medium">
+              Notes cliniques
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pt-4">
+              <FormField
+                control={form.control}
+                name="conditionsMedicalesPreop"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Conditions pré-opératoires</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="État général du patient, médication..."
+                        className="min-h-[80px]"
+                        {...field}
+                        value={field.value || ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="notesPerop"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes per-opératoires</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Déroulement de l'intervention..."
+                        className="min-h-[80px]"
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="textarea-notes-perop"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="observationsPostop"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Observations post-opératoires</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Suites opératoires, recommandations..."
+                        className="min-h-[80px]"
+                        {...field}
+                        value={field.value || ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-operation">
-            {mutation.isPending ? "Enregistrement..." : "Enregistrer l'opération"}
+            {mutation.isPending ? "Enregistrement..." : "Enregistrer l'acte"}
           </Button>
         </div>
       </form>

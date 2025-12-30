@@ -1,0 +1,122 @@
+Continue. ✅
+On ne s’arrête pas au milieu du gué : tant que les endpoints ne renvoient pas latest_isq + top_flag/flag_count, tu ne verras toujours pas les badges/colonnes comme attendu.
+
+Voilà le prompt propre à renvoyer pour terminer ce qu’il a listé (sans te faire “tester d’abord”).
+
+⸻
+
+Prompt — Terminer la chaîne ISQ→Flags→UI (endpoints + agrégats patient)
+
+Contexte
+Tu as synchronisé flags, ajouté la sync ISQ via /api/visites, déclenché la détection des flags après ISQ, et invalidé certains caches.
+Mais l’UI ne peut pas afficher correctement les alertes tant que les endpoints ne renvoient pas :
+	•	le dernier ISQ (avec son label pose/2m/3m/6m)
+	•	le flag principal et le compteur de flags côté patient
+	•	les flags côté implants (table implants patient + implant global)
+
+Objectif
+Finaliser les “fonctionnalités restantes” immédiatement, sans pause test, pour que :
+	•	un ISQ à 54 génère un flag implant
+	•	le patient affiche un badge alerte + compteur
+	•	la colonne “Alertes/Flags” des tableaux (patients + implants) s’alimente automatiquement
+	•	les filtres par flag marchent partout
+
+⸻
+
+1) Ajouter “dernier ISQ” + “label” aux endpoints surgery-implants (obligatoire)
+
+Sur les endpoints qui retournent des implants posés (ex :
+	•	GET /api/patients/:id/implants
+	•	GET /api/surgery-implants
+	•	GET /api/surgery-implants/:id)
+
+Ajouter dans la réponse :
+	•	latest_isq_value
+	•	latest_isq_label ∈ {pose, 2m, 3m, 6m} (selon logique existante sync)
+	•	latest_isq_at
+
+⚠️ Ne pas dépendre uniquement des champs “pose/2m/3m/6m” si une table de mesures existe : déterminer le dernier ISQ par date, puis mapper le label.
+
+⸻
+
+2) Ajouter l’agrégat “alertes par patient” partout (obligatoire)
+
+Sur :
+	•	GET /api/patients (tableau patients)
+	•	GET /api/patients/summary
+	•	GET /api/patients/:id (fiche patient)
+
+Ajouter :
+	•	active_flag_count (nombre de flags actifs liés au patient, incluant flags directs patient + flags sur ses implants + flags sur ses actes)
+	•	top_flag (le plus important à afficher) :
+	•	choisir par priorité : level critical > warning > info
+	•	puis par date created_at desc
+
+Format minimal :
+
+"top_flag": { "type": "ISQ_LOW", "level": "critical", "label": "ISQ faible", "createdAt": "..." },
+"active_flag_count": 3
+
+
+⸻
+
+3) Ajouter le “flag principal” sur chaque implant dans les listes (obligatoire)
+
+Sur :
+	•	tableau implants d’un patient
+	•	tableau implants global
+
+Ajouter par implant :
+	•	top_flag
+	•	active_flag_count (optionnel mais utile pour hover)
+
+⸻
+
+4) Mettre à jour l’UI (wiring)
+	•	Colonne “Flag” :
+	•	afficher top_flag (badge coloré)
+	•	si active_flag_count > 1, afficher +N
+	•	hover → liste des autres flags (si déjà dispo via endpoint ou via call lazy)
+	•	Fiche patient :
+	•	badge principal + compteur en haut
+	•	Fiche implant :
+	•	badge principal + affichage dernier ISQ (valeur + label)
+
+⸻
+
+5) Invalidation de cache complète (important)
+
+Quand on POST/PUT/DELETE une mesure ISQ, invalider aussi :
+	•	les queries d’implants :
+	•	/api/patients/:id/implants
+	•	/api/surgery-implants
+	•	/api/surgery-implants/:id
+	•	et les détails patient :
+	•	/api/patients/:id
+
+⸻
+
+6) Tests automatisés minimum (à faire)
+
+Créer un test d’intégration simple :
+	1.	créer patient + acte + implant posé
+	2.	POST visite avec ISQ=54
+	3.	vérifier :
+
+	•	un flag implant ISQ_LOW existe et actif
+	•	GET /api/patients/summary renvoie active_flag_count >= 1 pour ce patient + top_flag.level=critical
+	•	GET /api/patients/:id/implants renvoie latest_isq_value=54 + top_flag
+
+⸻
+
+Definition of Done
+	•	Je saisis ISQ=54 → dans la même session :
+	•	l’implant affiche le dernier ISQ (valeur + label)
+	•	le patient affiche un badge alerte
+	•	les tableaux patients + implants affichent le flag principal
+	•	les filtres par flag retrouvent le patient
+
+⸻
+
+Tu peux l’envoyer tel quel.
+Et surtout : ne teste pas avant qu’il ait terminé ces 3 retours de données (latest ISQ + top_flag + flag_count). Sinon tu vas juste constater “ça marche pas” encore une fois, pour une raison purement structurelle.

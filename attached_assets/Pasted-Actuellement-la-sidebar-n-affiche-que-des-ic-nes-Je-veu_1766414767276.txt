@@ -1,0 +1,129 @@
+Actuellement, la sidebar n’affiche que des icônes. Je veux une sidebar qui puisse être :
+
+dépliée (icônes + libellés + éventuellement sections)
+
+repliée (icônes uniquement)
+avec un bouton de toggle.
+Le mode doit être déplié par défaut et le choix utilisateur doit être persistant (il doit rester identique après refresh / reconnexion).
+
+Objectifs
+
+Ajouter un mode expanded (déplié) et collapsed (replié)
+
+Sidebar expanded par défaut
+
+Persist de l’état (expanded/collapsed)
+
+UX propre :
+
+transitions fluides
+
+tooltips en mode collapsed
+
+accessibilité clavier
+
+Spécifications UX/UI
+1) Comportement par défaut
+
+Au premier chargement (aucune préférence enregistrée) → sidebar dépliée
+
+L’utilisateur peut cliquer sur un bouton “rétracter/déplier” (icône chevron)
+
+Le layout ne doit jamais disparaître lors de la navigation
+
+2) Affichage
+Mode déplié
+
+Afficher :
+
+icône
+
+libellé texte
+
+Afficher les sections (si existantes) : “Dashboard”, “Patients”, “Implants”, “Actes”, etc.
+
+Conserver la cohérence avec la topbar (marges, alignements)
+
+Mode replié
+
+Afficher :
+
+icônes uniquement
+
+Au hover sur un item : afficher un tooltip avec le libellé
+
+Les sous-menus (si présents) doivent rester accessibles (popover ou tooltip enrichi)
+
+3) Transitions
+
+Transition fluide sur largeur (ex: 180–240px déplié, 64–80px replié)
+
+Pas de reflow brutal du contenu : le Main doit s’adapter sans “saut”
+
+4) Accessibilité
+
+Toggle accessible clavier (Enter/Space)
+
+Aria :
+
+aria-expanded sur le bouton toggle
+
+Les tooltips doivent être lisibles et non bloquants
+
+Persistance de l’état (obligatoire)
+Option A (recommandée pour commencer) : LocalStorage
+
+Stocker une clé : cassius.sidebarCollapsed = "true" | "false"
+
+Au chargement :
+
+si la clé existe → appliquer
+
+sinon → expanded par défaut
+
+Architecture / Implementation
+1) Layout persistant
+
+La sidebar doit vivre dans AppLayout (layout principal)
+
+Elle ne doit pas être remount à chaque route :
+
+éviter key={pathname} sur AppLayout
+
+éviter fallback global qui démonte le layout
+
+2) State management
+
+Ajouter un state global (Context / store) :
+
+isSidebarCollapsed
+
+toggleSidebar()
+
+Initialiser le state depuis LocalStorage
+
+3) Styling
+
+Assurer que :
+
+Main prend la largeur restante
+
+la topbar ne bouge pas
+
+la sidebar garde une hauteur full (min-height: 100vh)
+
+Critères d’acceptation
+
+Par défaut : sidebar dépliée (icônes + labels)
+
+Bouton toggle : replie/déplie avec animation
+
+Après refresh : le mode choisi reste identique
+
+En mode replié :
+
+tooltips affichent les labels
+
+navigation reste utilisable
+
+Le layout ne disparaît plus pendant les chargements de pages

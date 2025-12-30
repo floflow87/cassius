@@ -1,0 +1,55 @@
+Contexte
+Nous avons maintenant flagsByPatient dans /api/patients/summary et l’affichage sur la liste patients est OK.
+Il reste toutefois à rendre l’ISQ et les flags visibles sur les implants et dans la fiche patient :
+	•	Vue d’ensemble implant (dans la fiche patient) : afficher le dernier ISQ + label (pose/2m/3m/6m)
+	•	Tableau “implants du patient” : afficher dernier ISQ + colonne Flag (top_flag + count hover)
+	•	Page détail implant : afficher dernier ISQ + badge ISQ faible si <60
+	•	S’assurer que l’ajout d’un ISQ (POST /api/visites) met à jour immédiatement ces vues (refetch/invalidation)
+
+1) Étendre les endpoints implants
+
+Mettre à jour :
+	•	GET /api/patients/:patientId/implants
+	•	GET /api/surgery-implants
+	•	GET /api/surgery-implants/:id
+
+Pour renvoyer pour chaque implant :
+	•	latest_isq_value
+	•	latest_isq_label ∈ {pose,2m,3m,6m}
+	•	latest_isq_at
+	•	top_flag (most severe active flag for this implant)
+	•	active_flag_count (optionnel)
+
+Implémentation recommandée :
+	•	latest_isq_* via subquery “last measurement by measured_at desc limit 1” (pas via champ statique)
+	•	top_flag via agrégation batched (pas N+1)
+
+2) Mettre à jour la fiche patient
+
+Sur GET /api/patients/:id (ou endpoint équivalent) ajouter :
+	•	top_flag + active_flag_count pour le patient (comme summary) afin d’afficher un badge en header de fiche
+	•	(optionnel) liste flags actifs pour le drawer détail
+
+3) UI
+	•	Tableau implants patient : colonne “ISQ” (value + label) + colonne “Flag”
+	•	Vue d’ensemble implant (cards) : ISQ en évidence, badge si flag critical
+	•	Hover sur flag : liste des autres flags
+
+4) Invalidation / refetch
+
+Après POST/PUT/DELETE d’une mesure ISQ :
+	•	invalider/refetch :
+	•	/api/patients/:id
+	•	/api/patients/:id/implants
+	•	/api/surgery-implants + /api/surgery-implants/:id
+	•	/api/patients/summary
+
+5) Test de bout en bout (Jeanne Dupont)
+
+Créer un test ou scénario :
+	•	ajouter ISQ=54 sur un implant de Jeanne
+	•	vérifier :
+	•	flag implant ISQ_LOW créé
+	•	patient top_flag devient CRITICAL
+	•	tableau implants patient affiche latest_isq=54 + badge
+	•	fiche patient affiche badge

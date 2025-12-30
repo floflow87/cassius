@@ -1,0 +1,191 @@
+Voici un prompt “machine de guerre” à coller dans Replit (ou à ton dev) pour lancer une passe d’optimisation globale de Cassius sans audit préalable : instrumentation → diagnostic → quick wins → refactors structurants.
+
+⸻
+
+Prompt Replit — Optimisation Performance Cassius (objectif “machine de guerre”)
+
+Contexte
+
+Cassius est un CRM médical (patients, actes chirurgicaux, implants, radiographies/documents via Supabase Storage privé + URLs signées, ISQ, visites). L’application est plus lente que Planbase, notamment lors de l’affichage d’un implant posé sur un patient (pages de détail riches).
+
+Objectif : obtenir une app très rapide, stable, scalable, avec un temps de réponse faible et une UX fluide.
+
+⸻
+
+1) Phase 0 — Instrumentation obligatoire (avant tout refactor)
+
+Mettre en place une instrumentation légère (dev + prod) pour localiser la latence :
+
+1.1 Middleware HTTP timing (Express)
+	•	Logguer pour chaque requête :
+	•	méthode, route
+	•	status code
+	•	durée totale (ms)
+	•	taille réponse (si possible)
+	•	Ajouter un X-Response-Time header.
+
+1.2 Timing par étape dans les endpoints critiques
+
+Sur les endpoints les plus lourds (patients/:id, implants/:id, etc.), mesurer séparément :
+	•	temps DB (par requête)
+	•	temps génération signed URLs
+	•	temps sérialisation JSON
+
+1.3 Observabilité DB
+
+Activer / utiliser :
+	•	EXPLAIN (ANALYZE, BUFFERS) sur les requêtes lentes
+	•	logs des requêtes > 200ms (dev)
+	•	ajouter un compteur simple “nombre de requêtes DB par endpoint” (détecter N+1)
+
+Deliverable : un mini rapport “Top 10 endpoints les plus lents” + causes principales.
+
+⸻
+
+2) Phase 1 — Quick wins (impact max / risque min)
+
+2.1 Éliminer les N+1 queries
+	•	Identifier les boucles où on fait des requêtes DB par item (implants, docs, visites…)
+	•	Remplacer par :
+	•	requêtes groupées (WHERE id IN (...))
+	•	joins SQL
+	•	ou RPC Supabase / view matérialisée si besoin
+
+Critère : chaque page critique doit faire ≤ 3–6 requêtes DB, pas 30+.
+
+2.2 Paginer / lazy-load tout ce qui peut l’être
+	•	Par défaut, ne pas charger :
+	•	toutes les radios
+	•	tous les documents
+	•	toute la timeline clinique
+	•	toutes les visites historiques
+	•	Charger à la demande :
+	•	par onglet (tabs)
+	•	par pagination (ex: 20 items)
+	•	ou infinite scroll
+
+Critère : payload initial page < ~200KB idéalement (hors images).
+
+2.3 Signed URLs : génération à la demande
+	•	Ne pas générer une signed URL pour chaque document à l’affichage initial.
+	•	Stratégie recommandée :
+	•	liste = métadonnées + “needsSignedUrl”
+	•	signed URL générée uniquement :
+	•	quand l’item devient visible (lazy)
+	•	ou quand l’utilisateur clique (viewer/download)
+	•	Mettre en cache côté backend (in-memory) pendant la durée de vie (ex 5–10 min) si possible.
+
+Critère : pas de “storm” d’appels Supabase Storage au chargement.
+
+2.4 Réduire les champs renvoyés
+	•	Remplacer SELECT * par sélection de colonnes nécessaires
+	•	Ajouter des DTO “summary vs detail” :
+	•	implantSummary
+	•	implantDetail
+	•	patientSummary
+	•	patientDetail
+
+Critère : endpoints “summary” rapides et légers.
+
+2.5 Compression et caching HTTP
+	•	Activer gzip/brotli sur le serveur
+	•	Ajouter ETag ou Cache-Control sur endpoints non sensibles (ou cache privé court)
+	•	Pour les signed URLs, s’appuyer sur expiration + cache local (client).
+
+⸻
+
+3) Phase 2 — Data model & Indexes (performance DB durable)
+
+3.1 Vérifier et ajouter les indexes critiques
+
+Ajouter (selon schéma) des indexes multi-colonnes fréquents :
+	•	patients (organisation_id, last_name)
+	•	surgeries (organisation_id, patient_id, performed_at DESC)
+	•	surgery_implants (organisation_id, surgery_id)
+	•	surgery_implants (organisation_id, implant_id)
+	•	patient_documents (organisation_id, patient_id, category, created_at DESC)
+	•	visits (organisation_id, patient_id, scheduled_at DESC)
+	•	isq_measurements (organisation_id, implant_instance_id, measured_at DESC) (si table dédiée)
+
+Livrable : migration SQL indexes + justification (requêtes cibles).
+
+3.2 Consolidation des requêtes “implant posé”
+
+Créer une requête optimisée (ou view/RPC) qui récupère :
+	•	implant instance
+	•	acte chirurgical parent
+	•	patient
+	•	dernier ISQ + stats (avg, count)
+	•	éventuellement 1ère page docs/radios (métadonnées uniquement)
+
+En 1–2 requêtes max.
+
+⸻
+
+4) Phase 3 — Architecture API (rendre l’app “snappy”)
+
+4.1 Endpoints par “page”
+
+Créer des endpoints orientés UI :
+	•	GET /api/patients/:id/summary
+	•	GET /api/patients/:id/implants?limit=...
+	•	GET /api/implants/:id/detail
+	•	GET /api/implants/:id/isq?range=...
+	•	GET /api/patients/:id/documents?category=radiography&limit=...
+
+Charger le strict nécessaire au premier paint, le reste lazy-load.
+
+4.2 Concurrence / parallélisation
+	•	Paralléliser les requêtes indépendantes (Promise.all)
+	•	Éviter les appels en série inutiles (DB puis signed url puis docs etc.)
+
+⸻
+
+5) Phase 4 — Frontend optimisations (UX perçue)
+
+5.1 Chargement progressif
+	•	Skeletons
+	•	Tabs lazy
+	•	Virtualisation des listes (patients, docs, timeline)
+
+5.2 Cache côté client
+	•	Cache des réponses “summary” (SWR/React Query)
+	•	Invalidation au moment des mutations (upload, delete, add visit)
+
+⸻
+
+6) Critères de performance (Definition of Done)
+
+Atteindre et prouver :
+	•	Page “implant posé” :
+	•	TTFB backend < 300ms (staging), < 500ms (prod)
+	•	Nombre de requêtes DB < 6
+	•	Payload JSON initial < 200KB
+	•	Liste patients :
+	•	chargement < 500ms sur 5000 patients (avec pagination)
+	•	Documents/radios :
+	•	signed URL générée on-demand
+	•	pas de freeze UI
+
+Fournir un rapport final :
+	•	top endpoints + avant/après
+	•	nombre de requêtes DB avant/après
+	•	indexes ajoutés
+	•	changements signed URLs
+
+⸻
+
+7) Interdictions / règles
+	•	Ne pas utiliser de scraping ou hacks externes
+	•	Ne pas exposer service_role au frontend
+	•	Garder la compatibilité avec les anciennes radios (si prévu) mais éviter qu’elles dégradent la perf globale
+
+⸻
+
+Résultat attendu
+
+Une application Cassius rapide, avec un chargement progressif intelligent, des requêtes DB optimisées et indexées, une gestion signed URL non-bloquante, et des endpoints adaptés aux écrans.
+
+⸻
+
+Si tu veux, je peux aussi te donner une version ultra-courte (10 lignes) à envoyer au dev, ou une version checklist à cocher sprint par sprint.

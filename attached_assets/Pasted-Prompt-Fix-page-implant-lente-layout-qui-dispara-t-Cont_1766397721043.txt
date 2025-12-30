@@ -1,0 +1,112 @@
+Prompt — Fix page implant lente + layout qui disparaît
+
+Contexte
+La route /patients/:patientId/implants/:id met très longtemps à charger et pendant le chargement le layout complet disparaît (sidebar + topbar). Il n’y a pas beaucoup de data affichée, donc il y a probablement un problème de rendering/routing (layout unmounted) et/ou un endpoint trop lent (DB/N+1/signed URLs) ou une boucle de fetch.
+
+Objectifs
+
+Empêcher définitivement le démontage du layout lors du chargement de la page implant
+
+Identifier précisément le goulot (frontend loop vs backend slow query vs signed URLs)
+
+Réduire le temps de chargement de la page implant (TTFB + waterfall)
+
+1) Stabiliser le layout (obligatoire)
+
+Mettre Sidebar + Topbar dans un composant parent AppLayout qui reste monté en permanence.
+
+La page implant doit être rendue uniquement dans la zone Main (Outlet/RouterView).
+
+Interdire tout Suspense fallback / loading global au niveau du router ou du layout qui masquerait sidebar/topbar.
+
+Vérifier qu’aucun key={pathname} (ou équivalent) n’est appliqué au layout, ce qui le remonterait à chaque navigation.
+
+Interdire if (loading) return null au niveau page si cela remonte et retire le layout : afficher un loader dans Main.
+
+Acceptance : au chargement de /patients/:patientId/implants/:id, sidebar + topbar restent visibles 100% du temps.
+
+2) Ajouter instrumentation performance (obligatoire)
+
+Backend
+
+Ajouter middleware qui logge durée de chaque requête :
+
+méthode + route + status + durée (ms)
+
+Dans l’endpoint implant, logguer les durées par bloc :
+
+fetch implant
+
+fetch acte chirurgical lié
+
+fetch patient
+
+fetch ISQ
+
+fetch docs/radios (métadonnées)
+
+génération signed URLs (si fait)
+
+Frontend
+
+Logger une seule fois par navigation (pas en boucle) :
+
+“loading implant page”
+
+“loaded implant page”
+
+Détecter si le fetch est déclenché plusieurs fois (loop).
+
+Deliverable : identifier si la lenteur vient du backend (TTFB), du nombre d’appels, ou d’une boucle de fetch.
+
+3) Optimiser l’endpoint implant (quick wins)
+
+Éliminer les N+1 queries :
+
+regrouper les requêtes (IN / JOIN) au lieu de boucler
+
+Ne pas générer toutes les signed URLs au chargement :
+
+retourner uniquement les métadonnées docs/radios
+
+générer la signed URL uniquement quand l’utilisateur ouvre le viewer ou clique télécharger
+
+Réduire le payload : renvoyer un “implantDetail” minimal (pas tout le patient + tout l’historique)
+
+Ajouter pagination sur docs/radios (limit 10–20)
+
+Acceptance : page implant charge rapidement avec un payload léger, puis charge le reste à la demande.
+
+4) Vérifier les indexes DB (si TTFB élevé)
+
+Vérifier index sur :
+
+surgeries(patient_id, performed_at)
+
+surgery_implants(surgery_id)
+
+patient_documents(patient_id, category, created_at)
+
+isq_measurements(implant_id, measured_at)
+
+Ajouter migrations si manquants.
+
+5) Loader / skeleton (perceived performance)
+
+Ajouter un ImplantPageSkeleton dans Main pendant le chargement :
+
+titre, cards, bloc ISQ, bloc docs
+
+Aucun écran blanc.
+
+5) Le truc à vérifier en premier (le plus “coupable”)
+
+Si tu as ça quelque part, c’est quasi sûr que ça démonte le layout :
+
+key={location.pathname} sur AppLayout ou un parent
+
+<Suspense fallback={<FullPageLoader/>}> autour du router/layout
+
+if (loading) return null; dans un composant haut placé
+
+👉 Dis à Replit/au dev de chercher ces patterns.

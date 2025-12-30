@@ -31,7 +31,7 @@ const formSchema = insertPatientSchema.extend({
 type FormData = z.infer<typeof formSchema>;
 
 interface PatientFormProps {
-  onSuccess?: () => void;
+  onSuccess?: (patientId: string) => void;
 }
 
 export function PatientForm({ onSuccess }: PatientFormProps) {
@@ -46,6 +46,9 @@ export function PatientForm({ onSuccess }: PatientFormProps) {
       sexe: "HOMME",
       telephone: "",
       email: "",
+      adresse: "",
+      codePostal: "",
+      ville: "",
       contexteMedical: "",
     },
   });
@@ -55,13 +58,14 @@ export function PatientForm({ onSuccess }: PatientFormProps) {
       const res = await apiRequest("POST", "/api/patients", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       toast({
         title: "Patient créé",
         description: "Le patient a été ajouté avec succès.",
+        variant: "success",
       });
-      onSuccess?.();
+      onSuccess?.(data.id);
     },
     onError: (error) => {
       toast({
@@ -178,6 +182,64 @@ export function PatientForm({ onSuccess }: PatientFormProps) {
                     {...field}
                     value={field.value || ""}
                     data-testid="input-patient-email"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="adresse"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Adresse</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="123 Rue de la Paix"
+                  {...field}
+                  value={field.value || ""}
+                  data-testid="input-patient-adresse"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="codePostal"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Code postal</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="75001"
+                    {...field}
+                    value={field.value || ""}
+                    data-testid="input-patient-code-postal"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="ville"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ville</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Paris"
+                    {...field}
+                    value={field.value || ""}
+                    data-testid="input-patient-ville"
                   />
                 </FormControl>
                 <FormMessage />

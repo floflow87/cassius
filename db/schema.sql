@@ -102,7 +102,8 @@ CREATE TABLE IF NOT EXISTS patients (
   ville TEXT,
   pays TEXT,
   allergies TEXT,
-  medicaments TEXT,
+  traitement TEXT,
+  conditions TEXT,
   contexte_medical TEXT,
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
@@ -148,7 +149,7 @@ CREATE TABLE IF NOT EXISTS implants (
   date_pose DATE NOT NULL
 );
 
--- Radios
+-- Radios (documents radiographiques)
 CREATE TABLE IF NOT EXISTS radios (
   id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
   organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
@@ -156,9 +157,32 @@ CREATE TABLE IF NOT EXISTS radios (
   operation_id VARCHAR REFERENCES operations(id) ON DELETE SET NULL,
   implant_id VARCHAR REFERENCES implants(id) ON DELETE SET NULL,
   type type_radio NOT NULL,
-  url TEXT NOT NULL,
-  date DATE NOT NULL
+  title TEXT NOT NULL,
+  file_path TEXT, -- Supabase Storage path (nullable for legacy)
+  url TEXT, -- Legacy Replit Object Storage URL (kept for backward compatibility)
+  mime_type TEXT,
+  size_bytes BIGINT,
+  file_name TEXT,
+  date DATE NOT NULL,
+  created_by VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
+
+-- Migration: Add new columns for Supabase Storage (keeping legacy url for backward compatibility)
+DO $$ BEGIN
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS file_path TEXT;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS file_name TEXT;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS created_by VARCHAR REFERENCES users(id) ON DELETE SET NULL;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS title TEXT;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS mime_type TEXT;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS size_bytes BIGINT;
+  ALTER TABLE radios ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+  
+  -- Set default title for existing records
+  UPDATE radios SET title = 'Radio ' || id WHERE title IS NULL;
+  ALTER TABLE radios ALTER COLUMN title SET NOT NULL;
+EXCEPTION WHEN OTHERS THEN null;
+END $$;
 
 -- Visites (follow-up visits)
 CREATE TABLE IF NOT EXISTS visites (
@@ -184,6 +208,62 @@ CREATE TABLE IF NOT EXISTS protheses (
   notes TEXT
 );
 
+-- Notes (patient notes)
+DO $$ BEGIN
+  CREATE TYPE type_note_tag AS ENUM ('CONSULTATION', 'CHIRURGIE', 'SUIVI', 'COMPLICATION', 'ADMINISTRATIVE');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS notes (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  patient_id VARCHAR NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tag type_note_tag,
+  contenu TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+-- Rendez-vous (patient appointments)
+DO $$ BEGIN
+  CREATE TYPE type_rdv_tag AS ENUM ('CONSULTATION', 'SUIVI', 'CHIRURGIE');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS rendez_vous (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  patient_id VARCHAR NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  titre TEXT NOT NULL,
+  description TEXT,
+  date DATE NOT NULL,
+  heure_debut TEXT NOT NULL,
+  heure_fin TEXT NOT NULL,
+  tag type_rdv_tag NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+-- Documents (PDF and other patient documents)
+DO $$ BEGIN
+  CREATE TYPE type_document_tag AS ENUM ('DEVIS', 'CONSENTEMENT', 'COMPTE_RENDU', 'ASSURANCE', 'AUTRE');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS documents (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organisation_id VARCHAR NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  patient_id VARCHAR NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  mime_type TEXT,
+  size_bytes BIGINT,
+  file_name TEXT,
+  tags TEXT[],
+  created_by VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_patients_organisation ON patients(organisation_id);
 CREATE INDEX IF NOT EXISTS idx_patients_nom ON patients(nom);
@@ -195,3 +275,11 @@ CREATE INDEX IF NOT EXISTS idx_implants_operation ON implants(operation_id);
 CREATE INDEX IF NOT EXISTS idx_visites_implant ON visites(implant_id);
 CREATE INDEX IF NOT EXISTS idx_radios_patient ON radios(patient_id);
 CREATE INDEX IF NOT EXISTS idx_users_organisation ON users(organisation_id);
+CREATE INDEX IF NOT EXISTS idx_notes_patient ON notes(patient_id);
+CREATE INDEX IF NOT EXISTS idx_notes_organisation ON notes(organisation_id);
+CREATE INDEX IF NOT EXISTS idx_rendez_vous_patient ON rendez_vous(patient_id);
+CREATE INDEX IF NOT EXISTS idx_rendez_vous_organisation ON rendez_vous(organisation_id);
+CREATE INDEX IF NOT EXISTS idx_rendez_vous_date ON rendez_vous(date);
+CREATE INDEX IF NOT EXISTS idx_documents_patient ON documents(patient_id);
+CREATE INDEX IF NOT EXISTS idx_documents_organisation ON documents(organisation_id);
+CREATE INDEX IF NOT EXISTS idx_documents_tags ON documents USING GIN(tags);

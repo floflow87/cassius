@@ -1,0 +1,228 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+const BUCKET_NAME = 'patient-documents';
+const SIGNED_URL_EXPIRY = 3600; // 1 hour in seconds
+
+let supabaseClient: SupabaseClient | null = null;
+
+function getSupabaseClient(): SupabaseClient {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for file storage');
+  }
+
+  supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  return supabaseClient;
+}
+
+/**
+ * Generate storage path for a radiograph
+ * Format: org/{orgId}/patients/{patientId}/radiographies/{docId}/{filename}
+ */
+export function generateFilePath(
+  organisationId: string,
+  patientId: string,
+  documentId: string,
+  fileName: string
+): string {
+  // Sanitize filename
+  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return `org/${organisationId}/patients/${patientId}/radiographies/${documentId}/${sanitizedFileName}`;
+}
+
+/**
+ * Upload a file to Supabase Storage
+ */
+export async function uploadFile(
+  filePath: string,
+  fileBuffer: Buffer,
+  mimeType: string
+): Promise<{ path: string }> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .upload(filePath, fileBuffer, {
+      contentType: mimeType,
+      upsert: false,
+    });
+
+  if (error) {
+    console.error('[STORAGE] Upload error:', error);
+    throw new Error(`Failed to upload file: ${error.message}`);
+  }
+
+  return { path: data.path };
+}
+
+/**
+ * Create a signed upload URL for client-side upload
+ */
+export async function createSignedUploadUrl(
+  filePath: string
+): Promise<{ signedUrl: string; token: string; path: string }> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .createSignedUploadUrl(filePath);
+
+  if (error) {
+    console.error('[STORAGE] Create signed upload URL error:', error);
+    throw new Error(`Failed to create upload URL: ${error.message}`);
+  }
+
+  return {
+    signedUrl: data.signedUrl,
+    token: data.token,
+    path: data.path,
+  };
+}
+
+/**
+ * Get a signed URL for viewing/downloading a file
+ */
+export async function getSignedUrl(
+  filePath: string,
+  expiresIn: number = SIGNED_URL_EXPIRY
+): Promise<string> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .createSignedUrl(filePath, expiresIn);
+
+  if (error) {
+    console.error('[STORAGE] Get signed URL error:', error);
+    throw new Error(`Failed to get signed URL: ${error.message}`);
+  }
+
+  return data.signedUrl;
+}
+
+/**
+ * Get signed URLs for multiple files
+ */
+export async function getSignedUrls(
+  filePaths: string[],
+  expiresIn: number = SIGNED_URL_EXPIRY
+): Promise<Map<string, string>> {
+  const supabase = getSupabaseClient();
+  const result = new Map<string, string>();
+
+  if (filePaths.length === 0) {
+    return result;
+  }
+
+  const { data, error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .createSignedUrls(filePaths, expiresIn);
+
+  if (error) {
+    console.error('[STORAGE] Get signed URLs error:', error);
+    throw new Error(`Failed to get signed URLs: ${error.message}`);
+  }
+
+  for (const item of data) {
+    if (item.signedUrl && item.path) {
+      result.set(item.path, item.signedUrl);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Delete a file from Supabase Storage
+ */
+export async function deleteFile(filePath: string): Promise<void> {
+  const supabase = getSupabaseClient();
+
+  const { error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .remove([filePath]);
+
+  if (error) {
+    console.error('[STORAGE] Delete error:', error);
+    throw new Error(`Failed to delete file: ${error.message}`);
+  }
+}
+
+/**
+ * Delete multiple files from Supabase Storage
+ */
+export async function deleteFiles(filePaths: string[]): Promise<void> {
+  if (filePaths.length === 0) {
+    return;
+  }
+
+  const supabase = getSupabaseClient();
+
+  const { error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .remove(filePaths);
+
+  if (error) {
+    console.error('[STORAGE] Bulk delete error:', error);
+    throw new Error(`Failed to delete files: ${error.message}`);
+  }
+}
+
+/**
+ * Check if Supabase Storage is configured
+ */
+export function isStorageConfigured(): boolean {
+  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/**
+ * Initialize bucket if it doesn't exist (should be called on startup in production)
+ */
+export async function initializeBucket(): Promise<void> {
+  if (!isStorageConfigured()) {
+    console.warn('[STORAGE] Supabase Storage not configured - skipping bucket initialization');
+    return;
+  }
+
+  const supabase = getSupabaseClient();
+
+  // Check if bucket exists
+  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+
+  if (listError) {
+    console.error('[STORAGE] Error listing buckets:', listError);
+    return;
+  }
+
+  const bucketExists = buckets.some((b) => b.name === BUCKET_NAME);
+
+  if (!bucketExists) {
+    console.log('[STORAGE] Creating bucket:', BUCKET_NAME);
+    const { error: createError } = await supabase.storage.createBucket(BUCKET_NAME, {
+      public: false,
+      fileSizeLimit: 10 * 1024 * 1024, // 10MB limit
+      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'],
+    });
+
+    if (createError) {
+      console.error('[STORAGE] Error creating bucket:', createError);
+      throw new Error(`Failed to create bucket: ${createError.message}`);
+    }
+
+    console.log('[STORAGE] Bucket created successfully');
+  } else {
+    console.log('[STORAGE] Bucket already exists:', BUCKET_NAME);
+  }
+}

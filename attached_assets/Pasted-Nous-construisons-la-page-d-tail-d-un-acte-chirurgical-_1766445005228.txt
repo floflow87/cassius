@@ -1,0 +1,158 @@
+Nous construisons la page détail d’un acte (chirurgical).
+Nous avons déjà une timeline clinique sur la page d’un patient (layout + style validés).
+Nous voulons ajouter une timeline similaire sur la page d’un acte, mais centrée sur cet acte et son suivi.
+
+Objectif
+
+Ajouter sur la page détail d’un acte une timeline clinique (même layout/design que patient) affichant tous les événements liés à l’acte :
+
+visites / rendez-vous (passés + à venir)
+
+opérations (incluant l’acte lui-même + éventuelles opérations liées)
+
+mesures ISQ renseignées (au niveau des implants posés lors de cet acte)
+
+documents pertinents (optionnel v1 : uniquement si déjà lié à l’acte)
+
+1) Périmètre des événements (V1)
+
+La timeline doit afficher, pour cet acte actId :
+
+A) Événements “Acte”
+
+L’acte lui-même (date/heure, type, statut)
+
+(optionnel) autres actes liés au même patient si explicitement rattachés à l’acte (sinon V2)
+
+B) Visites / rendez-vous liés
+
+Toutes les visites liées à cet acte (si la donnée act_id existe)
+
+Sinon fallback V1 : visites du patient dans une période autour de l’acte (ex : -7 jours à +365 jours) avec un badge “Non lié” si non rattaché
+
+Chaque visite affiche :
+
+date/heure
+
+type (consultation, suivi, chirurgie, contrôle…)
+
+description
+
+statut (passée / à venir)
+
+C) Mesures ISQ
+
+Toutes les mesures ISQ des implants posés dans cet acte
+
+Chaque événement ISQ doit afficher :
+
+date/heure de mesure
+
+implant (position / référence) cliquable
+
+valeur ISQ + badge stabilité (faible/modérée/élevée)
+
+delta vs mesure précédente du même implant (si applicable)
+
+2) UI / Layout (identique à la timeline patient)
+
+Réutiliser le composant existant de timeline (mêmes styles, spacing, badges, icônes)
+
+Ordonner les événements par date décroissante (plus récent en haut)
+
+Grouper visuellement par type (badges / icônes)
+
+Événements à venir :
+
+affichage distinct (ex : badge “À venir”, style plus léger)
+
+Cartes d’événement
+
+Chaque item de timeline doit contenir :
+
+une date (format lisible)
+
+un titre (ex : “Suivi”, “Mesure ISQ”, “Acte chirurgical”, “Consultation”)
+
+un sous-titre ou meta (implant concerné / type / statut)
+
+actions rapides (selon type) :
+
+visiter détail visite
+
+ouvrir implant
+
+ajouter note (optionnel)
+
+3) Data & API (performant)
+
+Créer un endpoint dédié qui renvoie la timeline déjà agrégée côté backend :
+
+GET /api/acts/:actId/timeline
+
+Réponse (exemple) :
+
+{
+  "act": { "id": "...", "performedAt": "...", "type": "...", "status": "done" },
+  "events": [
+    {
+      "type": "ISQ",
+      "at": "2025-12-10T10:00:00Z",
+      "implantInstanceId": "...",
+      "implantLabel": "36 - Straumann BLT",
+      "value": 72,
+      "stability": "high",
+      "delta": 4
+    },
+    {
+      "type": "VISIT",
+      "at": "2025-12-22T09:30:00Z",
+      "visitId": "...",
+      "visitType": "suivi",
+      "title": "Rendez-vous de suivi",
+      "status": "upcoming",
+      "description": "Contrôle post-op + ISQ"
+    },
+    {
+      "type": "SURGERY",
+      "at": "2025-10-14T08:00:00Z",
+      "actId": "...",
+      "title": "Pose implantaire",
+      "status": "done"
+    }
+  ]
+}
+
+Règles
+
+Le backend fait le tri, le mapping et la fusion des sources (pas le frontend).
+
+Retourner uniquement les champs nécessaires à l’affichage (payload léger).
+
+Pagination optionnelle si timeline très longue (V2). En V1, limit 50 derniers events.
+
+4) Règle de cohérence modèle (important)
+
+Rappel : Patient ↔ Implants via Acte
+
+Les ISQ doivent être rattachés à une implant instance liée à l’acte.
+
+Les visites doivent idéalement être rattachées à l’acte (visit.act_id), sinon fallback temporel V1.
+
+5) Critères d’acceptation
+
+Sur la page détail d’un acte, la timeline s’affiche avec le même layout que patient.
+
+Elle contient :
+
+l’acte lui-même
+
+les visites/rendez-vous pertinents
+
+les ISQ des implants posés dans cet acte
+
+Les items sont cliquables (vers visite / implant / acte si besoin)
+
+Les événements sont triés par date décroissante
+
+Chargement fluide (loader/skeleton local, sans démonter le layout)

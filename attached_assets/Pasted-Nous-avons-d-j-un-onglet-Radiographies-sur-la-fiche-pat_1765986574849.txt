@@ -1,0 +1,142 @@
+Nous avons déjà un onglet Radiographies sur la fiche patient avec :
+
+upload,
+
+affichage en grille de miniatures,
+
+viewer,
+
+rename / delete / download,
+
+stockage en Supabase Storage privé via URLs signées,
+
+documents liés au patientId.
+
+Objectif
+
+Ajouter un nouvel onglet Documents sur la fiche patient, permettant d’uploader des PDF, de les afficher avec la même UI que les radiographies, et de les taguer.
+
+A) Fonctionnel
+1) Onglet “Documents”
+
+Ajouter un onglet Documents dans la navigation de la fiche patient.
+
+Structure UI identique à Radiographies :
+
+titre,
+
+grille de vignettes,
+
+bouton Nouveau document.
+
+2) Upload PDF
+
+Autoriser l’upload de fichiers PDF (mime application/pdf).
+
+Upload unitaire et multiple (drag & drop si possible).
+
+Chaque document est lié au patientId et organisationId.
+
+3) Affichage en grille
+
+Chaque vignette affiche :
+
+une miniature (si génération possible) ou un aperçu standard (icône PDF + nom),
+
+le nom du document,
+
+la date d’ajout,
+
+les tags (badges).
+
+4) Viewer PDF
+
+Clic sur une vignette → ouverture dans un viewer (modal plein écran ou page) :
+
+affichage PDF (embed/iframe) si possible,
+
+sinon fallback : téléchargement.
+
+Boutons dans le viewer :
+
+télécharger,
+
+supprimer,
+
+renommer.
+
+5) Tags
+
+Lors de l’ajout ou en édition, permettre d’ajouter des tags (badges), ex :
+
+“Devis”, “Consentement”, “Compte-rendu”, “Assurance”, “Autre”
+
+Tags multiples par document.
+
+UI simple : champ tags + chips.
+
+6) Actions sur un document
+
+Via menu “…” :
+
+Renommer (modifie le titre uniquement),
+
+Télécharger (via signed URL),
+
+Supprimer (supprime fichier + métadonnées).
+
+B) Tech (Supabase Storage privé + modèle de données)
+1) Storage
+
+Bucket privé existant : patient-documents
+
+Stocker les PDF sous :
+org/{organisationId}/patients/{patientId}/documents/{documentId}/{originalFilename}
+
+Accès uniquement via signed URLs (durée 1h OK).
+
+2) Table de métadonnées
+
+Réutiliser la table patient_documents (recommandé) en ajoutant/assurant :
+
+category : valeurs radiography ou document
+
+title
+
+tags : text[] (recommandé pour aller vite)
+
+index GIN pour recherche plus tard
+
+file_path, mime_type, size_bytes, created_at, created_by, etc.
+
+3) Endpoints
+
+Créer / réutiliser la même logique que radiographies, en version documents :
+
+POST /api/documents/upload-url
+
+GET /api/documents/:id/signed-url
+
+GET /api/patients/:patientId/documents
+
+4) Sécurité
+
+SUPABASE_SERVICE_ROLE_KEY utilisée uniquement côté serveur.
+
+RLS sur patient_documents.
+
+Aucun accès public.
+
+Critères d’acceptation
+
+Upload PDF depuis un patient en staging → fichier visible uniquement dans bucket dev.
+
+Liste documents filtre correctement par patientId.
+
+Tags ajoutés/modifiés se reflètent immédiatement dans l’UI.
+
+Rename ne change pas le file_path (DB only).
+
+Delete supprime fichier Storage + ligne DB (0 orphelins).
+
+Viewer ouvre un PDF (ou fallback téléchargement si embed impossible).

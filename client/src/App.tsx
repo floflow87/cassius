@@ -11,9 +11,14 @@ import NotFound from "@/pages/not-found";
 import PatientsPage from "@/pages/patients";
 import PatientDetailsPage from "@/pages/patient-details";
 import ImplantDetailsPage from "@/pages/implant-details";
+import CatalogImplantDetailsPage from "@/pages/catalog-implant-details";
 import PatientReportPage from "@/pages/patient-report";
 import DashboardPage from "@/pages/dashboard";
+import StatsPage from "@/pages/stats";
 import ImplantsPage from "@/pages/implants";
+import ActesPage from "@/pages/actes";
+import ActeDetailsPage from "@/pages/acte-details";
+import DocumentsPage from "@/pages/documents";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import { apiRequest } from "@/lib/queryClient";
@@ -27,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { GlobalSearch } from "@/components/global-search";
 import type { Patient } from "@shared/schema";
 
 interface UserInfo {
@@ -50,17 +56,23 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
     if (location === "/patients" || location.startsWith("/patients/")) {
       return { 
         title: "Patients", 
-        subtitle: patientCount !== undefined ? `${patientCount} patients actifs` : null 
+        subtitle: null 
       };
     }
     if (location === "/implants" || location.startsWith("/implants/")) {
       return { title: "Implants", subtitle: null };
     }
-    if (location === "/dashboard" || location === "/" || location === "/stats") {
+    if (location === "/dashboard" || location === "/") {
       return { title: "Tableau de bord", subtitle: null };
+    }
+    if (location === "/stats") {
+      return { title: "Statistiques", subtitle: null };
     }
     if (location === "/actes") {
       return { title: "Actes", subtitle: null };
+    }
+    if (location === "/documents") {
+      return { title: "Documents", subtitle: null };
     }
     return { title: "Cassius", subtitle: null };
   };
@@ -82,13 +94,15 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
   return (
     <header className="flex items-center justify-between gap-4 px-6 h-16 bg-white dark:bg-gray-950 sticky top-0 z-50 border-b shrink-0">
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold text-foreground" data-testid="text-page-title">
+        <h1 className="text-base font-semibold text-foreground" data-testid="text-page-title">
           {title}
         </h1>
         {subtitle && (
           <span className="text-sm text-muted-foreground">{subtitle}</span>
         )}
       </div>
+      
+      <GlobalSearch className="flex-1 max-w-md" />
       
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-notifications">
@@ -133,13 +147,13 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
   return (
     <Switch>
       <Route path="/">
-        <Redirect to="/patients" />
+        <Redirect to="/dashboard" />
       </Route>
       <Route path="/register">
-        <Redirect to="/patients" />
+        <Redirect to="/dashboard" />
       </Route>
       <Route path="/login">
-        <Redirect to="/patients" />
+        <Redirect to="/dashboard" />
       </Route>
       <Route path="/patient/:id">
         {(params) => <Redirect to={`/patients/${params.id}`} />}
@@ -154,16 +168,33 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/patients/:id/report" component={PatientReportPage} />
       <Route path="/patients/:patientId/implants/:implantId" component={ImplantDetailsPage} />
       <Route path="/dashboard" component={DashboardPage} />
-      <Route path="/stats" component={DashboardPage} />
-      <Route path="/implants" component={ImplantsPage} />
-      <Route path="/actes" component={DashboardPage} />
+      <Route path="/stats" component={StatsPage} />
+      <Route path="/implants">
+        {() => <ImplantsPage />}
+      </Route>
+      <Route path="/implants/:id" component={CatalogImplantDetailsPage} />
+      <Route path="/actes">
+        {() => <ActesPage />}
+      </Route>
+      <Route path="/actes/:id" component={ActeDetailsPage} />
+      <Route path="/documents" component={DocumentsPage} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
+// Read initial sidebar state from localStorage (default to expanded)
+const getInitialSidebarState = () => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('cassius.sidebarCollapsed');
+    return stored !== 'true'; // true = expanded (default), false = collapsed
+  }
+  return true;
+};
+
 function AuthenticatedApp() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarState);
 
   const { data: user, isLoading, refetch } = useQuery<UserInfo>({
     queryKey: ["/api/auth/user"],
@@ -207,13 +238,23 @@ function AuthenticatedApp() {
     );
   }
 
+  // Persist sidebar state to localStorage when changed
+  const handleSidebarOpenChange = (open: boolean) => {
+    setSidebarOpen(open);
+    localStorage.setItem('cassius.sidebarCollapsed', open ? 'false' : 'true');
+  };
+
   const style = {
-    "--sidebar-width": "4rem",
+    "--sidebar-width": "14rem",
     "--sidebar-width-icon": "4rem",
   };
 
   return (
-    <SidebarProvider style={style as React.CSSProperties} defaultOpen={false}>
+    <SidebarProvider 
+      style={style as React.CSSProperties} 
+      open={sidebarOpen}
+      onOpenChange={handleSidebarOpenChange}
+    >
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0 bg-muted/30">

@@ -18,6 +18,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ArrowRight, Check } from "lucide-react";
 import { Link } from "wouter";
+import logoBlue from "@assets/logo_Cassius_Plan_de_travail_1_copie_1765897934649.png";
+import logoWhite from "@assets/logo_Cassius_Plan_de_travail_1_copie_Plan_de_travail_1_copie_2_1765897934649.png";
 
 const loginSchema = z.object({
   email: z.string().email("Adresse email invalide"),
@@ -56,6 +58,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       toast({
         title: "Connexion réussie",
         description: "Bienvenue sur Cassius",
+        variant: "success",
       });
       onLoginSuccess();
     },
@@ -84,9 +87,14 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       <div className="flex-1 flex flex-col justify-between bg-white dark:bg-gray-950 p-8 lg:p-12">
         <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
           {/* Logo */}
-          <h1 className="text-3xl font-semibold italic text-primary mb-12" data-testid="text-logo">
-            Cassius
-          </h1>
+          <div className="flex justify-center mb-10">
+            <img 
+              src={logoBlue} 
+              alt="Cassius" 
+              className="h-[80px] object-contain"
+              data-testid="img-logo-blue"
+            />
+          </div>
 
           {/* Form */}
           <div>
@@ -121,16 +129,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex items-center justify-between gap-2">
-                        <FormLabel className="text-sm text-muted-foreground">Mot de passe</FormLabel>
-                        <button 
-                          type="button"
-                          className="text-sm text-primary hover:underline"
-                          data-testid="link-forgot-password"
-                        >
-                          Mot de passe oublié ?
-                        </button>
-                      </div>
+                      <FormLabel className="text-sm text-muted-foreground">Mot de passe</FormLabel>
                       <FormControl>
                         <Input 
                           type="password" 
@@ -140,6 +139,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                           data-testid="input-password" 
                         />
                       </FormControl>
+                      <div className="flex justify-end">
+                        <button 
+                          type="button"
+                          className="text-sm text-primary hover:underline"
+                          data-testid="link-forgot-password"
+                        >
+                          Mot de passe oublié ?
+                        </button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -218,10 +226,13 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center justify-center w-full px-12 text-white">
-          <h2 className="text-4xl font-semibold italic mb-3" data-testid="text-brand-title">
-            Cassius
-          </h2>
-          <p className="text-lg opacity-90 mb-8" data-testid="text-tagline">
+          <img 
+            src={logoWhite} 
+            alt="Cassius" 
+            className="h-[120px] object-contain mb-3"
+            data-testid="img-logo-white"
+          />
+          <p className="text-[15px] italic opacity-90 mb-8" data-testid="text-tagline">
             Votre Mémoire Clinique, Éclairée.
           </p>
 
