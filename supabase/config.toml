@@ -1,0 +1,11 @@
+# Supabase Configuration
+# This file is used by the Supabase CLI for local development and migrations
+
+[project]
+project_id = ""
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
