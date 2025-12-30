@@ -1,14 +1,31 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
-import { ArrowLeft, Calendar, Check, AlertTriangle, RefreshCw, Unplug, Settings2, Eye, ExternalLink } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  ArrowLeft, 
+  Calendar, 
+  Check, 
+  AlertTriangle, 
+  RefreshCw, 
+  Unplug, 
+  ExternalLink,
+  Clock,
+  User,
+  MapPin,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Mail,
+  CalendarDays
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -44,6 +61,15 @@ interface EnvCheckResult {
   missingVariables: string[];
   appBaseUrl?: string;
   googleRedirectUri?: string;
+}
+
+interface SyncResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  total: number;
+  message?: string;
 }
 
 export default function GoogleCalendarIntegration() {
@@ -91,15 +117,14 @@ export default function GoogleCalendarIntegration() {
     retry: false,
   });
   
-  // Admin-only env check - fetch to show environment info (returns null for non-admins)
   const { data: envCheck } = useQuery<EnvCheckResult | null>({
     queryKey: ["/api/integrations/google/env-check"],
     enabled: status !== undefined,
     retry: false,
     queryFn: async () => {
       const res = await fetch("/api/integrations/google/env-check", { credentials: "include" });
-      if (res.status === 403) return null; // Non-admin, silently return null
-      if (!res.ok) return null; // Other errors, silently return null
+      if (res.status === 403) return null;
+      if (!res.ok) return null;
       return res.json();
     },
   });
@@ -139,35 +164,36 @@ export default function GoogleCalendarIntegration() {
   const syncNowMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/integrations/google/sync-now");
-      return response.json();
+      return response.json() as Promise<SyncResult>;
     },
-    onSuccess: (data: any) => {
-      // Build summary message
-      const parts: string[] = [];
-      if (data.created > 0) parts.push(`${data.created} créé(s)`);
-      if (data.updated > 0) parts.push(`${data.updated} mis à jour`);
-      if (data.skipped > 0) parts.push(`${data.skipped} ignoré(s)`);
-      if (data.failed > 0) parts.push(`${data.failed} en erreur`);
+    onSuccess: (data: SyncResult) => {
+      const total = data.created + data.updated;
       
-      const summary = parts.length > 0 ? parts.join(", ") : data.message || "Aucun changement";
-      
-      toast({ 
-        title: data.failed > 0 ? "Synchronisation partielle" : "Synchronisation terminée",
-        description: summary,
-        variant: data.failed > 0 ? "destructive" : "default",
-      });
+      if (data.failed > 0) {
+        toast({ 
+          title: "Synchronisation partielle",
+          description: `${total} événement(s) synchronisé(s), ${data.failed} en erreur`,
+          variant: "destructive",
+        });
+      } else if (total > 0) {
+        toast({ 
+          title: "Synchronisation réussie",
+          description: `${total} événement(s) synchronisé(s) avec Google Calendar`,
+        });
+      } else {
+        toast({ 
+          title: "Synchronisation terminée",
+          description: "Aucun événement à synchroniser",
+        });
+      }
       
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
     },
     onError: (error: any) => {
-      // apiRequest throws already-parsed error objects with message property
-      const errorMessage = error?.message || "Une erreur est survenue";
-      const step = error?.step ? ` (étape: ${error.step})` : "";
-      
       toast({ 
         title: "Erreur de synchronisation", 
-        description: `${errorMessage}${step}`,
+        description: error?.message || "Une erreur est survenue",
         variant: "destructive" 
       });
     },
@@ -213,77 +239,81 @@ export default function GoogleCalendarIntegration() {
   const integration = status?.integration;
   const currentCalendarId = selectedCalendarId || integration?.targetCalendarId || "";
   
+  const formatLastSync = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return "À l'instant";
+    if (diffMins < 60) return `Il y a ${diffMins} min`;
+    if (diffHours < 24) return `Il y a ${diffHours}h`;
+    if (diffDays < 7) return `Il y a ${diffDays}j`;
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  };
+
   return (
     <div className="p-6" data-testid="settings-google-calendar">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-8">
         <Link href="/settings/integrations">
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div>
-          <h1 className="text-2xl font-semibold">Google Calendar</h1>
-          <p className="text-muted-foreground">Synchronisez vos rendez-vous avec Google Calendar</p>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold">Google Calendar</h1>
+            <p className="text-sm text-muted-foreground">Synchronisation des rendez-vous</p>
+          </div>
         </div>
       </div>
       
       <div className="max-w-2xl space-y-6">
+        
+        {/* Section 1: Connection Status */}
         <Card data-testid="card-connection">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Connexion
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             {statusLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-10 w-32" />
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
               </div>
             ) : isConnected ? (
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="gap-1">
-                    <Check className="h-3 w-3" />
-                    Connecté
-                  </Badge>
-                  {status.email && (
-                    <span className="text-sm text-muted-foreground">{status.email}</span>
-                  )}
-                </div>
-                
-                {integration?.targetCalendarName && (
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Calendrier cible: </span>
-                    <span className="font-medium">{integration.targetCalendarName}</span>
+                {/* Connected Status Header */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-950">
+                      <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium">Compte connecté</span>
+                        <Badge 
+                          variant="secondary" 
+                          className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400 gap-1"
+                        >
+                          <Check className="h-3 w-3" />
+                          Actif
+                        </Badge>
+                      </div>
+                      {status.email && (
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <Mail className="h-3.5 w-3.5" />
+                          {status.email}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-                
-                {integration?.lastSyncAt && (
-                  <div className="text-sm text-muted-foreground">
-                    Dernière synchronisation: {new Date(integration.lastSyncAt).toLocaleString('fr-FR')}
-                  </div>
-                )}
-                
-                {integration?.lastSyncError && (
-                  <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-                    <AlertTriangle className="h-4 w-4" />
-                    {integration.lastSyncError}
-                  </div>
-                )}
-                
-                <div className="flex gap-2 pt-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => syncNowMutation.mutate()}
-                    disabled={syncNowMutation.isPending}
-                    data-testid="button-sync-now"
-                  >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${syncNowMutation.isPending ? "animate-spin" : ""}`} />
-                    Synchroniser maintenant
-                  </Button>
                   
                   <Button 
                     variant="ghost" 
@@ -293,16 +323,82 @@ export default function GoogleCalendarIntegration() {
                     className="text-muted-foreground"
                     data-testid="button-disconnect"
                   >
-                    <Unplug className="h-4 w-4 mr-2" />
-                    Déconnecter
+                    {disconnectMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Unplug className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
+                
+                <Separator />
+                
+                {/* Quick Stats */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Calendrier</p>
+                      <p className="text-sm font-medium truncate">
+                        {integration?.targetCalendarName || "Non sélectionné"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Dernière sync</p>
+                      <p className="text-sm font-medium">
+                        {formatLastSync(integration?.lastSyncAt ?? null) || "Jamais"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Sync Error Alert */}
+                {integration?.lastSyncError && (
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      {integration.lastSyncError}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Sync Button */}
+                <Button 
+                  onClick={() => syncNowMutation.mutate()}
+                  disabled={syncNowMutation.isPending}
+                  className="w-full"
+                  data-testid="button-sync-now"
+                >
+                  {syncNowMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Synchronisation en cours...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Synchroniser maintenant
+                    </>
+                  )}
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Connectez votre compte Google pour synchroniser automatiquement vos rendez-vous Cassius vers Google Calendar.
-                </p>
+                {/* Disconnected State */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-muted">
+                    <XCircle className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Non connecté</p>
+                    <p className="text-sm text-muted-foreground">
+                      Liez votre compte Google pour synchroniser vos rendez-vous
+                    </p>
+                  </div>
+                </div>
                 
                 {status?.error && (
                   <div className="flex items-center gap-2 text-sm text-destructive">
@@ -314,79 +410,42 @@ export default function GoogleCalendarIntegration() {
                 {!isConfigured && (
                   <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md space-y-2">
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      L'intégration Google Calendar n'est pas configurée. Contactez l'administrateur pour configurer les identifiants OAuth.
+                      L'intégration n'est pas configurée. Contactez l'administrateur.
                     </p>
                     
                     {envCheck && envCheck.missingVariables.length > 0 && (
                       <div className="pt-2 border-t border-amber-200 dark:border-amber-800">
-                        <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
+                        <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-1">
                           Variables manquantes :
                         </p>
-                        <ul className="list-disc list-inside text-sm text-amber-700 dark:text-amber-300">
+                        <ul className="list-disc list-inside text-xs text-amber-700 dark:text-amber-300">
                           {envCheck.missingVariables.map((variable) => (
-                            <li key={variable} className="font-mono text-xs">{variable}</li>
+                            <li key={variable} className="font-mono">{variable}</li>
                           ))}
                         </ul>
                       </div>
                     )}
-                    
-                    {envCheck && (envCheck.appBaseUrl || envCheck.googleRedirectUri) && (
-                      <div className="pt-2 border-t border-amber-200 dark:border-amber-800">
-                        <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                          Configuration actuelle :
-                        </p>
-                        <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
-                          {envCheck.appBaseUrl && (
-                            <li><span className="text-muted-foreground">APP_BASE_URL:</span> <span className="font-mono text-xs">{envCheck.appBaseUrl}</span></li>
-                          )}
-                          {envCheck.googleRedirectUri && (
-                            <li><span className="text-muted-foreground">GOOGLE_REDIRECT_URI:</span> <span className="font-mono text-xs">{envCheck.googleRedirectUri}</span></li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
                   </div>
                 )}
                 
-                {isConfigured && envCheck && (envCheck.appBaseUrl || envCheck.googleRedirectUri) && (
-                  <div className="p-3 bg-muted/50 border rounded-md">
-                    <p className="text-sm font-medium text-muted-foreground mb-2">Environnement actuel :</p>
-                    <ul className="text-sm space-y-1">
-                      {envCheck.appBaseUrl && (
-                        <li className="flex items-center gap-2">
-                          <span className="text-muted-foreground">APP_BASE_URL:</span>
-                          <Badge variant="secondary" className="font-mono text-xs">{envCheck.appBaseUrl}</Badge>
-                        </li>
-                      )}
-                      {envCheck.googleRedirectUri && (
-                        <li className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Redirect URI:</span>
-                          <Badge variant="secondary" className="font-mono text-xs">{envCheck.googleRedirectUri}</Badge>
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                )}
-                
-                <div className="flex gap-2 flex-wrap">
-                  <Button 
-                    onClick={handleConnect}
-                    disabled={!isConfigured || isConnecting || connectMutation.isPending}
-                    data-testid="button-connect-google"
-                  >
-                    {(isConnecting || connectMutation.isPending) ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Connexion en cours...
-                      </>
-                    ) : (
-                      <>
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Connecter Google Calendar
-                      </>
-                    )}
-                  </Button>
-                </div>
+                <Button 
+                  onClick={handleConnect}
+                  disabled={!isConfigured || isConnecting || connectMutation.isPending}
+                  className="w-full"
+                  data-testid="button-connect-google"
+                >
+                  {(isConnecting || connectMutation.isPending) ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Connexion en cours...
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Connecter Google Calendar
+                    </>
+                  )}
+                </Button>
               </div>
             )}
           </CardContent>
@@ -394,21 +453,19 @@ export default function GoogleCalendarIntegration() {
         
         {isConnected && (
           <>
+            {/* Section 2: Sync Rules */}
             <Card data-testid="card-sync-options">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Settings2 className="h-5 w-5" />
-                  Options de synchronisation
-                </CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium">Règles de synchronisation</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="sync-enabled" className="text-base">
-                      Synchroniser les RDV Cassius vers Google
+              <CardContent>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="sync-enabled" className="text-sm font-normal">
+                      Synchronisation automatique
                     </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Les rendez-vous créés ou modifiés dans Cassius seront automatiquement synchronisés
+                    <p className="text-xs text-muted-foreground">
+                      Envoie les RDV Cassius vers Google Calendar
                     </p>
                   </div>
                   <Switch
@@ -419,12 +476,19 @@ export default function GoogleCalendarIntegration() {
                     data-testid="switch-sync-enabled"
                   />
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="calendar-select">Calendrier cible</Label>
-                  {calendarsLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                  ) : (
+              </CardContent>
+            </Card>
+            
+            {/* Section 3: Target Calendar */}
+            <Card data-testid="card-calendar-select">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium">Calendrier cible</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {calendarsLoading ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : (
+                  <div className="space-y-2">
                     <Select
                       value={currentCalendarId}
                       onValueChange={handleCalendarChange}
@@ -441,41 +505,59 @@ export default function GoogleCalendarIntegration() {
                         ))}
                       </SelectContent>
                     </Select>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    Les événements seront créés dans ce calendrier
-                  </p>
-                </div>
+                    <p className="text-xs text-muted-foreground">
+                      Les événements seront créés dans ce calendrier
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
             
+            {/* Section 4: Event Preview */}
             <Card data-testid="card-event-preview">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Eye className="h-5 w-5" />
-                  Prévisualisation des événements
-                </CardTitle>
-                <CardDescription>
-                  Voici comment vos rendez-vous apparaîtront dans Google Calendar
-                </CardDescription>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium">Aperçu dans Google Calendar</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="border rounded-md p-4 bg-muted/30">
-                  <div className="space-y-2">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Titre</Label>
-                      <p className="font-medium">[Cassius] CHIRURGIE - Martin Dupont</p>
+                <div className="rounded-lg border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20 p-4">
+                  <div className="space-y-3">
+                    {/* Event Title */}
+                    <div className="flex items-start gap-3">
+                      <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-medium text-blue-900 dark:text-blue-100">
+                          [Cassius] CHIRURGIE - Martin Dupont
+                        </p>
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          Mardi 14 janvier 2025
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Description</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Rendez-vous Cassius<br />
-                        Type: Chirurgie<br />
-                        Patient: Martin Dupont
-                      </p>
+                    
+                    {/* Time */}
+                    <div className="flex items-center gap-3 text-sm">
+                      <Clock className="h-4 w-4 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
+                      <span className="text-blue-800 dark:text-blue-200">09:00 - 11:00</span>
+                    </div>
+                    
+                    {/* Patient */}
+                    <div className="flex items-center gap-3 text-sm">
+                      <User className="h-4 w-4 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
+                      <span className="text-blue-800 dark:text-blue-200">Patient: Martin Dupont</span>
+                    </div>
+                    
+                    {/* Calendar indicator */}
+                    <div className="flex items-center gap-3 text-sm">
+                      <MapPin className="h-4 w-4 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
+                      <span className="text-blue-800 dark:text-blue-200">
+                        {integration?.targetCalendarName || "Calendrier principal"}
+                      </span>
                     </div>
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Les événements sont préfixés par [Cassius] pour les identifier facilement
+                </p>
               </CardContent>
             </Card>
           </>
