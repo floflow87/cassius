@@ -56,22 +56,48 @@ async function runMigrations() {
 
     console.log('\n✅ All migrations applied successfully!');
 
-    // Verify tables exist
-    console.log('\nVerifying tables...');
+    // Verify all critical tables exist
+    console.log('\nVerifying all critical tables...');
+    const criticalTables = [
+      'organisations', 'users', 'patients', 'operations', 'implants', 
+      'surgery_implants', 'radios', 'visites', 'protheses',
+      'notes', 'rendez_vous', 'appointments', 'documents', 'flags', 
+      'saved_filters', 'calendar_integrations', 'appointment_external_links'
+    ];
+    
     const result = await client.query(`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
-      AND table_name IN ('calendar_integrations', 'appointment_external_links')
       ORDER BY table_name
     `);
     
-    if (result.rows.length > 0) {
-      console.log('Tables found:');
-      result.rows.forEach(row => console.log(`  ✓ ${row.table_name}`));
-    } else {
-      console.log('Warning: Tables not found. Migration may have failed silently.');
+    const existingTables = new Set(result.rows.map(r => r.table_name));
+    const missingTables: string[] = [];
+    const foundTables: string[] = [];
+    
+    for (const table of criticalTables) {
+      if (existingTables.has(table)) {
+        foundTables.push(table);
+      } else {
+        missingTables.push(table);
+      }
     }
+    
+    console.log(`\nTables found (${foundTables.length}/${criticalTables.length}):`);
+    foundTables.forEach(t => console.log(`  ✓ ${t}`));
+    
+    if (missingTables.length > 0) {
+      console.log(`\n⚠️ Missing tables (${missingTables.length}):`);
+      missingTables.forEach(t => console.log(`  ✗ ${t}`));
+      console.log('\nWarning: Some critical tables are missing!');
+    } else {
+      console.log('\n✅ All critical tables are present!');
+    }
+    
+    // Show all tables in database
+    console.log(`\nAll tables in database (${existingTables.size}):`);
+    Array.from(existingTables).sort().forEach(t => console.log(`  - ${t}`));
 
   } catch (error) {
     console.error('Migration failed:', error);

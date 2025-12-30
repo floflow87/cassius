@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
+import { logSchemaCheck } from "./schemaCheck";
 import { 
   createRequestContext, 
   runWithContext, 
@@ -89,6 +90,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Schema sanity check on startup
+  await logSchemaCheck();
+  
   await registerRoutes(httpServer, app);
 
   // Gestionnaire d'erreurs global - robuste pour contexte SaaS médical
