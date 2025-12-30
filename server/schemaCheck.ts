@@ -17,11 +17,13 @@ const CRITICAL_TABLES = [
   'visites',
   'protheses',
   'notes',
+  'rendez_vous',
   'appointments',
   'documents',
   'flags',
   'saved_filters',
   'calendar_integrations',
+  'appointment_external_links',
 ];
 
 export interface SchemaCheckResult {
