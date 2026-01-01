@@ -1,0 +1,95 @@
+Objectif
+Implémenter la section FRONTEND “Import Google → Cassius (V2)” dans la page Paramètres > Google Calendar, en s’appuyant sur le backend déjà livré.
+
+Contexte backend existant (NE PAS MODIFIER)
+Routes disponibles :
+- GET /api/google/events?calendarId=...&timeMin=...&timeMax=...
+- POST /api/google/import   body: { calendarId, timeMin, timeMax, mode: "preview"|"import" }
+- GET /api/google/import/status
+- GET /api/google/imported-events?timeMin=...&timeMax=...
+- GET /api/sync/conflicts?status=open|resolved|ignored
+- PATCH /api/sync/conflicts/:id   body: { status: "resolved"|"ignored", resolution?: "keep_google"|"keep_cassius"|"duplicate"|"manual" }
+
+La migration Supabase (20241230_005_google_events_import.sql) doit être appliquée. Le serveur fonctionne.
+
+UI/UX attendu (Page Google Calendar)
+Ajouter un nouveau bloc sous “Options de synchronisation” :
+Section : “Importer depuis Google vers Cassius”
+- Toggle : Activer l’import Google → Cassius
+- “Calendrier source” (dropdown) : liste des calendriers Google (utiliser la même liste que la V1 si déjà chargée)
+- “Période d’import” :
+  - Presets : 7 jours, 30 jours, Mois en cours
+  - Option “Plage personnalisée” avec 2 date pickers (date début / date fin)
+- Bouton primaire : “Prévisualiser”
+- Bouton secondaire : “Importer maintenant” (désactivé tant que la preview n’a pas été faite ou si preview=0)
+- Zone Résultat preview (affichée après preview) :
+  - Résumé : created / updated / skipped / cancelled / failed
+  - Liste “failures” (si existante)
+  - Liste “conflicts” (si existante) avec CTA “Voir conflits”
+- Statut :
+  - “Dernier import” + “Nombre d’événements importés” depuis GET /api/google/import/status
+  - Message d’aide : “Les événements [Cassius] sont automatiquement ignorés pour éviter les boucles.”
+
+Conflits (UI intégrée sur la page ou dans un drawer)
+- Ajouter un bloc “Conflits de synchronisation”
+  - compteur open
+  - liste paginée/scroll :
+    - titre, date, type de conflit, source, action requise
+  - pour chaque conflit :
+    - Boutons : “Garder Google” (resolved keep_google), “Garder Cassius” (resolved keep_cassius), “Ignorer” (ignored)
+    - après action : mise à jour instantanée UI + toast succès
+- Utiliser GET /api/sync/conflicts?status=open par défaut, et un filtre [Ouverts | Résolus | Ignorés]
+
+Affichage “Événements importés”
+- Ajouter un petit bouton “Voir les événements importés” qui ouvre une modal/drawer :
+  - récupère GET /api/google/imported-events?timeMin=...&timeMax=...
+  - affiche une liste simple (date/heure, summary, badge status, lien htmlLink si fourni)
+  - empty state si aucun
+
+Gestion des états (très important)
+- Loading states :
+  - au chargement : récupérer import/status + conflits ouverts + (optionnel) calendrier liste
+  - pendant preview/import : spinner sur boutons + désactiver inputs
+- Error handling :
+  - afficher les erreurs API dans un toast + dans un bloc d’erreur lisible (message + error code si dispo)
+- Success handling :
+  - toast “Prévisualisation réussie”
+  - toast “Import terminé”
+- Disable rules :
+  - Si pas connecté Google => section import grisée + CTA “Connecter”
+  - Si calendarId non sélectionné => boutons disabled
+  - “Importer maintenant” disabled si preview jamais faite, ou si preview indique 0 changement et 0 conflits
+
+Contrat de données (à respecter)
+- POST /api/google/import (preview/import) renvoie :
+  { created, updated, skipped, cancelled, failed, conflicts: [], failures: [] }
+Afficher ces champs.
+
+Implémentation technique (React)
+- Ajouter un state local :
+  importEnabled, sourceCalendarId
+  rangePreset ("7d"|"30d"|"month"|"custom")
+  timeMin, timeMax
+  previewResult, previewDone
+  statusInfo (lastImportAt, importedCount)
+  conflicts (open/resolved/ignored)
+  importedEventsModalOpen + importedEvents list
+- Centraliser les appels API dans un petit service (ex: api/googleCalendar.ts) si pattern existant.
+- Mettre à jour la page sans rechargement complet.
+
+UI design
+- Réutiliser les composants existants (Cards, Toggles, Select, Buttons, Alerts).
+- Hiérarchie visuelle : titre, sous-texte, actions.
+- Rendre la section import cohérente avec le style Cassius (sobre, médical, premium).
+- Microcopy FR (ton Cassius), court, rassurant.
+
+Livrables
+1) Section Import complète (toggle + calendrier source + période + preview + import)
+2) Bloc statut (dernier import + nb importés)
+3) UI Conflits (liste + résolution via PATCH)
+4) Modal/Drawer “événements importés”
+5) Gestion loading/error/success + règles de désactivation
+6) Vérification manuelle :
+   - Preview sur 7 jours
+   - Import sur 7 jours (idempotent)
+   - Conflit -> résolution -> refresh liste

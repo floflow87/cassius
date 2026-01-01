@@ -16,7 +16,13 @@ import {
   XCircle,
   Loader2,
   Mail,
-  CalendarDays
+  CalendarDays,
+  Download,
+  Eye,
+  AlertCircle,
+  ChevronRight,
+  FileText,
+  X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,8 +32,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { format, startOfMonth, endOfMonth, addDays, subDays } from "date-fns";
+import { fr } from "date-fns/locale";
 
 interface GoogleStatus {
   connected: boolean;
@@ -72,11 +82,81 @@ interface SyncResult {
   message?: string;
 }
 
+interface ImportPreviewResult {
+  mode: "preview" | "import";
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  cancelled: number;
+  failed: number;
+  events?: Array<{
+    id: string;
+    summary: string;
+    start: Date;
+    end: Date;
+    allDay: boolean;
+    status: string;
+    location?: string;
+  }>;
+  conflicts: Array<{ eventId: string; summary: string; reason: string }>;
+  failures: Array<{ eventId: string; reason: string }>;
+}
+
+interface ImportStatus {
+  connected: boolean;
+  importEnabled: boolean;
+  sourceCalendarId?: string;
+  sourceCalendarName?: string;
+  lastImportAt?: string;
+  importedEventsCount: number;
+}
+
+interface SyncConflict {
+  id: string;
+  source: "google" | "cassius";
+  entityType: string;
+  externalId?: string;
+  internalId?: string;
+  reason: string;
+  payload?: any;
+  status: "open" | "resolved" | "ignored";
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+interface ImportedEvent {
+  id: string;
+  googleEventId: string;
+  summary?: string;
+  startAt?: string;
+  endAt?: string;
+  allDay?: boolean;
+  status?: string;
+  htmlLink?: string;
+  location?: string;
+}
+
+type RangePreset = "7d" | "30d" | "month" | "custom";
+
 export default function GoogleCalendarIntegration() {
   const { toast } = useToast();
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>("");
   const [isConnecting, setIsConnecting] = useState(false);
   const searchParams = useSearch();
+  
+  // Import V2 state
+  const [importEnabled, setImportEnabled] = useState(false);
+  const [sourceCalendarId, setSourceCalendarId] = useState<string>("");
+  const [rangePreset, setRangePreset] = useState<RangePreset>("7d");
+  const [customStartDate, setCustomStartDate] = useState<string>("");
+  const [customEndDate, setCustomEndDate] = useState<string>("");
+  const [previewResult, setPreviewResult] = useState<ImportPreviewResult | null>(null);
+  const [previewDone, setPreviewDone] = useState(false);
+  const [conflictFilter, setConflictFilter] = useState<"open" | "resolved" | "ignored">("open");
+  const [importedEventsModalOpen, setImportedEventsModalOpen] = useState(false);
+  const [importedEvents, setImportedEvents] = useState<ImportedEvent[]>([]);
+  const [loadingImportedEvents, setLoadingImportedEvents] = useState(false);
   
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
@@ -125,6 +205,33 @@ export default function GoogleCalendarIntegration() {
       const res = await fetch("/api/integrations/google/env-check", { credentials: "include" });
       if (res.status === 403) return null;
       if (!res.ok) return null;
+      return res.json();
+    },
+  });
+  
+  const { data: importStatus } = useQuery<ImportStatus>({
+    queryKey: ["/api/google/import/status"],
+    enabled: status?.connected === true,
+    retry: false,
+  });
+  
+  // Hydrate import settings from backend
+  useEffect(() => {
+    if (importStatus) {
+      setImportEnabled(importStatus.importEnabled ?? false);
+      if (importStatus.sourceCalendarId) {
+        setSourceCalendarId(importStatus.sourceCalendarId);
+      }
+    }
+  }, [importStatus]);
+  
+  const { data: conflicts = [], refetch: refetchConflicts } = useQuery<SyncConflict[]>({
+    queryKey: ["/api/sync/conflicts", conflictFilter],
+    enabled: status?.connected === true,
+    retry: false,
+    queryFn: async () => {
+      const res = await fetch(`/api/sync/conflicts?status=${conflictFilter}`, { credentials: "include" });
+      if (!res.ok) return [];
       return res.json();
     },
   });
@@ -216,6 +323,140 @@ export default function GoogleCalendarIntegration() {
     },
   });
   
+  // Import V2 mutations
+  const previewMutation = useMutation({
+    mutationFn: async () => {
+      const { timeMin, timeMax } = getDateRange();
+      const response = await apiRequest("POST", "/api/google/import", {
+        calendarId: sourceCalendarId,
+        timeMin: timeMin.toISOString(),
+        timeMax: timeMax.toISOString(),
+        mode: "preview",
+      });
+      return response.json() as Promise<ImportPreviewResult>;
+    },
+    onSuccess: (data) => {
+      setPreviewResult(data);
+      setPreviewDone(true);
+      toast({ 
+        title: "Prévisualisation réussie",
+        description: `${data.total} événement(s) trouvé(s)`,
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erreur de prévisualisation", 
+        description: error?.message || "Une erreur est survenue",
+        variant: "destructive" 
+      });
+    },
+  });
+  
+  const importMutation = useMutation({
+    mutationFn: async () => {
+      const { timeMin, timeMax } = getDateRange();
+      const response = await apiRequest("POST", "/api/google/import", {
+        calendarId: sourceCalendarId,
+        timeMin: timeMin.toISOString(),
+        timeMax: timeMax.toISOString(),
+        mode: "import",
+      });
+      return response.json() as Promise<ImportPreviewResult>;
+    },
+    onSuccess: (data) => {
+      setPreviewResult(data);
+      toast({ 
+        title: "Import terminé",
+        description: `${data.created} créé(s), ${data.updated} mis à jour, ${data.skipped} ignoré(s)`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/google/import/status"] });
+      refetchConflicts();
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erreur d'import", 
+        description: error?.message || "Une erreur est survenue",
+        variant: "destructive" 
+      });
+    },
+  });
+  
+  const resolveConflictMutation = useMutation({
+    mutationFn: async ({ id, status, resolution }: { id: string; status: "resolved" | "ignored"; resolution?: string }) => {
+      return apiRequest("PATCH", `/api/sync/conflicts/${id}`, { status, resolution });
+    },
+    onSuccess: () => {
+      toast({ title: "Conflit résolu" });
+      refetchConflicts();
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erreur", 
+        description: error?.message || "Impossible de résoudre le conflit",
+        variant: "destructive" 
+      });
+    },
+  });
+  
+  const updateImportSettingsMutation = useMutation({
+    mutationFn: async (data: { importEnabled?: boolean; sourceCalendarId?: string; sourceCalendarName?: string }) => {
+      return apiRequest("PATCH", "/api/integrations/google/settings", data);
+    },
+    onSuccess: () => {
+      toast({ title: "Paramètres d'import mis à jour" });
+      queryClient.invalidateQueries({ queryKey: ["/api/google/import/status"] });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la mise à jour", variant: "destructive" });
+    },
+  });
+  
+  const handleToggleImportEnabled = (enabled: boolean) => {
+    setImportEnabled(enabled);
+    updateImportSettingsMutation.mutate({ importEnabled: enabled });
+  };
+  
+  const handleSourceCalendarChange = (calendarId: string) => {
+    const calendar = calendars.find(c => c.id === calendarId);
+    setSourceCalendarId(calendarId);
+    updateImportSettingsMutation.mutate({
+      sourceCalendarId: calendarId,
+      sourceCalendarName: calendar?.summary || undefined,
+    });
+  };
+  
+  const openImportedEventsModal = async () => {
+    setImportedEventsModalOpen(true);
+    await loadImportedEvents();
+  };
+  
+  const isCustomDateRangeValid = () => {
+    if (rangePreset !== "custom") return true;
+    if (!customStartDate || !customEndDate) return false;
+    const start = new Date(customStartDate);
+    const end = new Date(customEndDate);
+    return !isNaN(start.getTime()) && !isNaN(end.getTime()) && start <= end;
+  };
+  
+  const loadImportedEvents = async () => {
+    setLoadingImportedEvents(true);
+    try {
+      const { timeMin, timeMax } = getDateRange();
+      const res = await fetch(
+        `/api/google/imported-events?start=${timeMin.toISOString()}&end=${timeMax.toISOString()}`,
+        { credentials: "include" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setImportedEvents(data);
+      }
+    } catch (error) {
+      console.error("Error loading imported events:", error);
+    } finally {
+      setLoadingImportedEvents(false);
+    }
+  };
+  
   const handleConnect = () => {
     setIsConnecting(true);
     connectMutation.mutate();
@@ -234,12 +475,45 @@ export default function GoogleCalendarIntegration() {
     updateIntegrationMutation.mutate({ isEnabled: enabled });
   };
   
+  const getDateRange = () => {
+    const now = new Date();
+    let timeMin: Date;
+    let timeMax: Date;
+    
+    switch (rangePreset) {
+      case "7d":
+        timeMin = subDays(now, 1);
+        timeMax = addDays(now, 7);
+        break;
+      case "30d":
+        timeMin = subDays(now, 1);
+        timeMax = addDays(now, 30);
+        break;
+      case "month":
+        timeMin = startOfMonth(now);
+        timeMax = endOfMonth(now);
+        break;
+      case "custom":
+        timeMin = customStartDate ? new Date(customStartDate) : now;
+        timeMax = customEndDate ? new Date(customEndDate) : addDays(now, 7);
+        break;
+      default:
+        timeMin = now;
+        timeMax = addDays(now, 7);
+    }
+    
+    return { timeMin, timeMax };
+  };
+  
   const isConnected = status?.connected === true;
   const isConfigured = status?.configured !== false;
   const integration = status?.integration;
   const currentCalendarId = selectedCalendarId || integration?.targetCalendarId || "";
   
-  const formatLastSync = (dateStr: string | null) => {
+  const canPreview = isConnected && sourceCalendarId && isCustomDateRangeValid();
+  const canImport = isConnected && sourceCalendarId && previewDone && (previewResult?.total ?? 0) > 0 && isCustomDateRangeValid();
+  
+  const formatLastSync = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
     const now = new Date();
@@ -254,6 +528,8 @@ export default function GoogleCalendarIntegration() {
     if (diffDays < 7) return `Il y a ${diffDays}j`;
     return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   };
+  
+  const openConflictsCount = conflicts.filter(c => c.status === "open").length;
 
   return (
     <div className="p-6" data-testid="settings-google-calendar">
@@ -269,7 +545,7 @@ export default function GoogleCalendarIntegration() {
           </div>
           <div>
             <h1 className="text-2xl font-semibold">Google Calendar</h1>
-            <p className="text-sm text-muted-foreground">Synchronisation des rendez-vous</p>
+            <p className="text-sm text-muted-foreground">Synchronisation bidirectionnelle</p>
           </div>
         </div>
       </div>
@@ -338,7 +614,7 @@ export default function GoogleCalendarIntegration() {
                   <div className="flex items-center gap-3">
                     <CalendarDays className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Calendrier</p>
+                      <p className="text-xs text-muted-foreground">Calendrier cible</p>
                       <p className="text-sm font-medium truncate">
                         {integration?.targetCalendarName || "Non sélectionné"}
                       </p>
@@ -380,7 +656,7 @@ export default function GoogleCalendarIntegration() {
                   ) : (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2" />
-                      Synchroniser maintenant
+                      Synchroniser vers Google
                     </>
                   )}
                 </Button>
@@ -453,12 +729,12 @@ export default function GoogleCalendarIntegration() {
         
         {isConnected && (
           <>
-            {/* Section 2: Sync Rules */}
+            {/* Section 2: Sync Rules (Cassius -> Google) */}
             <Card data-testid="card-sync-options">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-medium">Règles de synchronisation</CardTitle>
+                <CardTitle className="text-base font-medium">Export Cassius vers Google</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
                     <Label htmlFor="sync-enabled" className="text-sm font-normal">
@@ -476,19 +752,15 @@ export default function GoogleCalendarIntegration() {
                     data-testid="switch-sync-enabled"
                   />
                 </div>
-              </CardContent>
-            </Card>
-            
-            {/* Section 3: Target Calendar */}
-            <Card data-testid="card-calendar-select">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-medium">Calendrier cible</CardTitle>
-              </CardHeader>
-              <CardContent>
+                
+                <Separator />
+                
+                {/* Target Calendar */}
                 {calendarsLoading ? (
                   <Skeleton className="h-10 w-full" />
                 ) : (
                   <div className="space-y-2">
+                    <Label className="text-sm">Calendrier cible</Label>
                     <Select
                       value={currentCalendarId}
                       onValueChange={handleCalendarChange}
@@ -506,14 +778,369 @@ export default function GoogleCalendarIntegration() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Les événements seront créés dans ce calendrier
+                      Les événements Cassius seront créés avec le préfixe [Cassius]
                     </p>
                   </div>
                 )}
               </CardContent>
             </Card>
             
-            {/* Section 4: Event Preview */}
+            {/* Section 3: Import from Google (V2) */}
+            <Card data-testid="card-import">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base font-medium">Import Google vers Cassius</CardTitle>
+                  <div className="flex items-center gap-2">
+                    {importStatus && importStatus.importedEventsCount > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {importStatus.importedEventsCount} importé(s)
+                      </Badge>
+                    )}
+                    <Switch
+                      checked={importEnabled}
+                      onCheckedChange={handleToggleImportEnabled}
+                      disabled={updateImportSettingsMutation.isPending}
+                      data-testid="switch-import-enabled"
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Source Calendar */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Calendrier source</Label>
+                  {calendarsLoading ? (
+                    <Skeleton className="h-10 w-full" />
+                  ) : (
+                    <Select
+                      value={sourceCalendarId}
+                      onValueChange={(val) => {
+                        handleSourceCalendarChange(val);
+                        setPreviewResult(null);
+                        setPreviewDone(false);
+                      }}
+                    >
+                      <SelectTrigger data-testid="select-source-calendar">
+                        <SelectValue placeholder="Sélectionnez un calendrier à importer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {calendars.map((cal) => (
+                          <SelectItem key={cal.id} value={cal.id}>
+                            {cal.summary} {cal.primary && "(Principal)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+                
+                {/* Date Range */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Période d'import</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant={rangePreset === "7d" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setRangePreset("7d");
+                        setPreviewResult(null);
+                        setPreviewDone(false);
+                      }}
+                      data-testid="button-range-7d"
+                    >
+                      7 jours
+                    </Button>
+                    <Button
+                      variant={rangePreset === "30d" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setRangePreset("30d");
+                        setPreviewResult(null);
+                        setPreviewDone(false);
+                      }}
+                      data-testid="button-range-30d"
+                    >
+                      30 jours
+                    </Button>
+                    <Button
+                      variant={rangePreset === "month" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setRangePreset("month");
+                        setPreviewResult(null);
+                        setPreviewDone(false);
+                      }}
+                      data-testid="button-range-month"
+                    >
+                      Mois en cours
+                    </Button>
+                    <Button
+                      variant={rangePreset === "custom" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setRangePreset("custom");
+                        setPreviewResult(null);
+                        setPreviewDone(false);
+                      }}
+                      data-testid="button-range-custom"
+                    >
+                      Personnalisé
+                    </Button>
+                  </div>
+                  
+                  {rangePreset === "custom" && (
+                    <div className="flex gap-2 mt-2">
+                      <div className="flex-1">
+                        <Label className="text-xs text-muted-foreground">Début</Label>
+                        <input
+                          type="date"
+                          value={customStartDate}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                          className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+                          data-testid="input-start-date"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs text-muted-foreground">Fin</Label>
+                        <input
+                          type="date"
+                          value={customEndDate}
+                          onChange={(e) => setCustomEndDate(e.target.value)}
+                          className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+                          data-testid="input-end-date"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => previewMutation.mutate()}
+                    disabled={!canPreview || previewMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-preview"
+                  >
+                    {previewMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Eye className="h-4 w-4 mr-2" />
+                    )}
+                    Prévisualiser
+                  </Button>
+                  <Button
+                    onClick={() => importMutation.mutate()}
+                    disabled={!canImport || importMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-import"
+                  >
+                    {importMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Importer maintenant
+                  </Button>
+                </div>
+                
+                {/* Preview/Import Results */}
+                {previewResult && (
+                  <div className="p-4 rounded-md bg-muted/50 space-y-3" data-testid="import-results">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {previewResult.mode === "preview" ? "Prévisualisation" : "Import terminé"}
+                      </span>
+                      <Badge variant="secondary">{previewResult.total} événement(s)</Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <span className="text-muted-foreground">Créés:</span>
+                        <span className="font-medium">{previewResult.created}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        <span className="text-muted-foreground">Mis à jour:</span>
+                        <span className="font-medium">{previewResult.updated}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-gray-400" />
+                        <span className="text-muted-foreground">Ignorés:</span>
+                        <span className="font-medium">{previewResult.skipped}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-red-500" />
+                        <span className="text-muted-foreground">Erreurs:</span>
+                        <span className="font-medium">{previewResult.failed}</span>
+                      </div>
+                    </div>
+                    
+                    {previewResult.failures.length > 0 && (
+                      <div className="pt-2 border-t">
+                        <p className="text-xs text-destructive mb-1">Erreurs :</p>
+                        <ul className="text-xs space-y-1">
+                          {previewResult.failures.slice(0, 3).map((f, i) => (
+                            <li key={i} className="text-muted-foreground">
+                              {f.eventId}: {f.reason}
+                            </li>
+                          ))}
+                          {previewResult.failures.length > 3 && (
+                            <li className="text-muted-foreground">
+                              ... et {previewResult.failures.length - 3} autre(s)
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Import Status */}
+                {importStatus && (
+                  <div className="flex items-center justify-between text-sm pt-2 border-t">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>Dernier import: {formatLastSync(importStatus.lastImportAt) || "Jamais"}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={openImportedEventsModal}
+                      className="text-xs"
+                      data-testid="button-view-imported"
+                    >
+                      <FileText className="h-3.5 w-3.5 mr-1" />
+                      Voir les événements
+                    </Button>
+                  </div>
+                )}
+                
+                <p className="text-xs text-muted-foreground">
+                  Les événements [Cassius] sont automatiquement ignorés pour éviter les boucles.
+                </p>
+              </CardContent>
+            </Card>
+            
+            {/* Section 4: Conflicts */}
+            <Card data-testid="card-conflicts">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base font-medium">Conflits de synchronisation</CardTitle>
+                  {openConflictsCount > 0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      {openConflictsCount} ouvert(s)
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Filter Tabs */}
+                <div className="flex gap-1 p-1 bg-muted rounded-md">
+                  <Button
+                    variant={conflictFilter === "open" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setConflictFilter("open")}
+                    className="flex-1 text-xs"
+                    data-testid="button-filter-open"
+                  >
+                    Ouverts
+                  </Button>
+                  <Button
+                    variant={conflictFilter === "resolved" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setConflictFilter("resolved")}
+                    className="flex-1 text-xs"
+                    data-testid="button-filter-resolved"
+                  >
+                    Résolus
+                  </Button>
+                  <Button
+                    variant={conflictFilter === "ignored" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setConflictFilter("ignored")}
+                    className="flex-1 text-xs"
+                    data-testid="button-filter-ignored"
+                  >
+                    Ignorés
+                  </Button>
+                </div>
+                
+                {/* Conflicts List */}
+                {conflicts.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Aucun conflit {conflictFilter === "open" ? "en attente" : conflictFilter === "resolved" ? "résolu" : "ignoré"}</p>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[240px]">
+                    <div className="space-y-2">
+                      {conflicts.map((conflict) => (
+                        <div
+                          key={conflict.id}
+                          className="p-3 rounded-md border bg-card"
+                          data-testid={`conflict-${conflict.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs shrink-0">
+                                  {conflict.source === "google" ? "Google" : "Cassius"}
+                                </Badge>
+                                <span className="text-sm font-medium truncate">
+                                  {conflict.reason}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(conflict.createdAt), "dd MMM yyyy HH:mm", { locale: fr })}
+                              </p>
+                            </div>
+                            
+                            {conflict.status === "open" && (
+                              <div className="flex gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => resolveConflictMutation.mutate({ 
+                                    id: conflict.id, 
+                                    status: "resolved",
+                                    resolution: "keep_google"
+                                  })}
+                                  disabled={resolveConflictMutation.isPending}
+                                  className="text-xs h-7 px-2"
+                                  title="Garder Google"
+                                  data-testid={`button-keep-google-${conflict.id}`}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => resolveConflictMutation.mutate({ 
+                                    id: conflict.id, 
+                                    status: "ignored" 
+                                  })}
+                                  disabled={resolveConflictMutation.isPending}
+                                  className="text-xs h-7 px-2"
+                                  title="Ignorer"
+                                  data-testid={`button-ignore-${conflict.id}`}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* Section 5: Event Preview */}
             <Card data-testid="card-event-preview">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-medium">Aperçu dans Google Calendar</CardTitle>
@@ -556,13 +1183,86 @@ export default function GoogleCalendarIntegration() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">
-                  Les événements sont préfixés par [Cassius] pour les identifier facilement
+                  Les événements exportés sont préfixés par [Cassius] pour les identifier
                 </p>
               </CardContent>
             </Card>
           </>
         )}
       </div>
+      
+      {/* Imported Events Modal */}
+      <Dialog open={importedEventsModalOpen} onOpenChange={setImportedEventsModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Événements importés</DialogTitle>
+            <DialogDescription>
+              Liste des événements Google Calendar importés dans Cassius
+            </DialogDescription>
+          </DialogHeader>
+          
+          {loadingImportedEvents ? (
+            <div className="py-8 text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Chargement...</p>
+            </div>
+          ) : importedEvents.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">
+              <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Aucun événement importé pour cette période</p>
+            </div>
+          ) : (
+            <ScrollArea className="h-[400px]">
+              <div className="space-y-2">
+                {importedEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="p-3 rounded-md border bg-card"
+                    data-testid={`imported-event-${event.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {event.summary || "Sans titre"}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {event.startAt && (
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(event.startAt), "dd MMM HH:mm", { locale: fr })}
+                            </span>
+                          )}
+                          {event.status && (
+                            <Badge variant="outline" className="text-xs">
+                              {event.status}
+                            </Badge>
+                          )}
+                        </div>
+                        {event.location && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate">
+                            {event.location}
+                          </p>
+                        )}
+                      </div>
+                      {event.htmlLink && (
+                        <a
+                          href={event.htmlLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0"
+                        >
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

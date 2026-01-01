@@ -2482,7 +2482,7 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const { isEnabled, targetCalendarId, targetCalendarName } = req.body;
+      const { isEnabled, targetCalendarId, targetCalendarName, importEnabled, sourceCalendarId, sourceCalendarName } = req.body;
       
       let integration = await storage.getCalendarIntegration(organisationId);
       
@@ -2494,6 +2494,9 @@ export async function registerRoutes(
         isEnabled: isEnabled ?? integration.isEnabled,
         targetCalendarId: targetCalendarId !== undefined ? targetCalendarId : integration.targetCalendarId,
         targetCalendarName: targetCalendarName !== undefined ? targetCalendarName : integration.targetCalendarName,
+        importEnabled: importEnabled !== undefined ? importEnabled : integration.importEnabled,
+        sourceCalendarId: sourceCalendarId !== undefined ? sourceCalendarId : integration.sourceCalendarId,
+        sourceCalendarName: sourceCalendarName !== undefined ? sourceCalendarName : integration.sourceCalendarName,
       });
       
       res.json(integration);
