@@ -426,8 +426,8 @@ export default function GoogleCalendarIntegration() {
   };
   
   const openImportedEventsModal = async () => {
-    setImportedEventsModalOpen(true);
     await loadImportedEvents();
+    setImportedEventsModalOpen(true);
   };
   
   const isCustomDateRangeValid = () => {
