@@ -24,6 +24,8 @@ const CRITICAL_TABLES = [
   'saved_filters',
   'calendar_integrations',
   'appointment_external_links',
+  'google_calendar_events',
+  'sync_conflicts',
 ];
 
 export interface SchemaCheckResult {

@@ -14,6 +14,8 @@ import {
   savedFilters,
   appointments,
   flags,
+  googleCalendarEvents,
+  syncConflicts,
   type Patient,
   type InsertPatient,
   type Operation,
@@ -52,6 +54,8 @@ import {
   calendarIntegrations,
   type CalendarIntegration,
   type InsertCalendarIntegration,
+  type GoogleCalendarEvent,
+  type SyncConflict,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -251,6 +255,28 @@ export interface IStorage {
   getAppointmentsForSync(organisationId: string, lastSyncAt?: Date): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]>;
   updateAppointmentSync(organisationId: string, id: string, data: { externalProvider?: string; externalCalendarId?: string; externalEventId?: string; externalEtag?: string; syncStatus?: string; lastSyncedAt?: Date; syncError?: string | null }): Promise<void>;
   updateIntegrationSyncStatus(organisationId: string, id: string, data: { lastSyncAt?: Date; syncErrorCount?: number; lastSyncError?: string | null }): Promise<void>;
+  
+  // V2: Google Calendar Import (Google -> Cassius)
+  upsertGoogleCalendarEvent(organisationId: string, data: {
+    integrationId: string;
+    googleCalendarId: string;
+    googleEventId: string;
+    etag?: string;
+    status?: 'confirmed' | 'tentative' | 'cancelled';
+    summary?: string | null;
+    description?: string | null;
+    location?: string | null;
+    startAt?: Date | null;
+    endAt?: Date | null;
+    allDay?: boolean;
+    attendees?: string | null;
+    htmlLink?: string | null;
+    updatedAtGoogle?: Date | null;
+  }): Promise<{ isNew: boolean; event: GoogleCalendarEvent }>;
+  getGoogleCalendarEvents(organisationId: string, startDate: Date, endDate: Date): Promise<GoogleCalendarEvent[]>;
+  getGoogleCalendarEventsCount(organisationId: string): Promise<number>;
+  getSyncConflicts(organisationId: string, status: 'open' | 'resolved' | 'ignored'): Promise<SyncConflict[]>;
+  resolveConflict(organisationId: string, id: string, status: 'resolved' | 'ignored', userId: string | null): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3612,6 +3638,123 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(calendarIntegrations.id, id),
         eq(calendarIntegrations.organisationId, organisationId)
+      ));
+  }
+  
+  // ========== V2: GOOGLE CALENDAR IMPORT ==========
+  
+  async upsertGoogleCalendarEvent(organisationId: string, data: {
+    integrationId: string;
+    googleCalendarId: string;
+    googleEventId: string;
+    etag?: string;
+    status?: 'confirmed' | 'tentative' | 'cancelled';
+    summary?: string | null;
+    description?: string | null;
+    location?: string | null;
+    startAt?: Date | null;
+    endAt?: Date | null;
+    allDay?: boolean;
+    attendees?: string | null;
+    htmlLink?: string | null;
+    updatedAtGoogle?: Date | null;
+  }): Promise<{ isNew: boolean; event: GoogleCalendarEvent }> {
+    // Check if event already exists
+    const existing = await db.select().from(googleCalendarEvents)
+      .where(and(
+        eq(googleCalendarEvents.organisationId, organisationId),
+        eq(googleCalendarEvents.googleCalendarId, data.googleCalendarId),
+        eq(googleCalendarEvents.googleEventId, data.googleEventId)
+      ))
+      .limit(1);
+    
+    const now = new Date();
+    
+    if (existing.length > 0) {
+      // Update existing event
+      const [updated] = await db.update(googleCalendarEvents)
+        .set({
+          etag: data.etag,
+          status: data.status,
+          summary: data.summary,
+          description: data.description,
+          location: data.location,
+          startAt: data.startAt,
+          endAt: data.endAt,
+          allDay: data.allDay,
+          attendees: data.attendees,
+          htmlLink: data.htmlLink,
+          updatedAtGoogle: data.updatedAtGoogle,
+          lastSyncedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(googleCalendarEvents.id, existing[0].id))
+        .returning();
+      
+      return { isNew: false, event: updated };
+    } else {
+      // Insert new event
+      const [inserted] = await db.insert(googleCalendarEvents)
+        .values({
+          organisationId,
+          integrationId: data.integrationId,
+          googleCalendarId: data.googleCalendarId,
+          googleEventId: data.googleEventId,
+          etag: data.etag,
+          status: data.status,
+          summary: data.summary,
+          description: data.description,
+          location: data.location,
+          startAt: data.startAt,
+          endAt: data.endAt,
+          allDay: data.allDay,
+          attendees: data.attendees,
+          htmlLink: data.htmlLink,
+          updatedAtGoogle: data.updatedAtGoogle,
+          lastSyncedAt: now,
+        })
+        .returning();
+      
+      return { isNew: true, event: inserted };
+    }
+  }
+  
+  async getGoogleCalendarEvents(organisationId: string, startDate: Date, endDate: Date): Promise<GoogleCalendarEvent[]> {
+    return await db.select().from(googleCalendarEvents)
+      .where(and(
+        eq(googleCalendarEvents.organisationId, organisationId),
+        gte(googleCalendarEvents.startAt, startDate),
+        lte(googleCalendarEvents.startAt, endDate)
+      ))
+      .orderBy(googleCalendarEvents.startAt);
+  }
+  
+  async getGoogleCalendarEventsCount(organisationId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(googleCalendarEvents)
+      .where(eq(googleCalendarEvents.organisationId, organisationId));
+    return Number(result[0]?.count || 0);
+  }
+  
+  async getSyncConflicts(organisationId: string, status: 'open' | 'resolved' | 'ignored'): Promise<SyncConflict[]> {
+    return await db.select().from(syncConflicts)
+      .where(and(
+        eq(syncConflicts.organisationId, organisationId),
+        eq(syncConflicts.status, status)
+      ))
+      .orderBy(desc(syncConflicts.createdAt));
+  }
+  
+  async resolveConflict(organisationId: string, id: string, status: 'resolved' | 'ignored', userId: string | null): Promise<void> {
+    await db.update(syncConflicts)
+      .set({
+        status,
+        resolvedAt: new Date(),
+        resolvedBy: userId,
+      })
+      .where(and(
+        eq(syncConflicts.id, id),
+        eq(syncConflicts.organisationId, organisationId)
       ));
   }
 }

@@ -166,6 +166,21 @@ Implant tracking uses `implants` (catalog) and `surgery_implants` (placement dat
         - `DELETE /api/integrations/google/disconnect` - Clear tokens and disconnect.
     - Features: Connect/disconnect Google account, select target calendar, enable/disable sync, manual sync trigger, error display.
     - Events created with `[Cassius]` prefix and extendedProperties.cassiusAppointmentId for identification.
+- **Google Calendar Import V2 (Google -> Cassius)**:
+    - Bidirectional sync: Import external Google Calendar events into Cassius.
+    - Database tables:
+        - `google_calendar_events` - Stores imported events with idempotent upsert on (org_id, calendar_id, event_id).
+        - `sync_conflicts` - Tracks conflicts between Cassius and Google Calendar events.
+    - New calendar_integrations columns: `sourceCalendarId`, `sourceCalendarName`, `importEnabled`, `lastImportAt`, `syncToken`.
+    - API endpoints:
+        - `GET /api/google/events` - List events from Google Calendar (with calendarId, timeMin, timeMax params).
+        - `POST /api/google/import` - Preview or import events (mode: "preview" or "import").
+        - `GET /api/google/import/status` - Get last import status and count of imported events.
+        - `GET /api/google/imported-events` - Get imported Google events for calendar display (with start, end params).
+        - `GET /api/sync/conflicts` - Get sync conflicts by status.
+        - `PATCH /api/sync/conflicts/:id` - Resolve a conflict (status: "resolved" or "ignored").
+    - Import filters: Automatically skips events with `[Cassius]` prefix to avoid re-importing exported events.
+    - Migration: `supabase/migrations/20241230_005_google_events_import.sql`.
 - **Settings Pages**:
     - 2-column layout with sidebar navigation (Profile, Organization, Integrations, Security).
     - `/settings/integrations` lists available integrations as cards.

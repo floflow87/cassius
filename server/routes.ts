@@ -2811,5 +2811,343 @@ export async function registerRoutes(
     }
   });
 
+  // V2: Google Calendar Import (Google -> Cassius)
+  
+  // GET /api/google/events - List events from Google Calendar
+  app.get("/api/google/events", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { calendarId, timeMin, timeMax } = req.query;
+      
+      if (!calendarId || !timeMin || !timeMax) {
+        return res.status(400).json({ 
+          error: "MISSING_PARAMS",
+          message: "calendarId, timeMin et timeMax sont requis" 
+        });
+      }
+      
+      const integration = await storage.getCalendarIntegration(organisationId);
+      if (!integration || !integration.accessToken) {
+        return res.status(400).json({ 
+          error: "NOT_CONNECTED",
+          message: "Google Calendar non connecté" 
+        });
+      }
+      
+      const result = await googleCalendar.listAllEvents(integration, {
+        calendarId: String(calendarId),
+        timeMin: String(timeMin),
+        timeMax: String(timeMax),
+      });
+      
+      // Update tokens if refreshed
+      if (result.refreshedTokens) {
+        await storage.updateCalendarIntegration(organisationId, integration.id, {
+          accessToken: result.refreshedTokens.accessToken,
+          tokenExpiresAt: result.refreshedTokens.expiresAt,
+        });
+      }
+      
+      res.json({
+        events: result.events,
+        count: result.events.length,
+      });
+      
+    } catch (error: any) {
+      console.error("[GOOGLE] Error listing events:", error);
+      
+      if (error.message === "SYNC_TOKEN_INVALID") {
+        return res.status(400).json({
+          error: "SYNC_TOKEN_INVALID",
+          message: "Token de synchronisation invalide, import complet requis",
+        });
+      }
+      
+      res.status(500).json({ 
+        error: "LIST_EVENTS_FAILED",
+        message: error.message || "Erreur lors de la récupération des événements" 
+      });
+    }
+  });
+  
+  // POST /api/google/import - Preview or import events
+  app.post("/api/google/import", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { calendarId, timeMin, timeMax, mode = "preview" } = req.body;
+      
+      if (!calendarId || !timeMin || !timeMax) {
+        return res.status(400).json({ 
+          error: "MISSING_PARAMS",
+          message: "calendarId, timeMin et timeMax sont requis" 
+        });
+      }
+      
+      if (mode !== "preview" && mode !== "import") {
+        return res.status(400).json({
+          error: "INVALID_MODE",
+          message: "Le mode doit être 'preview' ou 'import'"
+        });
+      }
+      
+      const integration = await storage.getCalendarIntegration(organisationId);
+      if (!integration || !integration.accessToken) {
+        return res.status(400).json({ 
+          error: "NOT_CONNECTED",
+          message: "Google Calendar non connecté" 
+        });
+      }
+      
+      console.log(`[IMPORT] Starting ${mode} for org=${organisationId}, calendar=${calendarId}, range=${timeMin} to ${timeMax}`);
+      
+      // Fetch events from Google
+      const result = await googleCalendar.listAllEvents(integration, {
+        calendarId: String(calendarId),
+        timeMin: String(timeMin),
+        timeMax: String(timeMax),
+      });
+      
+      // Update tokens if refreshed
+      if (result.refreshedTokens) {
+        await storage.updateCalendarIntegration(organisationId, integration.id, {
+          accessToken: result.refreshedTokens.accessToken,
+          tokenExpiresAt: result.refreshedTokens.expiresAt,
+        });
+      }
+      
+      const stats = {
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        cancelled: 0,
+        failed: 0,
+        conflicts: [] as Array<{ eventId: string; summary: string; reason: string }>,
+        failures: [] as Array<{ eventId: string; reason: string }>,
+      };
+      
+      // Filter out events created by Cassius (they have cassiusAppointmentId in extendedProperties)
+      const externalEvents = result.events.filter(e => {
+        // Skip if this is a Cassius-created event (has [Cassius] prefix)
+        if (e.summary?.startsWith("[Cassius]")) {
+          stats.skipped++;
+          return false;
+        }
+        return true;
+      });
+      
+      console.log(`[IMPORT] Found ${externalEvents.length} external events (skipped ${stats.skipped} Cassius events)`);
+      
+      if (mode === "preview") {
+        // Just return preview without importing
+        res.json({
+          mode: "preview",
+          total: externalEvents.length,
+          events: externalEvents.map(e => ({
+            id: e.id,
+            summary: e.summary,
+            start: e.start,
+            end: e.end,
+            allDay: e.allDay,
+            status: e.status,
+            location: e.location,
+          })),
+          skipped: stats.skipped,
+        });
+        return;
+      }
+      
+      // Import mode: upsert events into google_calendar_events table
+      for (const event of externalEvents) {
+        if (!event.id || !event.start) {
+          stats.failed++;
+          stats.failures.push({ eventId: event.id || 'unknown', reason: 'ID ou date de début manquant' });
+          continue;
+        }
+        
+        try {
+          if (event.status === 'cancelled') {
+            // Mark as cancelled in DB
+            await storage.upsertGoogleCalendarEvent(organisationId, {
+              integrationId: integration.id,
+              googleCalendarId: calendarId,
+              googleEventId: event.id,
+              etag: event.etag,
+              status: 'cancelled',
+              summary: event.summary,
+              description: event.description,
+              location: event.location,
+              startAt: event.start,
+              endAt: event.end,
+              allDay: event.allDay,
+              attendees: JSON.stringify(event.attendees),
+              htmlLink: event.htmlLink,
+              updatedAtGoogle: event.updated,
+            });
+            stats.cancelled++;
+          } else {
+            // Upsert event
+            const { isNew } = await storage.upsertGoogleCalendarEvent(organisationId, {
+              integrationId: integration.id,
+              googleCalendarId: calendarId,
+              googleEventId: event.id,
+              etag: event.etag,
+              status: event.status,
+              summary: event.summary,
+              description: event.description,
+              location: event.location,
+              startAt: event.start,
+              endAt: event.end,
+              allDay: event.allDay,
+              attendees: JSON.stringify(event.attendees),
+              htmlLink: event.htmlLink,
+              updatedAtGoogle: event.updated,
+            });
+            
+            if (isNew) {
+              stats.created++;
+            } else {
+              stats.updated++;
+            }
+          }
+        } catch (error: any) {
+          console.error(`[IMPORT] Error importing event ${event.id}:`, error);
+          stats.failed++;
+          stats.failures.push({ eventId: event.id, reason: error.message });
+        }
+      }
+      
+      // Update import status
+      await storage.updateCalendarIntegration(organisationId, integration.id, {
+        lastImportAt: new Date(),
+        sourceCalendarId: calendarId,
+      });
+      
+      console.log(`[IMPORT] Completed: created=${stats.created}, updated=${stats.updated}, cancelled=${stats.cancelled}, skipped=${stats.skipped}, failed=${stats.failed}`);
+      
+      res.json({
+        mode: "import",
+        total: externalEvents.length,
+        ...stats,
+      });
+      
+    } catch (error: any) {
+      console.error("[IMPORT] Fatal error:", error);
+      
+      res.status(500).json({ 
+        error: "IMPORT_FAILED",
+        step: "fetch_events",
+        message: error.message || "Erreur lors de l'import" 
+      });
+    }
+  });
+  
+  // GET /api/google/import/status - Get last import status
+  app.get("/api/google/import/status", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const integration = await storage.getCalendarIntegration(organisationId);
+      
+      if (!integration) {
+        return res.json({ 
+          connected: false,
+          importEnabled: false,
+        });
+      }
+      
+      // Get count of imported events
+      const importedEvents = await storage.getGoogleCalendarEventsCount(organisationId);
+      
+      res.json({
+        connected: !!integration.accessToken,
+        importEnabled: integration.importEnabled || false,
+        sourceCalendarId: integration.sourceCalendarId,
+        sourceCalendarName: integration.sourceCalendarName,
+        lastImportAt: integration.lastImportAt,
+        importedEventsCount: importedEvents,
+      });
+      
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting status:", error);
+      res.status(500).json({ error: "Failed to get import status" });
+    }
+  });
+  
+  // GET /api/google/imported-events - Get imported Google events for calendar display
+  app.get("/api/google/imported-events", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { start, end } = req.query;
+      
+      if (!start || !end) {
+        return res.status(400).json({ 
+          error: "MISSING_PARAMS",
+          message: "start et end sont requis" 
+        });
+      }
+      
+      const events = await storage.getGoogleCalendarEvents(
+        organisationId,
+        new Date(String(start)),
+        new Date(String(end))
+      );
+      
+      res.json(events);
+      
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting imported events:", error);
+      res.status(500).json({ error: "Failed to get imported events" });
+    }
+  });
+  
+  // GET /api/sync/conflicts - Get sync conflicts
+  app.get("/api/sync/conflicts", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { status = "open" } = req.query;
+      const conflicts = await storage.getSyncConflicts(organisationId, String(status) as "open" | "resolved" | "ignored");
+      res.json(conflicts);
+    } catch (error: any) {
+      console.error("[SYNC] Error getting conflicts:", error);
+      res.status(500).json({ error: "Failed to get conflicts" });
+    }
+  });
+  
+  // PATCH /api/sync/conflicts/:id - Resolve a conflict
+  app.patch("/api/sync/conflicts/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { id } = req.params;
+      const { status, action } = req.body;
+      
+      if (!status || !["resolved", "ignored"].includes(status)) {
+        return res.status(400).json({ 
+          error: "INVALID_STATUS",
+          message: "status doit être 'resolved' ou 'ignored'" 
+        });
+      }
+      
+      const userId = req.jwtUser?.id || null;
+      await storage.resolveConflict(organisationId, id, status, userId);
+      
+      res.json({ success: true });
+      
+    } catch (error: any) {
+      console.error("[SYNC] Error resolving conflict:", error);
+      res.status(500).json({ error: "Failed to resolve conflict" });
+    }
+  });
+
   return httpServer;
 }
