@@ -70,6 +70,22 @@ export const syncStatusEnum = pgEnum("sync_status", [
   "SYNCED",
   "ERROR"
 ]);
+
+// Enums for V2 Google Calendar import
+export const googleEventStatusEnum = pgEnum("google_event_status", [
+  "confirmed",
+  "tentative",
+  "cancelled"
+]);
+export const syncConflictStatusEnum = pgEnum("sync_conflict_status", [
+  "open",
+  "resolved",
+  "ignored"
+]);
+export const syncConflictSourceEnum = pgEnum("sync_conflict_source", [
+  "google",
+  "cassius"
+]);
 export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
 export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
 export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"]);
@@ -456,6 +472,12 @@ export const calendarIntegrations = pgTable("calendar_integrations", {
   lastSyncAt: timestamp("last_sync_at"),
   syncErrorCount: integer("sync_error_count").default(0).notNull(),
   lastSyncError: text("last_sync_error"),
+  // V2: Import settings (Google -> Cassius)
+  sourceCalendarId: text("source_calendar_id"),
+  sourceCalendarName: text("source_calendar_name"),
+  importEnabled: boolean("import_enabled").default(false),
+  lastImportAt: timestamp("last_import_at"),
+  syncToken: text("sync_token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -517,6 +539,101 @@ export const insertAppointmentExternalLinkSchema = createInsertSchema(appointmen
 });
 export type InsertAppointmentExternalLink = z.infer<typeof insertAppointmentExternalLinkSchema>;
 export type AppointmentExternalLink = typeof appointmentExternalLinks.$inferSelect;
+
+// Table google_calendar_events - Imported Google Calendar events for V2 bidirectional sync
+export const googleCalendarEvents = pgTable("google_calendar_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  integrationId: varchar("integration_id").references(() => calendarIntegrations.id, { onDelete: "cascade" }),
+  googleCalendarId: text("google_calendar_id").notNull(),
+  googleEventId: text("google_event_id").notNull(),
+  etag: text("etag"),
+  status: googleEventStatusEnum("status").default("confirmed"),
+  summary: text("summary"),
+  description: text("description"),
+  location: text("location"),
+  startAt: timestamp("start_at", { withTimezone: true }),
+  endAt: timestamp("end_at", { withTimezone: true }),
+  allDay: boolean("all_day").default(false),
+  attendees: text("attendees"),
+  htmlLink: text("html_link"),
+  updatedAtGoogle: timestamp("updated_at_google", { withTimezone: true }),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).defaultNow(),
+  cassiusAppointmentId: varchar("cassius_appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("google_calendar_events_unique_idx").on(table.organisationId, table.googleCalendarId, table.googleEventId),
+]);
+
+export const googleCalendarEventsRelations = relations(googleCalendarEvents, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [googleCalendarEvents.organisationId],
+    references: [organisations.id],
+  }),
+  user: one(users, {
+    fields: [googleCalendarEvents.userId],
+    references: [users.id],
+  }),
+  integration: one(calendarIntegrations, {
+    fields: [googleCalendarEvents.integrationId],
+    references: [calendarIntegrations.id],
+  }),
+  cassiusAppointment: one(appointments, {
+    fields: [googleCalendarEvents.cassiusAppointmentId],
+    references: [appointments.id],
+  }),
+}));
+
+export const insertGoogleCalendarEventSchema = createInsertSchema(googleCalendarEvents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertGoogleCalendarEvent = z.infer<typeof insertGoogleCalendarEventSchema>;
+export type GoogleCalendarEvent = typeof googleCalendarEvents.$inferSelect;
+
+// Table sync_conflicts - Tracks conflicts between Cassius and Google Calendar events
+export const syncConflicts = pgTable("sync_conflicts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  source: syncConflictSourceEnum("source").notNull(),
+  entityType: text("entity_type").default("event").notNull(),
+  externalId: text("external_id"),
+  internalId: varchar("internal_id"),
+  reason: text("reason").notNull(),
+  payload: text("payload"),
+  status: syncConflictStatusEnum("status").default("open").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by").references(() => users.id, { onDelete: "set null" }),
+});
+
+export const syncConflictsRelations = relations(syncConflicts, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [syncConflicts.organisationId],
+    references: [organisations.id],
+  }),
+  user: one(users, {
+    fields: [syncConflicts.userId],
+    references: [users.id],
+  }),
+  resolvedByUser: one(users, {
+    fields: [syncConflicts.resolvedBy],
+    references: [users.id],
+  }),
+}));
+
+export const insertSyncConflictSchema = createInsertSchema(syncConflicts).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+  resolvedBy: true,
+});
+export type InsertSyncConflict = z.infer<typeof insertSyncConflictSchema>;
+export type SyncConflict = typeof syncConflicts.$inferSelect;
 
 // Table flags - Clinical alerts and warnings
 export const flags = pgTable("flags", {
