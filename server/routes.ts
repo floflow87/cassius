@@ -2816,6 +2816,21 @@ export async function registerRoutes(
 
   // V2: Google Calendar Import (Google -> Cassius)
   
+  // Helper: Check if V2 import tables exist
+  const checkV2TablesExist = async (): Promise<boolean> => {
+    try {
+      const result = await db.execute(sql`
+        SELECT COUNT(*) as count FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name IN ('google_calendar_events', 'sync_conflicts')
+      `);
+      const rows = result.rows as Array<{ count: string }>;
+      return parseInt(rows[0]?.count || "0") === 2;
+    } catch {
+      return false;
+    }
+  };
+
   // GET /api/google/events - List events from Google Calendar
   app.get("/api/google/events", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -2881,6 +2896,15 @@ export async function registerRoutes(
     if (!organisationId) return;
     
     try {
+      // Check if V2 tables exist
+      const tablesExist = await checkV2TablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import Google Calendar ne sont pas disponibles. Exécutez la migration 20241230_005_google_events_import.sql sur Supabase."
+        });
+      }
+      
       const { calendarId, timeMin, timeMax, mode = "preview" } = req.body;
       
       if (!calendarId || !timeMin || !timeMax) {
@@ -3087,6 +3111,15 @@ export async function registerRoutes(
     if (!organisationId) return;
     
     try {
+      // Check if V2 tables exist
+      const tablesExist = await checkV2TablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import Google Calendar ne sont pas disponibles. Exécutez la migration 20241230_005_google_events_import.sql sur Supabase."
+        });
+      }
+      
       const { start, end } = req.query;
       
       if (!start || !end) {
@@ -3116,6 +3149,15 @@ export async function registerRoutes(
     if (!organisationId) return;
     
     try {
+      // Check if V2 tables exist
+      const tablesExist = await checkV2TablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import Google Calendar ne sont pas disponibles. Exécutez la migration 20241230_005_google_events_import.sql sur Supabase."
+        });
+      }
+      
       const { status = "open" } = req.query;
       const conflicts = await storage.getSyncConflicts(organisationId, String(status) as "open" | "resolved" | "ignored");
       res.json(conflicts);
@@ -3131,6 +3173,15 @@ export async function registerRoutes(
     if (!organisationId) return;
     
     try {
+      // Check if V2 tables exist
+      const tablesExist = await checkV2TablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import Google Calendar ne sont pas disponibles. Exécutez la migration 20241230_005_google_events_import.sql sur Supabase."
+        });
+      }
+      
       const { id } = req.params;
       const { status, action } = req.body;
       

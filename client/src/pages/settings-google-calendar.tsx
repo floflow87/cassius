@@ -157,6 +157,7 @@ export default function GoogleCalendarIntegration() {
   const [importedEventsModalOpen, setImportedEventsModalOpen] = useState(false);
   const [importedEvents, setImportedEvents] = useState<ImportedEvent[]>([]);
   const [loadingImportedEvents, setLoadingImportedEvents] = useState(false);
+  const [migrationRequired, setMigrationRequired] = useState(false);
   
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
@@ -227,10 +228,17 @@ export default function GoogleCalendarIntegration() {
   
   const { data: conflicts = [], refetch: refetchConflicts } = useQuery<SyncConflict[]>({
     queryKey: ["/api/sync/conflicts", conflictFilter],
-    enabled: status?.connected === true,
+    enabled: status?.connected === true && !migrationRequired,
     retry: false,
     queryFn: async () => {
       const res = await fetch(`/api/sync/conflicts?status=${conflictFilter}`, { credentials: "include" });
+      if (res.status === 503) {
+        const data = await res.json();
+        if (data.error === "MIGRATION_REQUIRED") {
+          setMigrationRequired(true);
+          return [];
+        }
+      }
       if (!res.ok) return [];
       return res.json();
     },
@@ -344,6 +352,10 @@ export default function GoogleCalendarIntegration() {
       });
     },
     onError: (error: any) => {
+      if (error?.error === "MIGRATION_REQUIRED") {
+        setMigrationRequired(true);
+        return;
+      }
       toast({ 
         title: "Erreur de prévisualisation", 
         description: error?.message || "Une erreur est survenue",
@@ -373,6 +385,10 @@ export default function GoogleCalendarIntegration() {
       refetchConflicts();
     },
     onError: (error: any) => {
+      if (error?.error === "MIGRATION_REQUIRED") {
+        setMigrationRequired(true);
+        return;
+      }
       toast({ 
         title: "Erreur d'import", 
         description: error?.message || "Une erreur est survenue",
@@ -446,6 +462,13 @@ export default function GoogleCalendarIntegration() {
         `/api/google/imported-events?start=${timeMin.toISOString()}&end=${timeMax.toISOString()}`,
         { credentials: "include" }
       );
+      if (res.status === 503) {
+        const data = await res.json();
+        if (data.error === "MIGRATION_REQUIRED") {
+          setMigrationRequired(true);
+          return;
+        }
+      }
       if (res.ok) {
         const data = await res.json();
         setImportedEvents(data);
@@ -806,6 +829,22 @@ export default function GoogleCalendarIntegration() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Migration Required Alert */}
+                {migrationRequired && (
+                  <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-800 p-4">
+                    <div className="flex gap-3">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-yellow-800 dark:text-yellow-300">Migration requise</p>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+                          Les tables d'import Google Calendar ne sont pas disponibles. 
+                          Exécutez la migration <code className="bg-yellow-100 dark:bg-yellow-900/50 px-1 rounded">20241230_005_google_events_import.sql</code> sur Supabase.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 {/* Source Calendar */}
                 <div className="space-y-2">
                   <Label className="text-sm">Calendrier source</Label>

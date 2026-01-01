@@ -1,0 +1,70 @@
+Contexte
+L’implémentation V2 Google Calendar (Google → Cassius) est terminée côté backend + frontend sur l’environnement dev/local :
+- UI Paramètres Google Calendar : toggle import, calendrier source avec persistance, presets de période + custom, preview + import + résultats, gestion conflits (filtres), modal événements importés (chargement avant ouverture).
+- Backend : routes import (events, import, status, imported-events, conflicts) + PATCH /api/integrations/google/settings (importEnabled, sourceCalendarId, sourceCalendarName).
+- Filtre anti-boucle : ignore les événements préfixés [Cassius].
+Mais sur Supabase distant (staging/prod), les tables google_calendar_events et sync_conflicts ne sont pas visibles car la migration n’a pas encore été exécutée.
+
+Objectif de la suite (priorité)
+1) Finaliser le déploiement V2 sur Supabase distant (staging puis prod) en appliquant la migration :
+   supabase/migrations/20241230_005_google_events_import.sql
+2) Mettre en place un plan de test complet (Tâche 9) pour valider toute la V2 end-to-end.
+3) Ensuite seulement, implémenter l’affichage visuel des événements importés dans le calendrier Cassius (Tâche 8 optionnelle), de manière cohérente (badge Google, filtres, conflits).
+
+Tâches détaillées
+
+A) Migration Supabase distant (staging)
+- Vérifier sur le projet Supabase STAGING que les tables n’existent pas encore.
+- Exécuter la migration 20241230_005_google_events_import.sql sur STAGING (SQL Editor) de façon idempotente.
+- Vérifier qu’après exécution, les tables apparaissent :
+  - google_calendar_events
+  - sync_conflicts
+- Vérifier indexes/contraintes (unique sur org_id + calendar_id + event_id) et champs nécessaires.
+
+B) Sanity checks côté serveur (éviter les 500 silencieuses)
+- Ajouter une vérification “schema readiness” au démarrage (ou à l’appel import) :
+  - si les tables google_calendar_events / sync_conflicts manquent, renvoyer une erreur claire :
+    { error: "MIGRATION_REQUIRED", message: "Execute migration 20241230_005_google_events_import.sql on Supabase." }
+- Même logique pour l’UI : afficher un message explicite si MIGRATION_REQUIRED.
+
+C) Plan de test (Tâche 9) – End-to-end
+- Tester dans STAGING :
+  1) Connexion Google OK
+  2) Choix calendrier source + persistance (reload page = valeur conservée)
+  3) Preview 7 jours : vérifier counts + conflits + failures (si any)
+  4) Import 7 jours : vérifier UPSERT idempotent (relancer import => created=0, updated=0 ou updated minimal)
+  5) Vérifier GET /api/google/import/status (last import + count)
+  6) Modal événements importés (GET /api/google/imported-events) : liste OK sur la période
+  7) Conflits :
+     - créer/forcer un conflit (ou en simuler un)
+     - vérifier GET /api/sync/conflicts?status=open
+     - résoudre via PATCH -> le conflit passe en resolved/ignored
+  8) Vérifier filtre [Cassius] : les événements [Cassius] ne sont pas importés
+
+- Collecter les résultats dans un mini rapport (checklist + captures) pour validation.
+
+D) Déploiement prod
+- Répéter la migration sur Supabase PROD.
+- Refaire les tests critiques (preview + import + status + conflits).
+
+E) (Optionnel – Tâche 8) Affichage des événements importés dans le calendrier Cassius
+- Objectif : afficher les événements importés (table google_calendar_events) dans la vue calendrier Cassius.
+- UI :
+  - événements Google avec badge “Google”
+  - filtre source : [Tous | Cassius | Google | Conflits]
+  - clic event => drawer avec summary, start/end, location, htmlLink, status, etag
+- Données :
+  - utiliser GET /api/google/imported-events?timeMin=...&timeMax=...
+- Ne pas modifier la logique d’import, uniquement l’affichage.
+
+Livrables attendus
+1) Migration appliquée sur STAGING (puis PROD), tables visibles dans Supabase.
+2) Ajout du guard MIGRATION_REQUIRED (backend + UI).
+3) Rapport de test end-to-end validant V2.
+4) (Optionnel) Affichage calendrier Cassius des événements Google importés + filtre.
+
+Contraintes
+- Ne pas casser V1 (Cassius → Google).
+- Ne pas logguer tokens.
+- Timezone Europe/Paris.
+- Minimiser les changements : focus sur migration + tests + UI guard, puis calendrier.
