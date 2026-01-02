@@ -73,6 +73,22 @@ interface LastImportResponse {
   } | null;
 }
 
+interface ImportHistoryItem {
+  id: string;
+  fileName: string | null;
+  status: string;
+  totalRows: number;
+  processedRows: number;
+  stats: ImportStats;
+  cancellationReason: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+interface ImportHistoryResponse {
+  history: ImportHistoryItem[];
+}
+
 interface PatientField {
   key: string | null;
   label: string;
@@ -119,6 +135,12 @@ export default function ImportPatientsPage() {
   // Query for last import
   const { data: lastImportData } = useQuery<LastImportResponse>({
     queryKey: ["/api/import/patients/last"],
+    staleTime: 30000,
+  });
+
+  // Query for import history
+  const { data: historyData, isLoading: historyLoading } = useQuery<ImportHistoryResponse>({
+    queryKey: ["/api/import/patients/history"],
     staleTime: 30000,
   });
 
@@ -536,51 +558,92 @@ export default function ImportPatientsPage() {
             </AlertDescription>
           </Alert>
 
-          {lastImportData?.lastImport && (
+          {/* Import History Table */}
+          {historyData?.history && historyData.history.length > 0 && (
             <div className="mt-6 pt-6 border-t">
               <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                Dernier import
+                Historique des imports
               </h4>
-              <div className="bg-muted/50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">
-                    {lastImportData.lastImport.fileName || "Fichier CSV"}
-                  </span>
-                  <Badge variant={lastImportData.lastImport.status === "completed" ? "default" : "destructive"}>
-                    {lastImportData.lastImport.status === "completed" ? "Terminé" : "Échoué"}
-                  </Badge>
-                </div>
-                <div className="text-xs text-muted-foreground mb-3">
-                  {new Date(lastImportData.lastImport.completedAt).toLocaleDateString("fr-FR", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </div>
-                {lastImportData.lastImport.stats && (
-                  <div className="grid grid-cols-4 gap-2 text-center">
-                    <div className="bg-background rounded p-2">
-                      <div className="text-sm font-bold">{lastImportData.lastImport.stats.total?.toLocaleString() || 0}</div>
-                      <div className="text-xs text-muted-foreground">Total</div>
-                    </div>
-                    <div className="bg-background rounded p-2">
-                      <div className="text-sm font-bold text-green-600">{lastImportData.lastImport.stats.toCreate?.toLocaleString() || 0}</div>
-                      <div className="text-xs text-muted-foreground">Créés</div>
-                    </div>
-                    <div className="bg-background rounded p-2">
-                      <div className="text-sm font-bold text-blue-600">{lastImportData.lastImport.stats.toUpdate?.toLocaleString() || 0}</div>
-                      <div className="text-xs text-muted-foreground">Mis à jour</div>
-                    </div>
-                    <div className="bg-background rounded p-2">
-                      <div className="text-sm font-bold text-red-600">{lastImportData.lastImport.stats.error?.toLocaleString() || 0}</div>
-                      <div className="text-xs text-muted-foreground">Erreurs</div>
-                    </div>
-                  </div>
-                )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="table-import-history">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="pb-2 font-medium text-muted-foreground">Fichier</th>
+                      <th className="pb-2 font-medium text-muted-foreground text-center">Statut</th>
+                      <th className="pb-2 font-medium text-muted-foreground text-right">Total</th>
+                      <th className="pb-2 font-medium text-muted-foreground text-right">Importés</th>
+                      <th className="pb-2 font-medium text-muted-foreground text-right">Restants</th>
+                      <th className="pb-2 font-medium text-muted-foreground">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyData.history.map((item) => {
+                      const imported = (item.stats?.toCreate || 0) + (item.stats?.toUpdate || 0);
+                      const remaining = item.totalRows - item.processedRows;
+                      
+                      const getStatusBadge = () => {
+                        if (item.status === "completed") {
+                          return <Badge variant="default" className="bg-green-600" data-testid={`badge-status-${item.id}`}>Terminé</Badge>;
+                        }
+                        if (item.status === "failed") {
+                          return <Badge variant="destructive" data-testid={`badge-status-${item.id}`}>Échoué</Badge>;
+                        }
+                        if (item.status === "cancelled") {
+                          const isUserCancelled = item.cancellationReason === "user";
+                          return (
+                            <Badge variant="outline" className="border-orange-500 text-orange-600" data-testid={`badge-status-${item.id}`}>
+                              {isUserCancelled ? "Annulé" : "Interrompu"}
+                            </Badge>
+                          );
+                        }
+                        if (item.status === "running") {
+                          return <Badge variant="secondary" data-testid={`badge-status-${item.id}`}>En cours</Badge>;
+                        }
+                        return <Badge variant="outline" data-testid={`badge-status-${item.id}`}>{item.status}</Badge>;
+                      };
+
+                      return (
+                        <tr key={item.id} className="border-b last:border-0" data-testid={`row-import-${item.id}`}>
+                          <td className="py-2 pr-2">
+                            <span className="truncate max-w-[150px] block" title={item.fileName || "Fichier CSV"}>
+                              {item.fileName || "Fichier CSV"}
+                            </span>
+                          </td>
+                          <td className="py-2 text-center">{getStatusBadge()}</td>
+                          <td className="py-2 text-right font-mono">{item.totalRows.toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono text-green-600">{imported.toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono text-muted-foreground">
+                            {item.status === "cancelled" || item.status === "failed" ? remaining.toLocaleString() : "-"}
+                          </td>
+                          <td className="py-2 text-muted-foreground text-xs">
+                            {item.completedAt 
+                              ? new Date(item.completedAt).toLocaleDateString("fr-FR", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "2-digit",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              : new Date(item.createdAt).toLocaleDateString("fr-FR", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "2-digit",
+                                })
+                            }
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+            </div>
+          )}
+          {historyLoading && (
+            <div className="mt-6 pt-6 border-t flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Chargement de l'historique...
             </div>
           )}
         </div>
@@ -955,7 +1018,7 @@ export default function ImportPatientsPage() {
     const { stats, status } = importResult;
     const isCancelled = status === "cancelled";
     const totalProcessed = stats.toCreate + stats.toUpdate + stats.error;
-    const totalRows = importProgress?.totalRows || validationResult?.totalRows || 0;
+    const totalRows = importProgress?.totalRows || validationResult?.stats?.total || 0;
     const remaining = totalRows - totalProcessed;
 
     return (
