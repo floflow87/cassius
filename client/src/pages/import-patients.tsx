@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface ImportStats {
   total: number;
@@ -1029,7 +1029,14 @@ export default function ImportPatientsPage() {
             <Button variant="outline" onClick={handleReset} data-testid="button-new-import">
               Nouvel import
             </Button>
-            <Button onClick={() => navigate("/patients")} data-testid="button-view-patients">
+            <Button 
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/patients/search"] });
+                navigate("/patients");
+              }} 
+              data-testid="button-view-patients"
+            >
               Voir les patients
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
