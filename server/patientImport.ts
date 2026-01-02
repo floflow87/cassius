@@ -420,7 +420,9 @@ export async function updateImportJobStatus(
   const updates: Partial<ImportJob> = { status };
   
   if (stats) {
-    updates.stats = JSON.stringify(stats);
+    const statsJson = JSON.stringify(stats);
+    console.log(`[IMPORT] Storing stats for job ${jobId}: ${statsJson.substring(0, 200)}...`);
+    updates.stats = statsJson;
     updates.totalRows = stats.total;
   }
   if (errorMessage) {
@@ -495,10 +497,14 @@ export async function executeImport(
   }
   
   const csvContent = job.filePath || "";
+  console.log(`[IMPORT] Raw job.stats type: ${typeof job.stats}, value preview: ${String(job.stats).substring(0, 100)}`);
   const storedStats = safeParseJSON<ImportStats>(job.stats, { total: 0, ok: 0, warning: 0, error: 0, collision: 0, toCreate: 0, toUpdate: 0 });
   const customMapping: ColumnMapping | undefined = storedStats.mapping || undefined;
   
   console.log(`[IMPORT] Executing import for job ${jobId} with ${customMapping ? 'custom' : 'auto'} mapping`);
+  if (!customMapping) {
+    console.warn(`[IMPORT] No custom mapping found in stats. Stats keys: ${Object.keys(storedStats).join(', ')}`);
+  }
   
   // Parse CSV with the stored mapping
   const csvRows = parseCSV(csvContent);
