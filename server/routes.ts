@@ -3524,6 +3524,42 @@ export async function registerRoutes(
     }
   });
   
+  // POST /api/import/:jobId/cancel - Request cancellation of an import job
+  app.post("/api/import/:jobId/cancel", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { jobId } = req.params;
+      const job = await patientImport.getImportJob(jobId);
+      
+      if (!job || job.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      if (job.status !== "running") {
+        return res.status(400).json({ error: "Can only cancel running imports" });
+      }
+      
+      const success = await patientImport.requestCancelImport(jobId);
+      
+      if (success) {
+        console.log(`[IMPORT] Cancellation requested for job ${jobId}`);
+        res.json({ 
+          jobId, 
+          status: job.status,
+          cancelRequested: true,
+          message: "Interruption demandée" 
+        });
+      } else {
+        res.status(500).json({ error: "Failed to request cancellation" });
+      }
+    } catch (error: any) {
+      console.error("[IMPORT] Error cancelling import:", error);
+      res.status(500).json({ error: error.message || "Failed to cancel import" });
+    }
+  });
+  
   // GET /api/import/patients/last - Get the last import job
   app.get("/api/import/patients/last", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

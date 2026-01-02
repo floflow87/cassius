@@ -486,7 +486,30 @@ export async function getImportJobRows(
   return await query.orderBy(importJobRows.rowIndex);
 }
 
-const IMPORT_BATCH_SIZE = 500;
+const IMPORT_BATCH_SIZE = 200; // Reduced from 500 for smoother progress updates
+
+export async function requestCancelImport(jobId: string): Promise<boolean> {
+  const result = await db.update(importJobs)
+    .set({ cancelRequested: true })
+    .where(eq(importJobs.id, jobId))
+    .returning({ id: importJobs.id });
+  return result.length > 0;
+}
+
+export async function isCancelRequested(jobId: string): Promise<boolean> {
+  const [job] = await db.select({ cancelRequested: importJobs.cancelRequested })
+    .from(importJobs)
+    .where(eq(importJobs.id, jobId));
+  return job?.cancelRequested ?? false;
+}
+
+export async function markJobCancelled(jobId: string, stats: ImportStats): Promise<void> {
+  await db.update(importJobs).set({
+    status: "cancelled",
+    stats: JSON.stringify(stats),
+    completedAt: new Date(),
+  }).where(eq(importJobs.id, jobId));
+}
 
 export async function updateImportProgress(
   jobId: string,
@@ -558,7 +581,21 @@ export async function executeImport(
   
   console.log(`[IMPORT] Processing ${csvRows.length} rows in batches of ${IMPORT_BATCH_SIZE}`);
   
+  let wasCancelled = false;
+  
   for (let i = 0; i < csvRows.length; i++) {
+    // Check for cancellation at the start of each batch
+    if (i % IMPORT_BATCH_SIZE === 0) {
+      const cancelRequested = await isCancelRequested(jobId);
+      if (cancelRequested) {
+        console.log(`[IMPORT] Cancellation requested at row ${i}/${csvRows.length}`);
+        wasCancelled = true;
+        await markJobCancelled(jobId, stats);
+        await updateImportProgress(jobId, i, stats);
+        break;
+      }
+    }
+    
     const rawData = csvRows[i];
     const result = normalizeRow(rawData, customMapping);
     
@@ -631,7 +668,11 @@ export async function executeImport(
     }
   }
   
-  console.log(`[IMPORT] Import complete: ${stats.toCreate} created, ${stats.toUpdate} updated, ${stats.error} errors`);
+  if (wasCancelled) {
+    console.log(`[IMPORT] Import cancelled: ${stats.toCreate} created, ${stats.toUpdate} updated, ${stats.error} errors`);
+  } else {
+    console.log(`[IMPORT] Import complete: ${stats.toCreate} created, ${stats.toUpdate} updated, ${stats.error} errors`);
+  }
   
   return stats;
 }
