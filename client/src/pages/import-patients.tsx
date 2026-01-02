@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Upload, FileText, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, ArrowRight, Download, Loader2, Settings2, StopCircle } from "lucide-react";
+import { Upload, FileText, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, ArrowRight, Download, Loader2, Settings2, StopCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -954,6 +954,9 @@ export default function ImportPatientsPage() {
     if (!importResult) return null;
     const { stats, status } = importResult;
     const isCancelled = status === "cancelled";
+    const totalProcessed = stats.toCreate + stats.toUpdate + stats.error;
+    const totalRows = importProgress?.totalRows || validationResult?.totalRows || 0;
+    const remaining = totalRows - totalProcessed;
 
     return (
       <Card>
@@ -974,6 +977,33 @@ export default function ImportPatientsPage() {
           <CardDescription>{importResult.message}</CardDescription>
         </CardHeader>
         <CardContent>
+          {isCancelled && totalRows > 0 && (
+            <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <span className="font-medium text-orange-800 dark:text-orange-300">Récapitulatif de l'interruption</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Lignes traitées :</span>
+                  <span className="ml-2 font-medium">{totalProcessed} / {totalRows}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Lignes restantes :</span>
+                  <span className="ml-2 font-medium text-orange-600">{remaining}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Progression :</span>
+                  <span className="ml-2 font-medium">{totalRows > 0 ? Math.round((totalProcessed / totalRows) * 100) : 0}%</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Statut :</span>
+                  <span className="ml-2 font-medium text-orange-600">Annulé par l'utilisateur</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
               <div className="text-2xl font-bold text-green-600">{stats.toCreate}</div>
@@ -988,6 +1018,12 @@ export default function ImportPatientsPage() {
               <div className="text-sm text-muted-foreground">Erreurs</div>
             </div>
           </div>
+
+          {isCancelled && remaining > 0 && (
+            <p className="text-sm text-muted-foreground mb-4 text-center">
+              Les patients déjà importés ont été conservés. Vous pouvez relancer un import pour traiter les lignes restantes.
+            </p>
+          )}
 
           <div className="flex justify-between gap-4">
             <Button variant="outline" onClick={handleReset} data-testid="button-new-import">

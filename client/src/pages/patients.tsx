@@ -40,6 +40,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PatientForm } from "@/components/patient-form";
 import { CassiusBadge, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import { AdvancedFilterDrawer, FilterChips, type FilterGroup } from "@/components/advanced-filter-drawer";
@@ -383,6 +384,32 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     },
   });
 
+  const bulkStatusMutation = useMutation({
+    mutationFn: async ({ ids, statut }: { ids: string[]; statut: string }) => {
+      for (const id of ids) {
+        await apiRequest("PATCH", `/api/patients/${id}`, { statut });
+      }
+      return { count: ids.length, statut };
+    },
+    onSuccess: ({ count, statut }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/search"] });
+      setSelectedIds(new Set());
+      const statutLabel = statut === "ACTIF" ? "Actif" : statut === "INACTIF" ? "Inactif" : "Archivé";
+      toast({
+        title: "Statuts mis à jour",
+        description: `${count} patient(s) passé(s) en "${statutLabel}".`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Erreur lors de la mise à jour",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSort = (columnId: ColumnId) => {
     if (sortColumn === columnId) {
       if (sortDirection === "asc") {
@@ -627,6 +654,21 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         {selectedIds.size > 0 && (
           <>
             <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
+            <Select
+              onValueChange={(value) => {
+                bulkStatusMutation.mutate({ ids: Array.from(selectedIds), statut: value });
+              }}
+              disabled={bulkStatusMutation.isPending}
+            >
+              <SelectTrigger className="w-[160px]" data-testid="select-bulk-status">
+                <SelectValue placeholder="Changer statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ACTIF" data-testid="select-status-actif">Actif</SelectItem>
+                <SelectItem value="INACTIF" data-testid="select-status-inactif">Inactif</SelectItem>
+                <SelectItem value="ARCHIVE" data-testid="select-status-archive">Archivé</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant="destructive"
               size="sm"
