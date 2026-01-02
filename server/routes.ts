@@ -3230,7 +3230,7 @@ export async function registerRoutes(
   app.post("/api/import/patients/upload", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
-    const userId = req.jwtUser?.id || "";
+    const userId = req.jwtUser?.id || null;
     
     try {
       const tablesExist = await checkImportTablesExist();

@@ -333,7 +333,7 @@ export function computeFileHash(content: string): string {
 
 export async function createImportJob(
   organisationId: string,
-  userId: string,
+  userId: string | null,
   fileName: string,
   fileHash: string
 ): Promise<ImportJob> {
