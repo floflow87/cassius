@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Upload, FileText, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, ArrowRight, Download, Loader2, Settings2 } from "lucide-react";
@@ -88,6 +88,9 @@ export default function ImportPatientsPage() {
   const [error, setError] = useState<string | null>(null);
   const [columnMapping, setColumnMapping] = useState<Record<string, string | null>>({});
   const [headersData, setHeadersData] = useState<HeadersResponse | null>(null);
+  const [importStarted, setImportStarted] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const getCurrentStepIndex = () => STEPS.findIndex(s => s.key === step);
 
@@ -145,17 +148,47 @@ export default function ImportPatientsPage() {
 
   const runMutation = useMutation({
     mutationFn: async (id: string) => {
+      console.log("[IMPORT] Calling POST /api/import/patients/run with jobId:", id);
       const res = await apiRequest("POST", "/api/import/patients/run", { jobId: id });
+      console.log("[IMPORT] Response status:", res.status);
       return res.json() as Promise<RunResponse>;
     },
     onSuccess: (data) => {
+      console.log("[IMPORT] Import completed successfully:", data);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
       setImportResult(data);
       setStep("complete");
     },
     onError: (err: Error) => {
-      setError(err.message);
+      console.error("[IMPORT] Import failed:", err.message);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      setError(`Erreur lors de l'import: ${err.message}`);
+      setImportStarted(false);
     },
   });
+
+  useEffect(() => {
+    if (step === "import" && jobId && !importStarted && !runMutation.isPending) {
+      console.log("[IMPORT] Step is 'import', starting import for jobId:", jobId);
+      setImportStarted(true);
+      setError(null);
+      runMutation.mutate(jobId);
+    }
+  }, [step, jobId, importStarted, runMutation.isPending]);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
 
   const [isDragging, setIsDragging] = useState(false);
 
@@ -217,8 +250,13 @@ export default function ImportPatientsPage() {
 
   const handleStartImport = () => {
     if (jobId) {
+      console.log("[IMPORT] handleStartImport called with jobId:", jobId);
+      setImportStarted(false);
+      setError(null);
       setStep("import");
-      runMutation.mutate(jobId);
+    } else {
+      console.error("[IMPORT] handleStartImport called but jobId is null");
+      setError("Erreur: Identifiant de job manquant. Veuillez recommencer l'import.");
     }
   };
 
@@ -233,6 +271,10 @@ export default function ImportPatientsPage() {
   };
 
   const handleReset = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
     setStep("upload");
     setJobId(null);
     setFileName("");
@@ -241,6 +283,8 @@ export default function ImportPatientsPage() {
     setError(null);
     setColumnMapping({});
     setHeadersData(null);
+    setImportStarted(false);
+    setImportProgress(0);
   };
 
   const handleMappingChange = (csvHeader: string, patientField: string | null) => {
@@ -575,25 +619,99 @@ export default function ImportPatientsPage() {
     );
   };
 
-  const renderImportingStep = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Import en cours
-        </CardTitle>
-        <CardDescription>
-          Création et mise à jour des patients...
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Progress value={75} className="mb-4" />
-        <p className="text-sm text-muted-foreground text-center">
-          Ne fermez pas cette page pendant l'import.
-        </p>
-      </CardContent>
-    </Card>
-  );
+  const renderImportingStep = () => {
+    if (!jobId) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="h-5 w-5" />
+              Erreur
+            </CardTitle>
+            <CardDescription>
+              Identifiant de job manquant
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Job introuvable</AlertTitle>
+              <AlertDescription>
+                L'identifiant du job d'import est manquant. Veuillez recommencer le processus d'import.
+              </AlertDescription>
+            </Alert>
+            <Button onClick={handleReset} data-testid="button-restart-import">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Recommencer l'import
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (error) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="h-5 w-5" />
+              Erreur lors de l'import
+            </CardTitle>
+            <CardDescription>
+              Une erreur s'est produite pendant l'import
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Erreur</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+            <div className="flex gap-4">
+              <Button variant="outline" onClick={handleReset} data-testid="button-restart-import">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Recommencer
+              </Button>
+              <Button 
+                onClick={() => {
+                  setImportStarted(false);
+                  setError(null);
+                }} 
+                data-testid="button-retry-import"
+              >
+                Réessayer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Import en cours
+          </CardTitle>
+          <CardDescription>
+            Création et mise à jour des patients...
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Progress value={runMutation.isPending ? 50 : 0} className="mb-4" />
+          <p className="text-sm text-muted-foreground text-center">
+            {runMutation.isPending 
+              ? "L'import est en cours, ne fermez pas cette page..." 
+              : "Démarrage de l'import..."}
+          </p>
+          {jobId && (
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              Job ID: {jobId}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderCompleteStep = () => {
     if (!importResult) return null;
