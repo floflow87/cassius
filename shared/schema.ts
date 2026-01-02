@@ -638,6 +638,98 @@ export const insertSyncConflictSchema = createInsertSchema(syncConflicts).omit({
 export type InsertSyncConflict = z.infer<typeof insertSyncConflictSchema>;
 export type SyncConflict = typeof syncConflicts.$inferSelect;
 
+// Import job enums
+export const importJobStatusEnum = pgEnum("import_job_status", [
+  "pending",
+  "validating",
+  "validated",
+  "running",
+  "completed",
+  "failed"
+]);
+
+export const importRowStatusEnum = pgEnum("import_row_status", [
+  "ok",
+  "warning",
+  "error",
+  "collision",
+  "skipped"
+]);
+
+// Table import_jobs - Tracks CSV import jobs
+export const importJobs = pgTable("import_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  type: text("type").default("patients_csv").notNull(),
+  status: importJobStatusEnum("status").default("pending").notNull(),
+  fileName: text("file_name"),
+  filePath: text("file_path"),
+  fileHash: text("file_hash"),
+  totalRows: integer("total_rows").default(0),
+  stats: text("stats").default("{}"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  validatedAt: timestamp("validated_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+});
+
+export const importJobsRelations = relations(importJobs, ({ one, many }) => ({
+  organisation: one(organisations, {
+    fields: [importJobs.organisationId],
+    references: [organisations.id],
+  }),
+  user: one(users, {
+    fields: [importJobs.userId],
+    references: [users.id],
+  }),
+  rows: many(importJobRows),
+}));
+
+// Table import_job_rows - Individual rows from CSV imports
+export const importJobRows = pgTable("import_job_rows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => importJobs.id, { onDelete: "cascade" }),
+  rowIndex: integer("row_index").notNull(),
+  rawData: text("raw_data").notNull(),
+  normalizedData: text("normalized_data"),
+  status: importRowStatusEnum("status").default("ok").notNull(),
+  errors: text("errors").default("[]"),
+  warnings: text("warnings").default("[]"),
+  matchedPatientId: varchar("matched_patient_id").references(() => patients.id, { onDelete: "set null" }),
+  matchType: text("match_type"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const importJobRowsRelations = relations(importJobRows, ({ one }) => ({
+  job: one(importJobs, {
+    fields: [importJobRows.jobId],
+    references: [importJobs.id],
+  }),
+  matchedPatient: one(patients, {
+    fields: [importJobRows.matchedPatientId],
+    references: [patients.id],
+  }),
+}));
+
+export const insertImportJobSchema = createInsertSchema(importJobs).omit({
+  id: true,
+  createdAt: true,
+  validatedAt: true,
+  startedAt: true,
+  completedAt: true,
+});
+export type InsertImportJob = z.infer<typeof insertImportJobSchema>;
+export type ImportJob = typeof importJobs.$inferSelect;
+
+export const insertImportJobRowSchema = createInsertSchema(importJobRows).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertImportJobRow = z.infer<typeof insertImportJobRowSchema>;
+export type ImportJobRow = typeof importJobRows.$inferSelect;
+
 // Table flags - Clinical alerts and warnings
 export const flags = pgTable("flags", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

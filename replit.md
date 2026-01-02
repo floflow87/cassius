@@ -34,6 +34,14 @@ Cassius utilizes a modern full-stack architecture built for scalability and resp
     - **Multi-tenant:** Supports organization-level and user-level OAuth credentials.
     - **Multi-environment:** Configurable for production and staging environments with environment-specific OAuth credentials and redirect URIs.
     - **Two-way sync (Google to Cassius):** Imports Google Calendar events into Cassius, handling conflicts and avoiding re-import of exported events.
+- **CSV Patient Import:**
+    - **5-step wizard:** Upload, Validate, Review, Import, Complete workflow.
+    - **Field mapping:** Supports French column names (Nom, Prénom, Date de naissance, Sexe, Téléphone, Email, Numéro de dossier, NIR, Adresse, Code postal, Ville, Pays).
+    - **Normalization:** SSN strips spaces/dots, dates parsed jj/mm/aaaa → ISO, email lowercased.
+    - **Smart matching:** file_number → name+DOB → email with collision detection.
+    - **Idempotent upserts:** Creates new patients or updates existing with conflict handling.
+    - **Error export:** Download CSV of failed rows for correction.
+    - **Migration required:** Tables import_jobs, import_job_rows (migration 20241230_008).
 
 ## External Dependencies
 - **Supabase PostgreSQL:** Database hosting and management.

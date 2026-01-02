@@ -16,7 +16,9 @@ import {
   Mail,
   Calendar,
   Trash2,
+  Upload,
 } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { PatientsListSkeleton } from "@/components/page-skeletons";
 import { Card, CardContent } from "@/components/ui/card";
@@ -631,6 +633,12 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           </>
         )}
 
+        <Link href="/patients/import">
+          <Button variant="outline" className="gap-2 shrink-0" data-testid="button-import-patients">
+            <Upload className="h-4 w-4" />
+            Importer
+          </Button>
+        </Link>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button className="gap-2 shrink-0" data-testid="button-new-patient">

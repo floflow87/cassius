@@ -24,6 +24,7 @@ import SettingsPage from "@/pages/settings";
 import IntegrationsPage from "@/pages/settings-integrations";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
+import ImportPatientsPage from "@/pages/import-patients";
 import { apiRequest } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -179,6 +180,7 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/patients">
         {() => <PatientsPage searchQuery={searchQuery} setSearchQuery={setSearchQuery} />}
       </Route>
+      <Route path="/patients/import" component={ImportPatientsPage} />
       <Route path="/patients/:id" component={PatientDetailsPage} />
       <Route path="/patients/:id/report" component={PatientReportPage} />
       <Route path="/patients/:patientId/implants/:implantId" component={ImplantDetailsPage} />

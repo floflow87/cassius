@@ -24,6 +24,7 @@ import {
   updateAppointmentSchema,
   insertFlagSchema,
   patients,
+  importJobs,
 } from "@shared/schema";
 import type {
   Patient,
@@ -44,7 +45,7 @@ import type {
 } from "@shared/types";
 import { z } from "zod";
 import { db, pool, testConnection, getDbEnv, getDbConnectionInfo } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 function getOrganisationId(req: Request, res: Response): string | null {
   const organisationId = req.jwtUser?.organisationId;
@@ -3200,6 +3201,297 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[SYNC] Error resolving conflict:", error);
       res.status(500).json({ error: "Failed to resolve conflict" });
+    }
+  });
+
+  // ========================================
+  // CSV Patient Import endpoints
+  // ========================================
+  
+  const patientImport = await import("./patientImport");
+  
+  // Helper to check if import tables exist
+  async function checkImportTablesExist(): Promise<boolean> {
+    try {
+      const result = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'import_jobs'
+        ) as exists
+      `);
+      return (result.rows[0] as any)?.exists === true;
+    } catch {
+      return false;
+    }
+  }
+  
+  // POST /api/import/patients/upload - Upload CSV and create import job
+  app.post("/api/import/patients/upload", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.jwtUser?.id || "";
+    
+    try {
+      const tablesExist = await checkImportTablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import ne sont pas disponibles. Exécutez la migration 20241230_008_import_jobs.sql sur Supabase."
+        });
+      }
+      
+      const { content, fileName } = req.body;
+      
+      if (!content || typeof content !== "string") {
+        return res.status(400).json({ error: "CSV content is required" });
+      }
+      
+      const fileHash = patientImport.computeFileHash(content);
+      const job = await patientImport.createImportJob(organisationId, userId, fileName || "import.csv", fileHash);
+      
+      // Store content in job for later validation
+      await db.update(importJobs).set({ filePath: content }).where(eq(importJobs.id, job.id));
+      
+      res.json({ 
+        jobId: job.id, 
+        fileName: job.fileName,
+        fileHash: job.fileHash,
+        status: job.status
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error uploading CSV:", error);
+      res.status(500).json({ error: error.message || "Failed to upload CSV" });
+    }
+  });
+  
+  // POST /api/import/patients/validate - Parse and validate CSV rows
+  app.post("/api/import/patients/validate", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const tablesExist = await checkImportTablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import ne sont pas disponibles. Exécutez la migration 20241230_008_import_jobs.sql sur Supabase."
+        });
+      }
+      
+      const { jobId } = req.body;
+      
+      if (!jobId) {
+        return res.status(400).json({ error: "jobId is required" });
+      }
+      
+      const job = await patientImport.getImportJob(jobId);
+      if (!job || job.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      // Update status to validating
+      await patientImport.updateImportJobStatus(jobId, "validating");
+      
+      // Parse CSV from stored content
+      const csvContent = job.filePath || "";
+      const rows = patientImport.parseCSV(csvContent);
+      
+      if (rows.length === 0) {
+        await patientImport.updateImportJobStatus(jobId, "failed", undefined, "CSV vide ou format invalide");
+        return res.status(400).json({ error: "CSV is empty or invalid format" });
+      }
+      
+      // Validate each row and find matches
+      const stats: patientImport.ImportStats = {
+        total: rows.length,
+        ok: 0,
+        warning: 0,
+        error: 0,
+        collision: 0,
+        toCreate: 0,
+        toUpdate: 0,
+      };
+      
+      const rowResults: Array<{
+        rowIndex: number;
+        rawData: patientImport.CSVRow;
+        result: patientImport.ValidationResult;
+      }> = [];
+      
+      for (let i = 0; i < rows.length; i++) {
+        const rawData = rows[i];
+        const result = patientImport.normalizeRow(rawData);
+        
+        // Find matching patient if row is valid
+        if (result.normalized) {
+          const match = await patientImport.findMatchingPatient(organisationId, result.normalized);
+          result.matchedPatientId = match.patientId;
+          result.matchType = match.matchType;
+          
+          if (match.patientId) {
+            stats.toUpdate++;
+          } else {
+            stats.toCreate++;
+          }
+        }
+        
+        // Update stats
+        if (result.status === "ok") stats.ok++;
+        else if (result.status === "warning") stats.warning++;
+        else if (result.status === "error") stats.error++;
+        
+        rowResults.push({ rowIndex: i, rawData, result });
+      }
+      
+      // Save all rows to database
+      await patientImport.saveImportJobRows(jobId, rowResults);
+      
+      // Update job status
+      await patientImport.updateImportJobStatus(jobId, "validated", stats);
+      
+      // Return summary with sample rows
+      const sampleOk = rowResults.filter(r => r.result.status === "ok").slice(0, 3);
+      const sampleErrors = rowResults.filter(r => r.result.status === "error").slice(0, 5);
+      const sampleWarnings = rowResults.filter(r => r.result.status === "warning").slice(0, 5);
+      
+      res.json({
+        jobId,
+        status: "validated",
+        stats,
+        samples: {
+          ok: sampleOk.map(r => ({ row: r.rowIndex + 2, data: r.result.normalized })),
+          errors: sampleErrors.map(r => ({ 
+            row: r.rowIndex + 2, 
+            raw: r.rawData, 
+            errors: r.result.errors 
+          })),
+          warnings: sampleWarnings.map(r => ({ 
+            row: r.rowIndex + 2, 
+            data: r.result.normalized, 
+            warnings: r.result.warnings 
+          })),
+        }
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error validating CSV:", error);
+      res.status(500).json({ error: error.message || "Failed to validate CSV" });
+    }
+  });
+  
+  // POST /api/import/patients/run - Execute the import
+  app.post("/api/import/patients/run", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const tablesExist = await checkImportTablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import ne sont pas disponibles. Exécutez la migration 20241230_008_import_jobs.sql sur Supabase."
+        });
+      }
+      
+      const { jobId } = req.body;
+      
+      if (!jobId) {
+        return res.status(400).json({ error: "jobId is required" });
+      }
+      
+      const job = await patientImport.getImportJob(jobId);
+      if (!job || job.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      if (job.status !== "validated") {
+        return res.status(400).json({ error: "Job must be validated before running" });
+      }
+      
+      // Update status to running
+      await patientImport.updateImportJobStatus(jobId, "running");
+      
+      // Execute import
+      const stats = await patientImport.executeImport(jobId, organisationId);
+      
+      // Update job to completed
+      await patientImport.updateImportJobStatus(jobId, "completed", stats);
+      
+      res.json({
+        jobId,
+        status: "completed",
+        stats,
+        message: `Import terminé: ${stats.toCreate} créés, ${stats.toUpdate} mis à jour, ${stats.error} erreurs`
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error running import:", error);
+      res.status(500).json({ error: error.message || "Failed to run import" });
+    }
+  });
+  
+  // GET /api/import/:jobId - Get import job status
+  app.get("/api/import/:jobId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { jobId } = req.params;
+      const job = await patientImport.getImportJob(jobId);
+      
+      if (!job || job.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      res.json({
+        id: job.id,
+        status: job.status,
+        fileName: job.fileName,
+        totalRows: job.totalRows,
+        stats: job.stats ? JSON.parse(job.stats) : null,
+        errorMessage: job.errorMessage,
+        createdAt: job.createdAt,
+        validatedAt: job.validatedAt,
+        startedAt: job.startedAt,
+        completedAt: job.completedAt,
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting job:", error);
+      res.status(500).json({ error: error.message || "Failed to get job" });
+    }
+  });
+  
+  // GET /api/import/:jobId/errors - Get error rows for export
+  app.get("/api/import/:jobId/errors", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { jobId } = req.params;
+      const job = await patientImport.getImportJob(jobId);
+      
+      if (!job || job.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      const rows = await patientImport.getImportJobRows(jobId);
+      const errorRows = rows.filter(r => r.status === "error" || r.status === "collision");
+      
+      // Build CSV
+      const headers = ["Ligne", "Statut", "Erreurs", "Données brutes"];
+      const csvLines = [headers.join(";")];
+      
+      for (const row of errorRows) {
+        const errors = row.errors ? JSON.parse(row.errors).map((e: any) => `${e.field}: ${e.message}`).join(", ") : "";
+        const rawData = row.rawData ? JSON.stringify(JSON.parse(row.rawData)) : "";
+        csvLines.push([row.rowIndex + 2, row.status, `"${errors}"`, `"${rawData}"`].join(";"));
+      }
+      
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="import_errors_${jobId}.csv"`);
+      res.send(csvLines.join("\n"));
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting errors:", error);
+      res.status(500).json({ error: error.message || "Failed to get errors" });
     }
   });
 
