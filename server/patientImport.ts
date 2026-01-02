@@ -549,9 +549,10 @@ export async function executeImport(
         stats.toCreate++;
       }
       
+      // Count as ok or warning (mutually exclusive)
       if (result.status === "warning") {
         stats.warning++;
-      } else {
+      } else if (result.status === "ok") {
         stats.ok++;
       }
     } catch (error) {
