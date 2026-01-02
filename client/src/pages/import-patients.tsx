@@ -208,8 +208,23 @@ export default function ImportPatientsPage() {
       });
       if (res.ok) {
         const progress = await res.json() as ProgressResponse;
-        console.log("[IMPORT] Progress:", progress.processedRows, "/", progress.totalRows);
+        console.log("[IMPORT] Progress:", progress.processedRows, "/", progress.totalRows, "status:", progress.status);
         setImportProgress(progress);
+        
+        // Stop polling if import is complete or failed
+        if (progress.status === "completed" || progress.status === "failed") {
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+        }
+      } else if (res.status === 404 || res.status >= 500) {
+        // Stop polling on terminal errors
+        console.error("[IMPORT] Error polling progress:", res.status);
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
       }
     } catch (err) {
       console.error("[IMPORT] Error polling progress:", err);
@@ -331,7 +346,7 @@ export default function ImportPatientsPage() {
     setColumnMapping({});
     setHeadersData(null);
     setImportStarted(false);
-    setImportProgress(0);
+    setImportProgress(null);
   };
 
   const handleMappingChange = (csvHeader: string, patientField: string | null) => {
