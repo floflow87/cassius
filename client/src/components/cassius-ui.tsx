@@ -4,17 +4,18 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 interface CassiusBadgeProps {
-  status: "actif" | "en-suivi" | "planifie" | "inactif";
+  status: "actif" | "en-suivi" | "planifie" | "inactif" | "archive";
   children: React.ReactNode;
   className?: string;
 }
 
 export function CassiusBadge({ status, children, className }: CassiusBadgeProps) {
-  const statusStyles = {
+  const statusStyles: Record<string, string> = {
     "actif": "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400",
     "en-suivi": "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400",
     "planifie": "bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400",
-    "inactif": "bg-gray-100 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400",
+    "inactif": "bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400",
+    "archive": "bg-gray-100 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400",
   };
 
   return (

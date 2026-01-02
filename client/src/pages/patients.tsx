@@ -466,16 +466,18 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     setAdvancedFilters(null);
   }, []);
 
-  const getPatientStatus = (_patient: Patient): "actif" | "en-suivi" | "planifie" | "inactif" => {
+  const getPatientStatus = (patient: Patient): "actif" | "inactif" | "archive" => {
+    const statut = patient.statut?.toUpperCase();
+    if (statut === "INACTIF") return "inactif";
+    if (statut === "ARCHIVE") return "archive";
     return "actif";
   };
 
   const getStatusLabel = (status: string): string => {
     switch (status) {
       case "actif": return "Actif";
-      case "en-suivi": return "En suivi";
-      case "planifie": return "Planifié";
       case "inactif": return "Inactif";
+      case "archive": return "Archivé";
       default: return "Actif";
     }
   };
