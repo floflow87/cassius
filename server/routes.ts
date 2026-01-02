@@ -3293,14 +3293,16 @@ export async function registerRoutes(
       // Update status to validating
       await patientImport.updateImportJobStatus(jobId, "validating");
       
-      // Parse CSV from stored content
+      // Parse CSV from stored content with debug mode
       const csvContent = job.filePath || "";
-      const rows = patientImport.parseCSV(csvContent);
+      const rows = patientImport.parseCSV(csvContent, true); // Enable debug logging
       
       if (rows.length === 0) {
         await patientImport.updateImportJobStatus(jobId, "failed", undefined, "CSV vide ou format invalide");
         return res.status(400).json({ error: "CSV is empty or invalid format" });
       }
+      
+      console.log(`[IMPORT] Processing ${rows.length} rows...`);
       
       // Validate each row and find matches
       const stats: patientImport.ImportStats = {
@@ -3321,7 +3323,8 @@ export async function registerRoutes(
       
       for (let i = 0; i < rows.length; i++) {
         const rawData = rows[i];
-        const result = patientImport.normalizeRow(rawData);
+        const debug = i === 0; // Debug first row only
+        const result = patientImport.normalizeRow(rawData, debug);
         
         // Find matching patient if row is valid
         if (result.normalized) {

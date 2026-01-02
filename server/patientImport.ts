@@ -13,8 +13,8 @@ export interface NormalizedPatient {
   ssn?: string;
   nom: string;
   prenom: string;
-  dateNaissance: string;
-  sexe: "HOMME" | "FEMME";
+  dateNaissance?: string;
+  sexe?: "HOMME" | "FEMME";
   telephone?: string;
   email?: string;
   addressFull?: string;
@@ -47,39 +47,39 @@ export interface ImportStats {
   toUpdate: number;
 }
 
-const CSV_FIELD_MAPPINGS: Record<string, keyof NormalizedPatient> = {
-  "Numéro de dossier": "fileNumber",
-  "N° Dossier": "fileNumber",
-  "N°Dossier": "fileNumber",
-  "file_number": "fileNumber",
-  "Numéro SS": "ssn",
-  "N° SS": "ssn",
-  "N°SS": "ssn",
-  "ssn": "ssn",
-  "Nom": "nom",
-  "nom": "nom",
-  "Prénom": "prenom",
-  "prenom": "prenom",
-  "Date de naissance": "dateNaissance",
-  "Date naissance": "dateNaissance",
-  "date_naissance": "dateNaissance",
-  "Sexe": "sexe",
-  "sexe": "sexe",
-  "Téléphone": "telephone",
-  "Tel": "telephone",
-  "telephone": "telephone",
-  "Email": "email",
-  "email": "email",
-  "Adresse": "addressFull",
-  "adresse": "addressFull",
-  "Code postal": "codePostal",
-  "CP": "codePostal",
-  "code_postal": "codePostal",
-  "Ville": "ville",
-  "ville": "ville",
-  "Pays": "pays",
-  "pays": "pays",
-};
+function normalizeColumnName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+const CSV_FIELD_MAPPINGS: Array<{ patterns: string[]; field: keyof NormalizedPatient }> = [
+  { patterns: ["numerodedossier", "ndossier", "filenumber", "numero_dossier", "n_dossier"], field: "fileNumber" },
+  { patterns: ["numeross", "nss", "ssn", "nir", "securitesociale"], field: "ssn" },
+  { patterns: ["nom", "name", "lastname"], field: "nom" },
+  { patterns: ["prenom", "firstname", "givenname"], field: "prenom" },
+  { patterns: ["datedenaissance", "datenaissance", "date_naissance", "dob", "birthdate", "datenaiss"], field: "dateNaissance" },
+  { patterns: ["sexe", "sex", "gender", "genre"], field: "sexe" },
+  { patterns: ["telephone", "tel", "phone", "mobile", "portable"], field: "telephone" },
+  { patterns: ["email", "mail", "courriel", "emailaddress"], field: "email" },
+  { patterns: ["adresse", "address", "adressecomplete", "addressfull"], field: "addressFull" },
+  { patterns: ["codepostal", "cp", "postalcode", "zipcode", "code_postal"], field: "codePostal" },
+  { patterns: ["ville", "city", "commune", "localite"], field: "ville" },
+  { patterns: ["pays", "country", "nation"], field: "pays" },
+];
+
+function findFieldMapping(columnName: string): keyof NormalizedPatient | null {
+  const normalized = normalizeColumnName(columnName);
+  for (const mapping of CSV_FIELD_MAPPINGS) {
+    if (mapping.patterns.includes(normalized)) {
+      return mapping.field;
+    }
+  }
+  return null;
+}
 
 export function normalizeSSN(ssn: string | undefined): string | undefined {
   if (!ssn) return undefined;
@@ -142,24 +142,31 @@ export function extractAddressParts(addressFull: string | undefined): { codePost
   return { codePostal, ville };
 }
 
-export function mapCSVRow(row: CSVRow): Partial<NormalizedPatient> {
+export function mapCSVRow(row: CSVRow, debug = false): Partial<NormalizedPatient> {
   const result: Partial<NormalizedPatient> = {};
   
   for (const [csvKey, value] of Object.entries(row)) {
-    const mappedKey = CSV_FIELD_MAPPINGS[csvKey];
+    const mappedKey = findFieldMapping(csvKey);
     if (mappedKey && value) {
       (result as any)[mappedKey] = value;
     }
+    if (debug && !mappedKey && value) {
+      console.log(`[IMPORT] Unmapped column: "${csvKey}" (normalized: "${normalizeColumnName(csvKey)}")`);
+    }
+  }
+  
+  if (debug) {
+    console.log("[IMPORT] Mapped row:", JSON.stringify(result, null, 2));
   }
   
   return result;
 }
 
-export function normalizeRow(rawData: CSVRow): ValidationResult {
+export function normalizeRow(rawData: CSVRow, debug = false): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationError[] = [];
   
-  const mapped = mapCSVRow(rawData);
+  const mapped = mapCSVRow(rawData, debug);
   
   if (!mapped.nom) {
     errors.push({ field: "nom", message: "Nom requis" });
@@ -167,21 +174,25 @@ export function normalizeRow(rawData: CSVRow): ValidationResult {
   if (!mapped.prenom) {
     errors.push({ field: "prenom", message: "Prénom requis" });
   }
+  
+  let dateISO: string | undefined = undefined;
   if (!mapped.dateNaissance) {
-    errors.push({ field: "dateNaissance", message: "Date de naissance requise" });
+    warnings.push({ field: "dateNaissance", message: "Date de naissance manquante" });
+  } else {
+    dateISO = parseDateFR(mapped.dateNaissance) || undefined;
+    if (!dateISO) {
+      warnings.push({ field: "dateNaissance", message: `Format date invalide: "${mapped.dateNaissance}" (attendu: jj/mm/aaaa)` });
+    }
   }
+  
+  let sexe: "HOMME" | "FEMME" | undefined = undefined;
   if (!mapped.sexe) {
-    errors.push({ field: "sexe", message: "Sexe requis" });
-  }
-  
-  const dateISO = parseDateFR(mapped.dateNaissance || "");
-  if (mapped.dateNaissance && !dateISO) {
-    errors.push({ field: "dateNaissance", message: "Format date invalide (attendu: jj/mm/aaaa)" });
-  }
-  
-  const sexe = parseSexe(mapped.sexe || "");
-  if (mapped.sexe && !sexe) {
-    errors.push({ field: "sexe", message: "Sexe invalide (attendu: M ou F)" });
+    warnings.push({ field: "sexe", message: "Sexe non renseigné" });
+  } else {
+    sexe = parseSexe(mapped.sexe) || undefined;
+    if (!sexe) {
+      warnings.push({ field: "sexe", message: `Sexe invalide: "${mapped.sexe}" (attendu: M, F, Homme, Femme)` });
+    }
   }
   
   const email = normalizeEmail(mapped.email);
@@ -206,8 +217,8 @@ export function normalizeRow(rawData: CSVRow): ValidationResult {
     ssn: normalizeSSN(mapped.ssn),
     nom: (mapped.nom || "").trim(),
     prenom: (mapped.prenom || "").trim(),
-    dateNaissance: dateISO!,
-    sexe: sexe!,
+    dateNaissance: dateISO,
+    sexe,
     telephone: normalizePhone(mapped.telephone),
     email,
     addressFull: mapped.addressFull?.trim(),
@@ -244,20 +255,22 @@ export async function findMatchingPatient(
     }
   }
   
-  const nameMatch = await db
-    .select({ id: patients.id })
-    .from(patients)
-    .where(
-      and(
-        eq(patients.organisationId, organisationId),
-        sql`LOWER(${patients.nom}) = LOWER(${normalized.nom})`,
-        sql`LOWER(${patients.prenom}) = LOWER(${normalized.prenom})`,
-        eq(patients.dateNaissance, normalized.dateNaissance)
+  if (normalized.dateNaissance) {
+    const nameMatch = await db
+      .select({ id: patients.id })
+      .from(patients)
+      .where(
+        and(
+          eq(patients.organisationId, organisationId),
+          sql`LOWER(${patients.nom}) = LOWER(${normalized.nom})`,
+          sql`LOWER(${patients.prenom}) = LOWER(${normalized.prenom})`,
+          eq(patients.dateNaissance, normalized.dateNaissance)
+        )
       )
-    )
-    .limit(1);
-  if (nameMatch.length > 0) {
-    return { patientId: nameMatch[0].id, matchType: "name_dob" };
+      .limit(1);
+    if (nameMatch.length > 0) {
+      return { patientId: nameMatch[0].id, matchType: "name_dob" };
+    }
   }
   
   if (normalized.email) {
@@ -279,7 +292,7 @@ export async function findMatchingPatient(
   return {};
 }
 
-export function parseCSV(content: string): CSVRow[] {
+export function parseCSV(content: string, debug = false): CSVRow[] {
   const lines = content.split(/\r?\n/).filter(line => line.trim());
   if (lines.length < 2) return [];
   
@@ -311,6 +324,17 @@ export function parseCSV(content: string): CSVRow[] {
   };
   
   const headers = parseRow(lines[0]);
+  
+  if (debug) {
+    console.log("[IMPORT] CSV delimiter:", delimiter);
+    console.log("[IMPORT] Detected headers:", headers);
+    console.log("[IMPORT] Header mappings:");
+    headers.forEach(h => {
+      const mapped = findFieldMapping(h);
+      console.log(`  "${h}" -> ${mapped || "(unmapped)"}`);
+    });
+  }
+  
   const rows: CSVRow[] = [];
   
   for (let i = 1; i < lines.length; i++) {
@@ -322,6 +346,10 @@ export function parseCSV(content: string): CSVRow[] {
       row[header] = values[index] || "";
     });
     rows.push(row);
+  }
+  
+  if (debug && rows.length > 0) {
+    console.log("[IMPORT] First raw row:", JSON.stringify(rows[0], null, 2));
   }
   
   return rows;
