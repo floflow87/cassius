@@ -665,6 +665,7 @@ export const importJobs = pgTable("import_jobs", {
   type: text("type").default("patients_csv").notNull(),
   status: importJobStatusEnum("status").default("pending").notNull(),
   cancelRequested: boolean("cancel_requested").default(false).notNull(),
+  cancellationReason: text("cancellation_reason"), // 'user' or 'system'
   fileName: text("file_name"),
   filePath: text("file_path"),
   fileHash: text("file_hash"),

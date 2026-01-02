@@ -486,7 +486,7 @@ export async function getImportJobRows(
   return await query.orderBy(importJobRows.rowIndex);
 }
 
-const IMPORT_BATCH_SIZE = 200; // Reduced from 500 for smoother progress updates
+const IMPORT_BATCH_SIZE = 150; // Reduced for smoother progress updates
 
 export async function requestCancelImport(jobId: string): Promise<boolean> {
   const result = await db.update(importJobs)
