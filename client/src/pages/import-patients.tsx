@@ -120,9 +120,13 @@ export default function ImportPatientsPage() {
     },
   });
 
-  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const [isDragging, setIsDragging] = useState(false);
+
+  const processFile = useCallback((file: File) => {
+    if (!file.name.endsWith('.csv')) {
+      setError("Veuillez sélectionner un fichier CSV");
+      return;
+    }
 
     setFileName(file.name);
     setError(null);
@@ -137,6 +141,35 @@ export default function ImportPatientsPage() {
     };
     reader.readAsText(file, "UTF-8");
   }, [uploadMutation]);
+
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    processFile(file);
+  }, [processFile]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+  }, [processFile]);
 
   const handleStartImport = () => {
     if (jobId) {
@@ -202,8 +235,13 @@ export default function ImportPatientsPage() {
       <CardContent>
         <div className="space-y-4">
           <div
-            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover-elevate"
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+              ${isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover-elevate"}`}
             onClick={() => document.getElementById("file-input")?.click()}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            data-testid="dropzone-csv"
           >
             <input
               id="file-input"
@@ -213,9 +251,9 @@ export default function ImportPatientsPage() {
               onChange={handleFileSelect}
               data-testid="input-file-csv"
             />
-            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-sm text-muted-foreground mb-2">
-              Cliquez pour sélectionner un fichier CSV
+            <FileText className={`h-12 w-12 mx-auto mb-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+            <p className={`text-sm mb-2 ${isDragging ? "text-primary font-medium" : "text-muted-foreground"}`}>
+              {isDragging ? "Déposez le fichier ici" : "Glissez-déposez ou cliquez pour sélectionner un fichier CSV"}
             </p>
             <p className="text-xs text-muted-foreground">
               Format attendu: nom, prénom, date de naissance, sexe, etc.
