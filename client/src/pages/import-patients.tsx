@@ -378,8 +378,8 @@ export default function ImportPatientsPage() {
           <CardContent>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-4 text-sm font-medium text-muted-foreground pb-2 border-b">
-                <div>Colonne CSV</div>
-                <div>Champ patient</div>
+                <div>Colonnes de votre fichier</div>
+                <div>Champs patient dans Cassius</div>
               </div>
               
               {headersData.headers.map((header, index) => (
@@ -540,7 +540,7 @@ export default function ImportPatientsPage() {
                 <AlertTriangle className="h-5 w-5" />
                 Avertissements ({stats.warning})
               </CardTitle>
-              <CardDescription>Ces lignes seront importées avec des données incomplètes</CardDescription>
+              <CardDescription>Ces patients seront importés. Certaines informations (date de naissance, sexe) pourront être complétées ultérieurement.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 max-h-64 overflow-y-auto">

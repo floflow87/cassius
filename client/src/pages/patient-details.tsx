@@ -229,6 +229,7 @@ export default function PatientDetailsPage() {
     sexe: "HOMME" as "HOMME" | "FEMME",
     telephone: "",
     email: "",
+    ssn: "",
     adresse: "",
     codePostal: "",
     ville: "",
@@ -881,6 +882,7 @@ export default function PatientDetailsPage() {
         sexe: patient.sexe,
         telephone: patient.telephone || "",
         email: patient.email || "",
+        ssn: patient.ssn || "",
         adresse: patient.adresse || "",
         codePostal: patient.codePostal || "",
         ville: patient.ville || "",
@@ -1483,6 +1485,12 @@ export default function PatientDetailsPage() {
                       <p>{patient.email}</p>
                     </div>
                   )}
+                  {patient.ssn && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">Numéro de sécurité sociale</span>
+                      <p>{patient.ssn}</p>
+                    </div>
+                  )}
                   {(patient.adresse || patient.codePostal || patient.ville || patient.pays) && (
                     <div>
                       <span className="text-muted-foreground text-xs">Adresse</span>
@@ -1578,6 +1586,16 @@ export default function PatientDetailsPage() {
                           data-testid="input-edit-email"
                         />
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ssn">Numéro de sécurité sociale</Label>
+                      <Input
+                        id="ssn"
+                        value={editForm.ssn}
+                        onChange={(e) => setEditForm({ ...editForm, ssn: e.target.value })}
+                        placeholder="1 23 45 67 890 123 45"
+                        data-testid="input-edit-ssn"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="adresse">Adresse</Label>

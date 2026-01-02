@@ -46,6 +46,7 @@ export function PatientForm({ onSuccess }: PatientFormProps) {
       sexe: "HOMME",
       telephone: "",
       email: "",
+      ssn: "",
       adresse: "",
       codePostal: "",
       ville: "",
@@ -189,6 +190,25 @@ export function PatientForm({ onSuccess }: PatientFormProps) {
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="ssn"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Numéro de sécurité sociale</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="1 23 45 67 890 123 45"
+                  {...field}
+                  value={field.value || ""}
+                  data-testid="input-patient-ssn"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

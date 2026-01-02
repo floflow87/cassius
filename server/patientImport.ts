@@ -45,6 +45,26 @@ export interface ImportStats {
   collision: number;
   toCreate: number;
   toUpdate: number;
+  mapping?: ColumnMapping | null;
+}
+
+// Safe JSON parse helper
+export function safeParseJSON<T = unknown>(value: unknown, fallback: T): T {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === "object") return value as T;
+  if (typeof value === "string") {
+    if (value === "[object Object]") {
+      console.warn("[IMPORT] Received invalid JSON string '[object Object]'");
+      return fallback;
+    }
+    try {
+      return JSON.parse(value);
+    } catch {
+      console.warn("[IMPORT] Failed to parse JSON:", value.substring(0, 100));
+      return fallback;
+    }
+  }
+  return fallback;
 }
 
 function normalizeColumnName(name: string): string {
@@ -475,7 +495,7 @@ export async function executeImport(
   }
   
   const csvContent = job.filePath || "";
-  const storedStats = job.stats ? JSON.parse(job.stats) : {};
+  const storedStats = safeParseJSON<ImportStats>(job.stats, { total: 0, ok: 0, warning: 0, error: 0, collision: 0, toCreate: 0, toUpdate: 0 });
   const customMapping: ColumnMapping | undefined = storedStats.mapping || undefined;
   
   console.log(`[IMPORT] Executing import for job ${jobId} with ${customMapping ? 'custom' : 'auto'} mapping`);
