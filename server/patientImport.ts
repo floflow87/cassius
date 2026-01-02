@@ -468,10 +468,23 @@ export async function executeImport(
   jobId: string,
   organisationId: string
 ): Promise<ImportStats> {
-  const rows = await getImportJobRows(jobId);
+  // Get the job to read CSV content and mapping from stats
+  const job = await getImportJob(jobId);
+  if (!job) {
+    throw new Error("Import job not found");
+  }
+  
+  const csvContent = job.filePath || "";
+  const storedStats = job.stats ? JSON.parse(job.stats) : {};
+  const customMapping: ColumnMapping | undefined = storedStats.mapping || undefined;
+  
+  console.log(`[IMPORT] Executing import for job ${jobId} with ${customMapping ? 'custom' : 'auto'} mapping`);
+  
+  // Parse CSV with the stored mapping
+  const csvRows = parseCSV(csvContent);
   
   const stats: ImportStats = {
-    total: rows.length,
+    total: csvRows.length,
     ok: 0,
     warning: 0,
     error: 0,
@@ -480,21 +493,24 @@ export async function executeImport(
     toUpdate: 0,
   };
   
-  for (const row of rows) {
-    if (row.status === "error") {
+  for (let i = 0; i < csvRows.length; i++) {
+    const rawData = csvRows[i];
+    const result = normalizeRow(rawData, customMapping);
+    
+    // Skip rows with errors
+    if (result.status === "error" || !result.normalized) {
       stats.error++;
       continue;
     }
     
-    if (!row.normalizedData) {
-      stats.error++;
-      continue;
-    }
-    
-    const normalized: NormalizedPatient = JSON.parse(row.normalizedData);
+    const normalized = result.normalized;
     
     try {
-      if (row.matchedPatientId) {
+      // Find matching patient now (during import, not validation)
+      const match = await findMatchingPatient(organisationId, normalized);
+      
+      if (match.patientId) {
+        // Update existing patient
         await db
           .update(patients)
           .set({
@@ -511,9 +527,10 @@ export async function executeImport(
             ville: normalized.ville,
             pays: normalized.pays,
           })
-          .where(eq(patients.id, row.matchedPatientId));
+          .where(eq(patients.id, match.patientId));
         stats.toUpdate++;
       } else {
+        // Create new patient
         await db.insert(patients).values({
           organisationId,
           fileNumber: normalized.fileNumber,
@@ -532,21 +549,18 @@ export async function executeImport(
         stats.toCreate++;
       }
       
-      if (row.status === "warning") {
+      if (result.status === "warning") {
         stats.warning++;
       } else {
         stats.ok++;
       }
     } catch (error) {
-      console.error(`Error importing row ${row.rowIndex}:`, error);
+      console.error(`[IMPORT] Error importing row ${i}:`, error);
       stats.error++;
-      
-      await db
-        .update(importJobRows)
-        .set({ status: "error", errors: JSON.stringify([{ field: "db", message: String(error) }]) })
-        .where(eq(importJobRows.id, row.id));
     }
   }
+  
+  console.log(`[IMPORT] Import complete: ${stats.toCreate} created, ${stats.toUpdate} updated, ${stats.error} errors`);
   
   return stats;
 }

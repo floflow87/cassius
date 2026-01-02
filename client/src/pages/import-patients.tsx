@@ -468,7 +468,8 @@ export default function ImportPatientsPage() {
     if (!validationResult) return null;
     const { stats, samples } = validationResult;
 
-    const importableCount = stats.total - stats.error;
+    // Importable = ok + warning (rows without blocking errors)
+    const importableCount = stats.ok + stats.warning;
 
     return (
       <div className="space-y-6">

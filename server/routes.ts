@@ -3429,12 +3429,9 @@ export async function registerRoutes(
         const debugRow = i === 0; // Debug first row only
         const result = patientImport.normalizeRow(rawData, customMapping, debugRow);
         
-        // Update stats
+        // Update stats (ok and warning are mutually exclusive)
         if (result.status === "ok") stats.ok++;
-        else if (result.status === "warning") {
-          stats.warning++;
-          stats.ok++; // Warnings are still valid for import
-        }
+        else if (result.status === "warning") stats.warning++;
         else if (result.status === "error") stats.error++;
         
         rowResults.push({ rowIndex: i, rawData, result });
@@ -3442,8 +3439,11 @@ export async function registerRoutes(
       
       console.log(`[IMPORT] Validation complete: ${stats.ok} ok, ${stats.warning} warnings, ${stats.error} errors`);
       
-      // Update job status (don't save rows to DB during validation - too slow)
-      await patientImport.updateImportJobStatus(jobId, "validated", stats);
+      // Store stats with mapping for use during import
+      const statsWithMapping = { ...stats, mapping: customMapping || null };
+      
+      // Update job status with stats and mapping
+      await patientImport.updateImportJobStatus(jobId, "validated", statsWithMapping);
       
       // Return summary with sample rows
       const sampleOk = rowResults.filter(r => r.result.status === "ok").slice(0, 3);
