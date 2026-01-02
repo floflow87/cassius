@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { patients, importJobs, importJobRows } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import type { ImportJob, ImportJobRow, InsertImportJob, InsertImportJobRow } from "@shared/schema";
 import crypto from "crypto";
 
@@ -503,10 +503,11 @@ export async function isCancelRequested(jobId: string): Promise<boolean> {
   return job?.cancelRequested ?? false;
 }
 
-export async function markJobCancelled(jobId: string, stats: ImportStats): Promise<void> {
+export async function markJobCancelled(jobId: string, stats: ImportStats, reason: 'user' | 'system' = 'user'): Promise<void> {
   await db.update(importJobs).set({
     status: "cancelled",
     stats: JSON.stringify(stats),
+    cancellationReason: reason,
     completedAt: new Date(),
   }).where(eq(importJobs.id, jobId));
 }
@@ -675,4 +676,36 @@ export async function executeImport(
   }
   
   return stats;
+}
+
+export interface ImportHistoryItem {
+  id: string;
+  fileName: string | null;
+  status: string;
+  totalRows: number;
+  processedRows: number;
+  stats: ImportStats;
+  cancellationReason: string | null;
+  createdAt: Date;
+  completedAt: Date | null;
+}
+
+export async function getImportHistory(organisationId: string, limit: number = 20): Promise<ImportHistoryItem[]> {
+  const jobs = await db.select()
+    .from(importJobs)
+    .where(eq(importJobs.organisationId, organisationId))
+    .orderBy(desc(importJobs.createdAt))
+    .limit(limit);
+  
+  return jobs.map(job => ({
+    id: job.id,
+    fileName: job.fileName,
+    status: job.status,
+    totalRows: job.totalRows || 0,
+    processedRows: job.processedRows || 0,
+    stats: safeParseJSON<ImportStats>(job.stats, { total: 0, ok: 0, warning: 0, error: 0, collision: 0, toCreate: 0, toUpdate: 0 }),
+    cancellationReason: job.cancellationReason,
+    createdAt: job.createdAt,
+    completedAt: job.completedAt,
+  }));
 }

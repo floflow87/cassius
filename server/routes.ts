@@ -3607,6 +3607,27 @@ export async function registerRoutes(
     }
   });
   
+  // GET /api/import/patients/history - Get import history
+  app.get("/api/import/patients/history", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const tablesExist = await checkImportTablesExist();
+      if (!tablesExist) {
+        return res.json({ history: [] });
+      }
+      
+      const limit = parseInt(req.query.limit as string) || 20;
+      const history = await patientImport.getImportHistory(organisationId, limit);
+      
+      res.json({ history });
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting import history:", error);
+      res.status(500).json({ error: error.message || "Failed to get import history" });
+    }
+  });
+  
   // GET /api/import/:jobId/progress - Get import progress
   app.get("/api/import/:jobId/progress", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
