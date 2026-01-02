@@ -614,7 +614,7 @@ export default function ImportPatientsPage() {
                           <td className="py-2 text-right font-mono">{item.totalRows.toLocaleString()}</td>
                           <td className="py-2 text-right font-mono text-green-600">{imported.toLocaleString()}</td>
                           <td className="py-2 text-right font-mono text-muted-foreground">
-                            {item.status === "cancelled" || item.status === "failed" ? remaining.toLocaleString() : "-"}
+                            {remaining > 0 ? remaining.toLocaleString() : (item.status === "completed" ? "0" : "-")}
                           </td>
                           <td className="py-2 text-muted-foreground text-xs">
                             {item.completedAt 
