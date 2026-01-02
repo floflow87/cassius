@@ -645,7 +645,8 @@ export const importJobStatusEnum = pgEnum("import_job_status", [
   "validated",
   "running",
   "completed",
-  "failed"
+  "failed",
+  "cancelled"
 ]);
 
 export const importRowStatusEnum = pgEnum("import_row_status", [
@@ -663,6 +664,7 @@ export const importJobs = pgTable("import_jobs", {
   userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
   type: text("type").default("patients_csv").notNull(),
   status: importJobStatusEnum("status").default("pending").notNull(),
+  cancelRequested: boolean("cancel_requested").default(false).notNull(),
   fileName: text("file_name"),
   filePath: text("file_path"),
   fileHash: text("file_hash"),
