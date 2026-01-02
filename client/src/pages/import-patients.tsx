@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Upload, FileText, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, ArrowRight, Download, Loader2, Settings2 } from "lucide-react";
+import { Upload, FileText, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, ArrowRight, Download, Loader2, Settings2, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -110,7 +110,11 @@ export default function ImportPatientsPage() {
   const [headersData, setHeadersData] = useState<HeadersResponse | null>(null);
   const [importStarted, setImportStarted] = useState(false);
   const [importProgress, setImportProgress] = useState<ProgressResponse | null>(null);
+  const [cancelRequested, setCancelRequested] = useState(false);
+  const [animatedProgress, setAnimatedProgress] = useState(0);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const lastServerProgress = useRef(0);
 
   // Query for last import
   const { data: lastImportData } = useQuery<LastImportResponse>({
@@ -199,6 +203,58 @@ export default function ImportPatientsPage() {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/import/${id}/cancel`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      setCancelRequested(true);
+    },
+    onError: (err: Error) => {
+      console.error("[IMPORT] Cancel failed:", err.message);
+    },
+  });
+
+  // Smooth progress animation
+  useEffect(() => {
+    if (!importProgress) return;
+    
+    const totalRows = importProgress.totalRows || 1;
+    const targetPercent = Math.round((importProgress.processedRows / totalRows) * 100);
+    
+    // Animate from current animated progress to target
+    const startPercent = animatedProgress;
+    const duration = 800; // Animation duration in ms
+    const startTime = performance.now();
+    
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Ease out animation
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const newPercent = startPercent + (targetPercent - startPercent) * easeOut;
+      
+      setAnimatedProgress(Math.round(newPercent));
+      
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+    
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+    animationRef.current = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [importProgress?.processedRows, importProgress?.totalRows]);
+
   // Poll for progress when import is running
   const pollProgress = useCallback(async () => {
     if (!jobId) return;
@@ -211,11 +267,21 @@ export default function ImportPatientsPage() {
         console.log("[IMPORT] Progress:", progress.processedRows, "/", progress.totalRows, "status:", progress.status);
         setImportProgress(progress);
         
-        // Stop polling if import is complete or failed
-        if (progress.status === "completed" || progress.status === "failed") {
+        // Stop polling if import is complete, failed, or cancelled
+        if (progress.status === "completed" || progress.status === "failed" || progress.status === "cancelled") {
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
+          }
+          // Handle cancelled status
+          if (progress.status === "cancelled") {
+            setImportResult({
+              jobId: jobId,
+              status: "cancelled",
+              stats: progress.stats,
+              message: `Import interrompu: ${progress.stats.toCreate} créés, ${progress.stats.toUpdate} mis à jour, ${progress.stats.error} erreurs`
+            });
+            setStep("complete");
           }
         }
       } else if (res.status === 404 || res.status >= 500) {
@@ -337,6 +403,10 @@ export default function ImportPatientsPage() {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
     setStep("upload");
     setJobId(null);
     setFileName("");
@@ -347,6 +417,14 @@ export default function ImportPatientsPage() {
     setHeadersData(null);
     setImportStarted(false);
     setImportProgress(null);
+    setCancelRequested(false);
+    setAnimatedProgress(0);
+  };
+
+  const handleCancelImport = () => {
+    if (jobId && !cancelRequested) {
+      cancelMutation.mutate(jobId);
+    }
   };
 
   const handleMappingChange = (csvHeader: string, patientField: string | null) => {
@@ -806,15 +884,26 @@ export default function ImportPatientsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Import en cours
+            {cancelRequested ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Interruption en cours...
+              </>
+            ) : (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Import en cours
+              </>
+            )}
           </CardTitle>
           <CardDescription>
-            Création et mise à jour des patients...
+            {cancelRequested 
+              ? "L'import sera interrompu après le batch en cours..." 
+              : "Création et mise à jour des patients..."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Progress value={progressPercent} className="mb-4" />
+          <Progress value={animatedProgress} className="mb-4" />
           
           <div className="text-center mb-4">
             <div className="text-2xl font-bold">
@@ -842,9 +931,20 @@ export default function ImportPatientsPage() {
             </div>
           )}
 
-          <p className="text-sm text-muted-foreground text-center">
-            Ne fermez pas cette page pendant l'import.
-          </p>
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-muted-foreground text-center">
+              Ne fermez pas cette page pendant l'import.
+            </p>
+            <Button
+              variant="outline"
+              onClick={handleCancelImport}
+              disabled={cancelRequested || cancelMutation.isPending}
+              data-testid="button-cancel-import"
+            >
+              <StopCircle className="h-4 w-4 mr-2" />
+              {cancelRequested ? "Interruption demandée..." : "Interrompre l'import"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -852,14 +952,24 @@ export default function ImportPatientsPage() {
 
   const renderCompleteStep = () => {
     if (!importResult) return null;
-    const { stats } = importResult;
+    const { stats, status } = importResult;
+    const isCancelled = status === "cancelled";
 
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-green-600">
-            <CheckCircle2 className="h-5 w-5" />
-            Import terminé
+          <CardTitle className={`flex items-center gap-2 ${isCancelled ? "text-orange-600" : "text-green-600"}`}>
+            {isCancelled ? (
+              <>
+                <StopCircle className="h-5 w-5" />
+                Import interrompu
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-5 w-5" />
+                Import terminé
+              </>
+            )}
           </CardTitle>
           <CardDescription>{importResult.message}</CardDescription>
         </CardHeader>
