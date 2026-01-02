@@ -486,6 +486,40 @@ export async function getImportJobRows(
   return await query.orderBy(importJobRows.rowIndex);
 }
 
+const IMPORT_BATCH_SIZE = 500;
+
+export async function updateImportProgress(
+  jobId: string,
+  processedRows: number,
+  stats: ImportStats
+): Promise<void> {
+  await db.update(importJobs).set({
+    processedRows,
+    stats: JSON.stringify(stats),
+  }).where(eq(importJobs.id, jobId));
+}
+
+export async function getImportProgress(jobId: string): Promise<{
+  status: string;
+  totalRows: number;
+  processedRows: number;
+  stats: ImportStats;
+} | null> {
+  const job = await getImportJob(jobId);
+  if (!job) return null;
+  
+  const stats = safeParseJSON<ImportStats>(job.stats, {
+    total: 0, ok: 0, warning: 0, error: 0, collision: 0, toCreate: 0, toUpdate: 0
+  });
+  
+  return {
+    status: job.status,
+    totalRows: job.totalRows || 0,
+    processedRows: job.processedRows || 0,
+    stats,
+  };
+}
+
 export async function executeImport(
   jobId: string,
   organisationId: string
@@ -519,6 +553,11 @@ export async function executeImport(
     toUpdate: 0,
   };
   
+  // Update total rows count
+  await db.update(importJobs).set({ totalRows: csvRows.length, processedRows: 0 }).where(eq(importJobs.id, jobId));
+  
+  console.log(`[IMPORT] Processing ${csvRows.length} rows in batches of ${IMPORT_BATCH_SIZE}`);
+  
   for (let i = 0; i < csvRows.length; i++) {
     const rawData = csvRows[i];
     const result = normalizeRow(rawData, customMapping);
@@ -526,20 +565,37 @@ export async function executeImport(
     // Skip rows with errors
     if (result.status === "error" || !result.normalized) {
       stats.error++;
-      continue;
-    }
-    
-    const normalized = result.normalized;
-    
-    try {
-      // Find matching patient now (during import, not validation)
-      const match = await findMatchingPatient(organisationId, normalized);
+    } else {
+      const normalized = result.normalized;
       
-      if (match.patientId) {
-        // Update existing patient
-        await db
-          .update(patients)
-          .set({
+      try {
+        // Find matching patient now (during import, not validation)
+        const match = await findMatchingPatient(organisationId, normalized);
+        
+        if (match.patientId) {
+          // Update existing patient
+          await db
+            .update(patients)
+            .set({
+              fileNumber: normalized.fileNumber,
+              ssn: normalized.ssn,
+              nom: normalized.nom,
+              prenom: normalized.prenom,
+              dateNaissance: normalized.dateNaissance,
+              sexe: normalized.sexe,
+              telephone: normalized.telephone,
+              email: normalized.email,
+              addressFull: normalized.addressFull,
+              codePostal: normalized.codePostal,
+              ville: normalized.ville,
+              pays: normalized.pays,
+            })
+            .where(eq(patients.id, match.patientId));
+          stats.toUpdate++;
+        } else {
+          // Create new patient
+          await db.insert(patients).values({
+            organisationId,
             fileNumber: normalized.fileNumber,
             ssn: normalized.ssn,
             nom: normalized.nom,
@@ -552,38 +608,26 @@ export async function executeImport(
             codePostal: normalized.codePostal,
             ville: normalized.ville,
             pays: normalized.pays,
-          })
-          .where(eq(patients.id, match.patientId));
-        stats.toUpdate++;
-      } else {
-        // Create new patient
-        await db.insert(patients).values({
-          organisationId,
-          fileNumber: normalized.fileNumber,
-          ssn: normalized.ssn,
-          nom: normalized.nom,
-          prenom: normalized.prenom,
-          dateNaissance: normalized.dateNaissance,
-          sexe: normalized.sexe,
-          telephone: normalized.telephone,
-          email: normalized.email,
-          addressFull: normalized.addressFull,
-          codePostal: normalized.codePostal,
-          ville: normalized.ville,
-          pays: normalized.pays,
-        });
-        stats.toCreate++;
+          });
+          stats.toCreate++;
+        }
+        
+        // Count as ok or warning (mutually exclusive)
+        if (result.status === "warning") {
+          stats.warning++;
+        } else if (result.status === "ok") {
+          stats.ok++;
+        }
+      } catch (error) {
+        console.error(`[IMPORT] Error importing row ${i}:`, error);
+        stats.error++;
       }
-      
-      // Count as ok or warning (mutually exclusive)
-      if (result.status === "warning") {
-        stats.warning++;
-      } else if (result.status === "ok") {
-        stats.ok++;
-      }
-    } catch (error) {
-      console.error(`[IMPORT] Error importing row ${i}:`, error);
-      stats.error++;
+    }
+    
+    // Update progress every batch
+    if ((i + 1) % IMPORT_BATCH_SIZE === 0 || i === csvRows.length - 1) {
+      await updateImportProgress(jobId, i + 1, stats);
+      console.log(`[IMPORT] Progress: ${i + 1}/${csvRows.length} (${stats.toCreate} created, ${stats.toUpdate} updated, ${stats.error} errors)`);
     }
   }
   

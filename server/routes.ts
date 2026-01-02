@@ -45,7 +45,7 @@ import type {
 } from "@shared/types";
 import { z } from "zod";
 import { db, pool, testConnection, getDbEnv, getDbConnectionInfo } from "./db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, inArray, desc } from "drizzle-orm";
 
 function getOrganisationId(req: Request, res: Response): string | null {
   const organisationId = req.jwtUser?.organisationId;
@@ -3524,6 +3524,73 @@ export async function registerRoutes(
     }
   });
   
+  // GET /api/import/patients/last - Get the last import job
+  app.get("/api/import/patients/last", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const tablesExist = await checkImportTablesExist();
+      if (!tablesExist) {
+        return res.json({ lastImport: null });
+      }
+      
+      // Get the most recent completed import job for this organisation
+      const [lastJob] = await db
+        .select()
+        .from(importJobs)
+        .where(and(
+          eq(importJobs.organisationId, organisationId),
+          eq(importJobs.type, "patients_csv"),
+          inArray(importJobs.status, ["completed", "failed"])
+        ))
+        .orderBy(desc(importJobs.completedAt))
+        .limit(1);
+      
+      if (!lastJob) {
+        return res.json({ lastImport: null });
+      }
+      
+      const stats = patientImport.safeParseJSON(lastJob.stats, null);
+      
+      res.json({
+        lastImport: {
+          id: lastJob.id,
+          status: lastJob.status,
+          fileName: lastJob.fileName,
+          totalRows: lastJob.totalRows,
+          processedRows: lastJob.processedRows,
+          stats,
+          completedAt: lastJob.completedAt,
+          createdAt: lastJob.createdAt,
+        }
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting last import:", error);
+      res.status(500).json({ error: error.message || "Failed to get last import" });
+    }
+  });
+  
+  // GET /api/import/:jobId/progress - Get import progress
+  app.get("/api/import/:jobId/progress", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { jobId } = req.params;
+      const progress = await patientImport.getImportProgress(jobId);
+      
+      if (!progress) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      res.json(progress);
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting progress:", error);
+      res.status(500).json({ error: error.message || "Failed to get progress" });
+    }
+  });
+
   // GET /api/import/:jobId - Get import job status
   app.get("/api/import/:jobId", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -3542,6 +3609,7 @@ export async function registerRoutes(
         status: job.status,
         fileName: job.fileName,
         totalRows: job.totalRows,
+        processedRows: job.processedRows,
         stats: job.stats ? JSON.parse(job.stats) : null,
         errorMessage: job.errorMessage,
         createdAt: job.createdAt,

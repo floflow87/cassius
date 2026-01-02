@@ -667,6 +667,7 @@ export const importJobs = pgTable("import_jobs", {
   filePath: text("file_path"),
   fileHash: text("file_hash"),
   totalRows: integer("total_rows").default(0),
+  processedRows: integer("processed_rows").default(0),
   stats: text("stats").default("{}"),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
