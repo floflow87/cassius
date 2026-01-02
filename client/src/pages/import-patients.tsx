@@ -53,6 +53,26 @@ interface RunResponse {
   message: string;
 }
 
+interface ProgressResponse {
+  status: string;
+  totalRows: number;
+  processedRows: number;
+  stats: ImportStats;
+}
+
+interface LastImportResponse {
+  lastImport: {
+    id: string;
+    status: string;
+    fileName: string;
+    totalRows: number;
+    processedRows: number;
+    stats: ImportStats | null;
+    completedAt: string;
+    createdAt: string;
+  } | null;
+}
+
 interface PatientField {
   key: string | null;
   label: string;
@@ -89,8 +109,14 @@ export default function ImportPatientsPage() {
   const [columnMapping, setColumnMapping] = useState<Record<string, string | null>>({});
   const [headersData, setHeadersData] = useState<HeadersResponse | null>(null);
   const [importStarted, setImportStarted] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
+  const [importProgress, setImportProgress] = useState<ProgressResponse | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Query for last import
+  const { data: lastImportData } = useQuery<LastImportResponse>({
+    queryKey: ["/api/import/patients/last"],
+    staleTime: 30000,
+  });
 
   const getCurrentStepIndex = () => STEPS.findIndex(s => s.key === step);
 
@@ -173,14 +199,35 @@ export default function ImportPatientsPage() {
     },
   });
 
+  // Poll for progress when import is running
+  const pollProgress = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const res = await fetch(`/api/import/${jobId}/progress`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const progress = await res.json() as ProgressResponse;
+        console.log("[IMPORT] Progress:", progress.processedRows, "/", progress.totalRows);
+        setImportProgress(progress);
+      }
+    } catch (err) {
+      console.error("[IMPORT] Error polling progress:", err);
+    }
+  }, [jobId]);
+
   useEffect(() => {
     if (step === "import" && jobId && !importStarted && !runMutation.isPending) {
       console.log("[IMPORT] Step is 'import', starting import for jobId:", jobId);
       setImportStarted(true);
       setError(null);
+      setImportProgress(null);
       runMutation.mutate(jobId);
+      
+      // Start polling for progress
+      pollingRef.current = setInterval(pollProgress, 1000);
     }
-  }, [step, jobId, importStarted, runMutation.isPending]);
+  }, [step, jobId, importStarted, runMutation.isPending, pollProgress]);
 
   useEffect(() => {
     return () => {
@@ -395,6 +442,54 @@ export default function ImportPatientsPage() {
               Nom, Prénom, Date de naissance, Téléphone, E-mail, Numéro de dossier, Numéro SS, Adresse, Code postal, Ville, Pays
             </AlertDescription>
           </Alert>
+
+          {lastImportData?.lastImport && (
+            <div className="mt-6 pt-6 border-t">
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Dernier import
+              </h4>
+              <div className="bg-muted/50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">
+                    {lastImportData.lastImport.fileName || "Fichier CSV"}
+                  </span>
+                  <Badge variant={lastImportData.lastImport.status === "completed" ? "default" : "destructive"}>
+                    {lastImportData.lastImport.status === "completed" ? "Terminé" : "Échoué"}
+                  </Badge>
+                </div>
+                <div className="text-xs text-muted-foreground mb-3">
+                  {new Date(lastImportData.lastImport.completedAt).toLocaleDateString("fr-FR", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </div>
+                {lastImportData.lastImport.stats && (
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div className="bg-background rounded p-2">
+                      <div className="text-sm font-bold">{lastImportData.lastImport.stats.total?.toLocaleString() || 0}</div>
+                      <div className="text-xs text-muted-foreground">Total</div>
+                    </div>
+                    <div className="bg-background rounded p-2">
+                      <div className="text-sm font-bold text-green-600">{lastImportData.lastImport.stats.toCreate?.toLocaleString() || 0}</div>
+                      <div className="text-xs text-muted-foreground">Créés</div>
+                    </div>
+                    <div className="bg-background rounded p-2">
+                      <div className="text-sm font-bold text-blue-600">{lastImportData.lastImport.stats.toUpdate?.toLocaleString() || 0}</div>
+                      <div className="text-xs text-muted-foreground">Mis à jour</div>
+                    </div>
+                    <div className="bg-background rounded p-2">
+                      <div className="text-sm font-bold text-red-600">{lastImportData.lastImport.stats.error?.toLocaleString() || 0}</div>
+                      <div className="text-xs text-muted-foreground">Erreurs</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -685,6 +780,13 @@ export default function ImportPatientsPage() {
       );
     }
 
+    const totalRows = importProgress?.totalRows || validationResult?.stats?.total || 0;
+    const processedRows = importProgress?.processedRows || 0;
+    const progressPercent = totalRows > 0 ? Math.round((processedRows / totalRows) * 100) : 0;
+    const created = importProgress?.stats?.toCreate || 0;
+    const updated = importProgress?.stats?.toUpdate || 0;
+    const errors = importProgress?.stats?.error || 0;
+
     return (
       <Card>
         <CardHeader>
@@ -697,17 +799,37 @@ export default function ImportPatientsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Progress value={runMutation.isPending ? 50 : 0} className="mb-4" />
-          <p className="text-sm text-muted-foreground text-center">
-            {runMutation.isPending 
-              ? "L'import est en cours, ne fermez pas cette page..." 
-              : "Démarrage de l'import..."}
-          </p>
-          {jobId && (
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              Job ID: {jobId}
+          <Progress value={progressPercent} className="mb-4" />
+          
+          <div className="text-center mb-4">
+            <div className="text-2xl font-bold">
+              {processedRows.toLocaleString()} / {totalRows.toLocaleString()}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              patients traités ({progressPercent}%)
             </p>
+          </div>
+
+          {importProgress && (
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <div className="text-lg font-bold text-green-600">{created.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">Créés</div>
+              </div>
+              <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="text-lg font-bold text-blue-600">{updated.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">Mis à jour</div>
+              </div>
+              <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                <div className="text-lg font-bold text-red-600">{errors.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">Erreurs</div>
+              </div>
+            </div>
           )}
+
+          <p className="text-sm text-muted-foreground text-center">
+            Ne fermez pas cette page pendant l'import.
+          </p>
         </CardContent>
       </Card>
     );
