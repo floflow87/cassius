@@ -574,13 +574,16 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     <div className="p-6">
       <div className="flex items-center gap-4 mb-5">
         <CassiusSearchInput
-          placeholder="Rechercher un patient (nom, prénom, date de naissance...)"
+          placeholder="Rechercher un patient..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           icon={<Search className="h-4 w-4" />}
-          className="max-w-2xl"
+          className="max-w-sm"
           data-testid="input-search-patients"
         />
+        <span className="text-sm italic text-muted-foreground">
+          {patients?.length?.toLocaleString() || 0} patients
+        </span>
         
         <AdvancedFilterDrawer
           filters={advancedFilters}

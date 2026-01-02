@@ -3584,6 +3584,10 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Import job not found" });
       }
       
+      // Disable caching for progress endpoint
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.json(progress);
     } catch (error: any) {
       console.error("[IMPORT] Error getting progress:", error);
