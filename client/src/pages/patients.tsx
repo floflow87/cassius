@@ -56,7 +56,7 @@ interface PatientsPageProps {
 }
 
 type SortDirection = "asc" | "desc" | null;
-type ColumnId = "patient" | "dateNaissance" | "contact" | "implants" | "derniereVisite" | "flags" | "statut";
+type ColumnId = "patient" | "dateNaissance" | "sexe" | "contact" | "implants" | "derniereVisite" | "flags" | "statut";
 
 interface ColumnConfig {
   id: ColumnId;
@@ -68,6 +68,7 @@ interface ColumnConfig {
 const defaultColumns: ColumnConfig[] = [
   { id: "patient", label: "Patient", width: "w-56", sortable: true },
   { id: "dateNaissance", label: "Date de naissance", width: "w-40", sortable: true },
+  { id: "sexe", label: "Sexe", width: "w-20", sortable: true },
   { id: "contact", label: "Contact", width: "w-44", sortable: true },
   { id: "implants", label: "Implants", width: "w-28", sortable: true },
   { id: "derniereVisite", label: "Dernière visite", width: "w-40", sortable: true },
@@ -285,6 +286,9 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           break;
         case "dateNaissance":
           comparison = new Date(a.dateNaissance).getTime() - new Date(b.dateNaissance).getTime();
+          break;
+        case "sexe":
+          comparison = (a.sexe || "").localeCompare(b.sexe || "");
           break;
         case "contact":
           comparison = (a.telephone || "").localeCompare(b.telephone || "");
@@ -519,6 +523,12 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         return (
           <span className="text-sm text-muted-foreground">
             {formatDateWithAge(patient.dateNaissance)}
+          </span>
+        );
+      case "sexe":
+        return (
+          <span className="text-sm text-muted-foreground">
+            {patient.sexe === "M" ? "H" : patient.sexe === "F" ? "F" : "—"}
           </span>
         );
       case "contact":
