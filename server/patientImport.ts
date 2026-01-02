@@ -71,7 +71,7 @@ const CSV_FIELD_MAPPINGS: Array<{ patterns: string[]; field: keyof NormalizedPat
   { patterns: ["pays", "country", "nation"], field: "pays" },
 ];
 
-function findFieldMapping(columnName: string): keyof NormalizedPatient | null {
+export function findFieldMapping(columnName: string): keyof NormalizedPatient | null {
   const normalized = normalizeColumnName(columnName);
   for (const mapping of CSV_FIELD_MAPPINGS) {
     if (mapping.patterns.includes(normalized)) {
@@ -80,6 +80,8 @@ function findFieldMapping(columnName: string): keyof NormalizedPatient | null {
   }
   return null;
 }
+
+export type ColumnMapping = Record<string, keyof NormalizedPatient | null>;
 
 export function normalizeSSN(ssn: string | undefined): string | undefined {
   if (!ssn) return undefined;
@@ -142,11 +144,12 @@ export function extractAddressParts(addressFull: string | undefined): { codePost
   return { codePostal, ville };
 }
 
-export function mapCSVRow(row: CSVRow, debug = false): Partial<NormalizedPatient> {
+export function mapCSVRow(row: CSVRow, customMapping?: ColumnMapping, debug = false): Partial<NormalizedPatient> {
   const result: Partial<NormalizedPatient> = {};
   
   for (const [csvKey, value] of Object.entries(row)) {
-    const mappedKey = findFieldMapping(csvKey);
+    // Use custom mapping if provided, otherwise auto-detect
+    const mappedKey = customMapping ? customMapping[csvKey] : findFieldMapping(csvKey);
     if (mappedKey && value) {
       (result as any)[mappedKey] = value;
     }
@@ -162,11 +165,11 @@ export function mapCSVRow(row: CSVRow, debug = false): Partial<NormalizedPatient
   return result;
 }
 
-export function normalizeRow(rawData: CSVRow, debug = false): ValidationResult {
+export function normalizeRow(rawData: CSVRow, customMapping?: ColumnMapping, debug = false): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationError[] = [];
   
-  const mapped = mapCSVRow(rawData, debug);
+  const mapped = mapCSVRow(rawData, customMapping, debug);
   
   if (!mapped.nom) {
     errors.push({ field: "nom", message: "Nom requis" });

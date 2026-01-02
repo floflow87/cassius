@@ -3226,6 +3226,101 @@ export async function registerRoutes(
     }
   }
   
+  // CSV template columns (in French)
+  const CSV_TEMPLATE_COLUMNS = [
+    "Nom",
+    "Prénom", 
+    "Numéro de dossier",
+    "Numéro SS",
+    "Date de naissance",
+    "E-mail",
+    "Téléphone",
+    "Adresse",
+    "Code postal",
+    "Ville",
+    "Pays"
+  ];
+  
+  // GET /api/import/patients/template - Download CSV template
+  app.get("/api/import/patients/template", requireJwtOrSession, (req, res) => {
+    const variant = req.query.variant as string || "empty";
+    
+    const headers = CSV_TEMPLATE_COLUMNS.join(";");
+    let content = headers + "\n";
+    
+    if (variant === "example") {
+      content += "Dupont;Jean;P2024-001;1850175001234;15/03/1975;jean.dupont@email.com;0612345678;15 rue de la Paix;75001;Paris;France\n";
+      content += "Martin;Marie;P2024-002;2880656789012;22/08/1988;marie.martin@email.com;0698765432;8 avenue Victor Hugo;69003;Lyon;France\n";
+    }
+    
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="modele_import_patients_${variant}.csv"`);
+    res.send("\ufeff" + content); // BOM for Excel UTF-8 compatibility
+  });
+  
+  // POST /api/import/patients/detect-headers - Detect CSV headers and suggest mapping
+  app.post("/api/import/patients/detect-headers", requireJwtOrSession, async (req, res) => {
+    try {
+      const { jobId } = req.body;
+      
+      if (!jobId) {
+        return res.status(400).json({ error: "jobId is required" });
+      }
+      
+      const job = await patientImport.getImportJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      const csvContent = job.filePath || "";
+      const lines = csvContent.split(/\r?\n/).filter(line => line.trim());
+      
+      if (lines.length === 0) {
+        return res.status(400).json({ error: "CSV is empty" });
+      }
+      
+      const delimiter = lines[0].includes(";") ? ";" : ",";
+      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ""));
+      
+      // Get suggested mapping for each header
+      const suggestedMapping = headers.map(header => {
+        const field = patientImport.findFieldMapping ? 
+          (patientImport as any).findFieldMapping(header) : null;
+        return {
+          csvHeader: header,
+          suggestedField: field || null
+        };
+      });
+      
+      // Define available patient fields with metadata
+      const patientFields = [
+        { key: "nom", label: "Nom", required: true },
+        { key: "prenom", label: "Prénom", required: true },
+        { key: "fileNumber", label: "Numéro de dossier", required: false },
+        { key: "ssn", label: "Numéro SS", required: false },
+        { key: "dateNaissance", label: "Date de naissance", required: false },
+        { key: "email", label: "E-mail", required: false },
+        { key: "telephone", label: "Téléphone", required: false },
+        { key: "addressFull", label: "Adresse", required: false },
+        { key: "codePostal", label: "Code postal", required: false },
+        { key: "ville", label: "Ville", required: false },
+        { key: "pays", label: "Pays", required: false },
+        { key: null, label: "Ignorer", required: false },
+      ];
+      
+      res.json({
+        headers,
+        delimiter,
+        rowCount: lines.length - 1,
+        suggestedMapping,
+        patientFields
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error detecting headers:", error);
+      res.status(500).json({ error: error.message || "Failed to detect headers" });
+    }
+  });
+  
   // POST /api/import/patients/upload - Upload CSV and create import job
   app.post("/api/import/patients/upload", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -3279,7 +3374,7 @@ export async function registerRoutes(
         });
       }
       
-      const { jobId } = req.body;
+      const { jobId, mapping } = req.body;
       
       if (!jobId) {
         return res.status(400).json({ error: "jobId is required" });
@@ -3293,25 +3388,32 @@ export async function registerRoutes(
       // Update status to validating
       await patientImport.updateImportJobStatus(jobId, "validating");
       
-      // Parse CSV from stored content with debug mode
+      // Parse CSV from stored content
       const csvContent = job.filePath || "";
-      const rows = patientImport.parseCSV(csvContent, true); // Enable debug logging
+      const debug = true;
+      const rows = patientImport.parseCSV(csvContent, debug);
       
       if (rows.length === 0) {
         await patientImport.updateImportJobStatus(jobId, "failed", undefined, "CSV vide ou format invalide");
         return res.status(400).json({ error: "CSV is empty or invalid format" });
       }
       
-      console.log(`[IMPORT] Processing ${rows.length} rows...`);
+      console.log(`[IMPORT] Processing ${rows.length} rows with ${mapping ? 'custom' : 'auto'} mapping...`);
       
-      // Validate each row and find matches
+      // Build custom mapping from request if provided
+      const customMapping: patientImport.ColumnMapping | undefined = mapping ? 
+        Object.fromEntries(
+          Object.entries(mapping as Record<string, string | null>).map(([k, v]) => [k, v as keyof patientImport.NormalizedPatient | null])
+        ) : undefined;
+      
+      // Validate each row (no DB lookups for speed - do matching during import)
       const stats: patientImport.ImportStats = {
         total: rows.length,
         ok: 0,
         warning: 0,
         error: 0,
         collision: 0,
-        toCreate: 0,
+        toCreate: rows.length, // Assume all new for now, will refine during import
         toUpdate: 0,
       };
       
@@ -3321,42 +3423,32 @@ export async function registerRoutes(
         result: patientImport.ValidationResult;
       }> = [];
       
+      // Process all rows synchronously (fast, no DB calls)
       for (let i = 0; i < rows.length; i++) {
         const rawData = rows[i];
-        const debug = i === 0; // Debug first row only
-        const result = patientImport.normalizeRow(rawData, debug);
-        
-        // Find matching patient if row is valid
-        if (result.normalized) {
-          const match = await patientImport.findMatchingPatient(organisationId, result.normalized);
-          result.matchedPatientId = match.patientId;
-          result.matchType = match.matchType;
-          
-          if (match.patientId) {
-            stats.toUpdate++;
-          } else {
-            stats.toCreate++;
-          }
-        }
+        const debugRow = i === 0; // Debug first row only
+        const result = patientImport.normalizeRow(rawData, customMapping, debugRow);
         
         // Update stats
         if (result.status === "ok") stats.ok++;
-        else if (result.status === "warning") stats.warning++;
+        else if (result.status === "warning") {
+          stats.warning++;
+          stats.ok++; // Warnings are still valid for import
+        }
         else if (result.status === "error") stats.error++;
         
         rowResults.push({ rowIndex: i, rawData, result });
       }
       
-      // Save all rows to database
-      await patientImport.saveImportJobRows(jobId, rowResults);
+      console.log(`[IMPORT] Validation complete: ${stats.ok} ok, ${stats.warning} warnings, ${stats.error} errors`);
       
-      // Update job status
+      // Update job status (don't save rows to DB during validation - too slow)
       await patientImport.updateImportJobStatus(jobId, "validated", stats);
       
       // Return summary with sample rows
       const sampleOk = rowResults.filter(r => r.result.status === "ok").slice(0, 3);
       const sampleErrors = rowResults.filter(r => r.result.status === "error").slice(0, 5);
-      const sampleWarnings = rowResults.filter(r => r.result.status === "warning").slice(0, 5);
+      const sampleWarnings = rowResults.filter(r => r.result.status === "warning").slice(0, 10);
       
       res.json({
         jobId,
