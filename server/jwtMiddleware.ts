@@ -90,3 +90,29 @@ export function generateToken(payload: JwtPayload, expiresInSeconds: number = 14
   }
   return jwt.sign(payload, JWT_SECRET, { expiresIn: expiresInSeconds });
 }
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.jwtUser) {
+    return res.status(401).json({ 
+      error: "Accès non autorisé",
+      message: "Authentification requise"
+    });
+  }
+  
+  if (req.jwtUser.role !== "ADMIN") {
+    return res.status(403).json({ 
+      error: "Accès refusé",
+      message: "Droits administrateur requis pour cette action"
+    });
+  }
+  
+  next();
+}
+
+export function isAdmin(role: string): boolean {
+  return role === "ADMIN";
+}
+
+export function isCollaborateur(role: string): boolean {
+  return role === "CHIRURGIEN" || role === "ASSISTANT";
+}

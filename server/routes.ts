@@ -3719,5 +3719,322 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================
+  // SETTINGS ENDPOINTS
+  // ============================================
+  
+  // GET /api/settings/profile - Get current user profile with organisation info
+  app.get("/api/settings/profile", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      
+      let organisationNom: string | undefined;
+      if (user.organisationId) {
+        const org = await storage.getOrganisationById(user.organisationId);
+        organisationNom = org?.nom;
+      }
+      
+      res.json({
+        id: user.id,
+        username: user.username,
+        nom: user.nom,
+        prenom: user.prenom,
+        role: user.role,
+        organisationId: user.organisationId,
+        organisationNom,
+      });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error getting profile:", error);
+      res.status(500).json({ error: "Erreur lors de la récupération du profil" });
+    }
+  });
+  
+  // POST /api/settings/password - Change password
+  app.post("/api/settings/password", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Mot de passe actuel et nouveau requis" });
+      }
+      
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 8 caractères" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      
+      // Verify current password
+      const { scrypt, timingSafeEqual } = await import("crypto");
+      const { promisify } = await import("util");
+      const scryptAsync = promisify(scrypt);
+      
+      const [hashed, salt] = user.password.split(".");
+      const hashedBuf = Buffer.from(hashed, "hex");
+      const suppliedBuf = (await scryptAsync(currentPassword, salt, 64)) as Buffer;
+      
+      if (!timingSafeEqual(hashedBuf, suppliedBuf)) {
+        return res.status(400).json({ error: "Mot de passe actuel incorrect" });
+      }
+      
+      // Hash new password
+      const { randomBytes } = await import("crypto");
+      const newSalt = randomBytes(16).toString("hex");
+      const newHashedBuf = (await scryptAsync(newPassword, newSalt, 64)) as Buffer;
+      const newHashedPassword = `${newHashedBuf.toString("hex")}.${newSalt}`;
+      
+      await storage.updateUser(userId, { password: newHashedPassword });
+      
+      res.json({ success: true, message: "Mot de passe modifié avec succès" });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error changing password:", error);
+      res.status(500).json({ error: "Erreur lors du changement de mot de passe" });
+    }
+  });
+  
+  // GET /api/settings/collaborators - Get organisation collaborators (admin only)
+  app.get("/api/settings/collaborators", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      // Admin check
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const users = await storage.getUsersByOrganisation(organisationId);
+      
+      res.json(users.map(u => ({
+        id: u.id,
+        username: u.username,
+        nom: u.nom,
+        prenom: u.prenom,
+        role: u.role,
+      })));
+    } catch (error: any) {
+      console.error("[SETTINGS] Error getting collaborators:", error);
+      res.status(500).json({ error: "Erreur lors de la récupération des collaborateurs" });
+    }
+  });
+  
+  // POST /api/settings/collaborators - Invite new collaborator (admin only)
+  app.post("/api/settings/collaborators", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { email, role, nom, prenom } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email requis" });
+      }
+      
+      if (!role || !["ADMIN", "CHIRURGIEN", "ASSISTANT"].includes(role)) {
+        return res.status(400).json({ error: "Rôle invalide" });
+      }
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Un utilisateur avec cet email existe déjà" });
+      }
+      
+      // Create user with temporary password
+      const { randomBytes, scrypt } = await import("crypto");
+      const { promisify } = await import("util");
+      const scryptAsync = promisify(scrypt);
+      
+      const tempPassword = randomBytes(12).toString("hex");
+      const salt = randomBytes(16).toString("hex");
+      const buf = (await scryptAsync(tempPassword, salt, 64)) as Buffer;
+      const hashedPassword = `${buf.toString("hex")}.${salt}`;
+      
+      const newUser = await storage.createUser({
+        username: email,
+        password: hashedPassword,
+        role: role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT",
+        organisationId,
+        nom: nom || null,
+        prenom: prenom || null,
+      });
+      
+      // TODO: Send invitation email with temp password
+      console.log(`[SETTINGS] New collaborator created: ${email} with temp password (email not sent)`);
+      
+      res.status(201).json({
+        id: newUser.id,
+        username: newUser.username,
+        nom: newUser.nom,
+        prenom: newUser.prenom,
+        role: newUser.role,
+      });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error creating collaborator:", error);
+      res.status(500).json({ error: error.message || "Erreur lors de la création du collaborateur" });
+    }
+  });
+  
+  // PATCH /api/settings/collaborators/:id - Update collaborator role (admin only)
+  app.patch("/api/settings/collaborators/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { id } = req.params;
+      const { role } = req.body;
+      
+      if (!role || !["ADMIN", "CHIRURGIEN", "ASSISTANT"].includes(role)) {
+        return res.status(400).json({ error: "Rôle invalide" });
+      }
+      
+      const user = await storage.getUserById(id);
+      if (!user || user.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Collaborateur non trouvé" });
+      }
+      
+      // Prevent removing the last admin
+      if (user.role === "ADMIN" && role !== "ADMIN") {
+        const admins = await storage.getUsersByOrganisation(organisationId);
+        const adminCount = admins.filter(u => u.role === "ADMIN").length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Impossible de retirer le dernier administrateur" });
+        }
+      }
+      
+      await storage.updateUser(id, { role: role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT" });
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error updating collaborator:", error);
+      res.status(500).json({ error: "Erreur lors de la mise à jour du rôle" });
+    }
+  });
+  
+  // DELETE /api/settings/collaborators/:id - Remove collaborator (admin only)
+  app.delete("/api/settings/collaborators/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { id } = req.params;
+      const currentUserId = req.jwtUser?.userId;
+      
+      if (id === currentUserId) {
+        return res.status(400).json({ error: "Vous ne pouvez pas supprimer votre propre compte" });
+      }
+      
+      const user = await storage.getUserById(id);
+      if (!user || user.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Collaborateur non trouvé" });
+      }
+      
+      // Prevent removing the last admin
+      if (user.role === "ADMIN") {
+        const admins = await storage.getUsersByOrganisation(organisationId);
+        const adminCount = admins.filter(u => u.role === "ADMIN").length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Impossible de supprimer le dernier administrateur" });
+        }
+      }
+      
+      await storage.deleteUser(id);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error deleting collaborator:", error);
+      res.status(500).json({ error: "Erreur lors de la suppression du collaborateur" });
+    }
+  });
+  
+  // GET /api/settings/organisation - Get organisation details (admin only)
+  app.get("/api/settings/organisation", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const org = await storage.getOrganisationById(organisationId);
+      if (!org) {
+        return res.status(404).json({ error: "Organisation non trouvée" });
+      }
+      
+      res.json({
+        id: org.id,
+        nom: org.nom,
+        adresse: (org as any).adresse || null,
+        timezone: (org as any).timezone || "Europe/Paris",
+        createdAt: org.createdAt,
+      });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error getting organisation:", error);
+      res.status(500).json({ error: "Erreur lors de la récupération de l'organisation" });
+    }
+  });
+  
+  // PUT /api/settings/organisation - Update organisation (admin only)
+  app.put("/api/settings/organisation", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { nom, adresse, timezone } = req.body;
+      
+      await storage.updateOrganisation(organisationId, { 
+        nom, 
+        adresse, 
+        timezone 
+      });
+      
+      const updated = await storage.getOrganisationById(organisationId);
+      
+      res.json({
+        id: updated?.id,
+        nom: updated?.nom,
+        adresse: (updated as any)?.adresse || null,
+        timezone: (updated as any)?.timezone || "Europe/Paris",
+        createdAt: updated?.createdAt,
+      });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error updating organisation:", error);
+      res.status(500).json({ error: "Erreur lors de la mise à jour de l'organisation" });
+    }
+  });
+
   return httpServer;
 }

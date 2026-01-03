@@ -182,9 +182,14 @@ export interface IStorage {
   getUserById(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(data: CreateUserInput): Promise<User>;
+  updateUser(id: string, data: Partial<{ password: string; role: "ADMIN" | "CHIRURGIEN" | "ASSISTANT"; nom: string | null; prenom: string | null }>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
+  getUsersByOrganisation(organisationId: string): Promise<User[]>;
 
   // Organisation methods
   createOrganisation(data: InsertOrganisation): Promise<Organisation>;
+  getOrganisationById(id: string): Promise<Organisation | undefined>;
+  updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; timezone: string }>): Promise<Organisation | undefined>;
 
   // Note methods
   getPatientNotes(organisationId: string, patientId: string): Promise<(Note & { user: { nom: string | null; prenom: string | null } })[]>;
@@ -1921,12 +1926,36 @@ export class DatabaseStorage implements IStorage {
     }).returning();
     return user;
   }
+  
+  async updateUser(id: string, data: Partial<{ password: string; role: "ADMIN" | "CHIRURGIEN" | "ASSISTANT"; nom: string | null; prenom: string | null }>): Promise<User | undefined> {
+    const [user] = await db.update(users).set(data as any).where(eq(users.id, id)).returning();
+    return user;
+  }
+  
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+  
+  async getUsersByOrganisation(organisationId: string): Promise<User[]> {
+    return db.select().from(users).where(eq(users.organisationId, organisationId));
+  }
 
   // ========== ORGANISATIONS ==========
   async createOrganisation(data: InsertOrganisation): Promise<Organisation> {
     const [org] = await db.insert(organisations).values({
       nom: data.nom,
     }).returning();
+    return org;
+  }
+  
+  async getOrganisationById(id: string): Promise<Organisation | undefined> {
+    const [org] = await db.select().from(organisations).where(eq(organisations.id, id));
+    return org;
+  }
+  
+  async updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; timezone: string }>): Promise<Organisation | undefined> {
+    const [org] = await db.update(organisations).set(data as any).where(eq(organisations.id, id)).returning();
     return org;
   }
 
