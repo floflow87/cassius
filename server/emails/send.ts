@@ -8,35 +8,48 @@ import { systemAlertHtml, systemAlertText, SystemAlertData } from './templates/s
 
 let connectionSettings: any;
 
-async function getCredentials() {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
+interface CredentialsResult {
+  apiKey: string;
+  fromEmail: string;
+}
 
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
-  }
+async function getCredentials(): Promise<CredentialsResult | null> {
+  try {
+    const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+    const xReplitToken = process.env.REPL_IDENTITY 
+      ? 'repl ' + process.env.REPL_IDENTITY 
+      : process.env.WEB_REPL_RENEWAL 
+      ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+      : null;
 
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
+    if (!xReplitToken || !hostname) {
+      console.log('[Email] Resend connector not available (no token/hostname)');
+      return null;
     }
-  ).then(res => res.json()).then(data => data.items?.[0]);
 
-  if (!connectionSettings || (!connectionSettings.settings.api_key)) {
-    throw new Error('Resend not connected');
+    connectionSettings = await fetch(
+      'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
+      {
+        headers: {
+          'Accept': 'application/json',
+          'X_REPLIT_TOKEN': xReplitToken
+        }
+      }
+    ).then(res => res.json()).then(data => data.items?.[0]);
+
+    if (!connectionSettings || (!connectionSettings.settings?.api_key)) {
+      console.log('[Email] Resend not configured (no API key)');
+      return null;
+    }
+    
+    return { 
+      apiKey: connectionSettings.settings.api_key, 
+      fromEmail: connectionSettings.settings.from_email || 'noreply@cassiuspro.com' 
+    };
+  } catch (error) {
+    console.log('[Email] Error getting Resend credentials:', error);
+    return null;
   }
-  return { 
-    apiKey: connectionSettings.settings.api_key, 
-    fromEmail: connectionSettings.settings.from_email || 'noreply@cassiuspro.com' 
-  };
 }
 
 function getBaseUrl(): string {
@@ -138,7 +151,14 @@ export async function sendEmail<T extends TemplateName>(
   data: TemplateData[T]
 ): Promise<EmailResult> {
   try {
-    const { apiKey, fromEmail } = await getCredentials();
+    const credentials = await getCredentials();
+    
+    if (!credentials) {
+      console.log(`[Email] Skipping ${template} email to ${toEmail} - Resend not configured`);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    
+    const { apiKey, fromEmail } = credentials;
     const resend = new Resend(apiKey);
     
     const subject = SUBJECT_MAP[template](data);
