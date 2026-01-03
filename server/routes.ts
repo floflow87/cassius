@@ -3920,7 +3920,8 @@ export async function registerRoutes(
         token,
         organisationName,
         inviterName,
-        role
+        role,
+        expiresAt
       );
       
       // Log to email outbox

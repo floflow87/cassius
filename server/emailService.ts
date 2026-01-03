@@ -1,4 +1,6 @@
 import { Resend } from 'resend';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 let connectionSettings: any;
 
@@ -54,10 +56,29 @@ interface EmailResult {
   error?: string;
 }
 
+function createSimpleEmailHtml(content: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.8; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+    a { color: #1e40af; }
+    .signature { margin-top: 30px; color: #64748b; }
+  </style>
+</head>
+<body>
+${content}
+</body>
+</html>
+  `.trim();
+}
+
 export async function sendPasswordResetEmail(
   toEmail: string,
   token: string,
-  userName?: string
+  firstName?: string
 ): Promise<EmailResult> {
   try {
     let clientData;
@@ -69,52 +90,22 @@ export async function sendPasswordResetEmail(
     }
     const { client, fromEmail } = clientData;
     const resetUrl = `${getBaseUrl()}/reset-password?token=${token}`;
+    const expiryMinutes = 60;
     
+    const htmlContent = createSimpleEmailHtml(`
+<p>Bonjour ${firstName || ''},</p>
+<p>Nous avons reçu une demande de réinitialisation du mot de passe de votre compte ${APP_NAME}.</p>
+<p>Pour réinitialiser votre mot de passe, cliquez sur ce lien : <a href="${resetUrl}">${resetUrl}</a></p>
+<p>Ce lien expire dans ${expiryMinutes} minutes.</p>
+<p>Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</p>
+<p class="signature">— L'équipe ${APP_NAME}</p>
+    `);
+
     const { data, error } = await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: `${APP_NAME} - Réinitialisation de votre mot de passe`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
-    .button { display: inline-block; background: #1e40af; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 500; margin: 20px 0; }
-    .footer { padding: 20px; text-align: center; color: #64748b; font-size: 13px; }
-    .warning { background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 6px; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1 style="margin: 0; font-size: 24px;">${APP_NAME}</h1>
-    <p style="margin: 10px 0 0 0; opacity: 0.9;">Gestion de cabinet dentaire</p>
-  </div>
-  <div class="content">
-    <h2 style="color: #1e40af; margin-top: 0;">Réinitialisation de mot de passe</h2>
-    <p>Bonjour${userName ? ` ${userName}` : ''},</p>
-    <p>Vous avez demandé la réinitialisation de votre mot de passe pour votre compte ${APP_NAME}.</p>
-    <p>Cliquez sur le bouton ci-dessous pour créer un nouveau mot de passe :</p>
-    <p style="text-align: center;">
-      <a href="${resetUrl}" class="button" style="color: white;">Réinitialiser mon mot de passe</a>
-    </p>
-    <div class="warning">
-      <strong>Important :</strong> Ce lien expire dans 1 heure pour des raisons de sécurité. Si vous n'avez pas demandé cette réinitialisation, vous pouvez ignorer cet email en toute sécurité.
-    </div>
-    <p style="color: #64748b; font-size: 13px;">
-      Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :<br>
-      <a href="${resetUrl}" style="color: #3b82f6; word-break: break-all;">${resetUrl}</a>
-    </p>
-  </div>
-  <div class="footer">
-    <p>Cet email a été envoyé automatiquement par ${APP_NAME}.<br>Merci de ne pas y répondre directement.</p>
-  </div>
-</body>
-</html>
-      `.trim(),
+      subject: `Réinitialisation de votre mot de passe — ${APP_NAME}`,
+      html: htmlContent,
     });
 
     if (error) {
@@ -133,7 +124,7 @@ export async function sendPasswordResetEmail(
 export async function sendEmailVerificationEmail(
   toEmail: string,
   token: string,
-  userName?: string
+  firstName?: string
 ): Promise<EmailResult> {
   try {
     let clientData;
@@ -146,46 +137,19 @@ export async function sendEmailVerificationEmail(
     const { client, fromEmail } = clientData;
     const verifyUrl = `${getBaseUrl()}/verify-email?token=${token}`;
     
+    const htmlContent = createSimpleEmailHtml(`
+<p>Bonjour ${firstName || ''},</p>
+<p>Pour finaliser l'activation de votre compte ${APP_NAME}, merci de confirmer votre adresse email.</p>
+<p>Confirmer mon email ici : <a href="${verifyUrl}">${verifyUrl}</a></p>
+<p>Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement ce message.</p>
+<p class="signature">— L'équipe ${APP_NAME}</p>
+    `);
+
     const { data, error } = await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: `${APP_NAME} - Confirmez votre adresse email`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
-    .button { display: inline-block; background: #1e40af; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 500; margin: 20px 0; }
-    .footer { padding: 20px; text-align: center; color: #64748b; font-size: 13px; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1 style="margin: 0; font-size: 24px;">${APP_NAME}</h1>
-    <p style="margin: 10px 0 0 0; opacity: 0.9;">Gestion de cabinet dentaire</p>
-  </div>
-  <div class="content">
-    <h2 style="color: #1e40af; margin-top: 0;">Confirmez votre adresse email</h2>
-    <p>Bonjour${userName ? ` ${userName}` : ''},</p>
-    <p>Bienvenue sur ${APP_NAME} ! Pour activer pleinement votre compte et accéder à toutes les fonctionnalités, veuillez confirmer votre adresse email.</p>
-    <p style="text-align: center;">
-      <a href="${verifyUrl}" class="button" style="color: white;">Confirmer mon email</a>
-    </p>
-    <p style="color: #64748b; font-size: 13px;">
-      Ce lien expire dans 24 heures. Si le bouton ne fonctionne pas, copiez ce lien :<br>
-      <a href="${verifyUrl}" style="color: #3b82f6; word-break: break-all;">${verifyUrl}</a>
-    </p>
-  </div>
-  <div class="footer">
-    <p>Cet email a été envoyé automatiquement par ${APP_NAME}.<br>Merci de ne pas y répondre directement.</p>
-  </div>
-</body>
-</html>
-      `.trim(),
+      subject: `Confirmez votre adresse email pour votre inscription à ${APP_NAME}`,
+      html: htmlContent,
     });
 
     if (error) {
@@ -206,7 +170,8 @@ export async function sendCollaboratorInvitationEmail(
   token: string,
   organisationName: string,
   inviterName: string,
-  role: string
+  role: string,
+  expiresAt: Date
 ): Promise<EmailResult> {
   try {
     let clientData;
@@ -219,53 +184,23 @@ export async function sendCollaboratorInvitationEmail(
     const { client, fromEmail } = clientData;
     const inviteUrl = `${getBaseUrl()}/accept-invitation?token=${token}`;
     
-    const roleDisplay = role === 'ADMIN' ? 'Administrateur' : role === 'CHIRURGIEN' ? 'Chirurgien' : 'Assistant';
+    const roleLabel = role === 'ADMIN' ? 'Administrateur' : role === 'CHIRURGIEN' ? 'Chirurgien' : 'Assistant';
+    const expiryDate = format(expiresAt, 'dd MMMM yyyy', { locale: fr });
     
+    const htmlContent = createSimpleEmailHtml(`
+<p>Bonjour,</p>
+<p>${inviterName} vous a invité(e) à rejoindre ${organisationName} sur ${APP_NAME} en tant que ${roleLabel}.</p>
+<p>Rejoindre le cabinet maintenant : <a href="${inviteUrl}">${inviteUrl}</a></p>
+<p>Ce lien expire le ${expiryDate}.</p>
+<p>Si vous pensez qu'il s'agit d'une erreur, vous pouvez ignorer cet email.</p>
+<p class="signature">— ${APP_NAME}</p>
+    `);
+
     const { data, error } = await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: `${APP_NAME} - Invitation à rejoindre ${organisationName}`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
-    .button { display: inline-block; background: #1e40af; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 500; margin: 20px 0; }
-    .footer { padding: 20px; text-align: center; color: #64748b; font-size: 13px; }
-    .info-box { background: #eff6ff; border: 1px solid #3b82f6; padding: 15px; border-radius: 6px; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1 style="margin: 0; font-size: 24px;">${APP_NAME}</h1>
-    <p style="margin: 10px 0 0 0; opacity: 0.9;">Gestion de cabinet dentaire</p>
-  </div>
-  <div class="content">
-    <h2 style="color: #1e40af; margin-top: 0;">Vous êtes invité(e) !</h2>
-    <p>Bonjour,</p>
-    <p><strong>${inviterName}</strong> vous invite à rejoindre le cabinet <strong>${organisationName}</strong> sur ${APP_NAME}.</p>
-    <div class="info-box">
-      <p style="margin: 0;"><strong>Rôle proposé :</strong> ${roleDisplay}</p>
-    </div>
-    <p>${APP_NAME} est une plateforme de gestion complète pour les cabinets d'implantologie dentaire, permettant de suivre les patients, les actes chirurgicaux et les implants.</p>
-    <p style="text-align: center;">
-      <a href="${inviteUrl}" class="button" style="color: white;">Accepter l'invitation</a>
-    </p>
-    <p style="color: #64748b; font-size: 13px;">
-      Cette invitation expire dans 7 jours. Si le bouton ne fonctionne pas, copiez ce lien :<br>
-      <a href="${inviteUrl}" style="color: #3b82f6; word-break: break-all;">${inviteUrl}</a>
-    </p>
-  </div>
-  <div class="footer">
-    <p>Cet email a été envoyé automatiquement par ${APP_NAME}.<br>Si vous n'attendiez pas cette invitation, vous pouvez l'ignorer.</p>
-  </div>
-</body>
-</html>
-      `.trim(),
+      subject: `Vous avez été invité(e) à rejoindre ${organisationName} sur ${APP_NAME}`,
+      html: htmlContent,
     });
 
     if (error) {
@@ -283,9 +218,7 @@ export async function sendCollaboratorInvitationEmail(
 
 export async function sendPaymentFailedEmail(
   toEmail: string,
-  userName: string,
-  organisationName: string,
-  amount: string
+  firstName: string
 ): Promise<EmailResult> {
   try {
     let clientData;
@@ -298,47 +231,19 @@ export async function sendPaymentFailedEmail(
     const { client, fromEmail } = clientData;
     const billingUrl = `${getBaseUrl()}/settings?section=billing`;
     
+    const htmlContent = createSimpleEmailHtml(`
+<p>Bonjour ${firstName},</p>
+<p>Nous n'avons pas pu renouveler votre abonnement ${APP_NAME} (paiement refusé).</p>
+<p>Afin de conserver votre compte, mettez à jour votre moyen de paiement ici : <a href="${billingUrl}">${billingUrl}</a></p>
+<p>Vos données restent accessibles, mais certaines fonctionnalités pourront être limitées si la situation n'est pas régularisée.</p>
+<p class="signature">— ${APP_NAME}</p>
+    `);
+
     const { data, error } = await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: `${APP_NAME} - Problème avec votre paiement`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
-    .button { display: inline-block; background: #1e40af; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 500; margin: 20px 0; }
-    .footer { padding: 20px; text-align: center; color: #64748b; font-size: 13px; }
-    .warning { background: #fef2f2; border: 1px solid #dc2626; padding: 15px; border-radius: 6px; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1 style="margin: 0; font-size: 24px;">${APP_NAME}</h1>
-    <p style="margin: 10px 0 0 0; opacity: 0.9;">Attention requise</p>
-  </div>
-  <div class="content">
-    <h2 style="color: #dc2626; margin-top: 0;">Échec du paiement</h2>
-    <p>Bonjour ${userName},</p>
-    <p>Nous n'avons pas pu traiter le paiement de ${amount} pour votre abonnement ${APP_NAME} pour le cabinet <strong>${organisationName}</strong>.</p>
-    <div class="warning">
-      <strong>Action requise :</strong> Veuillez mettre à jour vos informations de paiement pour éviter toute interruption de service.
-    </div>
-    <p style="text-align: center;">
-      <a href="${billingUrl}" class="button" style="color: white;">Mettre à jour le paiement</a>
-    </p>
-    <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
-  </div>
-  <div class="footer">
-    <p>Cet email a été envoyé automatiquement par ${APP_NAME}.</p>
-  </div>
-</body>
-</html>
-      `.trim(),
+      subject: `Action requise — problème de paiement ${APP_NAME}`,
+      html: htmlContent,
     });
 
     if (error) {
@@ -355,9 +260,8 @@ export async function sendPaymentFailedEmail(
 
 export async function sendTrialEndingEmail(
   toEmail: string,
-  userName: string,
-  organisationName: string,
-  daysRemaining: number
+  firstName: string,
+  trialEndDate: Date
 ): Promise<EmailResult> {
   try {
     let clientData;
@@ -369,48 +273,21 @@ export async function sendTrialEndingEmail(
     }
     const { client, fromEmail } = clientData;
     const billingUrl = `${getBaseUrl()}/settings?section=billing`;
+    const formattedDate = format(trialEndDate, 'dd MMMM yyyy', { locale: fr });
     
+    const htmlContent = createSimpleEmailHtml(`
+<p>Bonjour ${firstName},</p>
+<p>Votre période d'essai se termine le ${formattedDate}.</p>
+<p>Pour conserver l'accès complet à ${APP_NAME}, vous pouvez activer votre abonnement à tout moment.</p>
+<p>Gérer mon abonnement maintenant : <a href="${billingUrl}">${billingUrl}</a></p>
+<p class="signature">— ${APP_NAME}</p>
+    `);
+
     const { data, error } = await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: `${APP_NAME} - Votre période d'essai se termine dans ${daysRemaining} jour${daysRemaining > 1 ? 's' : ''}`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
-    .button { display: inline-block; background: #1e40af; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 500; margin: 20px 0; }
-    .footer { padding: 20px; text-align: center; color: #64748b; font-size: 13px; }
-    .info-box { background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 6px; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1 style="margin: 0; font-size: 24px;">${APP_NAME}</h1>
-    <p style="margin: 10px 0 0 0; opacity: 0.9;">Rappel important</p>
-  </div>
-  <div class="content">
-    <h2 style="color: #f59e0b; margin-top: 0;">Fin de période d'essai</h2>
-    <p>Bonjour ${userName},</p>
-    <p>Votre période d'essai gratuite de ${APP_NAME} pour le cabinet <strong>${organisationName}</strong> se termine dans <strong>${daysRemaining} jour${daysRemaining > 1 ? 's' : ''}</strong>.</p>
-    <div class="info-box">
-      Pour continuer à utiliser ${APP_NAME} et conserver toutes vos données, veuillez souscrire à un abonnement avant la fin de votre essai.
-    </div>
-    <p style="text-align: center;">
-      <a href="${billingUrl}" class="button" style="color: white;">Choisir un abonnement</a>
-    </p>
-    <p>Nous espérons que ${APP_NAME} vous aide dans la gestion de votre cabinet !</p>
-  </div>
-  <div class="footer">
-    <p>Cet email a été envoyé automatiquement par ${APP_NAME}.</p>
-  </div>
-</body>
-</html>
-      `.trim(),
+      subject: `Votre essai ${APP_NAME} se termine bientôt`,
+      html: htmlContent,
     });
 
     if (error) {
@@ -421,79 +298,6 @@ export async function sendTrialEndingEmail(
     return { success: true, messageId: data?.id };
   } catch (err: any) {
     console.error('[Email] Error sending trial ending email:', err);
-    return { success: false, error: err.message };
-  }
-}
-
-export async function sendAccountRestrictedEmail(
-  toEmail: string,
-  userName: string,
-  organisationName: string,
-  reason: string
-): Promise<EmailResult> {
-  try {
-    let clientData;
-    try {
-      clientData = await getUncachableResendClient();
-    } catch (credError: any) {
-      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
-      return { success: true, messageId: 'skipped-no-resend' };
-    }
-    const { client, fromEmail } = clientData;
-    const billingUrl = `${getBaseUrl()}/settings?section=billing`;
-    
-    const { data, error } = await client.emails.send({
-      from: fromEmail,
-      to: toEmail,
-      subject: `${APP_NAME} - Accès restreint à votre compte`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; }
-    .button { display: inline-block; background: #1e40af; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 500; margin: 20px 0; }
-    .footer { padding: 20px; text-align: center; color: #64748b; font-size: 13px; }
-    .warning { background: #fef2f2; border: 1px solid #dc2626; padding: 15px; border-radius: 6px; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1 style="margin: 0; font-size: 24px;">${APP_NAME}</h1>
-    <p style="margin: 10px 0 0 0; opacity: 0.9;">Action requise</p>
-  </div>
-  <div class="content">
-    <h2 style="color: #dc2626; margin-top: 0;">Compte restreint</h2>
-    <p>Bonjour ${userName},</p>
-    <p>L'accès à votre compte ${APP_NAME} pour le cabinet <strong>${organisationName}</strong> a été restreint.</p>
-    <div class="warning">
-      <strong>Raison :</strong> ${reason}
-    </div>
-    <p>Vos données sont préservées et seront à nouveau accessibles dès que la situation sera régularisée.</p>
-    <p style="text-align: center;">
-      <a href="${billingUrl}" class="button" style="color: white;">Régulariser mon compte</a>
-    </p>
-    <p>Si vous pensez qu'il s'agit d'une erreur, veuillez nous contacter.</p>
-  </div>
-  <div class="footer">
-    <p>Cet email a été envoyé automatiquement par ${APP_NAME}.</p>
-  </div>
-</body>
-</html>
-      `.trim(),
-    });
-
-    if (error) {
-      console.error('[Email] Failed to send account restricted email:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, messageId: data?.id };
-  } catch (err: any) {
-    console.error('[Email] Error sending account restricted email:', err);
     return { success: false, error: err.message };
   }
 }
