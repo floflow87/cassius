@@ -7,6 +7,7 @@ import { getTopSlowestEndpoints, getTopDbHeavyEndpoints, getAllStats, clearStats
 import { runFlagDetection } from "./flagEngine";
 import * as googleCalendar from "./googleCalendar";
 import * as emailService from "./emailService";
+import { sendEmail, getPreviewHtml, getBaseUrl, TemplateName } from "./emails";
 import { randomBytes, scryptSync } from "crypto";
 import {
   insertPatientSchema,
@@ -3914,15 +3915,16 @@ export async function registerRoutes(
         prenom: prenom || null,
       });
       
-      // Send invitation email
-      const result = await emailService.sendCollaboratorInvitationEmail(
-        normalizedEmail,
-        token,
+      // Send invitation email using new branded templates
+      const baseUrl = getBaseUrl();
+      const inviteUrl = `${baseUrl}/accept-invitation?token=${token}`;
+      const result = await sendEmail(normalizedEmail, 'invitation', {
+        inviteUrl,
         organisationName,
         inviterName,
         role,
-        expiresAt
-      );
+        expiresAt,
+      });
       
       // Log to email outbox
       await storage.logEmail({
@@ -4257,9 +4259,14 @@ export async function registerRoutes(
         expiresAt,
       });
       
-      // Send email
+      // Send email using new branded templates
+      const baseUrl = getBaseUrl();
+      const resetUrl = `${baseUrl}/reset-password?token=${token}`;
       const userName = user.prenom || user.nom || undefined;
-      const result = await emailService.sendPasswordResetEmail(email, token, userName);
+      const result = await sendEmail(email, 'resetPassword', {
+        resetUrl,
+        firstName: userName,
+      });
       
       // Log to email outbox
       await storage.logEmail({
@@ -4391,9 +4398,14 @@ export async function registerRoutes(
         expiresAt,
       });
       
-      // Send email
+      // Send email using new branded templates
+      const baseUrl = getBaseUrl();
+      const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
       const userName = user.prenom || user.nom || undefined;
-      const result = await emailService.sendEmailVerificationEmail(email, token, userName);
+      const result = await sendEmail(email, 'verifyEmail', {
+        verifyUrl,
+        firstName: userName,
+      });
       
       // Log to email outbox
       await storage.logEmail({
@@ -4480,6 +4492,64 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[AUTH] Error getting email status:", error);
       res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  // ========== DEV ONLY: EMAIL PREVIEW ==========
+  
+  // GET /api/dev/email-preview - Preview email templates (DEV + ADMIN only)
+  app.get("/api/dev/email-preview", requireJwtOrSession, async (req, res) => {
+    try {
+      // Only allow in development
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: "Non disponible en production" });
+      }
+      
+      // Only allow admins
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { template } = req.query;
+      
+      if (!template || typeof template !== 'string') {
+        const availableTemplates: TemplateName[] = [
+          'resetPassword',
+          'verifyEmail', 
+          'invitation',
+          'securityNotice',
+          'integrationConnected',
+          'systemAlert',
+        ];
+        return res.json({
+          message: "Templates disponibles",
+          templates: availableTemplates,
+          usage: "/api/dev/email-preview?template=resetPassword",
+        });
+      }
+      
+      const validTemplates: TemplateName[] = [
+        'resetPassword',
+        'verifyEmail',
+        'invitation',
+        'securityNotice',
+        'integrationConnected',
+        'systemAlert',
+      ];
+      
+      if (!validTemplates.includes(template as TemplateName)) {
+        return res.status(400).json({ 
+          error: `Template invalide: ${template}`,
+          available: validTemplates,
+        });
+      }
+      
+      const html = getPreviewHtml(template as TemplateName);
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error: any) {
+      console.error("[DEV] Error previewing email:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 
