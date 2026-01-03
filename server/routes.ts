@@ -6,6 +6,8 @@ import * as supabaseStorage from "./supabaseStorage";
 import { getTopSlowestEndpoints, getTopDbHeavyEndpoints, getAllStats, clearStats } from "./instrumentation";
 import { runFlagDetection } from "./flagEngine";
 import * as googleCalendar from "./googleCalendar";
+import * as emailService from "./emailService";
+import { randomBytes, scryptSync } from "crypto";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -3808,7 +3810,7 @@ export async function registerRoutes(
     }
   });
   
-  // GET /api/settings/collaborators - Get organisation collaborators (admin only)
+  // GET /api/settings/collaborators - Get organisation collaborators and invitations (admin only)
   app.get("/api/settings/collaborators", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -3820,14 +3822,34 @@ export async function registerRoutes(
       }
       
       const users = await storage.getUsersByOrganisation(organisationId);
+      const invitations = await storage.getInvitationsByOrganisation(organisationId);
       
-      res.json(users.map(u => ({
-        id: u.id,
-        username: u.username,
-        nom: u.nom,
-        prenom: u.prenom,
-        role: u.role,
-      })));
+      // Combine users and pending invitations
+      const collaborators = [
+        ...users.map(u => ({
+          id: u.id,
+          username: u.username,
+          email: u.username,
+          nom: u.nom,
+          prenom: u.prenom,
+          role: u.role,
+          status: 'ACTIVE' as const,
+          type: 'user' as const,
+        })),
+        ...invitations.filter(inv => inv.status === 'PENDING').map(inv => ({
+          id: inv.id,
+          username: inv.email,
+          email: inv.email,
+          nom: inv.nom,
+          prenom: inv.prenom,
+          role: inv.role,
+          status: 'PENDING' as const,
+          type: 'invitation' as const,
+          expiresAt: inv.expiresAt,
+        })),
+      ];
+      
+      res.json(collaborators);
     } catch (error: any) {
       console.error("[SETTINGS] Error getting collaborators:", error);
       res.status(500).json({ error: "Erreur lors de la récupération des collaborateurs" });
@@ -3854,44 +3876,79 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Rôle invalide" });
       }
       
+      const normalizedEmail = email.toLowerCase().trim();
+      
       // Check if user already exists
-      const existingUser = await storage.getUserByUsername(email);
+      const existingUser = await storage.getUserByUsername(normalizedEmail);
       if (existingUser) {
         return res.status(400).json({ error: "Un utilisateur avec cet email existe déjà" });
       }
       
-      // Create user with temporary password
-      const { randomBytes, scrypt } = await import("crypto");
-      const { promisify } = await import("util");
-      const scryptAsync = promisify(scrypt);
+      // Check if invitation already exists
+      const existingInvitation = await storage.getInvitationByEmail(organisationId, normalizedEmail);
+      if (existingInvitation) {
+        return res.status(400).json({ error: "Une invitation est déjà en attente pour cet email" });
+      }
       
-      const tempPassword = randomBytes(12).toString("hex");
-      const salt = randomBytes(16).toString("hex");
-      const buf = (await scryptAsync(tempPassword, salt, 64)) as Buffer;
-      const hashedPassword = `${buf.toString("hex")}.${salt}`;
+      // Get organisation name for email
+      const org = await storage.getOrganisationById(organisationId);
+      const organisationName = org?.nom || "Cabinet dentaire";
       
-      const newUser = await storage.createUser({
-        username: email,
-        password: hashedPassword,
+      // Get inviter name
+      const inviter = await storage.getUserById(req.jwtUser?.id || "");
+      const inviterName = inviter ? `${inviter.prenom || ""} ${inviter.nom || ""}`.trim() || inviter.username : "Un administrateur";
+      
+      // Generate secure invitation token
+      const token = randomBytes(32).toString('hex');
+      const tokenHash = scryptSync(token, 'salt_invitation', 64).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      
+      // Create invitation
+      const invitation = await storage.createInvitation(organisationId, {
+        email: normalizedEmail,
         role: role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT",
-        organisationId,
+        tokenHash,
+        expiresAt,
+        invitedByUserId: req.jwtUser?.id || "",
         nom: nom || null,
         prenom: prenom || null,
       });
       
-      // TODO: Send invitation email with temp password
-      console.log(`[SETTINGS] New collaborator created: ${email} with temp password (email not sent)`);
+      // Send invitation email
+      const result = await emailService.sendCollaboratorInvitationEmail(
+        normalizedEmail,
+        token,
+        organisationName,
+        inviterName,
+        role
+      );
+      
+      // Log to email outbox
+      await storage.logEmail({
+        organisationId,
+        toEmail: normalizedEmail,
+        template: 'COLLABORATOR_INVITATION',
+        subject: `Cassius - Invitation à rejoindre ${organisationName}`,
+        payload: JSON.stringify({ role, organisationName, inviterName }),
+        status: result.success ? 'SENT' : 'FAILED',
+        sentAt: result.success ? new Date() : null,
+        errorMessage: result.error || null,
+      });
+      
+      console.log(`[SETTINGS] Invitation created for: ${normalizedEmail}, email sent: ${result.success}`);
       
       res.status(201).json({
-        id: newUser.id,
-        username: newUser.username,
-        nom: newUser.nom,
-        prenom: newUser.prenom,
-        role: newUser.role,
+        id: invitation.id,
+        email: invitation.email,
+        nom: invitation.nom,
+        prenom: invitation.prenom,
+        role: invitation.role,
+        status: invitation.status,
+        expiresAt: invitation.expiresAt,
       });
     } catch (error: any) {
-      console.error("[SETTINGS] Error creating collaborator:", error);
-      res.status(500).json({ error: error.message || "Erreur lors de la création du collaborateur" });
+      console.error("[SETTINGS] Error creating invitation:", error);
+      res.status(500).json({ error: error.message || "Erreur lors de l'envoi de l'invitation" });
     }
   });
   
@@ -4033,6 +4090,395 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[SETTINGS] Error updating organisation:", error);
       res.status(500).json({ error: "Erreur lors de la mise à jour de l'organisation" });
+    }
+  });
+
+  // ========== INVITATION ACCEPTANCE FLOW ==========
+  
+  // GET /api/auth/verify-invitation - Verify invitation token
+  app.get("/api/auth/verify-invitation", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ valid: false, error: "Token manquant" });
+      }
+      
+      const tokenHash = scryptSync(token, 'salt_invitation', 64).toString('hex');
+      const invitation = await storage.getInvitationByToken(tokenHash);
+      
+      if (!invitation) {
+        return res.json({ valid: false, error: "Invitation invalide" });
+      }
+      
+      if (invitation.status !== 'PENDING') {
+        return res.json({ valid: false, error: "Cette invitation a déjà été utilisée" });
+      }
+      
+      if (new Date() > invitation.expiresAt) {
+        return res.json({ valid: false, error: "Cette invitation a expiré" });
+      }
+      
+      // Get organisation name
+      const org = await storage.getOrganisationById(invitation.organisationId);
+      
+      res.json({
+        valid: true,
+        email: invitation.email,
+        role: invitation.role,
+        organisationName: org?.nom || "Cabinet dentaire",
+        nom: invitation.nom,
+        prenom: invitation.prenom,
+      });
+    } catch (error: any) {
+      console.error("[AUTH] Error verifying invitation:", error);
+      res.status(500).json({ valid: false, error: "Erreur de vérification" });
+    }
+  });
+  
+  // POST /api/auth/accept-invitation - Accept invitation and create account
+  app.post("/api/auth/accept-invitation", async (req, res) => {
+    try {
+      const { token, password, nom, prenom } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ error: "Token et mot de passe requis" });
+      }
+      
+      if (password.length < 8) {
+        return res.status(400).json({ error: "Le mot de passe doit contenir au moins 8 caractères" });
+      }
+      
+      const tokenHash = scryptSync(token, 'salt_invitation', 64).toString('hex');
+      const invitation = await storage.getInvitationByToken(tokenHash);
+      
+      if (!invitation) {
+        return res.status(400).json({ error: "Invitation invalide" });
+      }
+      
+      if (invitation.status !== 'PENDING') {
+        return res.status(400).json({ error: "Cette invitation a déjà été utilisée" });
+      }
+      
+      if (new Date() > invitation.expiresAt) {
+        return res.status(400).json({ error: "Cette invitation a expiré" });
+      }
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(invitation.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Un compte existe déjà avec cet email" });
+      }
+      
+      // Hash password
+      const salt = randomBytes(16).toString('hex');
+      const hashedPassword = scryptSync(password, salt, 64).toString('hex');
+      const passwordWithSalt = `${salt}:${hashedPassword}`;
+      
+      // Create user
+      const newUser = await storage.createUser({
+        username: invitation.email,
+        password: passwordWithSalt,
+        role: invitation.role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT",
+        organisationId: invitation.organisationId,
+        nom: nom || invitation.nom || null,
+        prenom: prenom || invitation.prenom || null,
+      });
+      
+      // Mark invitation as accepted
+      await storage.acceptInvitation(invitation.id);
+      
+      console.log("[AUTH] Invitation accepted, user created:", newUser.id);
+      res.json({
+        success: true,
+        message: "Compte créé avec succès",
+        email: newUser.username,
+      });
+    } catch (error: any) {
+      console.error("[AUTH] Error accepting invitation:", error);
+      res.status(500).json({ error: error.message || "Erreur lors de la création du compte" });
+    }
+  });
+  
+  // DELETE /api/settings/invitations/:id - Cancel invitation (admin only)
+  app.delete("/api/settings/invitations/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { id } = req.params;
+      
+      await storage.cancelInvitation(organisationId, id);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error cancelling invitation:", error);
+      res.status(500).json({ error: "Erreur lors de l'annulation de l'invitation" });
+    }
+  });
+
+  // ========== PASSWORD RESET FLOW ==========
+  
+  // POST /api/auth/forgot-password - Request password reset
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ error: "Email requis" });
+      }
+      
+      const user = await storage.getUserByEmail(email.toLowerCase().trim());
+      
+      // Always return success to prevent email enumeration
+      if (!user) {
+        console.log("[AUTH] Password reset requested for unknown email:", email);
+        return res.json({ success: true, message: "Si cette adresse existe, un email a été envoyé." });
+      }
+      
+      // Invalidate any existing password reset tokens
+      await storage.invalidateEmailTokens(email.toLowerCase().trim(), 'PASSWORD_RESET');
+      
+      // Generate secure token
+      const token = randomBytes(32).toString('hex');
+      const tokenHash = scryptSync(token, 'salt_pw_reset', 64).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      
+      await storage.createEmailToken({
+        userId: user.id,
+        email: email.toLowerCase().trim(),
+        type: 'PASSWORD_RESET',
+        tokenHash,
+        expiresAt,
+      });
+      
+      // Send email
+      const userName = user.prenom || user.nom || undefined;
+      const result = await emailService.sendPasswordResetEmail(email, token, userName);
+      
+      // Log to email outbox
+      await storage.logEmail({
+        organisationId: user.organisationId,
+        toEmail: email,
+        template: 'PASSWORD_RESET',
+        subject: 'Cassius - Réinitialisation de votre mot de passe',
+        status: result.success ? 'SENT' : 'FAILED',
+        sentAt: result.success ? new Date() : null,
+        errorMessage: result.error || null,
+      });
+      
+      res.json({ success: true, message: "Si cette adresse existe, un email a été envoyé." });
+    } catch (error: any) {
+      console.error("[AUTH] Error in forgot-password:", error);
+      res.status(500).json({ error: "Erreur lors de l'envoi de l'email" });
+    }
+  });
+  
+  // POST /api/auth/reset-password - Reset password with token
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        return res.status(400).json({ error: "Token et nouveau mot de passe requis" });
+      }
+      
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Le mot de passe doit contenir au moins 8 caractères" });
+      }
+      
+      // Find token
+      const tokenHash = scryptSync(token, 'salt_pw_reset', 64).toString('hex');
+      const emailToken = await storage.getEmailTokenByHash(tokenHash);
+      
+      if (!emailToken) {
+        return res.status(400).json({ error: "Lien invalide ou expiré" });
+      }
+      
+      if (emailToken.usedAt) {
+        return res.status(400).json({ error: "Ce lien a déjà été utilisé" });
+      }
+      
+      if (new Date() > emailToken.expiresAt) {
+        return res.status(400).json({ error: "Ce lien a expiré" });
+      }
+      
+      if (!emailToken.userId) {
+        return res.status(400).json({ error: "Token invalide" });
+      }
+      
+      // Hash new password
+      const salt = randomBytes(16).toString('hex');
+      const hashedPassword = scryptSync(newPassword, salt, 64).toString('hex');
+      const passwordWithSalt = `${salt}:${hashedPassword}`;
+      
+      // Update user password
+      await storage.updateUser(emailToken.userId, { password: passwordWithSalt });
+      
+      // Mark token as used
+      await storage.markEmailTokenUsed(emailToken.id);
+      
+      console.log("[AUTH] Password reset successful for user:", emailToken.userId);
+      res.json({ success: true, message: "Mot de passe modifié avec succès" });
+    } catch (error: any) {
+      console.error("[AUTH] Error in reset-password:", error);
+      res.status(500).json({ error: "Erreur lors de la réinitialisation du mot de passe" });
+    }
+  });
+  
+  // GET /api/auth/verify-reset-token - Verify reset token is valid
+  app.get("/api/auth/verify-reset-token", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ valid: false, error: "Token manquant" });
+      }
+      
+      const tokenHash = scryptSync(token, 'salt_pw_reset', 64).toString('hex');
+      const emailToken = await storage.getEmailTokenByHash(tokenHash);
+      
+      if (!emailToken || emailToken.usedAt || new Date() > emailToken.expiresAt) {
+        return res.json({ valid: false });
+      }
+      
+      res.json({ valid: true, email: emailToken.email });
+    } catch (error: any) {
+      console.error("[AUTH] Error verifying reset token:", error);
+      res.status(500).json({ valid: false, error: "Erreur de vérification" });
+    }
+  });
+  
+  // ========== EMAIL VERIFICATION FLOW ==========
+  
+  // POST /api/auth/send-verification - Send email verification
+  app.post("/api/auth/send-verification", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.id;
+      const email = req.jwtUser?.username;
+      
+      if (!userId || !email) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      
+      if ((user as any).emailVerified) {
+        return res.json({ success: true, message: "Email déjà vérifié" });
+      }
+      
+      // Invalidate any existing verification tokens
+      await storage.invalidateEmailTokens(email, 'EMAIL_VERIFY');
+      
+      // Generate secure token
+      const token = randomBytes(32).toString('hex');
+      const tokenHash = scryptSync(token, 'salt_email_verify', 64).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
+      await storage.createEmailToken({
+        userId,
+        email,
+        type: 'EMAIL_VERIFY',
+        tokenHash,
+        expiresAt,
+      });
+      
+      // Send email
+      const userName = user.prenom || user.nom || undefined;
+      const result = await emailService.sendEmailVerificationEmail(email, token, userName);
+      
+      // Log to email outbox
+      await storage.logEmail({
+        organisationId: user.organisationId,
+        toEmail: email,
+        template: 'EMAIL_VERIFY',
+        subject: 'Cassius - Confirmez votre adresse email',
+        status: result.success ? 'SENT' : 'FAILED',
+        sentAt: result.success ? new Date() : null,
+        errorMessage: result.error || null,
+      });
+      
+      if (result.success) {
+        res.json({ success: true, message: "Email de vérification envoyé" });
+      } else {
+        res.status(500).json({ error: "Erreur lors de l'envoi de l'email" });
+      }
+    } catch (error: any) {
+      console.error("[AUTH] Error sending verification email:", error);
+      res.status(500).json({ error: "Erreur lors de l'envoi de l'email" });
+    }
+  });
+  
+  // POST /api/auth/verify-email - Verify email with token
+  app.post("/api/auth/verify-email", async (req, res) => {
+    try {
+      const { token } = req.body;
+      
+      if (!token) {
+        return res.status(400).json({ error: "Token requis" });
+      }
+      
+      const tokenHash = scryptSync(token, 'salt_email_verify', 64).toString('hex');
+      const emailToken = await storage.getEmailTokenByHash(tokenHash);
+      
+      if (!emailToken) {
+        return res.status(400).json({ error: "Lien invalide ou expiré" });
+      }
+      
+      if (emailToken.usedAt) {
+        return res.status(400).json({ error: "Ce lien a déjà été utilisé" });
+      }
+      
+      if (new Date() > emailToken.expiresAt) {
+        return res.status(400).json({ error: "Ce lien a expiré" });
+      }
+      
+      if (!emailToken.userId) {
+        return res.status(400).json({ error: "Token invalide" });
+      }
+      
+      // Mark user email as verified
+      await storage.updateUserEmailVerified(emailToken.userId);
+      
+      // Mark token as used
+      await storage.markEmailTokenUsed(emailToken.id);
+      
+      console.log("[AUTH] Email verified for user:", emailToken.userId);
+      res.json({ success: true, message: "Email vérifié avec succès" });
+    } catch (error: any) {
+      console.error("[AUTH] Error verifying email:", error);
+      res.status(500).json({ error: "Erreur lors de la vérification" });
+    }
+  });
+  
+  // GET /api/auth/email-status - Get current email verification status
+  app.get("/api/auth/email-status", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      
+      res.json({
+        email: user.username,
+        verified: (user as any).emailVerified || false,
+        verifiedAt: (user as any).emailVerifiedAt || null,
+      });
+    } catch (error: any) {
+      console.error("[AUTH] Error getting email status:", error);
+      res.status(500).json({ error: "Erreur" });
     }
   });
 

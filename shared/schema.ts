@@ -370,6 +370,9 @@ export const users = pgTable("users", {
   role: roleEnum("role").default("ASSISTANT").notNull(),
   nom: text("nom"),
   prenom: text("prenom"),
+  emailVerified: boolean("email_verified").default(false),
+  emailVerifiedAt: timestamp("email_verified_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const usersRelations = relations(users, ({ one }) => ({
@@ -971,8 +974,105 @@ export const insertOrganisationSchema = createInsertSchema(organisations).omit({
   createdAt: true,
 });
 
+// Enums for transactional emails
+export const emailTokenTypeEnum = pgEnum("email_token_type", ["PASSWORD_RESET", "EMAIL_VERIFY"]);
+export const invitationStatusEnum = pgEnum("invitation_status", ["PENDING", "ACCEPTED", "EXPIRED", "CANCELLED"]);
+export const emailStatusEnum = pgEnum("email_status", ["PENDING", "SENT", "FAILED"]);
+
+// Email tokens for password reset and email verification
+export const emailTokens = pgTable("email_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  type: emailTokenTypeEnum("type").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const emailTokensRelations = relations(emailTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [emailTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+// Invitations for collaborators
+export const invitations = pgTable("invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: roleEnum("role").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  status: invitationStatusEnum("status").default("PENDING").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  invitedByUserId: varchar("invited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  nom: text("nom"),
+  prenom: text("prenom"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [invitations.organisationId],
+    references: [organisations.id],
+  }),
+  invitedBy: one(users, {
+    fields: [invitations.invitedByUserId],
+    references: [users.id],
+  }),
+}));
+
+// Email outbox for tracking sent emails
+export const emailOutbox = pgTable("email_outbox", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").references(() => organisations.id, { onDelete: "cascade" }),
+  toEmail: text("to_email").notNull(),
+  template: text("template").notNull(),
+  subject: text("subject").notNull(),
+  payload: text("payload"),
+  status: emailStatusEnum("status").default("PENDING").notNull(),
+  sentAt: timestamp("sent_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const emailOutboxRelations = relations(emailOutbox, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [emailOutbox.organisationId],
+    references: [organisations.id],
+  }),
+}));
+
+// Insert schemas for new tables
+export const insertEmailTokenSchema = createInsertSchema(emailTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInvitationSchema = createInsertSchema(invitations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEmailOutboxSchema = createInsertSchema(emailOutbox).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertOrganisation = z.infer<typeof insertOrganisationSchema>;
 export type Organisation = typeof organisations.$inferSelect;
+
+export type InsertEmailToken = z.infer<typeof insertEmailTokenSchema>;
+export type EmailToken = typeof emailTokens.$inferSelect;
+
+export type InsertInvitation = z.infer<typeof insertInvitationSchema>;
+export type Invitation = typeof invitations.$inferSelect;
+
+export type InsertEmailOutbox = z.infer<typeof insertEmailOutboxSchema>;
+export type EmailOutbox = typeof emailOutbox.$inferSelect;
 
 export type InsertPatient = z.infer<typeof insertPatientSchema>;
 export type Patient = typeof patients.$inferSelect;
