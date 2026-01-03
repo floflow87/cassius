@@ -1,0 +1,66 @@
+We want to redesign ALL transactional emails to match Cassius brand, using a reusable email layout and consistent typography/colors.
+
+Goals
+- Replace current plain email rendering (raw text + long reset link) with a branded HTML template.
+- Keep emails medically neutral: never include patient data (names, ISQ values, medical details) in clear text.
+- Provide a short CTA button + fallback plain link.
+- Ensure deliverability: include a text/plain version in addition to HTML.
+- Centralize templates: one base layout + per-email templates.
+- Add preview route available only in DEV/ADMIN to view templates in browser.
+
+Brand / Cassius email style guide
+- Tone: calm, reassuring, concise, professional (medical SaaS).
+- Visual: clean white card, subtle border, generous spacing, no heavy marketing.
+- Colors:
+  - Primary (CTA/button): use existing Cassius primary brand color from DS (same as app primary button).
+  - Neutral text: #111827
+  - Secondary text: #6B7280
+  - Background: #F9FAFB
+  - Divider: #E5E7EB
+- Typography: system font stack (Inter if available, fallback Arial/sans-serif).
+- Components in base layout:
+  - Header: Cassius logo/text wordmark (no external images required; use text “Cassius” + optional small icon inline SVG)
+  - Title (H1) + body content
+  - Primary CTA button component
+  - Fallback link block (copy/paste URL)
+  - Footer: “— L’équipe Cassius” + legal small print
+- Accessibility:
+  - Minimum 14px body font
+  - Sufficient contrast
+  - Button with padding and border radius.
+
+Implementation structure (Node backend)
+- Create /server/emails/
+  - baseLayout.ts (shared HTML wrapper)
+  - components.ts (button, infoBox, footer, linkFallback)
+  - templates/
+    - resetPassword.ts
+    - verifyEmail.ts
+    - invitation.ts
+    - emailChanged.ts (optional)
+    - orgInvite.ts (optional)
+    - paymentFailed.ts (placeholder for Stripe)
+  - send.ts (single sendEmail function: accepts template name + variables, returns html + text)
+- Update all auth/email endpoints to use sendEmail().
+
+Templates to implement now (French)
+1) Reset password
+2) Email verification (after signup)
+3) Invitation to join organisation (collaborator invite)
+4) Security notice: “New login / new device” (optional but recommended)
+5) Integration connected: “Google Calendar connected” (neutral)
+6) System alert (generic): “Action requise dans Cassius” (no medical details)
+
+Plain text versions
+- For each email, generate a text version (no HTML), short, includes CTA link and expiration where relevant.
+
+Preview
+- Add DEV-only route: GET /api/dev/email-preview?template=resetPassword
+  - Protected: ADMIN only + disabled in production.
+  - Renders HTML in browser for quick review.
+
+Acceptance criteria
+- All transactional emails use new branded templates (HTML + text).
+- Reset email shows a clean button instead of a raw URL, plus a fallback link.
+- No patient data is included in emails.
+- Preview works in DEV for quick iteration.
