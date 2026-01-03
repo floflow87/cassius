@@ -28,12 +28,19 @@ Cassius utilizes a modern full-stack architecture built for scalability and resp
 - **Clinical Flag System:** Automated alerts (CRITICAL, WARNING, INFO) for clinical issues and data completeness (e.g., ISQ_LOW, NO_POSTOP_FOLLOWUP).
 - **Document Explorer:** Global document management with folder tree navigation, search, sort, and a document viewer, allowing documents to be linked to operations.
 - **Calendar Page:** Professional scheduling page using FullCalendar, supporting day, week, month, and agenda views, with drag-and-drop rescheduling and quick appointment creation.
+    - **Unified Calendar View:** Displays both Cassius appointments and Google Calendar events in a single view.
+    - **Source Filters:** Filter by source (All | Cassius | Google | Conflicts) in the sidebar.
+    - **Google Badge:** Google events display a Google icon badge for easy identification.
+    - **Event Drawer:** Click on Google events to view details with link to open in Google Calendar.
+    - **Conflict Resolution:** View and resolve sync conflicts directly from the calendar.
+    - **Persistent Toggle:** "Afficher Google" toggle persisted in localStorage.
 - **Google Calendar Integration:**
     - **One-way sync (Cassius to Google):** Exports Cassius appointments to Google Calendar.
     - **Standard OAuth 2.0:** Secure, production-ready integration with automatic token refresh and CSRF protection.
     - **Multi-tenant:** Supports organization-level and user-level OAuth credentials.
     - **Multi-environment:** Configurable for production and staging environments with environment-specific OAuth credentials and redirect URIs.
     - **Two-way sync (Google to Cassius):** Imports Google Calendar events into Cassius, handling conflicts and avoiding re-import of exported events.
+    - **API Endpoints:** GET /api/google/imported-events, GET /api/sync/conflicts, PATCH /api/sync/conflicts/:id
 - **CSV Patient Import:**
     - **5-step wizard:** Upload, Validate, Review, Import, Complete workflow.
     - **Field mapping:** Supports French column names (Nom, Prénom, Date de naissance, Sexe, Téléphone, Email, Numéro de dossier, NIR, Adresse, Code postal, Ville, Pays).
