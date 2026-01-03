@@ -60,7 +60,14 @@ export async function sendPasswordResetEmail(
   userName?: string
 ): Promise<EmailResult> {
   try {
-    const { client, fromEmail } = await getUncachableResendClient();
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
     const resetUrl = `${getBaseUrl()}/reset-password?token=${token}`;
     
     const { data, error } = await client.emails.send({
@@ -129,7 +136,14 @@ export async function sendEmailVerificationEmail(
   userName?: string
 ): Promise<EmailResult> {
   try {
-    const { client, fromEmail } = await getUncachableResendClient();
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
     const verifyUrl = `${getBaseUrl()}/verify-email?token=${token}`;
     
     const { data, error } = await client.emails.send({
@@ -195,7 +209,14 @@ export async function sendCollaboratorInvitationEmail(
   role: string
 ): Promise<EmailResult> {
   try {
-    const { client, fromEmail } = await getUncachableResendClient();
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
     const inviteUrl = `${getBaseUrl()}/accept-invitation?token=${token}`;
     
     const roleDisplay = role === 'ADMIN' ? 'Administrateur' : role === 'CHIRURGIEN' ? 'Chirurgien' : 'Assistant';
@@ -267,7 +288,14 @@ export async function sendPaymentFailedEmail(
   amount: string
 ): Promise<EmailResult> {
   try {
-    const { client, fromEmail } = await getUncachableResendClient();
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
     const billingUrl = `${getBaseUrl()}/settings?section=billing`;
     
     const { data, error } = await client.emails.send({
@@ -332,7 +360,14 @@ export async function sendTrialEndingEmail(
   daysRemaining: number
 ): Promise<EmailResult> {
   try {
-    const { client, fromEmail } = await getUncachableResendClient();
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
     const billingUrl = `${getBaseUrl()}/settings?section=billing`;
     
     const { data, error } = await client.emails.send({
@@ -397,7 +432,14 @@ export async function sendAccountRestrictedEmail(
   reason: string
 ): Promise<EmailResult> {
   try {
-    const { client, fromEmail } = await getUncachableResendClient();
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
     const billingUrl = `${getBaseUrl()}/settings?section=billing`;
     
     const { data, error } = await client.emails.send({

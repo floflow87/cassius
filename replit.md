@@ -62,3 +62,35 @@ Cassius utilizes a modern full-stack architecture built for scalability and resp
 - **drizzle-zod:** Integration for generating Zod schemas from Drizzle.
 - **FullCalendar:** JavaScript event calendar.
 - **Uppy:** File uploader.
+- **Resend:** Transactional email service for password resets, email verification, and invitations.
+
+## Transactional Email System
+The application includes a comprehensive email system with 6 professional French medical-themed templates using Resend:
+
+**Email Types:**
+- **Password Reset:** 1-hour expiry token, scrypt hashing, email enumeration protection
+- **Email Verification:** 24-hour expiry token for new account verification
+- **Collaborator Invitation:** 7-day expiry token for organization invitations
+- **Account Created:** Welcome email for new users
+- **Password Changed:** Security notification after password change
+- **Subscription Notifications:** Plan upgrade/downgrade notifications
+
+**Security Features:**
+- Token hashing uses scrypt with hex encoding and type-specific salts (salt_pw_reset, salt_email_verify, salt_invitation)
+- Email enumeration protection: forgot-password always returns success regardless of email existence
+- All tokens invalidated after use or when new tokens are generated
+
+**Graceful Degradation:**
+All email functions handle missing Resend credentials gracefully - they return success with 'skipped-no-resend' messageId when RESEND_API_KEY is not configured, allowing development without email service.
+
+**Frontend Pages:**
+- `/forgot-password` - Password reset request form
+- `/reset-password` - Password reset form (with token validation)
+- `/accept-invitation` - Invitation acceptance form (with token validation)
+- `/verify-email` - Email verification page
+
+## Database Configuration
+**Important:** The application uses `SUPABASE_DB_URL_DEV` (Supabase PostgreSQL) for development, NOT `DATABASE_URL` (Replit PostgreSQL). 
+- `drizzle.config.ts` uses `DATABASE_URL` for migrations
+- `server/db.ts` uses `SUPABASE_DB_URL_DEV` for development
+- Schema changes must be applied to both databases or use `psql "$SUPABASE_DB_URL_DEV"` to apply directly
