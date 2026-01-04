@@ -1618,6 +1618,19 @@ export async function registerRoutes(
       const data = insertDocumentSchema.parse(req.body);
       const userId = req.jwtUser?.userId || null;
       const doc = await storage.createDocument(organisationId, { ...data, createdBy: userId });
+      
+      // Send notification about new document
+      if (userId) {
+        await notificationService.notificationEvents.onDocumentUploaded({
+          organisationId,
+          recipientUserId: userId,
+          actorUserId: userId,
+          documentId: doc.id,
+          documentName: doc.title || doc.fileName,
+          patientId: doc.patientId || undefined,
+        });
+      }
+      
       res.status(201).json(doc);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2057,6 +2070,20 @@ export async function registerRoutes(
       const { patientId } = req.params;
       const appointmentData = insertAppointmentSchema.parse({ ...req.body, patientId });
       const appointment = await storage.createAppointment(organisationId, appointmentData);
+      
+      // Send notification about new appointment
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        await notificationService.notificationEvents.onAppointmentCreated({
+          organisationId,
+          recipientUserId: userId,
+          actorUserId: userId,
+          appointmentId: appointment.id,
+          appointmentDate: appointment.dateStart.toISOString(),
+          patientId,
+        });
+      }
+      
       res.status(201).json(appointment);
     } catch (error) {
       console.error("Error creating appointment:", error);
@@ -3515,6 +3542,18 @@ export async function registerRoutes(
       
       // Update job to completed
       await patientImport.updateImportJobStatus(jobId, "completed", stats);
+      
+      // Send notification about import completion
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        await notificationService.notificationEvents.onImportCompleted({
+          organisationId,
+          recipientUserId: userId,
+          importId: jobId,
+          successCount: stats.toCreate + stats.toUpdate,
+          failureCount: stats.error,
+        });
+      }
       
       res.json({
         jobId,
