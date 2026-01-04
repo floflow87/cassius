@@ -6,7 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { Bell, Calendar, LogOut } from "lucide-react";
+import { Calendar, LogOut } from "lucide-react";
+import { NotificationBell } from "@/components/notification-bell";
 import NotFound from "@/pages/not-found";
 import PatientsPage from "@/pages/patients";
 import PatientDetailsPage from "@/pages/patient-details";
@@ -119,9 +120,7 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
       <GlobalSearch className="flex-1 max-w-md" />
       
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-notifications">
-          <Bell className="h-5 w-5" />
-        </Button>
+        <NotificationBell />
         <Button 
           variant="ghost" 
           size="icon" 
