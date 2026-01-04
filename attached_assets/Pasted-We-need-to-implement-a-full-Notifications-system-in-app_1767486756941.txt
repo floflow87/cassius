@@ -1,0 +1,122 @@
+We need to implement a full Notifications system (in-app + email) with user preferences.
+
+Context
+Cassius is a multi-tenant medical CRM. We want:
+- Alerts & reminders (flags): ISQ low, follow-up to schedule, overdue follow-up, sync errors, etc.
+- Team activity tracking: actions performed by collaborators (non-admin) like patient updates, document uploads, imports.
+- Import lifecycle notifications: started, completed, partial, failed.
+
+Core requirements
+1) Two delivery channels:
+- In-app notifications center (bell icon + /notifications page)
+- Email notifications via Resend + email_outbox (already implemented)
+
+2) User preferences per category:
+For each category, user can choose:
+- Frequency: NONE | DIGEST | IMMEDIATE
+- Channels: NONE | IN_APP | EMAIL (IN_APP and EMAIL can be both enabled)
+Categories:
+- ALERTS_REMINDERS
+- TEAM_ACTIVITY
+- IMPORTS
+- SYSTEM
+
+3) Safety
+- Emails must be neutral: never include patient names, ISQ values or medical details in clear text.
+- Email content: short title + “Open in Cassius” deep link (signed/session protected).
+- All endpoints must enforce organisation_id and RBAC.
+
+Database
+Create tables:
+A) notifications:
+- id uuid pk
+- organisation_id uuid (index)
+- recipient_user_id uuid (index)
+- kind enum (ALERT|REMINDER|ACTIVITY|IMPORT|SYSTEM)
+- type text (ISQ_LOW, FOLLOWUP_TO_SCHEDULE, PATIENT_UPDATED, DOCUMENT_ADDED, IMPORT_FAILED, etc.)
+- severity enum (INFO|WARNING|CRITICAL)
+- title text (neutral)
+- body text (neutral)
+- entity_type enum (PATIENT|IMPLANT|ACT|APPOINTMENT|DOCUMENT|IMPORT|INTEGRATION|BILLING)
+- entity_id uuid nullable
+- actor_user_id uuid nullable
+- metadata jsonb
+- created_at timestamptz default now()
+- read_at timestamptz nullable
+- archived_at timestamptz nullable
+- dedupe_key text nullable
+Indexes:
+- (organisation_id, recipient_user_id, created_at desc)
+- (recipient_user_id, read_at)
+
+B) notification_preferences:
+- id uuid pk
+- organisation_id uuid
+- user_id uuid
+- category enum
+- frequency enum (NONE|DIGEST|IMMEDIATE)
+- in_app_enabled boolean
+- email_enabled boolean
+- digest_time text default '08:30'
+- created_at, updated_at
+Unique (organisation_id, user_id, category)
+
+C) digest_runs:
+- id uuid pk
+- organisation_id uuid
+- user_id uuid
+- category enum
+- period_start timestamptz
+- period_end timestamptz
+- status (SENT|FAILED)
+- error text
+- sent_at timestamptz
+
+Service layer
+Implement notificationService with:
+- notifyEvent(event)
+- createNotification({recipient, kind, type, severity, title, body, entity, actor, dedupeKey})
+- applyPreference(recipient, category) -> decides in-app/email + immediate/digest
+- immediate email: insert into email_outbox then send via Resend
+- digest: store notifications; daily job sends digest email
+
+Event triggers
+Hook into existing flows:
+- ISQ update / visite creation -> create ALERT/REMINDER notifications + flags
+- appointment created/updated -> reminders (if needed) + activity logs
+- document/radio upload/delete -> activity logs
+- import start/finish/fail -> import notifications
+- google sync error -> system/alert
+
+Routing / API
+- GET /api/notifications?kind=&unreadOnly=&page=&pageSize=
+- POST /api/notifications/:id/read
+- POST /api/notifications/mark-all-read
+- POST /api/notifications/:id/archive
+- GET /api/settings/notification-preferences
+- PUT /api/settings/notification-preferences (update per category)
+Admin-only:
+- GET /api/admin/notifications/activity-feed (team activity across org)
+
+UI
+- Add bell icon to topbar with unread badge.
+- Dropdown showing last 10 notifications with type icon and "Open" action.
+- New page /notifications with tabs: Alerts & Reminders | Activity | Imports
+- Add settings page section: /settings/notifications to manage preferences (frequency + channels per category).
+
+Digest job
+- Implement a daily digest runner (server-side job) that sends digests at each user’s digest_time (use org timezone).
+- For MVP, run digest job every 15 minutes and send due digests.
+- Digest email groups notifications by type and includes deep links.
+
+Anti-spam
+- Use dedupe_key to avoid flooding:
+  - prevent sending same IMMEDIATE alert more than once within 30 minutes per recipient.
+- Add cooldown for reminders (24h).
+
+Acceptance criteria
+- Users can configure per category: NONE/DIGEST/IMMEDIATE + IN_APP/EMAIL.
+- Alerts/reminders and imports work end-to-end.
+- Admin sees collaborator activity (digest by default).
+- Emails are neutral and safe.
+- In-app notification center works with read/archive.
