@@ -31,6 +31,8 @@ export type TypePilier = "DROIT" | "ANGULE" | "MULTI_UNIT";
 export interface Patient {
   id: string;
   organisationId: string;
+  fileNumber: string | null;
+  ssn: string | null;
   nom: string;
   prenom: string;
   dateNaissance: string;
@@ -38,6 +40,7 @@ export interface Patient {
   telephone: string | null;
   email: string | null;
   adresse: string | null;
+  addressFull: string | null;
   codePostal: string | null;
   ville: string | null;
   pays: string | null;

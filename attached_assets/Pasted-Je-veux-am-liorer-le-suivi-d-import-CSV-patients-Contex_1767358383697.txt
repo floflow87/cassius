@@ -1,0 +1,60 @@
+Je veux améliorer le suivi d’import CSV patients.
+
+Contexte actuel
+- La progression est persistée/affichée par batch de 500, donc le compteur “saute”.
+- Je veux une sensation plus “live”, sans exploser la charge.
+- Je veux aussi un bouton “Interrompre l’import”.
+
+Objectifs
+1) Progress plus fluide côté UI (ressenti temps réel) sans augmenter massivement les writes DB.
+2) Ajouter un bouton “Interrompre” qui stoppe réellement l’import côté backend, proprement, et met le job dans un état final cohérent.
+
+Solution recommandée
+A) Progress tracking
+- Continuer à persister la progression côté DB par batch (500 ou mieux 200) pour limiter la charge.
+- Ajouter dans l’UI une interpolation/animation entre la dernière valeur connue et la nouvelle valeur (ex: sur 1–2s), pour donner un effet “live” sans polling agressif.
+
+B) Cancel import
+- Ajouter champs dans import_jobs :
+  - cancel_requested BOOLEAN DEFAULT FALSE
+  - status ENUM inclut 'cancelled'
+  - cancelled_at TIMESTAMPTZ (optionnel) ou utiliser completed_at
+- Endpoint backend :
+  POST /api/import/:jobId/cancel
+  -> set cancel_requested=true
+  -> répondre { jobId, status:'running', cancel_requested:true }
+
+- Dans la boucle d’import backend (entre batches):
+  - avant de traiter chaque batch, recharger import_jobs.cancel_requested
+  - si true :
+    - arrêter le traitement
+    - status='cancelled'
+    - completed_at=now()
+    - retourner un résumé partiel (processed/created/updated/errors)
+  - garantir que l’import n’écrit plus après cancellation.
+
+Frontend
+1) Sur l’étape “Import en cours”
+- Ajouter bouton “Interrompre”
+- Au clic :
+  - call POST /api/import/:jobId/cancel
+  - afficher toast “Interruption demandée…”
+  - continuer le polling status jusqu’à status='cancelled' (ou completed/failed)
+
+2) Polling status
+- Poll GET /api/import/:jobId/status toutes les 2s
+- Stop si status in ['completed','failed','cancelled']
+
+3) Progress UI fluide
+- Stocker lastServerProcessedRows et targetProcessedRows
+- Quand une nouvelle valeur arrive (ex: 1000 -> 1500):
+  - animer progressivement l’affichage (requestAnimationFrame ou setInterval court)
+  - mais NE PAS modifier la valeur serveur
+- Afficher aussi “Dernière mise à jour: hh:mm:ss” en mode dev pour debug.
+
+Livrables
+- Progress “fluide” même si backend update par batch
+- Bouton “Interrompre” fonctionnel :
+  - status passe à 'cancelled'
+  - l’UI quitte l’écran d’import et affiche un récap partiel
+- Aucun impact perf majeur (pas d’update DB par ligne)

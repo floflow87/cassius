@@ -6,6 +6,9 @@ import * as supabaseStorage from "./supabaseStorage";
 import { getTopSlowestEndpoints, getTopDbHeavyEndpoints, getAllStats, clearStats } from "./instrumentation";
 import { runFlagDetection } from "./flagEngine";
 import * as googleCalendar from "./googleCalendar";
+import * as emailService from "./emailService";
+import { sendEmail, getPreviewHtml, getBaseUrl, TemplateName } from "./emails";
+import { randomBytes, scryptSync } from "crypto";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -24,6 +27,7 @@ import {
   updateAppointmentSchema,
   insertFlagSchema,
   patients,
+  importJobs,
 } from "@shared/schema";
 import type {
   Patient,
@@ -44,7 +48,7 @@ import type {
 } from "@shared/types";
 import { z } from "zod";
 import { db, pool, testConnection, getDbEnv, getDbConnectionInfo } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql, and, inArray, desc } from "drizzle-orm";
 
 function getOrganisationId(req: Request, res: Response): string | null {
   const organisationId = req.jwtUser?.organisationId;
@@ -2482,7 +2486,7 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const { isEnabled, targetCalendarId, targetCalendarName } = req.body;
+      const { isEnabled, targetCalendarId, targetCalendarName, importEnabled, sourceCalendarId, sourceCalendarName } = req.body;
       
       let integration = await storage.getCalendarIntegration(organisationId);
       
@@ -2494,6 +2498,9 @@ export async function registerRoutes(
         isEnabled: isEnabled ?? integration.isEnabled,
         targetCalendarId: targetCalendarId !== undefined ? targetCalendarId : integration.targetCalendarId,
         targetCalendarName: targetCalendarName !== undefined ? targetCalendarName : integration.targetCalendarName,
+        importEnabled: importEnabled !== undefined ? importEnabled : integration.importEnabled,
+        sourceCalendarId: sourceCalendarId !== undefined ? sourceCalendarId : integration.sourceCalendarId,
+        sourceCalendarName: sourceCalendarName !== undefined ? sourceCalendarName : integration.sourceCalendarName,
       });
       
       res.json(integration);
@@ -2535,49 +2542,140 @@ export async function registerRoutes(
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
 
+    // Structured sync result
+    interface SyncFailure { appointmentId: string; reason: string; googleCode?: string }
+    const result = {
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      failures: [] as SyncFailure[],
+      total: 0,
+    };
+
+    console.log(`[SYNC] Starting sync for org=${organisationId}`);
+
     try {
+      // Step 1: Get integration
+      console.log(`[SYNC] Step 1: Fetching calendar integration`);
       const integration = await storage.getCalendarIntegration(organisationId);
       
-      if (!integration || !integration.isEnabled || !integration.accessToken) {
-        return res.status(400).json({ error: "Google Calendar integration not enabled or not connected" });
+      if (!integration) {
+        console.log(`[SYNC] No integration found for org=${organisationId}`);
+        return res.status(400).json({ 
+          error: "INTEGRATION_NOT_FOUND",
+          message: "Aucune intégration Google Calendar trouvée. Veuillez d'abord connecter votre compte Google.",
+          step: "fetch_integration",
+        });
       }
-      
+
+      if (!integration.isEnabled) {
+        console.log(`[SYNC] Integration disabled for org=${organisationId}`);
+        return res.status(400).json({ 
+          error: "INTEGRATION_DISABLED",
+          message: "L'intégration Google Calendar est désactivée.",
+          step: "check_enabled",
+        });
+      }
+
+      if (!integration.accessToken) {
+        console.log(`[SYNC] No access token for org=${organisationId}`);
+        return res.status(400).json({ 
+          error: "NOT_CONNECTED",
+          message: "Google Calendar n'est pas connecté. Veuillez vous reconnecter.",
+          step: "check_tokens",
+        });
+      }
+
+      if (!integration.refreshToken) {
+        console.log(`[SYNC] No refresh token for org=${organisationId} - needs reconsent`);
+        return res.status(400).json({ 
+          error: "NEED_RECONSENT",
+          message: "Le token de rafraîchissement est manquant. Veuillez déconnecter et reconnecter Google Calendar.",
+          step: "check_refresh_token",
+        });
+      }
+
       const calendarId = integration.targetCalendarId || "primary";
-      
-      // Get appointments that need syncing
+      console.log(`[SYNC] Using calendarId=${calendarId}, lastSyncAt=${integration.lastSyncAt}`);
+
+      // Step 2: Get appointments to sync
+      console.log(`[SYNC] Step 2: Fetching appointments to sync`);
       const appointments = await storage.getAppointmentsForSync(organisationId, integration.lastSyncAt ?? undefined);
+      result.total = appointments.length;
+      console.log(`[SYNC] Found ${appointments.length} appointment(s) to sync`);
+
+      if (appointments.length === 0) {
+        console.log(`[SYNC] No appointments to sync`);
+        await storage.updateIntegrationSyncStatus(organisationId, integration.id, {
+          lastSyncAt: new Date(),
+          syncErrorCount: 0,
+          lastSyncError: null,
+        });
+        return res.json({ ...result, message: "Aucun rendez-vous à synchroniser" });
+      }
+
+      let lastPersistedToken = integration.accessToken;
       
-      let synced = 0;
-      let errors = 0;
-      let tokensRefreshed = false;
-      
-      // Helper to persist refreshed tokens
+      // Helper to persist refreshed tokens - stores every new token (handles multiple refreshes per sync)
       const persistRefreshedTokens = async (refreshedTokens?: { accessToken: string; expiresAt: Date }) => {
-        if (refreshedTokens && !tokensRefreshed) {
-          tokensRefreshed = true;
+        if (refreshedTokens && refreshedTokens.accessToken !== lastPersistedToken) {
+          lastPersistedToken = refreshedTokens.accessToken;
+          console.log(`[SYNC] Token refreshed, persisting to database`);
           await storage.updateCalendarIntegration(organisationId, integration.id, {
             accessToken: refreshedTokens.accessToken,
             tokenExpiresAt: refreshedTokens.expiresAt,
           });
+          // Update the integration object for subsequent calls
+          integration.accessToken = refreshedTokens.accessToken;
+          integration.tokenExpiresAt = refreshedTokens.expiresAt;
         }
       };
+
+      // Step 3: Sync each appointment
+      console.log(`[SYNC] Step 3: Syncing appointments one by one`);
       
       for (const apt of appointments) {
+        const patient = apt.patient;
+        const patientName = patient ? `${patient.prenom || ""} ${patient.nom || ""}`.trim() : "Patient inconnu";
+        
+        // Fail appointments without required data (don't skip - that's misleading)
+        if (!apt.dateStart) {
+          console.log(`[SYNC] Failing apt=${apt.id}: no dateStart`);
+          result.failed++;
+          result.failures.push({
+            appointmentId: apt.id,
+            reason: "Date de début manquante",
+          });
+          await storage.updateAppointmentSync(organisationId, apt.id, {
+            syncStatus: "ERROR",
+            syncError: "Date de début manquante",
+          });
+          continue;
+        }
+
         try {
-          const patient = apt.patient;
-          const title = `[Cassius] ${apt.type} - ${patient?.prenom || ""} ${patient?.nom || ""}`.trim();
-          const description = `Rendez-vous Cassius\nType: ${apt.type}\nPatient: ${patient?.prenom || ""} ${patient?.nom || ""}`;
+          const title = `[Cassius] ${apt.type} - ${patientName}`;
+          const description = [
+            `Rendez-vous Cassius`,
+            `Type: ${apt.type}`,
+            `Patient: ${patientName}`,
+            apt.description ? `Notes: ${apt.description}` : null,
+          ].filter(Boolean).join("\n");
           
           const startDate = new Date(apt.dateStart);
           const endDate = apt.dateEnd ? new Date(apt.dateEnd) : new Date(startDate.getTime() + 30 * 60 * 1000);
-          
+
           if (apt.externalEventId) {
-            // Update existing event
+            // Check if event exists
+            console.log(`[SYNC] Checking existing event apt=${apt.id}, eventId=${apt.externalEventId}`);
             const getResult = await googleCalendar.getCalendarEvent(integration, calendarId, apt.externalEventId);
             await persistRefreshedTokens(getResult.refreshedTokens);
             
             if (getResult.event) {
-              const result = await googleCalendar.updateCalendarEvent(integration, {
+              // Update existing event
+              console.log(`[SYNC] Updating event apt=${apt.id}`);
+              const updateResult = await googleCalendar.updateCalendarEvent(integration, {
                 calendarId,
                 eventId: apt.externalEventId,
                 summary: title,
@@ -2586,17 +2684,19 @@ export async function registerRoutes(
                 end: endDate,
                 cassiusAppointmentId: apt.id,
               });
-              await persistRefreshedTokens(result.refreshedTokens);
+              await persistRefreshedTokens(updateResult.refreshedTokens);
               
               await storage.updateAppointmentSync(organisationId, apt.id, {
                 syncStatus: "SYNCED",
-                externalEtag: result.etag,
+                externalEtag: updateResult.etag,
                 lastSyncedAt: new Date(),
                 syncError: null,
               });
+              result.updated++;
             } else {
               // Event was deleted, recreate
-              const result = await googleCalendar.createCalendarEvent(integration, {
+              console.log(`[SYNC] Event deleted, recreating apt=${apt.id}`);
+              const createResult = await googleCalendar.createCalendarEvent(integration, {
                 calendarId,
                 summary: title,
                 description,
@@ -2604,21 +2704,23 @@ export async function registerRoutes(
                 end: endDate,
                 cassiusAppointmentId: apt.id,
               });
-              await persistRefreshedTokens(result.refreshedTokens);
+              await persistRefreshedTokens(createResult.refreshedTokens);
               
               await storage.updateAppointmentSync(organisationId, apt.id, {
                 externalProvider: "google",
                 externalCalendarId: calendarId,
-                externalEventId: result.eventId,
-                externalEtag: result.etag,
+                externalEventId: createResult.eventId,
+                externalEtag: createResult.etag,
                 syncStatus: "SYNCED",
                 lastSyncedAt: new Date(),
                 syncError: null,
               });
+              result.created++;
             }
           } else {
             // Create new event
-            const result = await googleCalendar.createCalendarEvent(integration, {
+            console.log(`[SYNC] Creating new event apt=${apt.id}`);
+            const createResult = await googleCalendar.createCalendarEvent(integration, {
               calendarId,
               summary: title,
               description,
@@ -2626,41 +2728,1828 @@ export async function registerRoutes(
               end: endDate,
               cassiusAppointmentId: apt.id,
             });
-            await persistRefreshedTokens(result.refreshedTokens);
+            await persistRefreshedTokens(createResult.refreshedTokens);
             
             await storage.updateAppointmentSync(organisationId, apt.id, {
               externalProvider: "google",
               externalCalendarId: calendarId,
-              externalEventId: result.eventId,
-              externalEtag: result.etag,
+              externalEventId: createResult.eventId,
+              externalEtag: createResult.etag,
               syncStatus: "SYNCED",
               lastSyncedAt: new Date(),
               syncError: null,
             });
+            result.created++;
+          }
+        } catch (error: any) {
+          console.error(`[SYNC] Error syncing apt=${apt.id}:`, error);
+          
+          // Parse Google API error
+          let reason = error.message || "Erreur inconnue";
+          let googleCode: string | undefined;
+          
+          if (error.code) {
+            googleCode = String(error.code);
+            if (error.code === 401) {
+              reason = "Token expiré ou invalide";
+            } else if (error.code === 403) {
+              reason = "Permissions insuffisantes sur le calendrier";
+            } else if (error.code === 404) {
+              reason = "Calendrier non trouvé";
+            } else if (error.code === 429) {
+              reason = "Limite de requêtes Google atteinte";
+            }
           }
           
-          synced++;
-        } catch (error: any) {
-          console.error(`Error syncing appointment ${apt.id}:`, error);
           await storage.updateAppointmentSync(organisationId, apt.id, {
             syncStatus: "ERROR",
-            syncError: error.message || "Unknown error",
+            syncError: reason,
           });
-          errors++;
+          
+          result.failed++;
+          result.failures.push({
+            appointmentId: apt.id,
+            reason,
+            googleCode,
+          });
+        }
+      }
+
+      // Step 4: Update integration status
+      console.log(`[SYNC] Step 4: Updating integration status - created=${result.created}, updated=${result.updated}, skipped=${result.skipped}, failed=${result.failed}`);
+      await storage.updateIntegrationSyncStatus(organisationId, integration.id, {
+        lastSyncAt: new Date(),
+        syncErrorCount: result.failed,
+        lastSyncError: result.failed > 0 ? `${result.failed} rendez-vous en erreur` : null,
+      });
+
+      console.log(`[SYNC] Sync completed successfully`);
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error(`[SYNC] Fatal error during sync:`, error);
+      
+      // Parse error for better response
+      let errorCode = "SYNC_FAILED";
+      let message = error.message || "Erreur lors de la synchronisation";
+      let step = "unknown";
+      let googleCode: string | undefined;
+      
+      if (error.code) {
+        googleCode = String(error.code);
+        if (error.code === 401) {
+          errorCode = "TOKEN_INVALID";
+          message = "Token d'accès invalide. Veuillez reconnecter Google Calendar.";
+          step = "google_auth";
+        } else if (error.code === 403) {
+          errorCode = "INSUFFICIENT_PERMISSIONS";
+          message = "Permissions insuffisantes. Veuillez reconnecter Google Calendar avec les bons scopes.";
+          step = "google_auth";
         }
       }
       
-      // Update integration sync status
-      await storage.updateIntegrationSyncStatus(organisationId, integration.id, {
-        lastSyncAt: new Date(),
-        syncErrorCount: errors,
-        lastSyncError: errors > 0 ? `${errors} appointment(s) failed to sync` : null,
+      res.status(500).json({ 
+        error: errorCode,
+        message,
+        step,
+        googleCode,
+        details: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      });
+    }
+  });
+
+  // V2: Google Calendar Import (Google -> Cassius)
+  
+  // Helper: Check if V2 import tables exist
+  const checkV2TablesExist = async (): Promise<boolean> => {
+    try {
+      const result = await db.execute(sql`
+        SELECT COUNT(*) as count FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name IN ('google_calendar_events', 'sync_conflicts')
+      `);
+      const rows = result.rows as Array<{ count: string }>;
+      return parseInt(rows[0]?.count || "0") === 2;
+    } catch {
+      return false;
+    }
+  };
+
+  // GET /api/google/events - List events from Google Calendar
+  app.get("/api/google/events", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { calendarId, timeMin, timeMax } = req.query;
+      
+      if (!calendarId || !timeMin || !timeMax) {
+        return res.status(400).json({ 
+          error: "MISSING_PARAMS",
+          message: "calendarId, timeMin et timeMax sont requis" 
+        });
+      }
+      
+      const integration = await storage.getCalendarIntegration(organisationId);
+      if (!integration || !integration.accessToken) {
+        return res.status(400).json({ 
+          error: "NOT_CONNECTED",
+          message: "Google Calendar non connecté" 
+        });
+      }
+      
+      const result = await googleCalendar.listAllEvents(integration, {
+        calendarId: String(calendarId),
+        timeMin: String(timeMin),
+        timeMax: String(timeMax),
       });
       
-      res.json({ synced, errors, total: appointments.length });
+      // Update tokens if refreshed
+      if (result.refreshedTokens) {
+        await storage.updateCalendarIntegration(organisationId, integration.id, {
+          accessToken: result.refreshedTokens.accessToken,
+          tokenExpiresAt: result.refreshedTokens.expiresAt,
+        });
+      }
+      
+      res.json({
+        events: result.events,
+        count: result.events.length,
+      });
+      
     } catch (error: any) {
-      console.error("Error during sync:", error);
-      res.status(500).json({ error: error.message || "Sync failed" });
+      console.error("[GOOGLE] Error listing events:", error);
+      
+      if (error.message === "SYNC_TOKEN_INVALID") {
+        return res.status(400).json({
+          error: "SYNC_TOKEN_INVALID",
+          message: "Token de synchronisation invalide, import complet requis",
+        });
+      }
+      
+      res.status(500).json({ 
+        error: "LIST_EVENTS_FAILED",
+        message: error.message || "Erreur lors de la récupération des événements" 
+      });
+    }
+  });
+  
+  // POST /api/google/import - Preview or import events
+  app.post("/api/google/import", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      // Check if V2 tables exist
+      const tablesExist = await checkV2TablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import Google Calendar ne sont pas disponibles. Exécutez la migration 20241230_005_google_events_import.sql sur Supabase."
+        });
+      }
+      
+      const { calendarId, timeMin, timeMax, mode = "preview" } = req.body;
+      
+      if (!calendarId || !timeMin || !timeMax) {
+        return res.status(400).json({ 
+          error: "MISSING_PARAMS",
+          message: "calendarId, timeMin et timeMax sont requis" 
+        });
+      }
+      
+      if (mode !== "preview" && mode !== "import") {
+        return res.status(400).json({
+          error: "INVALID_MODE",
+          message: "Le mode doit être 'preview' ou 'import'"
+        });
+      }
+      
+      const integration = await storage.getCalendarIntegration(organisationId);
+      if (!integration || !integration.accessToken) {
+        return res.status(400).json({ 
+          error: "NOT_CONNECTED",
+          message: "Google Calendar non connecté" 
+        });
+      }
+      
+      console.log(`[IMPORT] Starting ${mode} for org=${organisationId}, calendar=${calendarId}, range=${timeMin} to ${timeMax}`);
+      
+      // Fetch events from Google
+      const result = await googleCalendar.listAllEvents(integration, {
+        calendarId: String(calendarId),
+        timeMin: String(timeMin),
+        timeMax: String(timeMax),
+      });
+      
+      // Update tokens if refreshed
+      if (result.refreshedTokens) {
+        await storage.updateCalendarIntegration(organisationId, integration.id, {
+          accessToken: result.refreshedTokens.accessToken,
+          tokenExpiresAt: result.refreshedTokens.expiresAt,
+        });
+      }
+      
+      const stats = {
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        cancelled: 0,
+        failed: 0,
+        conflicts: [] as Array<{ eventId: string; summary: string; reason: string }>,
+        failures: [] as Array<{ eventId: string; reason: string }>,
+      };
+      
+      // Filter out events created by Cassius (they have cassiusAppointmentId in extendedProperties)
+      const externalEvents = result.events.filter(e => {
+        // Skip if this is a Cassius-created event (has [Cassius] prefix)
+        if (e.summary?.startsWith("[Cassius]")) {
+          stats.skipped++;
+          return false;
+        }
+        return true;
+      });
+      
+      console.log(`[IMPORT] Found ${externalEvents.length} external events (skipped ${stats.skipped} Cassius events)`);
+      
+      if (mode === "preview") {
+        // Just return preview without importing
+        res.json({
+          mode: "preview",
+          total: externalEvents.length,
+          events: externalEvents.map(e => ({
+            id: e.id,
+            summary: e.summary,
+            start: e.start,
+            end: e.end,
+            allDay: e.allDay,
+            status: e.status,
+            location: e.location,
+          })),
+          skipped: stats.skipped,
+        });
+        return;
+      }
+      
+      // Import mode: upsert events into google_calendar_events table
+      for (const event of externalEvents) {
+        if (!event.id || !event.start) {
+          stats.failed++;
+          stats.failures.push({ eventId: event.id || 'unknown', reason: 'ID ou date de début manquant' });
+          continue;
+        }
+        
+        try {
+          if (event.status === 'cancelled') {
+            // Mark as cancelled in DB
+            await storage.upsertGoogleCalendarEvent(organisationId, {
+              integrationId: integration.id,
+              googleCalendarId: calendarId,
+              googleEventId: event.id,
+              etag: event.etag,
+              status: 'cancelled',
+              summary: event.summary,
+              description: event.description,
+              location: event.location,
+              startAt: event.start,
+              endAt: event.end,
+              allDay: event.allDay,
+              attendees: JSON.stringify(event.attendees),
+              htmlLink: event.htmlLink,
+              updatedAtGoogle: event.updated,
+            });
+            stats.cancelled++;
+          } else {
+            // Upsert event
+            const { isNew } = await storage.upsertGoogleCalendarEvent(organisationId, {
+              integrationId: integration.id,
+              googleCalendarId: calendarId,
+              googleEventId: event.id,
+              etag: event.etag,
+              status: event.status,
+              summary: event.summary,
+              description: event.description,
+              location: event.location,
+              startAt: event.start,
+              endAt: event.end,
+              allDay: event.allDay,
+              attendees: JSON.stringify(event.attendees),
+              htmlLink: event.htmlLink,
+              updatedAtGoogle: event.updated,
+            });
+            
+            if (isNew) {
+              stats.created++;
+            } else {
+              stats.updated++;
+            }
+          }
+        } catch (error: any) {
+          console.error(`[IMPORT] Error importing event ${event.id}:`, error);
+          stats.failed++;
+          stats.failures.push({ eventId: event.id, reason: error.message });
+        }
+      }
+      
+      // Update import status
+      await storage.updateCalendarIntegration(organisationId, integration.id, {
+        lastImportAt: new Date(),
+        sourceCalendarId: calendarId,
+      });
+      
+      console.log(`[IMPORT] Completed: created=${stats.created}, updated=${stats.updated}, cancelled=${stats.cancelled}, skipped=${stats.skipped}, failed=${stats.failed}`);
+      
+      res.json({
+        mode: "import",
+        total: externalEvents.length,
+        ...stats,
+      });
+      
+    } catch (error: any) {
+      console.error("[IMPORT] Fatal error:", error);
+      
+      res.status(500).json({ 
+        error: "IMPORT_FAILED",
+        step: "fetch_events",
+        message: error.message || "Erreur lors de l'import" 
+      });
+    }
+  });
+  
+  // GET /api/google/import/status - Get last import status
+  app.get("/api/google/import/status", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const integration = await storage.getCalendarIntegration(organisationId);
+      
+      if (!integration) {
+        return res.json({ 
+          connected: false,
+          importEnabled: false,
+        });
+      }
+      
+      // Get count of imported events
+      const importedEvents = await storage.getGoogleCalendarEventsCount(organisationId);
+      
+      res.json({
+        connected: !!integration.accessToken,
+        importEnabled: integration.importEnabled || false,
+        sourceCalendarId: integration.sourceCalendarId,
+        sourceCalendarName: integration.sourceCalendarName,
+        lastImportAt: integration.lastImportAt,
+        importedEventsCount: importedEvents,
+      });
+      
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting status:", error);
+      res.status(500).json({ error: "Failed to get import status" });
+    }
+  });
+  
+  // GET /api/google/imported-events - Get imported Google events for calendar display
+  app.get("/api/google/imported-events", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      // Check if V2 tables exist
+      const tablesExist = await checkV2TablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import Google Calendar ne sont pas disponibles. Exécutez la migration 20241230_005_google_events_import.sql sur Supabase."
+        });
+      }
+      
+      const { start, end } = req.query;
+      
+      if (!start || !end) {
+        return res.status(400).json({ 
+          error: "MISSING_PARAMS",
+          message: "start et end sont requis" 
+        });
+      }
+      
+      const events = await storage.getGoogleCalendarEvents(
+        organisationId,
+        new Date(String(start)),
+        new Date(String(end))
+      );
+      
+      res.json(events);
+      
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting imported events:", error);
+      res.status(500).json({ error: "Failed to get imported events" });
+    }
+  });
+  
+  // GET /api/sync/conflicts - Get sync conflicts
+  app.get("/api/sync/conflicts", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      // Check if V2 tables exist
+      const tablesExist = await checkV2TablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import Google Calendar ne sont pas disponibles. Exécutez la migration 20241230_005_google_events_import.sql sur Supabase."
+        });
+      }
+      
+      const { status = "open" } = req.query;
+      const conflicts = await storage.getSyncConflicts(organisationId, String(status) as "open" | "resolved" | "ignored");
+      res.json(conflicts);
+    } catch (error: any) {
+      console.error("[SYNC] Error getting conflicts:", error);
+      res.status(500).json({ error: "Failed to get conflicts" });
+    }
+  });
+  
+  // PATCH /api/sync/conflicts/:id - Resolve a conflict
+  app.patch("/api/sync/conflicts/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      // Check if V2 tables exist
+      const tablesExist = await checkV2TablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import Google Calendar ne sont pas disponibles. Exécutez la migration 20241230_005_google_events_import.sql sur Supabase."
+        });
+      }
+      
+      const { id } = req.params;
+      const { status, action } = req.body;
+      
+      if (!status || !["resolved", "ignored"].includes(status)) {
+        return res.status(400).json({ 
+          error: "INVALID_STATUS",
+          message: "status doit être 'resolved' ou 'ignored'" 
+        });
+      }
+      
+      const userId = req.jwtUser?.id || null;
+      await storage.resolveConflict(organisationId, id, status, userId);
+      
+      res.json({ success: true });
+      
+    } catch (error: any) {
+      console.error("[SYNC] Error resolving conflict:", error);
+      res.status(500).json({ error: "Failed to resolve conflict" });
+    }
+  });
+
+  // ========================================
+  // CSV Patient Import endpoints
+  // ========================================
+  
+  const patientImport = await import("./patientImport");
+  
+  // Helper to check if import tables exist
+  async function checkImportTablesExist(): Promise<boolean> {
+    try {
+      const result = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'import_jobs'
+        ) as exists
+      `);
+      return (result.rows[0] as any)?.exists === true;
+    } catch {
+      return false;
+    }
+  }
+  
+  // CSV template columns (in French)
+  const CSV_TEMPLATE_COLUMNS = [
+    "Nom",
+    "Prénom", 
+    "Numéro de dossier",
+    "Numéro SS",
+    "Date de naissance",
+    "E-mail",
+    "Téléphone",
+    "Adresse",
+    "Code postal",
+    "Ville",
+    "Pays"
+  ];
+  
+  // GET /api/import/patients/template - Download CSV template
+  app.get("/api/import/patients/template", requireJwtOrSession, (req, res) => {
+    const variant = req.query.variant as string || "empty";
+    
+    const headers = CSV_TEMPLATE_COLUMNS.join(";");
+    let content = headers + "\n";
+    
+    if (variant === "example") {
+      content += "Dupont;Jean;P2024-001;1850175001234;15/03/1975;jean.dupont@email.com;0612345678;15 rue de la Paix;75001;Paris;France\n";
+      content += "Martin;Marie;P2024-002;2880656789012;22/08/1988;marie.martin@email.com;0698765432;8 avenue Victor Hugo;69003;Lyon;France\n";
+    }
+    
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="modele_import_patients_${variant}.csv"`);
+    res.send("\ufeff" + content); // BOM for Excel UTF-8 compatibility
+  });
+  
+  // POST /api/import/patients/detect-headers - Detect CSV headers and suggest mapping
+  app.post("/api/import/patients/detect-headers", requireJwtOrSession, async (req, res) => {
+    try {
+      const { jobId } = req.body;
+      
+      if (!jobId) {
+        return res.status(400).json({ error: "jobId is required" });
+      }
+      
+      const job = await patientImport.getImportJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      const csvContent = job.filePath || "";
+      const lines = csvContent.split(/\r?\n/).filter(line => line.trim());
+      
+      if (lines.length === 0) {
+        return res.status(400).json({ error: "CSV is empty" });
+      }
+      
+      const delimiter = lines[0].includes(";") ? ";" : ",";
+      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ""));
+      
+      // Get suggested mapping for each header
+      const suggestedMapping = headers.map(header => {
+        const field = patientImport.findFieldMapping ? 
+          (patientImport as any).findFieldMapping(header) : null;
+        return {
+          csvHeader: header,
+          suggestedField: field || null
+        };
+      });
+      
+      // Define available patient fields with metadata
+      const patientFields = [
+        { key: "nom", label: "Nom", required: true },
+        { key: "prenom", label: "Prénom", required: true },
+        { key: "fileNumber", label: "Numéro de dossier", required: false },
+        { key: "ssn", label: "Numéro SS", required: false },
+        { key: "dateNaissance", label: "Date de naissance", required: false },
+        { key: "email", label: "E-mail", required: false },
+        { key: "telephone", label: "Téléphone", required: false },
+        { key: "addressFull", label: "Adresse", required: false },
+        { key: "codePostal", label: "Code postal", required: false },
+        { key: "ville", label: "Ville", required: false },
+        { key: "pays", label: "Pays", required: false },
+        { key: null, label: "Ignorer", required: false },
+      ];
+      
+      res.json({
+        headers,
+        delimiter,
+        rowCount: lines.length - 1,
+        suggestedMapping,
+        patientFields
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error detecting headers:", error);
+      res.status(500).json({ error: error.message || "Failed to detect headers" });
+    }
+  });
+  
+  // POST /api/import/patients/upload - Upload CSV and create import job
+  app.post("/api/import/patients/upload", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.jwtUser?.id || null;
+    
+    try {
+      const tablesExist = await checkImportTablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import ne sont pas disponibles. Exécutez la migration 20241230_008_import_jobs.sql sur Supabase."
+        });
+      }
+      
+      const { content, fileName } = req.body;
+      
+      if (!content || typeof content !== "string") {
+        return res.status(400).json({ error: "CSV content is required" });
+      }
+      
+      const fileHash = patientImport.computeFileHash(content);
+      const job = await patientImport.createImportJob(organisationId, userId, fileName || "import.csv", fileHash);
+      
+      // Store content in job for later validation
+      await db.update(importJobs).set({ filePath: content }).where(eq(importJobs.id, job.id));
+      
+      res.json({ 
+        jobId: job.id, 
+        fileName: job.fileName,
+        fileHash: job.fileHash,
+        status: job.status
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error uploading CSV:", error);
+      res.status(500).json({ error: error.message || "Failed to upload CSV" });
+    }
+  });
+  
+  // POST /api/import/patients/validate - Parse and validate CSV rows
+  app.post("/api/import/patients/validate", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const tablesExist = await checkImportTablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import ne sont pas disponibles. Exécutez la migration 20241230_008_import_jobs.sql sur Supabase."
+        });
+      }
+      
+      const { jobId, mapping } = req.body;
+      
+      if (!jobId) {
+        return res.status(400).json({ error: "jobId is required" });
+      }
+      
+      const job = await patientImport.getImportJob(jobId);
+      if (!job || job.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      // Update status to validating
+      await patientImport.updateImportJobStatus(jobId, "validating");
+      
+      // Parse CSV from stored content
+      const csvContent = job.filePath || "";
+      const debug = true;
+      const rows = patientImport.parseCSV(csvContent, debug);
+      
+      if (rows.length === 0) {
+        await patientImport.updateImportJobStatus(jobId, "failed", undefined, "CSV vide ou format invalide");
+        return res.status(400).json({ error: "CSV is empty or invalid format" });
+      }
+      
+      console.log(`[IMPORT] Processing ${rows.length} rows with ${mapping ? 'custom' : 'auto'} mapping...`);
+      
+      // Build custom mapping from request if provided
+      const customMapping: patientImport.ColumnMapping | undefined = mapping ? 
+        Object.fromEntries(
+          Object.entries(mapping as Record<string, string | null>).map(([k, v]) => [k, v as keyof patientImport.NormalizedPatient | null])
+        ) : undefined;
+      
+      // Validate each row (no DB lookups for speed - do matching during import)
+      const stats: patientImport.ImportStats = {
+        total: rows.length,
+        ok: 0,
+        warning: 0,
+        error: 0,
+        collision: 0,
+        toCreate: rows.length, // Assume all new for now, will refine during import
+        toUpdate: 0,
+      };
+      
+      const rowResults: Array<{
+        rowIndex: number;
+        rawData: patientImport.CSVRow;
+        result: patientImport.ValidationResult;
+      }> = [];
+      
+      // Process all rows synchronously (fast, no DB calls)
+      for (let i = 0; i < rows.length; i++) {
+        const rawData = rows[i];
+        const debugRow = i === 0; // Debug first row only
+        const result = patientImport.normalizeRow(rawData, customMapping, debugRow);
+        
+        // Update stats (ok and warning are mutually exclusive)
+        if (result.status === "ok") stats.ok++;
+        else if (result.status === "warning") stats.warning++;
+        else if (result.status === "error") stats.error++;
+        
+        rowResults.push({ rowIndex: i, rawData, result });
+      }
+      
+      console.log(`[IMPORT] Validation complete: ${stats.ok} ok, ${stats.warning} warnings, ${stats.error} errors`);
+      
+      // Store stats with mapping for use during import
+      const statsWithMapping = { ...stats, mapping: customMapping || null };
+      
+      // Update job status with stats and mapping
+      await patientImport.updateImportJobStatus(jobId, "validated", statsWithMapping);
+      
+      // Return summary with sample rows
+      const sampleOk = rowResults.filter(r => r.result.status === "ok").slice(0, 3);
+      const sampleErrors = rowResults.filter(r => r.result.status === "error").slice(0, 5);
+      const sampleWarnings = rowResults.filter(r => r.result.status === "warning").slice(0, 10);
+      
+      res.json({
+        jobId,
+        status: "validated",
+        stats,
+        samples: {
+          ok: sampleOk.map(r => ({ row: r.rowIndex + 2, data: r.result.normalized })),
+          errors: sampleErrors.map(r => ({ 
+            row: r.rowIndex + 2, 
+            raw: r.rawData, 
+            errors: r.result.errors 
+          })),
+          warnings: sampleWarnings.map(r => ({ 
+            row: r.rowIndex + 2, 
+            data: r.result.normalized, 
+            warnings: r.result.warnings 
+          })),
+        }
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error validating CSV:", error);
+      res.status(500).json({ error: error.message || "Failed to validate CSV" });
+    }
+  });
+  
+  // POST /api/import/patients/run - Execute the import
+  app.post("/api/import/patients/run", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const tablesExist = await checkImportTablesExist();
+      if (!tablesExist) {
+        return res.status(503).json({
+          error: "MIGRATION_REQUIRED",
+          message: "Les tables d'import ne sont pas disponibles. Exécutez la migration 20241230_008_import_jobs.sql sur Supabase."
+        });
+      }
+      
+      const { jobId } = req.body;
+      
+      if (!jobId) {
+        return res.status(400).json({ error: "jobId is required" });
+      }
+      
+      const job = await patientImport.getImportJob(jobId);
+      if (!job || job.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      if (job.status !== "validated") {
+        return res.status(400).json({ error: "Job must be validated before running" });
+      }
+      
+      // Update status to running
+      await patientImport.updateImportJobStatus(jobId, "running");
+      
+      // Execute import
+      const stats = await patientImport.executeImport(jobId, organisationId);
+      
+      // Update job to completed
+      await patientImport.updateImportJobStatus(jobId, "completed", stats);
+      
+      res.json({
+        jobId,
+        status: "completed",
+        stats,
+        message: `Import terminé: ${stats.toCreate} créés, ${stats.toUpdate} mis à jour, ${stats.error} erreurs`
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error running import:", error);
+      res.status(500).json({ error: error.message || "Failed to run import" });
+    }
+  });
+  
+  // POST /api/import/:jobId/cancel - Request cancellation of an import job
+  app.post("/api/import/:jobId/cancel", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { jobId } = req.params;
+      const job = await patientImport.getImportJob(jobId);
+      
+      if (!job || job.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      if (job.status !== "running") {
+        return res.status(400).json({ error: "Can only cancel running imports" });
+      }
+      
+      const success = await patientImport.requestCancelImport(jobId);
+      
+      if (success) {
+        console.log(`[IMPORT] Cancellation requested for job ${jobId}`);
+        res.json({ 
+          jobId, 
+          status: job.status,
+          cancelRequested: true,
+          message: "Interruption demandée" 
+        });
+      } else {
+        res.status(500).json({ error: "Failed to request cancellation" });
+      }
+    } catch (error: any) {
+      console.error("[IMPORT] Error cancelling import:", error);
+      res.status(500).json({ error: error.message || "Failed to cancel import" });
+    }
+  });
+  
+  // GET /api/import/patients/last - Get the last import job
+  app.get("/api/import/patients/last", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const tablesExist = await checkImportTablesExist();
+      if (!tablesExist) {
+        return res.json({ lastImport: null });
+      }
+      
+      // Get the most recent completed import job for this organisation
+      const [lastJob] = await db
+        .select()
+        .from(importJobs)
+        .where(and(
+          eq(importJobs.organisationId, organisationId),
+          eq(importJobs.type, "patients_csv"),
+          inArray(importJobs.status, ["completed", "failed"])
+        ))
+        .orderBy(desc(importJobs.completedAt))
+        .limit(1);
+      
+      if (!lastJob) {
+        return res.json({ lastImport: null });
+      }
+      
+      const stats = patientImport.safeParseJSON(lastJob.stats, null);
+      
+      res.json({
+        lastImport: {
+          id: lastJob.id,
+          status: lastJob.status,
+          fileName: lastJob.fileName,
+          totalRows: lastJob.totalRows,
+          processedRows: lastJob.processedRows,
+          stats,
+          completedAt: lastJob.completedAt,
+          createdAt: lastJob.createdAt,
+        }
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting last import:", error);
+      res.status(500).json({ error: error.message || "Failed to get last import" });
+    }
+  });
+  
+  // GET /api/import/patients/history - Get import history
+  app.get("/api/import/patients/history", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const tablesExist = await checkImportTablesExist();
+      if (!tablesExist) {
+        return res.json({ history: [] });
+      }
+      
+      const limit = parseInt(req.query.limit as string) || 20;
+      const history = await patientImport.getImportHistory(organisationId, limit);
+      
+      res.json({ history });
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting import history:", error);
+      res.status(500).json({ error: error.message || "Failed to get import history" });
+    }
+  });
+  
+  // GET /api/import/:jobId/progress - Get import progress
+  app.get("/api/import/:jobId/progress", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { jobId } = req.params;
+      const progress = await patientImport.getImportProgress(jobId);
+      
+      if (!progress) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      // Disable caching for progress endpoint
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.json(progress);
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting progress:", error);
+      res.status(500).json({ error: error.message || "Failed to get progress" });
+    }
+  });
+
+  // GET /api/import/:jobId - Get import job status
+  app.get("/api/import/:jobId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { jobId } = req.params;
+      const job = await patientImport.getImportJob(jobId);
+      
+      if (!job || job.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      res.json({
+        id: job.id,
+        status: job.status,
+        fileName: job.fileName,
+        totalRows: job.totalRows,
+        processedRows: job.processedRows,
+        stats: job.stats ? JSON.parse(job.stats) : null,
+        errorMessage: job.errorMessage,
+        createdAt: job.createdAt,
+        validatedAt: job.validatedAt,
+        startedAt: job.startedAt,
+        completedAt: job.completedAt,
+      });
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting job:", error);
+      res.status(500).json({ error: error.message || "Failed to get job" });
+    }
+  });
+  
+  // GET /api/import/:jobId/errors - Get error rows for export
+  app.get("/api/import/:jobId/errors", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const { jobId } = req.params;
+      const job = await patientImport.getImportJob(jobId);
+      
+      if (!job || job.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+      
+      const rows = await patientImport.getImportJobRows(jobId);
+      const errorRows = rows.filter(r => r.status === "error" || r.status === "collision");
+      
+      // Build CSV
+      const headers = ["Ligne", "Statut", "Erreurs", "Données brutes"];
+      const csvLines = [headers.join(";")];
+      
+      for (const row of errorRows) {
+        const errors = row.errors ? JSON.parse(row.errors).map((e: any) => `${e.field}: ${e.message}`).join(", ") : "";
+        const rawData = row.rawData ? JSON.stringify(JSON.parse(row.rawData)) : "";
+        csvLines.push([row.rowIndex + 2, row.status, `"${errors}"`, `"${rawData}"`].join(";"));
+      }
+      
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="import_errors_${jobId}.csv"`);
+      res.send(csvLines.join("\n"));
+    } catch (error: any) {
+      console.error("[IMPORT] Error getting errors:", error);
+      res.status(500).json({ error: error.message || "Failed to get errors" });
+    }
+  });
+
+  // ============================================
+  // SETTINGS ENDPOINTS
+  // ============================================
+  
+  // GET /api/settings/profile - Get current user profile with organisation info
+  app.get("/api/settings/profile", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      
+      let organisationNom: string | undefined;
+      if (user.organisationId) {
+        const org = await storage.getOrganisationById(user.organisationId);
+        organisationNom = org?.nom;
+      }
+      
+      res.json({
+        id: user.id,
+        username: user.username,
+        nom: user.nom,
+        prenom: user.prenom,
+        role: user.role,
+        organisationId: user.organisationId,
+        organisationNom,
+      });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error getting profile:", error);
+      res.status(500).json({ error: "Erreur lors de la récupération du profil" });
+    }
+  });
+  
+  // POST /api/settings/password - Change password
+  app.post("/api/settings/password", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Mot de passe actuel et nouveau requis" });
+      }
+      
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 8 caractères" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      
+      // Verify current password
+      const { scrypt, timingSafeEqual } = await import("crypto");
+      const { promisify } = await import("util");
+      const scryptAsync = promisify(scrypt);
+      
+      const [hashed, salt] = user.password.split(".");
+      const hashedBuf = Buffer.from(hashed, "hex");
+      const suppliedBuf = (await scryptAsync(currentPassword, salt, 64)) as Buffer;
+      
+      if (!timingSafeEqual(hashedBuf, suppliedBuf)) {
+        return res.status(400).json({ error: "Mot de passe actuel incorrect" });
+      }
+      
+      // Hash new password
+      const { randomBytes } = await import("crypto");
+      const newSalt = randomBytes(16).toString("hex");
+      const newHashedBuf = (await scryptAsync(newPassword, newSalt, 64)) as Buffer;
+      const newHashedPassword = `${newHashedBuf.toString("hex")}.${newSalt}`;
+      
+      await storage.updateUser(userId, { password: newHashedPassword });
+      
+      res.json({ success: true, message: "Mot de passe modifié avec succès" });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error changing password:", error);
+      res.status(500).json({ error: "Erreur lors du changement de mot de passe" });
+    }
+  });
+  
+  // GET /api/settings/collaborators - Get organisation collaborators and invitations (admin only)
+  app.get("/api/settings/collaborators", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      // Admin check
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const users = await storage.getUsersByOrganisation(organisationId);
+      const invitations = await storage.getInvitationsByOrganisation(organisationId);
+      
+      // Combine users and pending invitations
+      const collaborators = [
+        ...users.map(u => ({
+          id: u.id,
+          username: u.username,
+          email: u.username,
+          nom: u.nom,
+          prenom: u.prenom,
+          role: u.role,
+          status: 'ACTIVE' as const,
+          type: 'user' as const,
+        })),
+        ...invitations.filter(inv => inv.status === 'PENDING').map(inv => ({
+          id: inv.id,
+          username: inv.email,
+          email: inv.email,
+          nom: inv.nom,
+          prenom: inv.prenom,
+          role: inv.role,
+          status: 'PENDING' as const,
+          type: 'invitation' as const,
+          expiresAt: inv.expiresAt,
+        })),
+      ];
+      
+      res.json(collaborators);
+    } catch (error: any) {
+      console.error("[SETTINGS] Error getting collaborators:", error);
+      res.status(500).json({ error: "Erreur lors de la récupération des collaborateurs" });
+    }
+  });
+  
+  // POST /api/settings/collaborators - Invite new collaborator (admin only)
+  app.post("/api/settings/collaborators", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { email, role, nom, prenom } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email requis" });
+      }
+      
+      if (!role || !["ADMIN", "CHIRURGIEN", "ASSISTANT"].includes(role)) {
+        return res.status(400).json({ error: "Rôle invalide" });
+      }
+      
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(normalizedEmail);
+      if (existingUser) {
+        return res.status(400).json({ error: "Un utilisateur avec cet email existe déjà" });
+      }
+      
+      // Check if invitation already exists
+      const existingInvitation = await storage.getInvitationByEmail(organisationId, normalizedEmail);
+      if (existingInvitation) {
+        return res.status(400).json({ error: "Une invitation est déjà en attente pour cet email" });
+      }
+      
+      // Get organisation name for email
+      const org = await storage.getOrganisationById(organisationId);
+      const organisationName = org?.nom || "Cabinet dentaire";
+      
+      // Get inviter name
+      const inviter = await storage.getUserById(req.jwtUser?.id || "");
+      const inviterName = inviter ? `${inviter.prenom || ""} ${inviter.nom || ""}`.trim() || inviter.username : "Un administrateur";
+      
+      // Generate secure invitation token
+      const token = randomBytes(32).toString('hex');
+      const tokenHash = scryptSync(token, 'salt_invitation', 64).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      
+      // Create invitation
+      const invitation = await storage.createInvitation(organisationId, {
+        email: normalizedEmail,
+        role: role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT",
+        tokenHash,
+        expiresAt,
+        invitedByUserId: req.jwtUser?.id || "",
+        nom: nom || null,
+        prenom: prenom || null,
+      });
+      
+      // Send invitation email using new branded templates
+      const baseUrl = getBaseUrl();
+      const inviteUrl = `${baseUrl}/accept-invitation?token=${token}`;
+      const result = await sendEmail(normalizedEmail, 'invitation', {
+        inviteUrl,
+        organisationName,
+        inviterName,
+        role,
+        expiresAt,
+      });
+      
+      // Log to email outbox
+      await storage.logEmail({
+        organisationId,
+        toEmail: normalizedEmail,
+        template: 'COLLABORATOR_INVITATION',
+        subject: `Cassius - Invitation à rejoindre ${organisationName}`,
+        payload: JSON.stringify({ role, organisationName, inviterName }),
+        status: result.success ? 'SENT' : 'FAILED',
+        sentAt: result.success ? new Date() : null,
+        errorMessage: result.error || null,
+      });
+      
+      console.log(`[SETTINGS] Invitation created for: ${normalizedEmail}, email sent: ${result.success}`);
+      
+      res.status(201).json({
+        id: invitation.id,
+        email: invitation.email,
+        nom: invitation.nom,
+        prenom: invitation.prenom,
+        role: invitation.role,
+        status: invitation.status,
+        expiresAt: invitation.expiresAt,
+      });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error creating invitation:", error);
+      res.status(500).json({ error: error.message || "Erreur lors de l'envoi de l'invitation" });
+    }
+  });
+  
+  // PATCH /api/settings/collaborators/:id - Update collaborator role (admin only)
+  app.patch("/api/settings/collaborators/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { id } = req.params;
+      const { role } = req.body;
+      
+      if (!role || !["ADMIN", "CHIRURGIEN", "ASSISTANT"].includes(role)) {
+        return res.status(400).json({ error: "Rôle invalide" });
+      }
+      
+      const user = await storage.getUserById(id);
+      if (!user || user.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Collaborateur non trouvé" });
+      }
+      
+      // Prevent removing the last admin
+      if (user.role === "ADMIN" && role !== "ADMIN") {
+        const admins = await storage.getUsersByOrganisation(organisationId);
+        const adminCount = admins.filter(u => u.role === "ADMIN").length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Impossible de retirer le dernier administrateur" });
+        }
+      }
+      
+      await storage.updateUser(id, { role: role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT" });
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error updating collaborator:", error);
+      res.status(500).json({ error: "Erreur lors de la mise à jour du rôle" });
+    }
+  });
+  
+  // DELETE /api/settings/collaborators/:id - Remove collaborator (admin only)
+  app.delete("/api/settings/collaborators/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { id } = req.params;
+      const currentUserId = req.jwtUser?.userId;
+      
+      if (id === currentUserId) {
+        return res.status(400).json({ error: "Vous ne pouvez pas supprimer votre propre compte" });
+      }
+      
+      const user = await storage.getUserById(id);
+      if (!user || user.organisationId !== organisationId) {
+        return res.status(404).json({ error: "Collaborateur non trouvé" });
+      }
+      
+      // Prevent removing the last admin
+      if (user.role === "ADMIN") {
+        const admins = await storage.getUsersByOrganisation(organisationId);
+        const adminCount = admins.filter(u => u.role === "ADMIN").length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Impossible de supprimer le dernier administrateur" });
+        }
+      }
+      
+      await storage.deleteUser(id);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error deleting collaborator:", error);
+      res.status(500).json({ error: "Erreur lors de la suppression du collaborateur" });
+    }
+  });
+  
+  // GET /api/settings/organisation - Get organisation details (admin only)
+  app.get("/api/settings/organisation", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const org = await storage.getOrganisationById(organisationId);
+      if (!org) {
+        return res.status(404).json({ error: "Organisation non trouvée" });
+      }
+      
+      res.json({
+        id: org.id,
+        nom: org.nom,
+        adresse: (org as any).adresse || null,
+        timezone: (org as any).timezone || "Europe/Paris",
+        createdAt: org.createdAt,
+      });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error getting organisation:", error);
+      res.status(500).json({ error: "Erreur lors de la récupération de l'organisation" });
+    }
+  });
+  
+  // PUT /api/settings/organisation - Update organisation (admin only)
+  app.put("/api/settings/organisation", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { nom, adresse, timezone } = req.body;
+      
+      await storage.updateOrganisation(organisationId, { 
+        nom, 
+        adresse, 
+        timezone 
+      });
+      
+      const updated = await storage.getOrganisationById(organisationId);
+      
+      res.json({
+        id: updated?.id,
+        nom: updated?.nom,
+        adresse: (updated as any)?.adresse || null,
+        timezone: (updated as any)?.timezone || "Europe/Paris",
+        createdAt: updated?.createdAt,
+      });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error updating organisation:", error);
+      res.status(500).json({ error: "Erreur lors de la mise à jour de l'organisation" });
+    }
+  });
+
+  // ========== INVITATION ACCEPTANCE FLOW ==========
+  
+  // GET /api/auth/verify-invitation - Verify invitation token
+  app.get("/api/auth/verify-invitation", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ valid: false, error: "Token manquant" });
+      }
+      
+      const tokenHash = scryptSync(token, 'salt_invitation', 64).toString('hex');
+      const invitation = await storage.getInvitationByToken(tokenHash);
+      
+      if (!invitation) {
+        return res.json({ valid: false, error: "Invitation invalide" });
+      }
+      
+      if (invitation.status !== 'PENDING') {
+        return res.json({ valid: false, error: "Cette invitation a déjà été utilisée" });
+      }
+      
+      if (new Date() > invitation.expiresAt) {
+        return res.json({ valid: false, error: "Cette invitation a expiré" });
+      }
+      
+      // Get organisation name
+      const org = await storage.getOrganisationById(invitation.organisationId);
+      
+      res.json({
+        valid: true,
+        email: invitation.email,
+        role: invitation.role,
+        organisationName: org?.nom || "Cabinet dentaire",
+        nom: invitation.nom,
+        prenom: invitation.prenom,
+      });
+    } catch (error: any) {
+      console.error("[AUTH] Error verifying invitation:", error);
+      res.status(500).json({ valid: false, error: "Erreur de vérification" });
+    }
+  });
+  
+  // POST /api/auth/accept-invitation - Accept invitation and create account
+  app.post("/api/auth/accept-invitation", async (req, res) => {
+    try {
+      const { token, password, nom, prenom } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ error: "Token et mot de passe requis" });
+      }
+      
+      if (password.length < 8) {
+        return res.status(400).json({ error: "Le mot de passe doit contenir au moins 8 caractères" });
+      }
+      
+      const tokenHash = scryptSync(token, 'salt_invitation', 64).toString('hex');
+      const invitation = await storage.getInvitationByToken(tokenHash);
+      
+      if (!invitation) {
+        return res.status(400).json({ error: "Invitation invalide" });
+      }
+      
+      if (invitation.status !== 'PENDING') {
+        return res.status(400).json({ error: "Cette invitation a déjà été utilisée" });
+      }
+      
+      if (new Date() > invitation.expiresAt) {
+        return res.status(400).json({ error: "Cette invitation a expiré" });
+      }
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(invitation.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Un compte existe déjà avec cet email" });
+      }
+      
+      // Hash password
+      const salt = randomBytes(16).toString('hex');
+      const hashedPassword = scryptSync(password, salt, 64).toString('hex');
+      const passwordWithSalt = `${salt}:${hashedPassword}`;
+      
+      // Create user
+      const newUser = await storage.createUser({
+        username: invitation.email,
+        password: passwordWithSalt,
+        role: invitation.role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT",
+        organisationId: invitation.organisationId,
+        nom: nom || invitation.nom || null,
+        prenom: prenom || invitation.prenom || null,
+      });
+      
+      // Mark invitation as accepted
+      await storage.acceptInvitation(invitation.id);
+      
+      console.log("[AUTH] Invitation accepted, user created:", newUser.id);
+      res.json({
+        success: true,
+        message: "Compte créé avec succès",
+        email: newUser.username,
+      });
+    } catch (error: any) {
+      console.error("[AUTH] Error accepting invitation:", error);
+      res.status(500).json({ error: error.message || "Erreur lors de la création du compte" });
+    }
+  });
+  
+  // DELETE /api/settings/invitations/:id - Cancel invitation (admin only)
+  app.delete("/api/settings/invitations/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { id } = req.params;
+      
+      await storage.cancelInvitation(organisationId, id);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error cancelling invitation:", error);
+      res.status(500).json({ error: "Erreur lors de l'annulation de l'invitation" });
+    }
+  });
+
+  // ========== PASSWORD RESET FLOW ==========
+  
+  // POST /api/auth/forgot-password - Request password reset
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ error: "Email requis" });
+      }
+      
+      const user = await storage.getUserByEmail(email.toLowerCase().trim());
+      
+      // Always return success to prevent email enumeration
+      if (!user) {
+        console.log("[AUTH] Password reset requested for unknown email:", email);
+        return res.json({ success: true, message: "Si cette adresse existe, un email a été envoyé." });
+      }
+      
+      // Invalidate any existing password reset tokens
+      await storage.invalidateEmailTokens(email.toLowerCase().trim(), 'PASSWORD_RESET');
+      
+      // Generate secure token
+      const token = randomBytes(32).toString('hex');
+      const tokenHash = scryptSync(token, 'salt_pw_reset', 64).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      
+      await storage.createEmailToken({
+        userId: user.id,
+        email: email.toLowerCase().trim(),
+        type: 'PASSWORD_RESET',
+        tokenHash,
+        expiresAt,
+      });
+      
+      // Send email using new branded templates
+      const baseUrl = getBaseUrl();
+      const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+      const userName = user.prenom || user.nom || undefined;
+      const result = await sendEmail(email, 'resetPassword', {
+        resetUrl,
+        firstName: userName,
+      });
+      
+      // Log to email outbox
+      await storage.logEmail({
+        organisationId: user.organisationId,
+        toEmail: email,
+        template: 'PASSWORD_RESET',
+        subject: 'Cassius - Réinitialisation de votre mot de passe',
+        status: result.success ? 'SENT' : 'FAILED',
+        sentAt: result.success ? new Date() : null,
+        errorMessage: result.error || null,
+      });
+      
+      res.json({ success: true, message: "Si cette adresse existe, un email a été envoyé." });
+    } catch (error: any) {
+      console.error("[AUTH] Error in forgot-password:", error);
+      res.status(500).json({ error: "Erreur lors de l'envoi de l'email" });
+    }
+  });
+  
+  // POST /api/auth/reset-password - Reset password with token
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        return res.status(400).json({ error: "Token et nouveau mot de passe requis" });
+      }
+      
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Le mot de passe doit contenir au moins 8 caractères" });
+      }
+      
+      // Find token
+      const tokenHash = scryptSync(token, 'salt_pw_reset', 64).toString('hex');
+      const emailToken = await storage.getEmailTokenByHash(tokenHash);
+      
+      if (!emailToken) {
+        return res.status(400).json({ error: "Lien invalide ou expiré" });
+      }
+      
+      if (emailToken.usedAt) {
+        return res.status(400).json({ error: "Ce lien a déjà été utilisé" });
+      }
+      
+      if (new Date() > emailToken.expiresAt) {
+        return res.status(400).json({ error: "Ce lien a expiré" });
+      }
+      
+      if (!emailToken.userId) {
+        return res.status(400).json({ error: "Token invalide" });
+      }
+      
+      // Hash new password
+      const salt = randomBytes(16).toString('hex');
+      const hashedPassword = scryptSync(newPassword, salt, 64).toString('hex');
+      const passwordWithSalt = `${salt}:${hashedPassword}`;
+      
+      // Update user password
+      await storage.updateUser(emailToken.userId, { password: passwordWithSalt });
+      
+      // Mark token as used
+      await storage.markEmailTokenUsed(emailToken.id);
+      
+      console.log("[AUTH] Password reset successful for user:", emailToken.userId);
+      res.json({ success: true, message: "Mot de passe modifié avec succès" });
+    } catch (error: any) {
+      console.error("[AUTH] Error in reset-password:", error);
+      res.status(500).json({ error: "Erreur lors de la réinitialisation du mot de passe" });
+    }
+  });
+  
+  // GET /api/auth/verify-reset-token - Verify reset token is valid
+  app.get("/api/auth/verify-reset-token", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ valid: false, error: "Token manquant" });
+      }
+      
+      const tokenHash = scryptSync(token, 'salt_pw_reset', 64).toString('hex');
+      const emailToken = await storage.getEmailTokenByHash(tokenHash);
+      
+      if (!emailToken || emailToken.usedAt || new Date() > emailToken.expiresAt) {
+        return res.json({ valid: false });
+      }
+      
+      res.json({ valid: true, email: emailToken.email });
+    } catch (error: any) {
+      console.error("[AUTH] Error verifying reset token:", error);
+      res.status(500).json({ valid: false, error: "Erreur de vérification" });
+    }
+  });
+  
+  // ========== EMAIL VERIFICATION FLOW ==========
+  
+  // POST /api/auth/send-verification - Send email verification
+  app.post("/api/auth/send-verification", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.id;
+      const email = req.jwtUser?.username;
+      
+      if (!userId || !email) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      
+      if ((user as any).emailVerified) {
+        return res.json({ success: true, message: "Email déjà vérifié" });
+      }
+      
+      // Invalidate any existing verification tokens
+      await storage.invalidateEmailTokens(email, 'EMAIL_VERIFY');
+      
+      // Generate secure token
+      const token = randomBytes(32).toString('hex');
+      const tokenHash = scryptSync(token, 'salt_email_verify', 64).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
+      await storage.createEmailToken({
+        userId,
+        email,
+        type: 'EMAIL_VERIFY',
+        tokenHash,
+        expiresAt,
+      });
+      
+      // Send email using new branded templates
+      const baseUrl = getBaseUrl();
+      const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
+      const userName = user.prenom || user.nom || undefined;
+      const result = await sendEmail(email, 'verifyEmail', {
+        verifyUrl,
+        firstName: userName,
+      });
+      
+      // Log to email outbox
+      await storage.logEmail({
+        organisationId: user.organisationId,
+        toEmail: email,
+        template: 'EMAIL_VERIFY',
+        subject: 'Cassius - Confirmez votre adresse email',
+        status: result.success ? 'SENT' : 'FAILED',
+        sentAt: result.success ? new Date() : null,
+        errorMessage: result.error || null,
+      });
+      
+      if (result.success) {
+        res.json({ success: true, message: "Email de vérification envoyé" });
+      } else {
+        res.status(500).json({ error: "Erreur lors de l'envoi de l'email" });
+      }
+    } catch (error: any) {
+      console.error("[AUTH] Error sending verification email:", error);
+      res.status(500).json({ error: "Erreur lors de l'envoi de l'email" });
+    }
+  });
+  
+  // POST /api/auth/verify-email - Verify email with token
+  app.post("/api/auth/verify-email", async (req, res) => {
+    try {
+      const { token } = req.body;
+      
+      if (!token) {
+        return res.status(400).json({ error: "Token requis" });
+      }
+      
+      const tokenHash = scryptSync(token, 'salt_email_verify', 64).toString('hex');
+      const emailToken = await storage.getEmailTokenByHash(tokenHash);
+      
+      if (!emailToken) {
+        return res.status(400).json({ error: "Lien invalide ou expiré" });
+      }
+      
+      if (emailToken.usedAt) {
+        return res.status(400).json({ error: "Ce lien a déjà été utilisé" });
+      }
+      
+      if (new Date() > emailToken.expiresAt) {
+        return res.status(400).json({ error: "Ce lien a expiré" });
+      }
+      
+      if (!emailToken.userId) {
+        return res.status(400).json({ error: "Token invalide" });
+      }
+      
+      // Mark user email as verified
+      await storage.updateUserEmailVerified(emailToken.userId);
+      
+      // Mark token as used
+      await storage.markEmailTokenUsed(emailToken.id);
+      
+      console.log("[AUTH] Email verified for user:", emailToken.userId);
+      res.json({ success: true, message: "Email vérifié avec succès" });
+    } catch (error: any) {
+      console.error("[AUTH] Error verifying email:", error);
+      res.status(500).json({ error: "Erreur lors de la vérification" });
+    }
+  });
+  
+  // GET /api/auth/email-status - Get current email verification status
+  app.get("/api/auth/email-status", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      
+      res.json({
+        email: user.username,
+        verified: (user as any).emailVerified || false,
+        verifiedAt: (user as any).emailVerifiedAt || null,
+      });
+    } catch (error: any) {
+      console.error("[AUTH] Error getting email status:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  // ========== DEV ONLY: EMAIL PREVIEW ==========
+  
+  // GET /api/dev/email-preview - Preview email templates (DEV + ADMIN only)
+  app.get("/api/dev/email-preview", requireJwtOrSession, async (req, res) => {
+    try {
+      // Only allow in development
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: "Non disponible en production" });
+      }
+      
+      // Only allow admins
+      if (req.jwtUser?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+      }
+      
+      const { template } = req.query;
+      
+      if (!template || typeof template !== 'string') {
+        const availableTemplates: TemplateName[] = [
+          'resetPassword',
+          'verifyEmail', 
+          'invitation',
+          'securityNotice',
+          'integrationConnected',
+          'systemAlert',
+        ];
+        return res.json({
+          message: "Templates disponibles",
+          templates: availableTemplates,
+          usage: "/api/dev/email-preview?template=resetPassword",
+        });
+      }
+      
+      const validTemplates: TemplateName[] = [
+        'resetPassword',
+        'verifyEmail',
+        'invitation',
+        'securityNotice',
+        'integrationConnected',
+        'systemAlert',
+      ];
+      
+      if (!validTemplates.includes(template as TemplateName)) {
+        return res.status(400).json({ 
+          error: `Template invalide: ${template}`,
+          available: validTemplates,
+        });
+      }
+      
+      const html = getPreviewHtml(template as TemplateName);
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error: any) {
+      console.error("[DEV] Error previewing email:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 

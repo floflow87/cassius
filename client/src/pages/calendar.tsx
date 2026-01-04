@@ -29,7 +29,9 @@ import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CalendarAppointment, CalendarFilters, Patient } from "@shared/types";
-import type { AppointmentWithDetails } from "@shared/schema";
+import type { AppointmentWithDetails, GoogleCalendarEvent, SyncConflict } from "@shared/schema";
+
+type SourceFilter = "all" | "cassius" | "google" | "conflicts";
 import type { EventClickArg, EventDropArg, EventContentArg } from "@fullcalendar/core";
 import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 
@@ -166,10 +168,29 @@ interface CalendarSidebarProps {
     showOnlyAtRisk: boolean;
   };
   onFiltersChange: (filters: { types: string[]; statuses: string[]; showOnlyAtRisk: boolean }) => void;
+  sourceFilter: SourceFilter;
+  onSourceFilterChange: (source: SourceFilter) => void;
+  showGoogleEvents: boolean;
+  onShowGoogleEventsChange: (show: boolean) => void;
+  conflictsCount: number;
+  googleConnected: boolean;
 }
 
-function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, onFiltersChange }: CalendarSidebarProps) {
+function CalendarSidebar({ 
+  selectedDate, 
+  onDateSelect, 
+  appointments, 
+  filters, 
+  onFiltersChange,
+  sourceFilter,
+  onSourceFilterChange,
+  showGoogleEvents,
+  onShowGoogleEventsChange,
+  conflictsCount,
+  googleConnected
+}: CalendarSidebarProps) {
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [sourcesOpen, setSourcesOpen] = useState(true);
   
   // Load saved state from localStorage on mount
   useEffect(() => {
@@ -220,6 +241,70 @@ function CalendarSidebar({ selectedDate, onDateSelect, appointments, filters, on
         onDateSelect={onDateSelect}
         appointments={appointments}
       />
+      
+      {/* Source filter section */}
+      <div className="border-t">
+        <Collapsible open={sourcesOpen} onOpenChange={setSourcesOpen}>
+          <CollapsibleTrigger asChild>
+            <button
+              className="flex items-center justify-between w-full px-3 py-3 hover-elevate"
+              data-testid="button-toggle-sources"
+            >
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <CalendarIcon className="h-4 w-4" />
+                Sources
+              </div>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${sourcesOpen ? "" : "-rotate-90"}`} />
+            </button>
+          </CollapsibleTrigger>
+          
+          <CollapsibleContent>
+            <div className="px-3 pb-3 space-y-1.5">
+              {[
+                { value: "all" as SourceFilter, label: "Tous les événements", icon: null },
+                { value: "cassius" as SourceFilter, label: "Cassius", icon: null },
+                { value: "google" as SourceFilter, label: "Google Calendar", icon: <SiGoogle className="h-3.5 w-3.5" /> },
+                { value: "conflicts" as SourceFilter, label: "Conflits", icon: <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />, count: conflictsCount },
+              ].map(source => (
+                <button
+                  key={source.value}
+                  onClick={() => onSourceFilterChange(source.value)}
+                  className={`flex items-center justify-between w-full px-2 py-1.5 rounded-md text-sm transition-colors ${
+                    sourceFilter === source.value 
+                      ? "bg-primary/10 text-primary font-medium" 
+                      : "hover-elevate"
+                  }`}
+                  data-testid={`source-filter-${source.value}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {source.icon}
+                    <span>{source.label}</span>
+                  </div>
+                  {source.count !== undefined && source.count > 0 && (
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                      {source.count}
+                    </Badge>
+                  )}
+                </button>
+              ))}
+              
+              {googleConnected && (
+                <div className="pt-2 border-t mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer px-2 py-1.5">
+                    <Checkbox
+                      checked={showGoogleEvents}
+                      onCheckedChange={(checked) => onShowGoogleEventsChange(!!checked)}
+                      data-testid="checkbox-show-google"
+                    />
+                    <SiGoogle className="h-3.5 w-3.5" />
+                    <span className="text-sm">Afficher Google</span>
+                  </label>
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
       
       <div className="border-t">
         <Collapsible open={filtersOpen} onOpenChange={handleFiltersOpenChange}>
@@ -1265,9 +1350,28 @@ export default function CalendarPage() {
   
   const [drawerAppointmentId, setDrawerAppointmentId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [googleEventDrawerId, setGoogleEventDrawerId] = useState<string | null>(null);
+  const [googleEventDrawerOpen, setGoogleEventDrawerOpen] = useState(false);
   
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [quickCreateDate, setQuickCreateDate] = useState<Date | null>(null);
+  
+  // Source filter and Google toggle
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [showGoogleEvents, setShowGoogleEvents] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("calendar-show-google");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+  
+  // Persist showGoogleEvents to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("calendar-show-google", String(showGoogleEvents));
+    }
+  }, [showGoogleEvents]);
   
   const calendarFilters: CalendarFilters = useMemo(() => ({
     start: dateRange.start,
@@ -1308,32 +1412,118 @@ export default function CalendarPage() {
     staleTime: 60000,
   });
   
+  // Fetch Google imported events
+  const { data: googleEvents = [] } = useQuery<GoogleCalendarEvent[]>({
+    queryKey: ["/api/google/imported-events", dateRange.start, dateRange.end],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/google/imported-events?timeMin=${dateRange.start}T00:00:00Z&timeMax=${dateRange.end}T23:59:59Z`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!googleStatus?.connected && showGoogleEvents,
+    staleTime: 30000,
+  });
+  
+  // Fetch open conflicts
+  const { data: conflicts = [] } = useQuery<SyncConflict[]>({
+    queryKey: ["/api/sync/conflicts", "open"],
+    queryFn: async () => {
+      const res = await fetch("/api/sync/conflicts?status=open", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!googleStatus?.connected,
+    staleTime: 60000,
+  });
+  
   const events = useMemo(() => {
-    let filteredAppointments = appointments;
+    const result: Array<{
+      id: string;
+      title: string;
+      start: string;
+      end?: string;
+      extendedProps: Record<string, unknown>;
+      backgroundColor?: string;
+      borderColor?: string;
+      classNames?: string[];
+    }> = [];
     
-    // Apply at-risk filter if enabled (client-side)
-    if (filters.showOnlyAtRisk) {
-      filteredAppointments = appointments.filter(apt => apt.hasCriticalFlag);
+    // Get conflict event IDs for highlighting (externalId stores googleEventId)
+    const conflictEventIds = new Set(conflicts.map(c => c.externalId).filter(Boolean));
+    
+    // Add Cassius appointments (unless source filter is google-only)
+    if (sourceFilter === "all" || sourceFilter === "cassius") {
+      let filteredAppointments = appointments;
+      
+      // Apply at-risk filter if enabled (client-side)
+      if (filters.showOnlyAtRisk) {
+        filteredAppointments = appointments.filter(apt => apt.hasCriticalFlag);
+      }
+      
+      for (const apt of filteredAppointments) {
+        result.push({
+          id: apt.id,
+          title: apt.title || (apt.patientPrenom && apt.patientNom ? `${apt.patientPrenom} ${apt.patientNom}` : "Nouveau rdv"),
+          start: typeof apt.dateStart === "string" ? apt.dateStart : apt.dateStart.toISOString(),
+          end: apt.dateEnd ? (typeof apt.dateEnd === "string" ? apt.dateEnd : apt.dateEnd.toISOString()) : undefined,
+          extendedProps: {
+            source: "cassius",
+            type: apt.type,
+            status: apt.status,
+            patientNom: apt.patientNom,
+            patientPrenom: apt.patientPrenom,
+            isq: apt.isq,
+            hasCriticalFlag: apt.hasCriticalFlag,
+          },
+          backgroundColor: getAppointmentColor(apt.type).replace("bg-", ""),
+          borderColor: "transparent",
+          classNames: [getAppointmentColor(apt.type)],
+        });
+      }
     }
     
-    return filteredAppointments.map(apt => ({
-      id: apt.id,
-      title: apt.title || (apt.patientPrenom && apt.patientNom ? `${apt.patientPrenom} ${apt.patientNom}` : "Nouveau rdv"),
-      start: apt.dateStart,
-      end: apt.dateEnd || undefined,
-      extendedProps: {
-        type: apt.type,
-        status: apt.status,
-        patientNom: apt.patientNom,
-        patientPrenom: apt.patientPrenom,
-        isq: apt.isq,
-        hasCriticalFlag: apt.hasCriticalFlag,
-      },
-      backgroundColor: getAppointmentColor(apt.type).replace("bg-", ""),
-      borderColor: "transparent",
-      classNames: [getAppointmentColor(apt.type)],
-    }));
-  }, [appointments, filters.showOnlyAtRisk]);
+    // Add Google events (if enabled and not cassius-only)
+    if (showGoogleEvents && (sourceFilter === "all" || sourceFilter === "google" || sourceFilter === "conflicts")) {
+      for (const ge of googleEvents) {
+        // Skip if conflicts filter and this event has no conflict
+        if (sourceFilter === "conflicts" && !conflictEventIds.has(ge.googleEventId)) {
+          continue;
+        }
+        
+        const hasConflict = conflictEventIds.has(ge.googleEventId);
+        
+        // Use startAt/endAt from schema
+        const startStr = ge.startAt ? (ge.startAt instanceof Date ? ge.startAt.toISOString() : ge.startAt) : "";
+        const endStr = ge.endAt ? (ge.endAt instanceof Date ? ge.endAt.toISOString() : ge.endAt) : undefined;
+        
+        if (!startStr) continue; // Skip events without start time
+        
+        result.push({
+          id: `google-${ge.id}`,
+          title: ge.summary || "Sans titre",
+          start: startStr,
+          end: endStr,
+          extendedProps: {
+            source: "google",
+            googleEventId: ge.googleEventId,
+            htmlLink: ge.htmlLink,
+            location: ge.location,
+            description: ge.description,
+            hasConflict,
+            attendees: ge.attendees,
+          },
+          backgroundColor: hasConflict ? "orange" : "rgb(66, 133, 244)",
+          borderColor: "transparent",
+          classNames: [hasConflict ? "bg-orange-500" : "bg-blue-400"],
+        });
+      }
+    }
+    
+    return result;
+  }, [appointments, googleEvents, conflicts, filters.showOnlyAtRisk, sourceFilter, showGoogleEvents]);
   
   const updateMutation = useMutation({
     mutationFn: async ({ id, dateStart, dateEnd }: { id: string; dateStart: Date; dateEnd?: Date }) => {
@@ -1350,8 +1540,16 @@ export default function CalendarPage() {
   });
   
   const handleEventClick = useCallback((info: EventClickArg) => {
-    setDrawerAppointmentId(info.event.id);
-    setDrawerOpen(true);
+    const source = info.event.extendedProps.source;
+    if (source === "google") {
+      // Extract the actual ID from "google-{id}"
+      const googleId = info.event.id.replace("google-", "");
+      setGoogleEventDrawerId(googleId);
+      setGoogleEventDrawerOpen(true);
+    } else {
+      setDrawerAppointmentId(info.event.id);
+      setDrawerOpen(true);
+    }
   }, []);
   
   const handleDateClick = useCallback((info: { date: Date; dateStr: string }) => {
@@ -1411,7 +1609,7 @@ export default function CalendarPage() {
   };
   
   const renderEventContent = (eventInfo: EventContentArg) => {
-    const { type, status, patientNom, patientPrenom, isq, hasCriticalFlag } = eventInfo.event.extendedProps;
+    const { source, type, patientNom, patientPrenom, isq, hasCriticalFlag, hasConflict, location } = eventInfo.event.extendedProps;
     const start = eventInfo.event.start;
     const end = eventInfo.event.end;
     
@@ -1424,26 +1622,46 @@ export default function CalendarPage() {
     // Show time for events >= 45 minutes in time-based views
     const showTime = durationMinutes >= 45 && eventInfo.view.type !== "dayGridMonth" && eventInfo.view.type !== "listWeek";
     
+    const isGoogle = source === "google";
+    
     return (
       <div className="p-1 text-xs overflow-hidden relative" data-testid={`calendar-event-${eventInfo.event.id}`}>
-        {hasCriticalFlag && (
-          <div className="absolute top-0 right-0 p-0.5" title="Alerte critique">
-            <AlertTriangle className="h-3 w-3 text-yellow-300" />
-          </div>
-        )}
+        <div className="absolute top-0 right-0 flex gap-0.5 p-0.5">
+          {isGoogle && (
+            <div title="Google Calendar">
+              <SiGoogle className="h-2.5 w-2.5 text-white/80" />
+            </div>
+          )}
+          {hasConflict && (
+            <div title="Conflit">
+              <AlertTriangle className="h-3 w-3 text-yellow-300" />
+            </div>
+          )}
+          {hasCriticalFlag && (
+            <div title="Alerte critique">
+              <AlertTriangle className="h-3 w-3 text-yellow-300" />
+            </div>
+          )}
+        </div>
         {showTime && start && (
           <div className="text-white/70 text-[10px]">
             {format(start, "HH:mm")}
             {end && ` - ${format(end, "HH:mm")}`}
           </div>
         )}
-        <div className="font-medium truncate text-white pr-4">
+        <div className="font-medium truncate text-white pr-6">
           {eventInfo.event.title}
         </div>
         {eventInfo.view.type !== "dayGridMonth" && durationMinutes >= 30 && (
           <div className="text-white/80 truncate">
-            {patientPrenom} {patientNom}
-            {isq !== null && isq !== undefined && ` • ISQ ${isq}`}
+            {isGoogle ? (
+              location ? location : ""
+            ) : (
+              <>
+                {patientPrenom} {patientNom}
+                {isq !== null && isq !== undefined && ` • ISQ ${isq}`}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -1458,6 +1676,12 @@ export default function CalendarPage() {
         appointments={appointments}
         filters={filters}
         onFiltersChange={setFilters}
+        sourceFilter={sourceFilter}
+        onSourceFilterChange={setSourceFilter}
+        showGoogleEvents={showGoogleEvents}
+        onShowGoogleEventsChange={setShowGoogleEvents}
+        conflictsCount={conflicts.length}
+        googleConnected={!!googleStatus?.connected}
       />
       
       <div className="flex-1 flex flex-col min-w-0">
@@ -1641,6 +1865,178 @@ export default function CalendarPage() {
           queryClient.invalidateQueries({ queryKey: ["/api/appointments/calendar"] });
         }}
       />
+      
+      {/* Google Event Drawer */}
+      <Sheet open={googleEventDrawerOpen} onOpenChange={(o) => {
+        if (!o) {
+          setGoogleEventDrawerOpen(false);
+          setGoogleEventDrawerId(null);
+        }
+      }}>
+        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <SiGoogle className="h-4 w-4" />
+              Événement Google
+            </SheetTitle>
+          </SheetHeader>
+          
+          {googleEventDrawerId && (
+            <GoogleEventDrawerContent 
+              eventId={googleEventDrawerId} 
+              googleEvents={googleEvents}
+              conflicts={conflicts}
+              onClose={() => {
+                setGoogleEventDrawerOpen(false);
+                setGoogleEventDrawerId(null);
+              }}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+interface GoogleEventDrawerContentProps {
+  eventId: string;
+  googleEvents: GoogleCalendarEvent[];
+  conflicts: SyncConflict[];
+  onClose: () => void;
+}
+
+function GoogleEventDrawerContent({ eventId, googleEvents, conflicts, onClose }: GoogleEventDrawerContentProps) {
+  const { toast } = useToast();
+  const event = googleEvents.find(e => e.id === eventId);
+  
+  // externalId stores the googleEventId for conflicts
+  const conflict = conflicts.find(c => c.externalId === event?.googleEventId);
+  
+  const resolveMutation = useMutation({
+    mutationFn: async ({ resolution }: { resolution: "cassius_wins" | "google_wins" | "ignore" }) => {
+      return apiRequest("PATCH", `/api/sync/conflicts/${conflict?.id}`, { resolution });
+    },
+    onSuccess: () => {
+      toast({ title: "Conflit résolu" });
+      queryClient.invalidateQueries({ queryKey: ["/api/sync/conflicts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/google/imported-events"] });
+      onClose();
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la résolution", variant: "destructive" });
+    },
+  });
+  
+  if (!event) {
+    return (
+      <div className="py-6 text-center text-muted-foreground">
+        Événement non trouvé
+      </div>
+    );
+  }
+  
+  const startDate = event.startAt ? new Date(event.startAt) : new Date();
+  const endDate = event.endAt ? new Date(event.endAt) : null;
+  
+  return (
+    <div className="py-6 space-y-6">
+      {/* Event details */}
+      <div className="space-y-4">
+        <div>
+          <Label className="text-xs text-muted-foreground">Titre</Label>
+          <p className="font-medium" data-testid="text-google-event-title">{event.summary || "Sans titre"}</p>
+        </div>
+        
+        <div>
+          <Label className="text-xs text-muted-foreground">Date et heure</Label>
+          <p data-testid="text-google-event-datetime">
+            {format(startDate, "EEEE d MMMM yyyy", { locale: fr })}
+            <br />
+            {format(startDate, "HH:mm")}
+            {endDate && ` - ${format(endDate, "HH:mm")}`}
+          </p>
+        </div>
+        
+        {event.location && (
+          <div>
+            <Label className="text-xs text-muted-foreground">Lieu</Label>
+            <p data-testid="text-google-event-location">{event.location}</p>
+          </div>
+        )}
+        
+        {event.description && (
+          <div>
+            <Label className="text-xs text-muted-foreground">Description</Label>
+            <p className="text-sm whitespace-pre-wrap" data-testid="text-google-event-description">{event.description}</p>
+          </div>
+        )}
+        
+        {event.attendees && (
+          <div>
+            <Label className="text-xs text-muted-foreground">Participants</Label>
+            <p className="text-sm" data-testid="text-google-event-attendees">{event.attendees}</p>
+          </div>
+        )}
+        
+        {event.htmlLink && (
+          <div>
+            <a 
+              href={event.htmlLink} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+              data-testid="link-google-calendar"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Ouvrir dans Google Calendar
+            </a>
+          </div>
+        )}
+      </div>
+      
+      {/* Conflict section */}
+      {conflict && (
+        <div className="border-t pt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <span className="font-medium text-orange-600 dark:text-orange-400">Conflit détecté</span>
+          </div>
+          
+          <p className="text-sm text-muted-foreground mb-4">
+            {conflict.reason || "Conflit de synchronisation détecté"}
+          </p>
+          
+          <div className="flex flex-col gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => resolveMutation.mutate({ resolution: "cassius_wins" })}
+              disabled={resolveMutation.isPending}
+              data-testid="button-resolve-cassius"
+            >
+              Garder Cassius
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => resolveMutation.mutate({ resolution: "google_wins" })}
+              disabled={resolveMutation.isPending}
+              data-testid="button-resolve-google"
+            >
+              Garder Google
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => resolveMutation.mutate({ resolution: "ignore" })}
+              disabled={resolveMutation.isPending}
+              data-testid="button-resolve-ignore"
+            >
+              Ignorer ce conflit
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

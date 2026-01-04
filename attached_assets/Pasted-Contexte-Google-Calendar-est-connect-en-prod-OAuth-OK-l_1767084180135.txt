@@ -1,0 +1,63 @@
+Contexte
+Google Calendar est connecté en prod : OAuth OK, liste des calendriers OK, calendrier cible sélectionné.
+Le clic sur “Synchroniser maintenant” déclenche une erreur 500 (Internal Server Error).
+Objectif : corriger le backend pour que la synchronisation Cassius -> Google fonctionne, avec logs clairs, gestion d’erreurs, et retour API explicite.
+
+Tâches (à faire dans cet ordre)
+
+1) Identifier l’endpoint exact appelé par le bouton “Synchroniser maintenant”
+- Trouver dans le front le handler du bouton et l’URL appelée (ex: POST /api/calendar/google/sync ou /api/google/sync).
+- Vérifier dans Network (ou logs) la méthode, payload et query params (organisationId, calendarId, date range, etc.).
+
+2) Instrumenter le backend pour comprendre la 500
+- Dans l’endpoint de sync, ajouter des logs structurés (sans tokens):
+  - orgId / userId / calendarId
+  - nb de RDV Cassius à synchroniser
+  - plage temporelle utilisée
+  - étape en cours (fetch RDV, map, create events, update db)
+- En cas d’erreur, renvoyer un JSON clair (pas juste 500) :
+  { error: "SYNC_FAILED", message: "...", step: "...", details: "...", googleCode?: "..."}
+- S’assurer que l’erreur réelle apparaît dans les logs serveur (stacktrace).
+
+3) Vérifier la cause la plus probable côté données (Supabase)
+- Vérifier que la table calendar_integrations contient bien :
+  - organisation_id / user_id (ou identifiant équivalent)
+  - refresh_token (ou un moyen de rafraîchir)
+  - calendar_id (celui du “calendrier cible”)
+- Vérifier que la requête Supabase ne renvoie pas null sur l’intégration active.
+- Si l’intégration n’est pas trouvée : renvoyer 400 avec message explicite.
+
+4) Vérifier les causes Google API les plus fréquentes
+- Refresh token absent : parfois Google ne renvoie pas de refresh_token si consentement déjà fait sans prompt=consent.
+  -> si refresh_token null, renvoyer erreur claire “NEED_RECONSENT” et forcer prompt=consent + access_type=offline.
+- Scopes insuffisants :
+  - s’assurer que le scope permet la création d’events (calendar ou calendar.events).
+  - si 403 insufficientPermissions, renvoyer une erreur instructive.
+- Mauvais calendarId :
+  - utiliser l’id exact renvoyé par Google (pas juste l’email si ce n’est pas “primary”).
+
+5) Rendre la sync robuste (pas un gros bloc qui casse)
+- Processer les RDV un par un avec try/catch par événement
+- Retourner un résumé:
+  { created: n, updated: n, skipped: n, failed: n, failures:[{rdvId, reason}] }
+- “Skipped” si RDV sans date, sans patient, etc.
+
+6) Mapping RDV Cassius -> Event Google
+- title : "[Cassius] <type> - <patient>"
+- start/end : ISO, timezone Europe/Paris
+- description : infos utiles (praticien, acte, notes)
+- location : cabinet si dispo
+- Idempotence :
+  - stocker google_event_id dans Cassius (table rdv) OU une table de mapping (calendar_event_mappings)
+  - si déjà synchronisé => update au lieu de create
+
+7) Côté front
+- Si l’endpoint renvoie un JSON d’erreur, l’afficher dans un toast lisible (message + step)
+- Pendant sync : état loading sur le bouton
+- Après sync : afficher le résumé (n created/updated/failed) et lister les échecs
+
+Livrables
+- Fix de la 500
+- Logs + erreurs explicites
+- Synchronisation qui crée des events Google dans le calendrier cible sélectionné
+- Résultat JSON détaillé (created/updated/failed)

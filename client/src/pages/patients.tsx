@@ -16,7 +16,9 @@ import {
   Mail,
   Calendar,
   Trash2,
+  Upload,
 } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { PatientsListSkeleton } from "@/components/page-skeletons";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +40,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PatientForm } from "@/components/patient-form";
 import { CassiusBadge, CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
 import { AdvancedFilterDrawer, FilterChips, type FilterGroup } from "@/components/advanced-filter-drawer";
@@ -54,7 +57,7 @@ interface PatientsPageProps {
 }
 
 type SortDirection = "asc" | "desc" | null;
-type ColumnId = "patient" | "dateNaissance" | "contact" | "implants" | "derniereVisite" | "flags" | "statut";
+type ColumnId = "patient" | "dateNaissance" | "sexe" | "contact" | "implants" | "derniereVisite" | "flags" | "statut";
 
 interface ColumnConfig {
   id: ColumnId;
@@ -66,6 +69,7 @@ interface ColumnConfig {
 const defaultColumns: ColumnConfig[] = [
   { id: "patient", label: "Patient", width: "w-56", sortable: true },
   { id: "dateNaissance", label: "Date de naissance", width: "w-40", sortable: true },
+  { id: "sexe", label: "Sexe", width: "w-20", sortable: true },
   { id: "contact", label: "Contact", width: "w-44", sortable: true },
   { id: "implants", label: "Implants", width: "w-28", sortable: true },
   { id: "derniereVisite", label: "Dernière visite", width: "w-40", sortable: true },
@@ -284,6 +288,9 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         case "dateNaissance":
           comparison = new Date(a.dateNaissance).getTime() - new Date(b.dateNaissance).getTime();
           break;
+        case "sexe":
+          comparison = (a.sexe || "").localeCompare(b.sexe || "");
+          break;
         case "contact":
           comparison = (a.telephone || "").localeCompare(b.telephone || "");
           break;
@@ -377,6 +384,32 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     },
   });
 
+  const bulkStatusMutation = useMutation({
+    mutationFn: async ({ ids, statut }: { ids: string[]; statut: string }) => {
+      for (const id of ids) {
+        await apiRequest("PATCH", `/api/patients/${id}`, { statut });
+      }
+      return { count: ids.length, statut };
+    },
+    onSuccess: ({ count, statut }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/search"] });
+      setSelectedIds(new Set());
+      const statutLabel = statut === "ACTIF" ? "Actif" : statut === "INACTIF" ? "Inactif" : "Archivé";
+      toast({
+        title: "Statuts mis à jour",
+        description: `${count} patient(s) passé(s) en "${statutLabel}".`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Erreur lors de la mise à jour",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSort = (columnId: ColumnId) => {
     if (sortColumn === columnId) {
       if (sortDirection === "asc") {
@@ -460,16 +493,18 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     setAdvancedFilters(null);
   }, []);
 
-  const getPatientStatus = (_patient: Patient): "actif" | "en-suivi" | "planifie" | "inactif" => {
+  const getPatientStatus = (patient: Patient): "actif" | "inactif" | "archive" => {
+    const statut = patient.statut?.toUpperCase();
+    if (statut === "INACTIF") return "inactif";
+    if (statut === "ARCHIVE") return "archive";
     return "actif";
   };
 
   const getStatusLabel = (status: string): string => {
     switch (status) {
       case "actif": return "Actif";
-      case "en-suivi": return "En suivi";
-      case "planifie": return "Planifié";
       case "inactif": return "Inactif";
+      case "archive": return "Archivé";
       default: return "Actif";
     }
   };
@@ -517,6 +552,12 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         return (
           <span className="text-sm text-muted-foreground">
             {formatDateWithAge(patient.dateNaissance)}
+          </span>
+        );
+      case "sexe":
+        return (
+          <span className="text-sm text-muted-foreground">
+            {patient.sexe === "M" ? "H" : patient.sexe === "F" ? "F" : "—"}
           </span>
         );
       case "contact":
@@ -572,13 +613,16 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     <div className="p-6">
       <div className="flex items-center gap-4 mb-5">
         <CassiusSearchInput
-          placeholder="Rechercher un patient (nom, prénom, date de naissance...)"
+          placeholder="Rechercher un patient..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           icon={<Search className="h-4 w-4" />}
-          className="max-w-2xl"
+          className="max-w-sm"
           data-testid="input-search-patients"
         />
+        <span className="text-sm italic text-muted-foreground">
+          {patients?.length?.toLocaleString() || 0} patients
+        </span>
         
         <AdvancedFilterDrawer
           filters={advancedFilters}
@@ -610,6 +654,21 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         {selectedIds.size > 0 && (
           <>
             <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
+            <Select
+              onValueChange={(value) => {
+                bulkStatusMutation.mutate({ ids: Array.from(selectedIds), statut: value });
+              }}
+              disabled={bulkStatusMutation.isPending}
+            >
+              <SelectTrigger className="w-[160px]" data-testid="select-bulk-status">
+                <SelectValue placeholder="Changer statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ACTIF" data-testid="select-status-actif">Actif</SelectItem>
+                <SelectItem value="INACTIF" data-testid="select-status-inactif">Inactif</SelectItem>
+                <SelectItem value="ARCHIVE" data-testid="select-status-archive">Archivé</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant="destructive"
               size="sm"
@@ -631,6 +690,12 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           </>
         )}
 
+        <Link href="/patients/import">
+          <Button variant="outline" className="gap-2 shrink-0" data-testid="button-import-patients">
+            <Upload className="h-4 w-4" />
+            Importer
+          </Button>
+        </Link>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button className="gap-2 shrink-0" data-testid="button-new-patient">

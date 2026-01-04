@@ -70,6 +70,22 @@ export const syncStatusEnum = pgEnum("sync_status", [
   "SYNCED",
   "ERROR"
 ]);
+
+// Enums for V2 Google Calendar import
+export const googleEventStatusEnum = pgEnum("google_event_status", [
+  "confirmed",
+  "tentative",
+  "cancelled"
+]);
+export const syncConflictStatusEnum = pgEnum("sync_conflict_status", [
+  "open",
+  "resolved",
+  "ignored"
+]);
+export const syncConflictSourceEnum = pgEnum("sync_conflict_source", [
+  "google",
+  "cassius"
+]);
 export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
 export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
 export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"]);
@@ -97,16 +113,19 @@ export const flagTypeEnum = pgEnum("flag_type", [
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  fileNumber: text("file_number"),
+  ssn: text("ssn"),
   nom: text("nom").notNull(),
   prenom: text("prenom").notNull(),
-  dateNaissance: date("date_naissance").notNull(),
-  sexe: sexeEnum("sexe").notNull(),
+  dateNaissance: date("date_naissance"),
+  sexe: sexeEnum("sexe"),
   telephone: text("telephone"),
   email: text("email"),
   adresse: text("adresse"),
+  addressFull: text("address_full"),
   codePostal: text("code_postal"),
   ville: text("ville"),
-  pays: text("pays"),
+  pays: text("pays").default("France"),
   allergies: text("allergies"),
   traitement: text("traitement"),
   conditions: text("conditions"),
@@ -351,6 +370,9 @@ export const users = pgTable("users", {
   role: roleEnum("role").default("ASSISTANT").notNull(),
   nom: text("nom"),
   prenom: text("prenom"),
+  emailVerified: boolean("email_verified").default(false),
+  emailVerifiedAt: timestamp("email_verified_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const usersRelations = relations(users, ({ one }) => ({
@@ -456,6 +478,12 @@ export const calendarIntegrations = pgTable("calendar_integrations", {
   lastSyncAt: timestamp("last_sync_at"),
   syncErrorCount: integer("sync_error_count").default(0).notNull(),
   lastSyncError: text("last_sync_error"),
+  // V2: Import settings (Google -> Cassius)
+  sourceCalendarId: text("source_calendar_id"),
+  sourceCalendarName: text("source_calendar_name"),
+  importEnabled: boolean("import_enabled").default(false),
+  lastImportAt: timestamp("last_import_at"),
+  syncToken: text("sync_token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -517,6 +545,197 @@ export const insertAppointmentExternalLinkSchema = createInsertSchema(appointmen
 });
 export type InsertAppointmentExternalLink = z.infer<typeof insertAppointmentExternalLinkSchema>;
 export type AppointmentExternalLink = typeof appointmentExternalLinks.$inferSelect;
+
+// Table google_calendar_events - Imported Google Calendar events for V2 bidirectional sync
+export const googleCalendarEvents = pgTable("google_calendar_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  integrationId: varchar("integration_id").references(() => calendarIntegrations.id, { onDelete: "cascade" }),
+  googleCalendarId: text("google_calendar_id").notNull(),
+  googleEventId: text("google_event_id").notNull(),
+  etag: text("etag"),
+  status: googleEventStatusEnum("status").default("confirmed"),
+  summary: text("summary"),
+  description: text("description"),
+  location: text("location"),
+  startAt: timestamp("start_at", { withTimezone: true }),
+  endAt: timestamp("end_at", { withTimezone: true }),
+  allDay: boolean("all_day").default(false),
+  attendees: text("attendees"),
+  htmlLink: text("html_link"),
+  updatedAtGoogle: timestamp("updated_at_google", { withTimezone: true }),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).defaultNow(),
+  cassiusAppointmentId: varchar("cassius_appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("google_calendar_events_unique_idx").on(table.organisationId, table.googleCalendarId, table.googleEventId),
+]);
+
+export const googleCalendarEventsRelations = relations(googleCalendarEvents, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [googleCalendarEvents.organisationId],
+    references: [organisations.id],
+  }),
+  user: one(users, {
+    fields: [googleCalendarEvents.userId],
+    references: [users.id],
+  }),
+  integration: one(calendarIntegrations, {
+    fields: [googleCalendarEvents.integrationId],
+    references: [calendarIntegrations.id],
+  }),
+  cassiusAppointment: one(appointments, {
+    fields: [googleCalendarEvents.cassiusAppointmentId],
+    references: [appointments.id],
+  }),
+}));
+
+export const insertGoogleCalendarEventSchema = createInsertSchema(googleCalendarEvents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertGoogleCalendarEvent = z.infer<typeof insertGoogleCalendarEventSchema>;
+export type GoogleCalendarEvent = typeof googleCalendarEvents.$inferSelect;
+
+// Table sync_conflicts - Tracks conflicts between Cassius and Google Calendar events
+export const syncConflicts = pgTable("sync_conflicts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  source: syncConflictSourceEnum("source").notNull(),
+  entityType: text("entity_type").default("event").notNull(),
+  externalId: text("external_id"),
+  internalId: varchar("internal_id"),
+  reason: text("reason").notNull(),
+  payload: text("payload"),
+  status: syncConflictStatusEnum("status").default("open").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by").references(() => users.id, { onDelete: "set null" }),
+});
+
+export const syncConflictsRelations = relations(syncConflicts, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [syncConflicts.organisationId],
+    references: [organisations.id],
+  }),
+  user: one(users, {
+    fields: [syncConflicts.userId],
+    references: [users.id],
+  }),
+  resolvedByUser: one(users, {
+    fields: [syncConflicts.resolvedBy],
+    references: [users.id],
+  }),
+}));
+
+export const insertSyncConflictSchema = createInsertSchema(syncConflicts).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+  resolvedBy: true,
+});
+export type InsertSyncConflict = z.infer<typeof insertSyncConflictSchema>;
+export type SyncConflict = typeof syncConflicts.$inferSelect;
+
+// Import job enums
+export const importJobStatusEnum = pgEnum("import_job_status", [
+  "pending",
+  "validating",
+  "validated",
+  "running",
+  "completed",
+  "failed",
+  "cancelled"
+]);
+
+export const importRowStatusEnum = pgEnum("import_row_status", [
+  "ok",
+  "warning",
+  "error",
+  "collision",
+  "skipped"
+]);
+
+// Table import_jobs - Tracks CSV import jobs
+export const importJobs = pgTable("import_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  type: text("type").default("patients_csv").notNull(),
+  status: importJobStatusEnum("status").default("pending").notNull(),
+  cancelRequested: boolean("cancel_requested").default(false).notNull(),
+  cancellationReason: text("cancellation_reason"), // 'user' or 'system'
+  fileName: text("file_name"),
+  filePath: text("file_path"),
+  fileHash: text("file_hash"),
+  totalRows: integer("total_rows").default(0),
+  processedRows: integer("processed_rows").default(0),
+  stats: text("stats").default("{}"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  validatedAt: timestamp("validated_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+});
+
+export const importJobsRelations = relations(importJobs, ({ one, many }) => ({
+  organisation: one(organisations, {
+    fields: [importJobs.organisationId],
+    references: [organisations.id],
+  }),
+  user: one(users, {
+    fields: [importJobs.userId],
+    references: [users.id],
+  }),
+  rows: many(importJobRows),
+}));
+
+// Table import_job_rows - Individual rows from CSV imports
+export const importJobRows = pgTable("import_job_rows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => importJobs.id, { onDelete: "cascade" }),
+  rowIndex: integer("row_index").notNull(),
+  rawData: text("raw_data").notNull(),
+  normalizedData: text("normalized_data"),
+  status: importRowStatusEnum("status").default("ok").notNull(),
+  errors: text("errors").default("[]"),
+  warnings: text("warnings").default("[]"),
+  matchedPatientId: varchar("matched_patient_id").references(() => patients.id, { onDelete: "set null" }),
+  matchType: text("match_type"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const importJobRowsRelations = relations(importJobRows, ({ one }) => ({
+  job: one(importJobs, {
+    fields: [importJobRows.jobId],
+    references: [importJobs.id],
+  }),
+  matchedPatient: one(patients, {
+    fields: [importJobRows.matchedPatientId],
+    references: [patients.id],
+  }),
+}));
+
+export const insertImportJobSchema = createInsertSchema(importJobs).omit({
+  id: true,
+  createdAt: true,
+  validatedAt: true,
+  startedAt: true,
+  completedAt: true,
+});
+export type InsertImportJob = z.infer<typeof insertImportJobSchema>;
+export type ImportJob = typeof importJobs.$inferSelect;
+
+export const insertImportJobRowSchema = createInsertSchema(importJobRows).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertImportJobRow = z.infer<typeof insertImportJobRowSchema>;
+export type ImportJobRow = typeof importJobRows.$inferSelect;
 
 // Table flags - Clinical alerts and warnings
 export const flags = pgTable("flags", {
@@ -755,8 +974,105 @@ export const insertOrganisationSchema = createInsertSchema(organisations).omit({
   createdAt: true,
 });
 
+// Enums for transactional emails
+export const emailTokenTypeEnum = pgEnum("email_token_type", ["PASSWORD_RESET", "EMAIL_VERIFY"]);
+export const invitationStatusEnum = pgEnum("invitation_status", ["PENDING", "ACCEPTED", "EXPIRED", "CANCELLED"]);
+export const emailStatusEnum = pgEnum("email_status", ["PENDING", "SENT", "FAILED"]);
+
+// Email tokens for password reset and email verification
+export const emailTokens = pgTable("email_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  type: emailTokenTypeEnum("type").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const emailTokensRelations = relations(emailTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [emailTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+// Invitations for collaborators
+export const invitations = pgTable("invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: roleEnum("role").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  status: invitationStatusEnum("status").default("PENDING").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  invitedByUserId: varchar("invited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  nom: text("nom"),
+  prenom: text("prenom"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [invitations.organisationId],
+    references: [organisations.id],
+  }),
+  invitedBy: one(users, {
+    fields: [invitations.invitedByUserId],
+    references: [users.id],
+  }),
+}));
+
+// Email outbox for tracking sent emails
+export const emailOutbox = pgTable("email_outbox", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").references(() => organisations.id, { onDelete: "cascade" }),
+  toEmail: text("to_email").notNull(),
+  template: text("template").notNull(),
+  subject: text("subject").notNull(),
+  payload: text("payload"),
+  status: emailStatusEnum("status").default("PENDING").notNull(),
+  sentAt: timestamp("sent_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const emailOutboxRelations = relations(emailOutbox, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [emailOutbox.organisationId],
+    references: [organisations.id],
+  }),
+}));
+
+// Insert schemas for new tables
+export const insertEmailTokenSchema = createInsertSchema(emailTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInvitationSchema = createInsertSchema(invitations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEmailOutboxSchema = createInsertSchema(emailOutbox).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertOrganisation = z.infer<typeof insertOrganisationSchema>;
 export type Organisation = typeof organisations.$inferSelect;
+
+export type InsertEmailToken = z.infer<typeof insertEmailTokenSchema>;
+export type EmailToken = typeof emailTokens.$inferSelect;
+
+export type InsertInvitation = z.infer<typeof insertInvitationSchema>;
+export type Invitation = typeof invitations.$inferSelect;
+
+export type InsertEmailOutbox = z.infer<typeof insertEmailOutboxSchema>;
+export type EmailOutbox = typeof emailOutbox.$inferSelect;
 
 export type InsertPatient = z.infer<typeof insertPatientSchema>;
 export type Patient = typeof patients.$inferSelect;

@@ -14,6 +14,11 @@ import {
   savedFilters,
   appointments,
   flags,
+  googleCalendarEvents,
+  syncConflicts,
+  emailTokens,
+  invitations,
+  emailOutbox,
   type Patient,
   type InsertPatient,
   type Operation,
@@ -52,6 +57,11 @@ import {
   calendarIntegrations,
   type CalendarIntegration,
   type InsertCalendarIntegration,
+  type GoogleCalendarEvent,
+  type SyncConflict,
+  type EmailToken,
+  type Invitation,
+  type EmailOutbox,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -178,9 +188,14 @@ export interface IStorage {
   getUserById(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(data: CreateUserInput): Promise<User>;
+  updateUser(id: string, data: Partial<{ password: string; role: "ADMIN" | "CHIRURGIEN" | "ASSISTANT"; nom: string | null; prenom: string | null }>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
+  getUsersByOrganisation(organisationId: string): Promise<User[]>;
 
   // Organisation methods
   createOrganisation(data: InsertOrganisation): Promise<Organisation>;
+  getOrganisationById(id: string): Promise<Organisation | undefined>;
+  updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; timezone: string }>): Promise<Organisation | undefined>;
 
   // Note methods
   getPatientNotes(organisationId: string, patientId: string): Promise<(Note & { user: { nom: string | null; prenom: string | null } })[]>;
@@ -251,6 +266,48 @@ export interface IStorage {
   getAppointmentsForSync(organisationId: string, lastSyncAt?: Date): Promise<(Appointment & { patient?: { nom: string; prenom: string } })[]>;
   updateAppointmentSync(organisationId: string, id: string, data: { externalProvider?: string; externalCalendarId?: string; externalEventId?: string; externalEtag?: string; syncStatus?: string; lastSyncedAt?: Date; syncError?: string | null }): Promise<void>;
   updateIntegrationSyncStatus(organisationId: string, id: string, data: { lastSyncAt?: Date; syncErrorCount?: number; lastSyncError?: string | null }): Promise<void>;
+  
+  // V2: Google Calendar Import (Google -> Cassius)
+  upsertGoogleCalendarEvent(organisationId: string, data: {
+    integrationId: string;
+    googleCalendarId: string;
+    googleEventId: string;
+    etag?: string;
+    status?: 'confirmed' | 'tentative' | 'cancelled';
+    summary?: string | null;
+    description?: string | null;
+    location?: string | null;
+    startAt?: Date | null;
+    endAt?: Date | null;
+    allDay?: boolean;
+    attendees?: string | null;
+    htmlLink?: string | null;
+    updatedAtGoogle?: Date | null;
+  }): Promise<{ isNew: boolean; event: GoogleCalendarEvent }>;
+  getGoogleCalendarEvents(organisationId: string, startDate: Date, endDate: Date): Promise<GoogleCalendarEvent[]>;
+  getGoogleCalendarEventsCount(organisationId: string): Promise<number>;
+  getSyncConflicts(organisationId: string, status: 'open' | 'resolved' | 'ignored'): Promise<SyncConflict[]>;
+  resolveConflict(organisationId: string, id: string, status: 'resolved' | 'ignored', userId: string | null): Promise<void>;
+
+  // Email token methods (password reset, email verification)
+  createEmailToken(data: { userId?: string | null; email: string; type: 'PASSWORD_RESET' | 'EMAIL_VERIFY'; tokenHash: string; expiresAt: Date }): Promise<EmailToken>;
+  getEmailTokenByHash(tokenHash: string): Promise<EmailToken | undefined>;
+  markEmailTokenUsed(id: string): Promise<void>;
+  invalidateEmailTokens(email: string, type: 'PASSWORD_RESET' | 'EMAIL_VERIFY'): Promise<void>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  updateUserEmailVerified(userId: string): Promise<void>;
+
+  // Invitation methods
+  createInvitation(organisationId: string, data: { email: string; role: 'ADMIN' | 'CHIRURGIEN' | 'ASSISTANT'; tokenHash: string; expiresAt: Date; invitedByUserId: string; nom?: string | null; prenom?: string | null }): Promise<Invitation>;
+  getInvitationByToken(tokenHash: string): Promise<Invitation | undefined>;
+  getInvitationsByOrganisation(organisationId: string): Promise<Invitation[]>;
+  acceptInvitation(id: string): Promise<void>;
+  cancelInvitation(organisationId: string, id: string): Promise<void>;
+  getInvitationByEmail(organisationId: string, email: string): Promise<Invitation | undefined>;
+
+  // Email outbox methods
+  logEmail(data: { organisationId?: string | null; toEmail: string; template: string; subject: string; payload?: string | null; status: 'PENDING' | 'SENT' | 'FAILED'; sentAt?: Date | null; errorMessage?: string | null }): Promise<EmailOutbox>;
+  updateEmailStatus(id: string, status: 'PENDING' | 'SENT' | 'FAILED', errorMessage?: string | null): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1895,12 +1952,36 @@ export class DatabaseStorage implements IStorage {
     }).returning();
     return user;
   }
+  
+  async updateUser(id: string, data: Partial<{ password: string; role: "ADMIN" | "CHIRURGIEN" | "ASSISTANT"; nom: string | null; prenom: string | null }>): Promise<User | undefined> {
+    const [user] = await db.update(users).set(data as any).where(eq(users.id, id)).returning();
+    return user;
+  }
+  
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+  
+  async getUsersByOrganisation(organisationId: string): Promise<User[]> {
+    return db.select().from(users).where(eq(users.organisationId, organisationId));
+  }
 
   // ========== ORGANISATIONS ==========
   async createOrganisation(data: InsertOrganisation): Promise<Organisation> {
     const [org] = await db.insert(organisations).values({
       nom: data.nom,
     }).returning();
+    return org;
+  }
+  
+  async getOrganisationById(id: string): Promise<Organisation | undefined> {
+    const [org] = await db.select().from(organisations).where(eq(organisations.id, id));
+    return org;
+  }
+  
+  async updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; timezone: string }>): Promise<Organisation | undefined> {
+    const [org] = await db.update(organisations).set(data as any).where(eq(organisations.id, id)).returning();
     return org;
   }
 
@@ -3613,6 +3694,258 @@ export class DatabaseStorage implements IStorage {
         eq(calendarIntegrations.id, id),
         eq(calendarIntegrations.organisationId, organisationId)
       ));
+  }
+  
+  // ========== V2: GOOGLE CALENDAR IMPORT ==========
+  
+  async upsertGoogleCalendarEvent(organisationId: string, data: {
+    integrationId: string;
+    googleCalendarId: string;
+    googleEventId: string;
+    etag?: string;
+    status?: 'confirmed' | 'tentative' | 'cancelled';
+    summary?: string | null;
+    description?: string | null;
+    location?: string | null;
+    startAt?: Date | null;
+    endAt?: Date | null;
+    allDay?: boolean;
+    attendees?: string | null;
+    htmlLink?: string | null;
+    updatedAtGoogle?: Date | null;
+  }): Promise<{ isNew: boolean; event: GoogleCalendarEvent }> {
+    // Check if event already exists
+    const existing = await db.select().from(googleCalendarEvents)
+      .where(and(
+        eq(googleCalendarEvents.organisationId, organisationId),
+        eq(googleCalendarEvents.googleCalendarId, data.googleCalendarId),
+        eq(googleCalendarEvents.googleEventId, data.googleEventId)
+      ))
+      .limit(1);
+    
+    const now = new Date();
+    
+    if (existing.length > 0) {
+      // Update existing event
+      const [updated] = await db.update(googleCalendarEvents)
+        .set({
+          etag: data.etag,
+          status: data.status,
+          summary: data.summary,
+          description: data.description,
+          location: data.location,
+          startAt: data.startAt,
+          endAt: data.endAt,
+          allDay: data.allDay,
+          attendees: data.attendees,
+          htmlLink: data.htmlLink,
+          updatedAtGoogle: data.updatedAtGoogle,
+          lastSyncedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(googleCalendarEvents.id, existing[0].id))
+        .returning();
+      
+      return { isNew: false, event: updated };
+    } else {
+      // Insert new event
+      const [inserted] = await db.insert(googleCalendarEvents)
+        .values({
+          organisationId,
+          integrationId: data.integrationId,
+          googleCalendarId: data.googleCalendarId,
+          googleEventId: data.googleEventId,
+          etag: data.etag,
+          status: data.status,
+          summary: data.summary,
+          description: data.description,
+          location: data.location,
+          startAt: data.startAt,
+          endAt: data.endAt,
+          allDay: data.allDay,
+          attendees: data.attendees,
+          htmlLink: data.htmlLink,
+          updatedAtGoogle: data.updatedAtGoogle,
+          lastSyncedAt: now,
+        })
+        .returning();
+      
+      return { isNew: true, event: inserted };
+    }
+  }
+  
+  async getGoogleCalendarEvents(organisationId: string, startDate: Date, endDate: Date): Promise<GoogleCalendarEvent[]> {
+    return await db.select().from(googleCalendarEvents)
+      .where(and(
+        eq(googleCalendarEvents.organisationId, organisationId),
+        gte(googleCalendarEvents.startAt, startDate),
+        lte(googleCalendarEvents.startAt, endDate)
+      ))
+      .orderBy(googleCalendarEvents.startAt);
+  }
+  
+  async getGoogleCalendarEventsCount(organisationId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(googleCalendarEvents)
+      .where(eq(googleCalendarEvents.organisationId, organisationId));
+    return Number(result[0]?.count || 0);
+  }
+  
+  async getSyncConflicts(organisationId: string, status: 'open' | 'resolved' | 'ignored'): Promise<SyncConflict[]> {
+    return await db.select().from(syncConflicts)
+      .where(and(
+        eq(syncConflicts.organisationId, organisationId),
+        eq(syncConflicts.status, status)
+      ))
+      .orderBy(desc(syncConflicts.createdAt));
+  }
+  
+  async resolveConflict(organisationId: string, id: string, status: 'resolved' | 'ignored', userId: string | null): Promise<void> {
+    await db.update(syncConflicts)
+      .set({
+        status,
+        resolvedAt: new Date(),
+        resolvedBy: userId,
+      })
+      .where(and(
+        eq(syncConflicts.id, id),
+        eq(syncConflicts.organisationId, organisationId)
+      ));
+  }
+
+  // ========== EMAIL TOKENS ==========
+  async createEmailToken(data: { userId?: string | null; email: string; type: 'PASSWORD_RESET' | 'EMAIL_VERIFY'; tokenHash: string; expiresAt: Date }): Promise<EmailToken> {
+    const [token] = await db.insert(emailTokens)
+      .values({
+        userId: data.userId || null,
+        email: data.email,
+        type: data.type,
+        tokenHash: data.tokenHash,
+        expiresAt: data.expiresAt,
+      })
+      .returning();
+    return token;
+  }
+
+  async getEmailTokenByHash(tokenHash: string): Promise<EmailToken | undefined> {
+    const [token] = await db.select().from(emailTokens)
+      .where(eq(emailTokens.tokenHash, tokenHash));
+    return token || undefined;
+  }
+
+  async markEmailTokenUsed(id: string): Promise<void> {
+    await db.update(emailTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(emailTokens.id, id));
+  }
+
+  async invalidateEmailTokens(email: string, type: 'PASSWORD_RESET' | 'EMAIL_VERIFY'): Promise<void> {
+    await db.update(emailTokens)
+      .set({ usedAt: new Date() })
+      .where(and(
+        eq(emailTokens.email, email),
+        eq(emailTokens.type, type),
+        isNull(emailTokens.usedAt)
+      ));
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users)
+      .where(eq(users.username, email));
+    return user || undefined;
+  }
+
+  async updateUserEmailVerified(userId: string): Promise<void> {
+    await db.update(users)
+      .set({
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  // ========== INVITATIONS ==========
+  async createInvitation(organisationId: string, data: { email: string; role: 'ADMIN' | 'CHIRURGIEN' | 'ASSISTANT'; tokenHash: string; expiresAt: Date; invitedByUserId: string; nom?: string | null; prenom?: string | null }): Promise<Invitation> {
+    const [invitation] = await db.insert(invitations)
+      .values({
+        organisationId,
+        email: data.email,
+        role: data.role,
+        tokenHash: data.tokenHash,
+        expiresAt: data.expiresAt,
+        invitedByUserId: data.invitedByUserId,
+        nom: data.nom || null,
+        prenom: data.prenom || null,
+      })
+      .returning();
+    return invitation;
+  }
+
+  async getInvitationByToken(tokenHash: string): Promise<Invitation | undefined> {
+    const [invitation] = await db.select().from(invitations)
+      .where(eq(invitations.tokenHash, tokenHash));
+    return invitation || undefined;
+  }
+
+  async getInvitationsByOrganisation(organisationId: string): Promise<Invitation[]> {
+    return await db.select().from(invitations)
+      .where(eq(invitations.organisationId, organisationId))
+      .orderBy(desc(invitations.createdAt));
+  }
+
+  async acceptInvitation(id: string): Promise<void> {
+    await db.update(invitations)
+      .set({
+        status: 'ACCEPTED',
+        acceptedAt: new Date(),
+      })
+      .where(eq(invitations.id, id));
+  }
+
+  async cancelInvitation(organisationId: string, id: string): Promise<void> {
+    await db.update(invitations)
+      .set({ status: 'CANCELLED' })
+      .where(and(
+        eq(invitations.id, id),
+        eq(invitations.organisationId, organisationId)
+      ));
+  }
+
+  async getInvitationByEmail(organisationId: string, email: string): Promise<Invitation | undefined> {
+    const [invitation] = await db.select().from(invitations)
+      .where(and(
+        eq(invitations.organisationId, organisationId),
+        eq(invitations.email, email),
+        eq(invitations.status, 'PENDING')
+      ));
+    return invitation || undefined;
+  }
+
+  // ========== EMAIL OUTBOX ==========
+  async logEmail(data: { organisationId?: string | null; toEmail: string; template: string; subject: string; payload?: string | null; status: 'PENDING' | 'SENT' | 'FAILED'; sentAt?: Date | null; errorMessage?: string | null }): Promise<EmailOutbox> {
+    const [email] = await db.insert(emailOutbox)
+      .values({
+        organisationId: data.organisationId || null,
+        toEmail: data.toEmail,
+        template: data.template,
+        subject: data.subject,
+        payload: data.payload || null,
+        status: data.status,
+        sentAt: data.sentAt || null,
+        errorMessage: data.errorMessage || null,
+      })
+      .returning();
+    return email;
+  }
+
+  async updateEmailStatus(id: string, status: 'PENDING' | 'SENT' | 'FAILED', errorMessage?: string | null): Promise<void> {
+    await db.update(emailOutbox)
+      .set({
+        status,
+        sentAt: status === 'SENT' ? new Date() : undefined,
+        errorMessage: errorMessage || null,
+      })
+      .where(eq(emailOutbox.id, id));
   }
 }
 

@@ -140,13 +140,13 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                         />
                       </FormControl>
                       <div className="flex justify-end">
-                        <button 
-                          type="button"
+                        <Link 
+                          href="/forgot-password"
                           className="text-sm text-primary hover:underline"
                           data-testid="link-forgot-password"
                         >
                           Mot de passe oublié ?
-                        </button>
+                        </Link>
                       </div>
                       <FormMessage />
                     </FormItem>

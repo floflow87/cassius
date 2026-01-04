@@ -1,0 +1,96 @@
+Objectif
+Le compteur live de l’import CSV (patients traités / total, créés, mis à jour, erreurs) reste à 0 pendant l’import.
+Je veux implémenter une méthode correcte et fiable pour suivre la progression en temps réel.
+
+Contexte
+- Import CSV patients (6601 lignes)
+- UI étape 5 “Import en cours” affiche :
+  - progress: processed/total
+  - counts: created, updated, errors
+- Actuellement : progress reste à 0 (probablement car l’UI ne reçoit aucun état intermédiaire, ou le backend ne persiste pas la progression).
+
+Bonne méthode à appliquer (obligatoire)
+Mettre en place un “job progress tracking” côté backend + polling côté frontend (ou SSE si souhaité).
+L’UI ne doit PAS essayer d’estimer la progression. Elle doit lire un état serveur persistant.
+
+Tâches Backend
+1) Stocker la progression dans la table import_jobs (ou une table dédiée)
+Ajouter/garantir les champs :
+- status: 'running' | 'completed' | 'failed'
+- total_rows INT
+- processed_rows INT
+- created_count INT
+- updated_count INT
+- error_count INT
+- last_error TEXT (optionnel)
+- started_at, completed_at
+- updated_at (auto)
+Optionnel: progress_details JSONB (ex: last_row_index, last_patient_name)
+
+2) Pendant l’import (batch processing)
+- Fixer total_rows dès le début (ex: 6601)
+- Traiter par batch (ex: 100 ou 200 lignes)
+- Après chaque batch, faire un UPDATE de import_jobs avec les compteurs :
+  processed_rows += batchProcessed
+  created_count += batchCreated
+  updated_count += batchUpdated
+  error_count += batchErrors
+- IMPORTANT : limiter le nombre d’updates DB (update par batch, pas par ligne) pour éviter de saturer Supabase.
+- En cas d’erreur globale : status='failed' + message + completed_at
+
+3) Exposer un endpoint de status “progress”
+Créer/valider :
+GET /api/import/:jobId/status
+Retourner un JSON stable :
+{
+  jobId,
+  status,
+  totalRows,
+  processedRows,
+  created,
+  updated,
+  errors,
+  startedAt,
+  completedAt,
+  lastError
+}
+
+4) Garantir la cohérence (anti-bug)
+- processedRows ne doit jamais dépasser totalRows
+- si status='completed' => processedRows = totalRows
+- si status='failed' => renvoyer lastError
+- Toujours mettre à jour updated_at pour que le polling voie du changement
+
+Tâches Frontend
+1) Déclenchement
+- À l’entrée étape 5 : appeler POST /api/import/patients/run (ou endpoint existant) et récupérer jobId
+- Démarrer le polling uniquement quand jobId est connu.
+
+2) Polling fiable
+- Toutes les 1s–2s : appeler GET /api/import/:jobId/status
+- Mettre à jour l’UI avec les champs renvoyés.
+- Stop polling si status in ['completed','failed'].
+- Si aucune progression (processedRows inchangé) pendant X secondes (ex 30–60s) :
+  afficher un warning “Import plus long que prévu, ne fermez pas la page” + garder polling.
+
+3) UI
+- Progress bar = processedRows / totalRows
+- Counters = created/updated/errors
+- Si status='failed' : arrêter loader + afficher lastError + bouton relancer / télécharger rapport erreurs
+- Si status='completed' : passer étape 6 “Terminé” avec résumé final
+
+4) Observabilité (debug)
+- Afficher en dev un mini log (optionnel) :
+  “Dernière mise à jour: hh:mm:ss” + “processedRows”
+pour vérifier facilement que ça bouge.
+
+Contraintes
+- Ne pas utiliser de WebSocket si non nécessaire. Polling suffit et est plus simple.
+- Mise à jour DB par batch, pas par ligne.
+- Ne jamais laisser l’UI en boucle infinie sans statut serveur.
+
+Livrables attendus
+- Pendant l’import, processedRows augmente (ex: 0 -> 200 -> 400...)
+- created/updated/errors se mettent à jour en live
+- En fin : status='completed' et passage auto à l’étape “Terminé”
+- En cas d’échec : status='failed' + message affiché, pas de loading infini
