@@ -15,13 +15,13 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   User, 
   Shield, 
   Link2, 
   Users, 
   Building2, 
-  ChevronRight,
   Check,
   X,
   Calendar,
@@ -33,8 +33,7 @@ import {
   UserPlus,
   Trash2,
   ExternalLink,
-  AlertCircle,
-  Settings
+  AlertCircle
 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 
@@ -116,7 +115,6 @@ function getRoleBadgeVariant(role: string): "default" | "secondary" | "outline" 
 }
 
 export default function SettingsPage() {
-  const [activeSection, setActiveSection] = useState<SettingsSection>("security");
   const { toast } = useToast();
 
   const { data: profile, isLoading: profileLoading } = useQuery<UserProfile>({
@@ -124,15 +122,6 @@ export default function SettingsPage() {
   });
 
   const userIsAdmin = profile?.role === "ADMIN";
-
-  const sections = [
-    { id: "security" as const, label: "Informations & Sécurité", icon: Shield, adminOnly: false },
-    { id: "integrations" as const, label: "Intégrations", icon: Link2, adminOnly: false },
-    { id: "collaborators" as const, label: "Collaborateurs", icon: Users, adminOnly: true },
-    { id: "organization" as const, label: "Organisation", icon: Building2, adminOnly: true },
-  ];
-
-  const visibleSections = sections.filter(s => !s.adminOnly || userIsAdmin);
 
   if (profileLoading) {
     return (
@@ -143,36 +132,55 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex h-full" data-testid="settings-page">
-      <aside className="w-64 border-r bg-sidebar p-4 space-y-1">
-        <div className="flex items-center gap-2 px-2 mb-4">
-          <Settings className="w-5 h-5" />
-          <h2 className="text-lg font-semibold">Paramètres</h2>
-        </div>
-        {visibleSections.map((section) => (
-          <button
-            key={section.id}
-            onClick={() => setActiveSection(section.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors ${
-              activeSection === section.id
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "hover-elevate"
-            }`}
-            data-testid={`nav-${section.id}`}
-          >
-            <section.icon className="w-4 h-4" />
-            <span className="flex-1">{section.label}</span>
-            {activeSection === section.id && <ChevronRight className="w-4 h-4" />}
-          </button>
-        ))}
-      </aside>
+    <div className="h-full overflow-auto p-6" data-testid="settings-page">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-2xl font-bold mb-6">Paramètres</h1>
+        
+        <Tabs defaultValue="security" className="w-full">
+          <TabsList className="mb-6 flex-wrap">
+            <TabsTrigger value="security" className="gap-2" data-testid="nav-security">
+              <Shield className="w-4 h-4" />
+              Informations & Sécurité
+            </TabsTrigger>
+            <TabsTrigger value="integrations" className="gap-2" data-testid="nav-integrations">
+              <Link2 className="w-4 h-4" />
+              Intégrations
+            </TabsTrigger>
+            {userIsAdmin && (
+              <TabsTrigger value="collaborators" className="gap-2" data-testid="nav-collaborators">
+                <Users className="w-4 h-4" />
+                Collaborateurs
+              </TabsTrigger>
+            )}
+            {userIsAdmin && (
+              <TabsTrigger value="organization" className="gap-2" data-testid="nav-organization">
+                <Building2 className="w-4 h-4" />
+                Organisation
+              </TabsTrigger>
+            )}
+          </TabsList>
 
-      <main className="flex-1 p-6 overflow-auto">
-        {activeSection === "security" && profile && <SecuritySection profile={profile} />}
-        {activeSection === "integrations" && <IntegrationsSection />}
-        {activeSection === "collaborators" && userIsAdmin && <CollaboratorsSection />}
-        {activeSection === "organization" && userIsAdmin && <OrganizationSection />}
-      </main>
+          <TabsContent value="security">
+            {profile && <SecuritySection profile={profile} />}
+          </TabsContent>
+          
+          <TabsContent value="integrations">
+            <IntegrationsSection />
+          </TabsContent>
+          
+          {userIsAdmin && (
+            <TabsContent value="collaborators">
+              <CollaboratorsSection />
+            </TabsContent>
+          )}
+          
+          {userIsAdmin && (
+            <TabsContent value="organization">
+              <OrganizationSection />
+            </TabsContent>
+          )}
+        </Tabs>
+      </div>
     </div>
   );
 }
