@@ -33,7 +33,9 @@ import {
   UserPlus,
   Trash2,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Bell,
+  Loader2
 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 
@@ -146,6 +148,10 @@ export default function SettingsPage() {
               <Link2 className="w-4 h-4" />
               Intégrations
             </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2" data-testid="nav-notifications">
+              <Bell className="w-4 h-4" />
+              Notifications
+            </TabsTrigger>
             {userIsAdmin && (
               <TabsTrigger value="collaborators" className="gap-2" data-testid="nav-collaborators">
                 <Users className="w-4 h-4" />
@@ -166,6 +172,10 @@ export default function SettingsPage() {
           
           <TabsContent value="integrations">
             <IntegrationsSection />
+          </TabsContent>
+          
+          <TabsContent value="notifications">
+            <NotificationsSection />
           </TabsContent>
           
           {userIsAdmin && (
@@ -1028,6 +1038,191 @@ function OrganizationSection() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface NotificationPreference {
+  id: string;
+  userId: string;
+  notificationType: string;
+  inAppEnabled: boolean;
+  emailEnabled: boolean;
+  frequency: "NONE" | "IMMEDIATE" | "DAILY_DIGEST" | "WEEKLY_DIGEST";
+}
+
+const NOTIFICATION_TYPE_LABELS: Record<string, { label: string; description: string }> = {
+  ISQ_UPDATE: { label: "Mises à jour ISQ", description: "Alertes sur les mesures ISQ (faibles, progrès, rappels)" },
+  APPOINTMENT: { label: "Rendez-vous", description: "Rappels et confirmations de rendez-vous" },
+  DOCUMENT: { label: "Documents", description: "Nouveaux documents ajoutés à vos patients" },
+  IMPORT: { label: "Imports", description: "Résultats des imports de patients" },
+  SYSTEM: { label: "Système", description: "Mises à jour et annonces du système" },
+};
+
+const FREQUENCY_LABELS: Record<string, string> = {
+  NONE: "Désactivé",
+  IMMEDIATE: "Immédiat",
+  DAILY_DIGEST: "Résumé quotidien",
+  WEEKLY_DIGEST: "Résumé hebdomadaire",
+};
+
+function NotificationsSection() {
+  const { toast } = useToast();
+  
+  const { data: preferences, isLoading } = useQuery<NotificationPreference[]>({
+    queryKey: ["/api/notifications/preferences"],
+  });
+  
+  const updatePreferenceMutation = useMutation({
+    mutationFn: async ({ notificationType, updates }: { notificationType: string; updates: Partial<NotificationPreference> }) => {
+      return apiRequest("PATCH", `/api/notifications/preferences/${notificationType}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/preferences"] });
+      toast({ title: "Préférences mises à jour" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    },
+  });
+  
+  const getPreference = (type: string) => {
+    return preferences?.find(p => p.notificationType === type) || {
+      notificationType: type,
+      inAppEnabled: true,
+      emailEnabled: false,
+      frequency: "IMMEDIATE" as const,
+    };
+  };
+  
+  const handleFrequencyChange = (type: string, frequency: string) => {
+    updatePreferenceMutation.mutate({ 
+      notificationType: type, 
+      updates: { frequency: frequency as NotificationPreference["frequency"] } 
+    });
+  };
+  
+  const handleToggleInApp = (type: string, enabled: boolean) => {
+    updatePreferenceMutation.mutate({ 
+      notificationType: type, 
+      updates: { inAppEnabled: enabled } 
+    });
+  };
+  
+  const handleToggleEmail = (type: string, enabled: boolean) => {
+    updatePreferenceMutation.mutate({ 
+      notificationType: type, 
+      updates: { emailEnabled: enabled } 
+    });
+  };
+  
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h2 className="text-2xl font-bold">Notifications</h2>
+        <p className="text-muted-foreground">Configurez comment et quand vous recevez les notifications.</p>
+      </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5" />
+            Préférences par type
+          </CardTitle>
+          <CardDescription>
+            Personnalisez les notifications pour chaque catégorie
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {Object.entries(NOTIFICATION_TYPE_LABELS).map(([type, { label, description }]) => {
+                const pref = getPreference(type);
+                return (
+                  <div key={type} className="pb-6 border-b last:border-b-0 last:pb-0">
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div>
+                        <h4 className="font-medium">{label}</h4>
+                        <p className="text-sm text-muted-foreground">{description}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div>
+                        <Label className="text-sm text-muted-foreground mb-2 block">Fréquence</Label>
+                        <Select 
+                          value={pref.frequency} 
+                          onValueChange={(v) => handleFrequencyChange(type, v)}
+                          disabled={updatePreferenceMutation.isPending}
+                        >
+                          <SelectTrigger data-testid={`select-frequency-${type}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="NONE">{FREQUENCY_LABELS.NONE}</SelectItem>
+                            <SelectItem value="IMMEDIATE">{FREQUENCY_LABELS.IMMEDIATE}</SelectItem>
+                            <SelectItem value="DAILY_DIGEST">{FREQUENCY_LABELS.DAILY_DIGEST}</SelectItem>
+                            <SelectItem value="WEEKLY_DIGEST">{FREQUENCY_LABELS.WEEKLY_DIGEST}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id={`inapp-${type}`}
+                          checked={pref.inAppEnabled}
+                          onCheckedChange={(v) => handleToggleInApp(type, v)}
+                          disabled={updatePreferenceMutation.isPending || pref.frequency === "NONE"}
+                          data-testid={`switch-inapp-${type}`}
+                        />
+                        <Label htmlFor={`inapp-${type}`} className="text-sm">
+                          Dans l'app
+                        </Label>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id={`email-${type}`}
+                          checked={pref.emailEnabled}
+                          onCheckedChange={(v) => handleToggleEmail(type, v)}
+                          disabled={updatePreferenceMutation.isPending || pref.frequency === "NONE"}
+                          data-testid={`switch-email-${type}`}
+                        />
+                        <Label htmlFor={`email-${type}`} className="text-sm">
+                          Email
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Résumés par email
+          </CardTitle>
+          <CardDescription>
+            Recevez un récapitulatif de vos notifications non lues
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Si vous choisissez "Résumé quotidien" ou "Résumé hebdomadaire" pour une catégorie, 
+            vous recevrez un email récapitulatif à la fréquence choisie, regroupant toutes les 
+            notifications non lues de cette catégorie.
+          </p>
         </CardContent>
       </Card>
     </div>
