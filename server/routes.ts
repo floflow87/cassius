@@ -4734,5 +4734,23 @@ export async function registerRoutes(
     }
   });
 
+  // Manual digest trigger (admin only - requires CHIRURGIEN or ADMIN role)
+  app.post("/api/admin/digest/daily", requireJwtOrSession, async (req, res) => {
+    try {
+      const userRole = req.jwtUser?.role;
+      if (!userRole || !["CHIRURGIEN", "ADMIN"].includes(userRole)) {
+        return res.status(403).json({ error: "Acces refuse - Administrateur requis" });
+      }
+      
+      const { runDailyDigest } = await import("./notifications/digestScheduler");
+      const result = await runDailyDigest();
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("[Digest] Error running daily digest:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+
   return httpServer;
 }

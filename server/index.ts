@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
 import { logSchemaCheck } from "./schemaCheck";
+import { startDigestScheduler } from "./notifications/digestScheduler";
 import { 
   createRequestContext, 
   runWithContext, 
@@ -147,6 +148,9 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      
+      // Start the notification digest scheduler
+      startDigestScheduler();
     },
   );
 })();
