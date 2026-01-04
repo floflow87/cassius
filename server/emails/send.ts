@@ -5,6 +5,7 @@ import { invitationHtml, invitationText, InvitationData } from './templates/invi
 import { securityNoticeHtml, securityNoticeText, SecurityNoticeData } from './templates/securityNotice';
 import { integrationConnectedHtml, integrationConnectedText, IntegrationConnectedData } from './templates/integrationConnected';
 import { systemAlertHtml, systemAlertText, SystemAlertData } from './templates/systemAlert';
+import { notificationDigestHtml, notificationDigestText, NotificationDigestData } from './templates/notificationDigest';
 
 let connectionSettings: any;
 
@@ -72,7 +73,8 @@ export type TemplateName =
   | 'invitation'
   | 'securityNotice'
   | 'integrationConnected'
-  | 'systemAlert';
+  | 'systemAlert'
+  | 'notificationDigest';
 
 export type TemplateData = {
   resetPassword: ResetPasswordData;
@@ -81,6 +83,7 @@ export type TemplateData = {
   securityNotice: SecurityNoticeData;
   integrationConnected: IntegrationConnectedData;
   systemAlert: SystemAlertData;
+  notificationDigest: NotificationDigestData;
 };
 
 const SUBJECT_MAP: Record<TemplateName, (data: any) => string> = {
@@ -105,6 +108,7 @@ const SUBJECT_MAP: Record<TemplateName, (data: any) => string> = {
     };
     return titles[data.alertType] || 'Notification Cassius';
   },
+  notificationDigest: (data: NotificationDigestData) => `Resume des notifications - ${data.periodLabel} - Cassius`,
 };
 
 function generateHtml(template: TemplateName, data: any): string {
@@ -121,6 +125,8 @@ function generateHtml(template: TemplateName, data: any): string {
       return integrationConnectedHtml(data);
     case 'systemAlert':
       return systemAlertHtml(data);
+    case 'notificationDigest':
+      return notificationDigestHtml(data);
     default:
       throw new Error(`Unknown template: ${template}`);
   }
@@ -140,6 +146,8 @@ function generateText(template: TemplateName, data: any): string {
       return integrationConnectedText(data);
     case 'systemAlert':
       return systemAlertText(data);
+    case 'notificationDigest':
+      return notificationDigestText(data);
     default:
       throw new Error(`Unknown template: ${template}`);
   }
@@ -226,6 +234,16 @@ export function getPreviewHtml(template: TemplateName, data?: any): string {
       actionUrl: `${baseUrl}/settings/billing`,
       actionLabel: 'Voir les offres',
       expiryInfo: 'Votre essai expire le 10 janvier 2026.',
+    },
+    notificationDigest: {
+      firstName: 'Marie',
+      periodLabel: 'Aujourd\'hui',
+      notifications: [
+        { title: 'ISQ bas detecte', body: 'Un implant presente un ISQ faible (58). Action requise.', severity: 'CRITICAL', createdAt: '10:30' },
+        { title: 'Suivi a programmer', body: 'Un patient necessite un rendez-vous de suivi.', severity: 'WARNING', createdAt: '09:15' },
+        { title: 'Import termine', body: '25 patients importes avec succes.', severity: 'INFO', createdAt: '08:00' },
+      ],
+      dashboardUrl: `${baseUrl}/notifications`,
     },
   };
   
