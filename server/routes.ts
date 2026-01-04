@@ -9,6 +9,7 @@ import * as googleCalendar from "./googleCalendar";
 import * as emailService from "./emailService";
 import { sendEmail, getPreviewHtml, getBaseUrl, TemplateName } from "./emails";
 import { randomBytes, scryptSync } from "crypto";
+import notificationService from "./notifications/notificationService";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -4520,6 +4521,7 @@ export async function registerRoutes(
           'securityNotice',
           'integrationConnected',
           'systemAlert',
+          'notificationDigest',
         ];
         return res.json({
           message: "Templates disponibles",
@@ -4535,6 +4537,7 @@ export async function registerRoutes(
         'securityNotice',
         'integrationConnected',
         'systemAlert',
+        'notificationDigest',
       ];
       
       if (!validTemplates.includes(template as TemplateName)) {
@@ -4549,6 +4552,145 @@ export async function registerRoutes(
       res.send(html);
     } catch (error: any) {
       console.error("[DEV] Error previewing email:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== NOTIFICATION ROUTES ====================
+
+  // Get notifications list
+  app.get("/api/notifications", requireJwtOrSession, async (req, res) => {
+    try {
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const { kind, unreadOnly, page, pageSize } = req.query;
+      
+      const result = await notificationService.getNotifications(userId, organisationId, {
+        kind: kind as any,
+        unreadOnly: unreadOnly === 'true',
+        page: page ? parseInt(page as string) : 1,
+        pageSize: pageSize ? parseInt(pageSize as string) : 20,
+      });
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Notifications] Error fetching notifications:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get unread count
+  app.get("/api/notifications/unread-count", requireJwtOrSession, async (req, res) => {
+    try {
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const count = await notificationService.getUnreadCount(userId, organisationId);
+      res.json({ count });
+    } catch (error: any) {
+      console.error("[Notifications] Error fetching unread count:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Mark notification as read
+  app.patch("/api/notifications/:id/read", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const { id } = req.params;
+      const success = await notificationService.markAsRead(id, userId);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Notification non trouvee" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Notifications] Error marking notification as read:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Mark all notifications as read
+  app.post("/api/notifications/mark-all-read", requireJwtOrSession, async (req, res) => {
+    try {
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const count = await notificationService.markAllAsRead(userId, organisationId);
+      res.json({ success: true, count });
+    } catch (error: any) {
+      console.error("[Notifications] Error marking all as read:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Archive a notification
+  app.patch("/api/notifications/:id/archive", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const { id } = req.params;
+      const success = await notificationService.archiveNotification(id, userId);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Notification non trouvee" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Notifications] Error archiving notification:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get user notification preferences
+  app.get("/api/notifications/preferences", requireJwtOrSession, async (req, res) => {
+    try {
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const preferences = await notificationService.getUserPreferences(userId, organisationId);
+      res.json(preferences);
+    } catch (error: any) {
+      console.error("[Notifications] Error fetching preferences:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update a notification preference
+  app.patch("/api/notifications/preferences/:category", requireJwtOrSession, async (req, res) => {
+    try {
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const { category } = req.params;
+      const { frequency, inAppEnabled, emailEnabled, digestTime } = req.body;
+      
+      const preference = await notificationService.updatePreference(
+        userId,
+        organisationId,
+        category as any,
+        { frequency, inAppEnabled, emailEnabled, digestTime }
+      );
+      
+      res.json(preference);
+    } catch (error: any) {
+      console.error("[Notifications] Error updating preference:", error);
       res.status(500).json({ error: error.message });
     }
   });
