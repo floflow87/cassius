@@ -272,7 +272,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Informations & Sécurité</h2>
         <p className="text-muted-foreground">Gérez vos informations personnelles et la sécurité de votre compte.</p>
@@ -803,7 +803,7 @@ function CollaboratorsSection() {
   });
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold">Collaborateurs</h2>
@@ -1073,7 +1073,7 @@ function OrganizationSection() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Organisation</h2>
         <p className="text-muted-foreground">Informations et paramètres de votre cabinet.</p>
@@ -1250,7 +1250,7 @@ function NotificationsSection() {
   };
   
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Notifications</h2>
         <p className="text-muted-foreground">Configurez comment et quand vous recevez les notifications.</p>
