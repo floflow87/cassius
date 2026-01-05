@@ -754,7 +754,7 @@ function CollaboratorsSection() {
 
   // Get current user to prevent self-deletion
   const { data: currentUser } = useQuery<UserProfile>({
-    queryKey: ["/api/auth/me"],
+    queryKey: ["/api/settings/profile"],
   });
 
   const { data: collaborators = [], isLoading } = useQuery<Collaborator[]>({

@@ -298,6 +298,7 @@ export default function AcceptInvitationPage() {
                         </Button>
                       </div>
                     </FormControl>
+                    <p className="text-xs text-red-500 italic">Le mot de passe doit contenir au moins 8 caractères</p>
                     <FormMessage />
                   </FormItem>
                 )}

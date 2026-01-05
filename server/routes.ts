@@ -4153,8 +4153,8 @@ export async function registerRoutes(
       res.json({
         id: org.id,
         nom: org.nom,
-        adresse: (org as any).adresse || null,
-        timezone: (org as any).timezone || "Europe/Paris",
+        adresse: org.adresse || null,
+        timezone: org.timezone || "Europe/Paris",
         createdAt: org.createdAt,
       });
     } catch (error: any) {
@@ -4186,8 +4186,8 @@ export async function registerRoutes(
       res.json({
         id: updated?.id,
         nom: updated?.nom,
-        adresse: (updated as any)?.adresse || null,
-        timezone: (updated as any)?.timezone || "Europe/Paris",
+        adresse: updated?.adresse || null,
+        timezone: updated?.timezone || "Europe/Paris",
         createdAt: updated?.createdAt,
       });
     } catch (error: any) {
@@ -4273,10 +4273,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Un compte existe déjà avec cet email" });
       }
       
-      // Hash password
+      // Hash password (format: hashedPassword.salt - same as auth.ts)
       const salt = randomBytes(16).toString('hex');
       const hashedPassword = scryptSync(password, salt, 64).toString('hex');
-      const passwordWithSalt = `${salt}:${hashedPassword}`;
+      const passwordWithSalt = `${hashedPassword}.${salt}`;
       
       // Create user
       const newUser = await storage.createUser({
