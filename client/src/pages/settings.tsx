@@ -35,9 +35,17 @@ import {
   ExternalLink,
   AlertCircle,
   Bell,
-  Loader2
+  Loader2,
+  Pencil
 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import googleCalendarIcon from "@assets/Google_Calendar_icon_(2020).svg_1767601723458.png";
+
+const profileFormSchema = z.object({
+  nom: z.string().max(100, "Le nom ne peut pas dépasser 100 caractères"),
+  prenom: z.string().max(100, "Le prénom ne peut pas dépasser 100 caractères"),
+});
 
 type SettingsSection = "security" | "integrations" | "collaborators" | "organization";
 
@@ -167,7 +175,7 @@ export default function SettingsPage() {
           </TabsList>
 
           <TabsContent value="security">
-            {profile && <SecuritySection profile={profile} />}
+            {profile && <SecuritySection profile={profile} onProfileUpdate={() => queryClient.invalidateQueries({ queryKey: ["/api/settings/profile"] })} />}
           </TabsContent>
           
           <TabsContent value="integrations">
@@ -195,7 +203,35 @@ export default function SettingsPage() {
   );
 }
 
-function SecuritySection({ profile }: { profile: UserProfile }) {
+function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; onProfileUpdate: () => void }) {
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileFormData, setProfileFormData] = useState({
+    nom: profile.nom || "",
+    prenom: profile.prenom || "",
+  });
+
+  useEffect(() => {
+    if (!isEditingProfile) {
+      setProfileFormData({
+        nom: profile.nom || "",
+        prenom: profile.prenom || "",
+      });
+    }
+  }, [profile, isEditingProfile]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { nom: string; prenom: string }) => {
+      return apiRequest("PUT", "/api/settings/profile", data);
+    },
+    onSuccess: () => {
+      onProfileUpdate();
+      setIsEditingProfile(false);
+      toast({ title: "Profil mis à jour" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    },
+  });
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -240,20 +276,76 @@ function SecuritySection({ profile }: { profile: UserProfile }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Profil utilisateur
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Profil utilisateur
+            </CardTitle>
+            {!isEditingProfile ? (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsEditingProfile(true)}
+                data-testid="button-edit-profile"
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setIsEditingProfile(false)}
+                  disabled={updateProfileMutation.isPending}
+                  data-testid="button-cancel-profile"
+                >
+                  Annuler
+                </Button>
+                <Button 
+                  size="sm"
+                  onClick={() => {
+                    const parsed = profileFormSchema.safeParse(profileFormData);
+                    if (!parsed.success) {
+                      toast({ title: "Erreur", description: parsed.error.errors[0]?.message || "Données invalides", variant: "destructive" });
+                      return;
+                    }
+                    updateProfileMutation.mutate(profileFormData);
+                  }}
+                  disabled={updateProfileMutation.isPending}
+                  data-testid="button-save-profile"
+                >
+                  {updateProfileMutation.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
+                  Enregistrer
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-muted-foreground text-sm">Nom</Label>
-              <p className="font-medium" data-testid="text-user-nom">{profile.nom || "—"}</p>
+              {isEditingProfile ? (
+                <Input
+                  value={profileFormData.nom}
+                  onChange={(e) => setProfileFormData(prev => ({ ...prev, nom: e.target.value }))}
+                  data-testid="input-user-nom"
+                />
+              ) : (
+                <p className="font-medium" data-testid="text-user-nom">{profile.nom || "—"}</p>
+              )}
             </div>
             <div>
               <Label className="text-muted-foreground text-sm">Prénom</Label>
-              <p className="font-medium" data-testid="text-user-prenom">{profile.prenom || "—"}</p>
+              {isEditingProfile ? (
+                <Input
+                  value={profileFormData.prenom}
+                  onChange={(e) => setProfileFormData(prev => ({ ...prev, prenom: e.target.value }))}
+                  data-testid="input-user-prenom"
+                />
+              ) : (
+                <p className="font-medium" data-testid="text-user-prenom">{profile.prenom || "—"}</p>
+              )}
             </div>
             <div>
               <Label className="text-muted-foreground text-sm">Email / Identifiant</Label>
@@ -462,9 +554,7 @@ function IntegrationsSection() {
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900">
-                <SiGoogle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
+              <img src={googleCalendarIcon} alt="Google Calendar" className="w-10 h-10" />
               <div>
                 <CardTitle>Google Calendar</CardTitle>
                 <CardDescription>Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
@@ -864,18 +954,35 @@ function CollaboratorsSection() {
                         <SelectItem value="ASSISTANT">Assistant</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        if (confirm("Êtes-vous sûr de vouloir supprimer ce collaborateur ?")) {
-                          deleteCollaboratorMutation.mutate(collab.id);
-                        }
-                      }}
-                      data-testid={`button-delete-${collab.id}`}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          data-testid={`button-delete-${collab.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Supprimer le collaborateur</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Êtes-vous sûr de vouloir supprimer {collab.prenom && collab.nom ? `${collab.prenom} ${collab.nom}` : collab.username} ? Cette action est irréversible.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteCollaboratorMutation.mutate(collab.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            data-testid={`button-confirm-delete-${collab.id}`}
+                          >
+                            Supprimer
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               ))}

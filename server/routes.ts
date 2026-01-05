@@ -3818,6 +3818,38 @@ export async function registerRoutes(
       res.status(500).json({ error: "Erreur lors de la récupération du profil" });
     }
   });
+
+  // PUT /api/settings/profile - Update user profile (nom, prenom)
+  const profileUpdateSchema = z.object({
+    nom: z.string().trim().max(100, "Le nom ne peut pas dépasser 100 caractères").optional(),
+    prenom: z.string().trim().max(100, "Le prénom ne peut pas dépasser 100 caractères").optional(),
+  });
+
+  app.put("/api/settings/profile", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const parsed = profileUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0]?.message || "Données invalides" });
+      }
+      
+      const { nom, prenom } = parsed.data;
+      
+      await storage.updateUser(userId, { 
+        nom: nom || null, 
+        prenom: prenom || null 
+      });
+      
+      res.json({ success: true, message: "Profil mis à jour" });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error updating profile:", error);
+      res.status(500).json({ error: "Erreur lors de la mise à jour du profil" });
+    }
+  });
   
   // POST /api/settings/password - Change password
   app.post("/api/settings/password", requireJwtOrSession, async (req, res) => {
