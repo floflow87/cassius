@@ -304,6 +304,8 @@ export interface IStorage {
   acceptInvitation(id: string): Promise<void>;
   cancelInvitation(organisationId: string, id: string): Promise<void>;
   getInvitationByEmail(organisationId: string, email: string): Promise<Invitation | undefined>;
+  getInvitationById(id: string): Promise<Invitation | undefined>;
+  deleteInvitation(id: string): Promise<void>;
 
   // Email outbox methods
   logEmail(data: { organisationId?: string | null; toEmail: string; template: string; subject: string; payload?: string | null; status: 'PENDING' | 'SENT' | 'FAILED'; sentAt?: Date | null; errorMessage?: string | null }): Promise<EmailOutbox>;
@@ -3919,6 +3921,17 @@ export class DatabaseStorage implements IStorage {
         eq(invitations.status, 'PENDING')
       ));
     return invitation || undefined;
+  }
+
+  async getInvitationById(id: string): Promise<Invitation | undefined> {
+    const [invitation] = await db.select().from(invitations)
+      .where(eq(invitations.id, id));
+    return invitation || undefined;
+  }
+
+  async deleteInvitation(id: string): Promise<void> {
+    await db.delete(invitations)
+      .where(eq(invitations.id, id));
   }
 
   // ========== EMAIL OUTBOX ==========

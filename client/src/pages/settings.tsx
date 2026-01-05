@@ -67,9 +67,13 @@ interface UserProfile {
 interface Collaborator {
   id: string;
   username: string;
+  email: string;
   nom: string | null;
   prenom: string | null;
   role: "ADMIN" | "CHIRURGIEN" | "ASSISTANT";
+  status: "ACTIVE" | "PENDING";
+  type: "user" | "invitation";
+  expiresAt?: string;
 }
 
 interface GoogleIntegrationStatus {
@@ -967,18 +971,30 @@ function CollaboratorsSection() {
                       <User className="w-5 h-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-medium">
-                        {collab.prenom && collab.nom
-                          ? `${collab.prenom} ${collab.nom}`
-                          : collab.username}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{collab.username}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">
+                          {collab.prenom && collab.nom
+                            ? `${collab.prenom} ${collab.nom}`
+                            : collab.username}
+                        </p>
+                        {collab.status === "PENDING" ? (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+                            Invitation envoyée
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950/30">
+                            Compte activé
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{collab.email || collab.username}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Select
                       defaultValue={collab.role}
                       onValueChange={(role) => updateRoleMutation.mutate({ id: collab.id, role })}
+                      disabled={collab.type === "invitation"}
                     >
                       <SelectTrigger className="w-40" data-testid={`select-role-${collab.id}`}>
                         <SelectValue />
@@ -989,8 +1005,8 @@ function CollaboratorsSection() {
                         <SelectItem value="ASSISTANT">Assistant</SelectItem>
                       </SelectContent>
                     </Select>
-                    {/* Hide delete button for current user (account creator cannot delete themselves) */}
-                    {currentUser?.id !== collab.id && (
+                    {/* Hide delete button for current user (type=user and same id) */}
+                    {!(collab.type === "user" && collab.id === currentUser?.id) && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -1003,9 +1019,13 @@ function CollaboratorsSection() {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Supprimer le collaborateur</AlertDialogTitle>
+                            <AlertDialogTitle>
+                              {collab.type === "invitation" ? "Annuler l'invitation" : "Supprimer le collaborateur"}
+                            </AlertDialogTitle>
                             <AlertDialogDescription>
-                              Êtes-vous sûr de vouloir supprimer {collab.prenom && collab.nom ? `${collab.prenom} ${collab.nom}` : collab.username} ? Cette action est irréversible.
+                              {collab.type === "invitation"
+                                ? `Êtes-vous sûr de vouloir annuler l'invitation pour ${collab.email} ?`
+                                : `Êtes-vous sûr de vouloir supprimer ${collab.prenom && collab.nom ? `${collab.prenom} ${collab.nom}` : collab.username} ? Cette action est irréversible.`}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -1015,7 +1035,7 @@ function CollaboratorsSection() {
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               data-testid={`button-confirm-delete-${collab.id}`}
                             >
-                              Supprimer
+                              {collab.type === "invitation" ? "Annuler l'invitation" : "Supprimer"}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>

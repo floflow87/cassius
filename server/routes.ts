@@ -4105,23 +4105,30 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Vous ne pouvez pas supprimer votre propre compte" });
       }
       
+      // First try to find as user
       const user = await storage.getUserById(id);
-      if (!user || user.organisationId !== organisationId) {
-        return res.status(404).json({ error: "Collaborateur non trouvé" });
-      }
-      
-      // Prevent removing the last admin
-      if (user.role === "ADMIN") {
-        const admins = await storage.getUsersByOrganisation(organisationId);
-        const adminCount = admins.filter(u => u.role === "ADMIN").length;
-        if (adminCount <= 1) {
-          return res.status(400).json({ error: "Impossible de supprimer le dernier administrateur" });
+      if (user && user.organisationId === organisationId) {
+        // Prevent removing the last admin
+        if (user.role === "ADMIN") {
+          const admins = await storage.getUsersByOrganisation(organisationId);
+          const adminCount = admins.filter(u => u.role === "ADMIN").length;
+          if (adminCount <= 1) {
+            return res.status(400).json({ error: "Impossible de supprimer le dernier administrateur" });
+          }
         }
+        
+        await storage.deleteUser(id);
+        return res.json({ success: true });
       }
       
-      await storage.deleteUser(id);
+      // Try to find as invitation
+      const invitation = await storage.getInvitationById(id);
+      if (invitation && invitation.organisationId === organisationId) {
+        await storage.deleteInvitation(id);
+        return res.json({ success: true });
+      }
       
-      res.json({ success: true });
+      return res.status(404).json({ error: "Collaborateur non trouvé" });
     } catch (error: any) {
       console.error("[SETTINGS] Error deleting collaborator:", error);
       res.status(500).json({ error: "Erreur lors de la suppression du collaborateur" });
