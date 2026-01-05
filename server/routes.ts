@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { storage, computeLatestIsq } from "./storage";
 import { requireJwtOrSession } from "./jwtMiddleware";
 import * as supabaseStorage from "./supabaseStorage";
+import { createDocumentsRouter } from "./modules/documents/routes";
+import { setStorageProvider as setDocumentsStorageProvider } from "./modules/documents/service";
 import { getTopSlowestEndpoints, getTopDbHeavyEndpoints, getAllStats, clearStats } from "./instrumentation";
 import { runFlagDetection } from "./flagEngine";
 import * as googleCalendar from "./googleCalendar";
@@ -317,6 +319,21 @@ export async function registerRoutes(
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
+
+  // Initialize and mount modular Documents router
+  setDocumentsStorageProvider({
+    isStorageConfigured: supabaseStorage.isStorageConfigured,
+    createSignedUploadUrl: supabaseStorage.createSignedUploadUrl,
+    getSignedDownloadUrl: supabaseStorage.getSignedDownloadUrl,
+    deleteFile: supabaseStorage.deleteFile,
+  });
+  
+  const documentsRouter = createDocumentsRouter(
+    requireJwtOrSession,
+    (req, res) => getOrganisationId(req, res) ?? undefined,
+    (req) => req.jwtUser?.userId
+  );
+  app.use("/api/documents", documentsRouter);
 
   app.get("/api/health/db", requireJwtOrSession, async (_req, res) => {
     const result = await testConnection();
@@ -1398,8 +1415,12 @@ export async function registerRoutes(
   });
 
   // ========== DOCUMENTS (PDF) ==========
+  // NOTE: /api/documents/* routes are now handled by the modular Documents router
+  // mounted above via app.use("/api/documents", documentsRouter).
+  // TODO: Remove deprecated routes and migrate /api/files, /api/patients/:patientId/documents
   
-  // Get document tree structure for explorer
+  // DEPRECATED: All /api/documents/* routes below are disabled - module handles them
+  if (false) {
   app.get("/api/documents/tree", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -1440,8 +1461,9 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to fetch documents" });
     }
   });
+  } // End of first deprecated block
 
-  // Get unified files list (documents + radios combined)
+  // Get unified files list (documents + radios combined) - KEEP ACTIVE
   app.get("/api/files", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -1468,6 +1490,8 @@ export async function registerRoutes(
     }
   });
 
+  // DEPRECATED: Continue disabling /api/documents routes
+  if (false) {
   // Get signed upload URL for client-side document upload
   app.post("/api/documents/upload-url", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -1506,8 +1530,9 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to get upload URL" });
     }
   });
+  } // End of second deprecated block
 
-  // Get all documents for a patient (signed URLs fetched on-demand)
+  // Get all documents for a patient (signed URLs fetched on-demand) - KEEP ACTIVE
   app.get("/api/patients/:patientId/documents", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -1524,6 +1549,8 @@ export async function registerRoutes(
     }
   });
 
+  // DEPRECATED: Continue disabling remaining /api/documents routes
+  if (false) {
   // Get single document with fresh signed URL
   app.get("/api/documents/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -1700,6 +1727,7 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to delete document" });
     }
   });
+  } // End of third deprecated block - all /api/documents routes now disabled
 
   // ========== VISITES ==========
   app.get("/api/implants/:id/visites", requireJwtOrSession, async (req, res) => {
