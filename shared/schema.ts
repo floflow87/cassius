@@ -7,6 +7,8 @@ import { z } from "zod";
 export const organisations = pgTable("organisations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nom: text("nom").notNull(),
+  adresse: text("adresse"),
+  timezone: text("timezone").default("Europe/Paris"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1046,6 +1048,134 @@ export const emailOutboxRelations = relations(emailOutbox, ({ one }) => ({
   }),
 }));
 
+// Notification system enums
+export const notificationKindEnum = pgEnum("notification_kind", [
+  "ALERT",
+  "REMINDER",
+  "ACTIVITY",
+  "IMPORT",
+  "SYSTEM"
+]);
+
+export const notificationSeverityEnum = pgEnum("notification_severity", [
+  "INFO",
+  "WARNING",
+  "CRITICAL"
+]);
+
+export const notificationEntityTypeEnum = pgEnum("notification_entity_type", [
+  "PATIENT",
+  "IMPLANT",
+  "OPERATION",
+  "APPOINTMENT",
+  "DOCUMENT",
+  "IMPORT",
+  "INTEGRATION",
+  "BILLING"
+]);
+
+export const notificationCategoryEnum = pgEnum("notification_category", [
+  "ALERTS_REMINDERS",
+  "TEAM_ACTIVITY",
+  "IMPORTS",
+  "SYSTEM"
+]);
+
+export const notificationFrequencyEnum = pgEnum("notification_frequency", [
+  "NONE",
+  "DIGEST",
+  "IMMEDIATE"
+]);
+
+export const digestStatusEnum = pgEnum("digest_status", [
+  "PENDING",
+  "SENT",
+  "FAILED"
+]);
+
+// Notifications table
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  recipientUserId: varchar("recipient_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: notificationKindEnum("kind").notNull(),
+  type: text("type").notNull(),
+  severity: notificationSeverityEnum("severity").default("INFO").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  entityType: notificationEntityTypeEnum("entity_type"),
+  entityId: varchar("entity_id"),
+  actorUserId: varchar("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  metadata: text("metadata"),
+  dedupeKey: text("dedupe_key"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  readAt: timestamp("read_at"),
+  archivedAt: timestamp("archived_at"),
+  digestedAt: timestamp("digested_at"),
+});
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [notifications.organisationId],
+    references: [organisations.id],
+  }),
+  recipient: one(users, {
+    fields: [notifications.recipientUserId],
+    references: [users.id],
+  }),
+}));
+
+// Notification preferences table
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  category: notificationCategoryEnum("category").notNull(),
+  frequency: notificationFrequencyEnum("frequency").default("IMMEDIATE").notNull(),
+  inAppEnabled: boolean("in_app_enabled").default(true).notNull(),
+  emailEnabled: boolean("email_enabled").default(false).notNull(),
+  digestTime: text("digest_time").default("08:30"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const notificationPreferencesRelations = relations(notificationPreferences, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [notificationPreferences.organisationId],
+    references: [organisations.id],
+  }),
+  user: one(users, {
+    fields: [notificationPreferences.userId],
+    references: [users.id],
+  }),
+}));
+
+// Digest runs table for tracking digest email batches
+export const digestRuns = pgTable("digest_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  category: notificationCategoryEnum("category").notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  status: digestStatusEnum("status").default("PENDING").notNull(),
+  errorMessage: text("error_message"),
+  notificationCount: integer("notification_count").default(0),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const digestRunsRelations = relations(digestRuns, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [digestRuns.organisationId],
+    references: [organisations.id],
+  }),
+  user: one(users, {
+    fields: [digestRuns.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas for new tables
 export const insertEmailTokenSchema = createInsertSchema(emailTokens).omit({
   id: true,
@@ -1058,6 +1188,22 @@ export const insertInvitationSchema = createInsertSchema(invitations).omit({
 });
 
 export const insertEmailOutboxSchema = createInsertSchema(emailOutbox).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNotificationPreferenceSchema = createInsertSchema(notificationPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDigestRunSchema = createInsertSchema(digestRuns).omit({
   id: true,
   createdAt: true,
 });
@@ -1121,6 +1267,15 @@ export type Document = typeof documents.$inferSelect;
 
 export type InsertSavedFilter = z.infer<typeof insertSavedFilterSchema>;
 export type SavedFilter = typeof savedFilters.$inferSelect;
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
+export type InsertNotificationPreference = z.infer<typeof insertNotificationPreferenceSchema>;
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+
+export type InsertDigestRun = z.infer<typeof insertDigestRunSchema>;
+export type DigestRun = typeof digestRuns.$inferSelect;
 
 // Extended types for API responses
 export interface SurgeryImplantWithDetails extends SurgeryImplant {

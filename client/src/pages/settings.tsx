@@ -9,19 +9,20 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   User, 
   Shield, 
   Link2, 
   Users, 
   Building2, 
-  ChevronRight,
   Check,
   X,
   Calendar,
@@ -34,9 +35,22 @@ import {
   Trash2,
   ExternalLink,
   AlertCircle,
-  Settings
+  Bell,
+  Loader2,
+  Pencil
 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import googleCalendarIcon from "@assets/Google_Calendar_icon_(2020).svg_1767601723458.png";
+import gmailIcon from "@assets/gmail_1767602212820.png";
+import outlookIcon from "@assets/Microsoft_Outlook_Icon_(2025–present).svg_1767602593769.png";
+import googleMeetIcon from "@assets/google-meet_1767602721784.png";
+import googleLogo from "@assets/logo_Google_1767604702248.png";
+
+const profileFormSchema = z.object({
+  nom: z.string().max(100, "Le nom ne peut pas dépasser 100 caractères"),
+  prenom: z.string().max(100, "Le prénom ne peut pas dépasser 100 caractères"),
+});
 
 type SettingsSection = "security" | "integrations" | "collaborators" | "organization";
 
@@ -53,9 +67,13 @@ interface UserProfile {
 interface Collaborator {
   id: string;
   username: string;
+  email: string;
   nom: string | null;
   prenom: string | null;
   role: "ADMIN" | "CHIRURGIEN" | "ASSISTANT";
+  status: "ACTIVE" | "PENDING";
+  type: "user" | "invitation";
+  expiresAt?: string;
 }
 
 interface GoogleIntegrationStatus {
@@ -101,7 +119,7 @@ const inviteSchema = z.object({
 function getRoleLabel(role: string): string {
   switch (role) {
     case "ADMIN": return "Administrateur";
-    case "CHIRURGIEN": return "Praticien";
+    case "CHIRURGIEN": return "Collaborateur";
     case "ASSISTANT": return "Assistant";
     default: return role;
   }
@@ -116,7 +134,6 @@ function getRoleBadgeVariant(role: string): "default" | "secondary" | "outline" 
 }
 
 export default function SettingsPage() {
-  const [activeSection, setActiveSection] = useState<SettingsSection>("security");
   const { toast } = useToast();
 
   const { data: profile, isLoading: profileLoading } = useQuery<UserProfile>({
@@ -124,15 +141,6 @@ export default function SettingsPage() {
   });
 
   const userIsAdmin = profile?.role === "ADMIN";
-
-  const sections = [
-    { id: "security" as const, label: "Informations & Sécurité", icon: Shield, adminOnly: false },
-    { id: "integrations" as const, label: "Intégrations", icon: Link2, adminOnly: false },
-    { id: "collaborators" as const, label: "Collaborateurs", icon: Users, adminOnly: true },
-    { id: "organization" as const, label: "Organisation", icon: Building2, adminOnly: true },
-  ];
-
-  const visibleSections = sections.filter(s => !s.adminOnly || userIsAdmin);
 
   if (profileLoading) {
     return (
@@ -143,41 +151,96 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex h-full" data-testid="settings-page">
-      <aside className="w-64 border-r bg-sidebar p-4 space-y-1">
-        <div className="flex items-center gap-2 px-2 mb-4">
-          <Settings className="w-5 h-5" />
-          <h2 className="text-lg font-semibold">Paramètres</h2>
-        </div>
-        {visibleSections.map((section) => (
-          <button
-            key={section.id}
-            onClick={() => setActiveSection(section.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors ${
-              activeSection === section.id
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "hover-elevate"
-            }`}
-            data-testid={`nav-${section.id}`}
-          >
-            <section.icon className="w-4 h-4" />
-            <span className="flex-1">{section.label}</span>
-            {activeSection === section.id && <ChevronRight className="w-4 h-4" />}
-          </button>
-        ))}
-      </aside>
+    <div className="h-full overflow-auto p-6" data-testid="settings-page">
+      <div className="w-full">
+        <h1 className="text-2xl font-bold mb-6">Paramètres</h1>
+        
+        <Tabs defaultValue="security" className="w-full">
+          <TabsList className="mb-6 flex-wrap">
+            <TabsTrigger value="security" className="gap-2" data-testid="nav-security">
+              <Shield className="w-4 h-4" />
+              Informations & Sécurité
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2" data-testid="nav-notifications">
+              <Bell className="w-4 h-4" />
+              Notifications
+            </TabsTrigger>
+            {userIsAdmin && (
+              <TabsTrigger value="collaborators" className="gap-2" data-testid="nav-collaborators">
+                <Users className="w-4 h-4" />
+                Collaborateurs
+              </TabsTrigger>
+            )}
+            {userIsAdmin && (
+              <TabsTrigger value="organization" className="gap-2" data-testid="nav-organization">
+                <Building2 className="w-4 h-4" />
+                Organisation
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="integrations" className="gap-2" data-testid="nav-integrations">
+              <Link2 className="w-4 h-4" />
+              Intégrations
+            </TabsTrigger>
+          </TabsList>
 
-      <main className="flex-1 p-6 overflow-auto">
-        {activeSection === "security" && profile && <SecuritySection profile={profile} />}
-        {activeSection === "integrations" && <IntegrationsSection />}
-        {activeSection === "collaborators" && userIsAdmin && <CollaboratorsSection />}
-        {activeSection === "organization" && userIsAdmin && <OrganizationSection />}
-      </main>
+          <TabsContent value="security">
+            {profile && <SecuritySection profile={profile} onProfileUpdate={() => queryClient.invalidateQueries({ queryKey: ["/api/settings/profile"] })} />}
+          </TabsContent>
+          
+          <TabsContent value="notifications">
+            <NotificationsSection />
+          </TabsContent>
+          
+          {userIsAdmin && (
+            <TabsContent value="collaborators">
+              <CollaboratorsSection />
+            </TabsContent>
+          )}
+          
+          {userIsAdmin && (
+            <TabsContent value="organization">
+              <OrganizationSection />
+            </TabsContent>
+          )}
+          
+          <TabsContent value="integrations">
+            <IntegrationsSection />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
 
-function SecuritySection({ profile }: { profile: UserProfile }) {
+function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; onProfileUpdate: () => void }) {
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileFormData, setProfileFormData] = useState({
+    nom: profile.nom || "",
+    prenom: profile.prenom || "",
+  });
+
+  useEffect(() => {
+    if (!isEditingProfile) {
+      setProfileFormData({
+        nom: profile.nom || "",
+        prenom: profile.prenom || "",
+      });
+    }
+  }, [profile, isEditingProfile]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { nom: string; prenom: string }) => {
+      return apiRequest("PUT", "/api/settings/profile", data);
+    },
+    onSuccess: () => {
+      onProfileUpdate();
+      setIsEditingProfile(false);
+      toast({ title: "Profil mis à jour" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    },
+  });
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -214,7 +277,7 @@ function SecuritySection({ profile }: { profile: UserProfile }) {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Informations & Sécurité</h2>
         <p className="text-muted-foreground">Gérez vos informations personnelles et la sécurité de votre compte.</p>
@@ -222,20 +285,76 @@ function SecuritySection({ profile }: { profile: UserProfile }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Profil utilisateur
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Profil utilisateur
+            </CardTitle>
+            {!isEditingProfile ? (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsEditingProfile(true)}
+                data-testid="button-edit-profile"
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setIsEditingProfile(false)}
+                  disabled={updateProfileMutation.isPending}
+                  data-testid="button-cancel-profile"
+                >
+                  Annuler
+                </Button>
+                <Button 
+                  size="sm"
+                  onClick={() => {
+                    const parsed = profileFormSchema.safeParse(profileFormData);
+                    if (!parsed.success) {
+                      toast({ title: "Erreur", description: parsed.error.errors[0]?.message || "Données invalides", variant: "destructive" });
+                      return;
+                    }
+                    updateProfileMutation.mutate(profileFormData);
+                  }}
+                  disabled={updateProfileMutation.isPending}
+                  data-testid="button-save-profile"
+                >
+                  {updateProfileMutation.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
+                  Enregistrer
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-muted-foreground text-sm">Nom</Label>
-              <p className="font-medium" data-testid="text-user-nom">{profile.nom || "—"}</p>
+              {isEditingProfile ? (
+                <Input
+                  value={profileFormData.nom}
+                  onChange={(e) => setProfileFormData(prev => ({ ...prev, nom: e.target.value }))}
+                  data-testid="input-user-nom"
+                />
+              ) : (
+                <p className="font-medium" data-testid="text-user-nom">{profile.nom || "—"}</p>
+              )}
             </div>
             <div>
               <Label className="text-muted-foreground text-sm">Prénom</Label>
-              <p className="font-medium" data-testid="text-user-prenom">{profile.prenom || "—"}</p>
+              {isEditingProfile ? (
+                <Input
+                  value={profileFormData.prenom}
+                  onChange={(e) => setProfileFormData(prev => ({ ...prev, prenom: e.target.value }))}
+                  data-testid="input-user-prenom"
+                />
+              ) : (
+                <p className="font-medium" data-testid="text-user-prenom">{profile.prenom || "—"}</p>
+              )}
             </div>
             <div>
               <Label className="text-muted-foreground text-sm">Email / Identifiant</Label>
@@ -434,185 +553,209 @@ function IntegrationsSection() {
   });
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Intégrations</h2>
         <p className="text-muted-foreground">Connectez vos services externes pour synchroniser vos données.</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900">
-                <SiGoogle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
+        {/* Google Calendar - Active Integration */}
+        <Card className="flex flex-col !bg-white dark:!bg-zinc-900">
+          <CardHeader className="pb-3">
+            <div className="flex justify-end mb-2">
+              {googleStatus?.connected ? (
+                <Badge variant="default" className="bg-green-600 text-[11px]" data-testid="badge-google-connected">
+                  <Check className="w-3 h-3 mr-1" />
+                  Connecté
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[11px]" data-testid="badge-google-disconnected">
+                  Non connecté
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-start gap-3">
+              <img src={googleCalendarIcon} alt="Google Calendar" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle>Google Calendar</CardTitle>
+                <CardTitle className="text-base whitespace-nowrap">Google Calendar</CardTitle>
                 <CardDescription>Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
               </div>
             </div>
-            {googleStatus?.connected ? (
-              <Badge variant="default" className="bg-green-600" data-testid="badge-google-connected">
-                <Check className="w-3 h-3 mr-1" />
-                Connecté
-              </Badge>
-            ) : (
-              <Badge variant="outline" data-testid="badge-google-disconnected">
-                <X className="w-3 h-3 mr-1" />
-                Non connecté
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {googleLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              Chargement...
-            </div>
-          ) : googleStatus?.connected ? (
-            <>
-              {googleStatus.email && (
-                <div>
-                  <Label className="text-muted-foreground text-sm">Compte connecté</Label>
-                  <p className="font-medium">{googleStatus.email}</p>
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Synchronisation automatique</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Les rendez-vous sont synchronisés automatiquement
-                  </p>
-                </div>
-                <Switch
-                  checked={googleStatus.integration?.isEnabled ?? false}
-                  onCheckedChange={(checked) => toggleSyncMutation.mutate(checked)}
-                  disabled={toggleSyncMutation.isPending}
-                  data-testid="switch-google-sync"
-                />
+          </CardHeader>
+          <CardContent className="space-y-4 flex-1">
+            {googleLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Chargement...
               </div>
-
-              {googleStatus.integration?.targetCalendarName && (
-                <div>
-                  <Label className="text-muted-foreground text-sm">Calendrier cible</Label>
-                  <p className="font-medium flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    {googleStatus.integration.targetCalendarName}
-                  </p>
+            ) : googleStatus?.connected ? (
+              <>
+                {googleStatus.email && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Compte connecté</Label>
+                    <p className="font-medium text-sm">{googleStatus.email}</p>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <Label className="text-sm">Synchronisation automatique</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Les rendez-vous sont synchronisés automatiquement
+                    </p>
+                  </div>
+                  <Switch
+                    checked={googleStatus.integration?.isEnabled ?? false}
+                    onCheckedChange={(checked) => toggleSyncMutation.mutate(checked)}
+                    disabled={toggleSyncMutation.isPending}
+                    data-testid="switch-google-sync"
+                  />
                 </div>
-              )}
 
-              {googleStatus.integration?.lastSyncAt && (
-                <div>
-                  <Label className="text-muted-foreground text-sm">Dernière synchronisation</Label>
-                  <p className="text-sm">
-                    {new Date(googleStatus.integration.lastSyncAt).toLocaleString("fr-FR")}
-                  </p>
+                {googleStatus.integration?.targetCalendarName && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Calendrier cible</Label>
+                    <p className="font-medium text-sm flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      {googleStatus.integration.targetCalendarName}
+                    </p>
+                  </div>
+                )}
+
+                {googleStatus.integration?.lastSyncAt && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Dernière synchronisation</Label>
+                    <p className="text-sm">
+                      {new Date(googleStatus.integration.lastSyncAt).toLocaleString("fr-FR")}
+                    </p>
+                  </div>
+                )}
+
+                {googleStatus.integration?.syncErrorCount && googleStatus.integration.syncErrorCount > 0 && (
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-sm">{googleStatus.integration.syncErrorCount} erreurs de synchronisation</span>
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncNowMutation.mutate()}
+                    disabled={syncNowMutation.isPending}
+                    data-testid="button-sync-now"
+                  >
+                    {syncNowMutation.isPending ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Synchroniser maintenant
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => disconnectGoogleMutation.mutate()}
+                    disabled={disconnectGoogleMutation.isPending}
+                    className="text-destructive"
+                    data-testid="button-disconnect-google"
+                  >
+                    Déconnecter
+                  </Button>
                 </div>
-              )}
-
-              {googleStatus.integration?.syncErrorCount && googleStatus.integration.syncErrorCount > 0 && (
-                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-sm">{googleStatus.integration.syncErrorCount} erreurs de synchronisation</span>
-                </div>
-              )}
-
-              <Separator />
-
-              <div className="flex gap-2 flex-wrap">
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center flex-1 space-y-3">
+                {!googleStatus?.configured && (
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span className="text-sm">L'intégration Google n'est pas configurée. Contactez l'administrateur.</span>
+                  </div>
+                )}
                 <Button
-                  variant="outline"
-                  onClick={() => syncNowMutation.mutate()}
-                  disabled={syncNowMutation.isPending}
-                  data-testid="button-sync-now"
+                  onClick={() => connectGoogleMutation.mutate()}
+                  disabled={connectGoogleMutation.isPending || !googleStatus?.configured}
+                  data-testid="button-connect-google"
                 >
-                  {syncNowMutation.isPending ? (
+                  {connectGoogleMutation.isPending ? (
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
+                    <img src={googleLogo} alt="Google" className="w-4 h-4 mr-2" />
                   )}
-                  Synchroniser maintenant
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => disconnectGoogleMutation.mutate()}
-                  disabled={disconnectGoogleMutation.isPending}
-                  className="text-destructive"
-                  data-testid="button-disconnect-google"
-                >
-                  Déconnecter
+                  Connecter Google Calendar
                 </Button>
               </div>
-            </>
-          ) : (
-            <div className="space-y-4">
-              {!googleStatus?.configured && (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-sm">L'intégration Google n'est pas configurée. Contactez l'administrateur.</span>
-                </div>
-              )}
-              <Button
-                onClick={() => connectGoogleMutation.mutate()}
-                disabled={connectGoogleMutation.isPending || !googleStatus?.configured}
-                data-testid="button-connect-google"
-              >
-                {connectGoogleMutation.isPending ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <SiGoogle className="w-4 h-4 mr-2" />
-                )}
-                Connecter Google Calendar
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
 
-      <Card className="opacity-60">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-muted">
-                <Mail className="w-5 h-5 text-muted-foreground" />
-              </div>
+        {/* Gmail - Coming Soon */}
+        <Card className="flex flex-col !bg-white dark:!bg-zinc-900">
+          <CardHeader className="pb-3">
+            <div className="flex justify-end mb-2">
+              <Badge variant="outline" className="text-[11px]">Bientôt disponible</Badge>
+            </div>
+            <div className="flex items-start gap-3">
+              <img src={gmailIcon} alt="Gmail" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle>Notifications Email</CardTitle>
-                <CardDescription>Rappels de rendez-vous par email</CardDescription>
+                <CardTitle className="text-base whitespace-nowrap">Gmail</CardTitle>
+                <CardDescription>Synchronisez vos emails avec Google Gmail</CardDescription>
               </div>
             </div>
-            <Badge variant="outline">Bientôt disponible</Badge>
-          </div>
-        </CardHeader>
-      </Card>
+          </CardHeader>
+          <CardContent className="flex-1" />
+        </Card>
 
-      <Card className="opacity-60">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-muted">
-                <Building2 className="w-5 h-5 text-muted-foreground" />
-              </div>
+        {/* Google Meet - Coming Soon */}
+        <Card className="flex flex-col !bg-white dark:!bg-zinc-900">
+          <CardHeader className="pb-3">
+            <div className="flex justify-end mb-2">
+              <Badge variant="outline" className="text-[11px]">Bientôt disponible</Badge>
+            </div>
+            <div className="flex items-start gap-3">
+              <img src={googleMeetIcon} alt="Google Meet" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle>Facturation Stripe</CardTitle>
-                <CardDescription>Gestion des paiements et abonnements</CardDescription>
+                <CardTitle className="text-base whitespace-nowrap">Google Meet</CardTitle>
+                <CardDescription>Intégrez vos visioconférences avec Google Meet</CardDescription>
               </div>
             </div>
-            <Badge variant="outline">Bientôt disponible</Badge>
-          </div>
-        </CardHeader>
-      </Card>
+          </CardHeader>
+          <CardContent className="flex-1" />
+        </Card>
+
+        {/* Microsoft Outlook - Coming Soon */}
+        <Card className="flex flex-col !bg-white dark:!bg-zinc-900">
+          <CardHeader className="pb-3">
+            <div className="flex justify-end mb-2">
+              <Badge variant="outline" className="text-[11px]">Bientôt disponible</Badge>
+            </div>
+            <div className="flex items-start gap-3">
+              <img src={outlookIcon} alt="Microsoft Outlook" className="w-10 h-10 flex-shrink-0" />
+              <div>
+                <CardTitle className="text-base whitespace-nowrap">Microsoft Outlook</CardTitle>
+                <CardDescription>Synchronisez vos emails avec Microsoft Outlook</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1" />
+        </Card>
+      </div>
     </div>
   );
 }
 
 function CollaboratorsSection() {
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
   const { toast } = useToast();
+
+  // Get current user to prevent self-deletion
+  const { data: currentUser } = useQuery<UserProfile>({
+    queryKey: ["/api/settings/profile"],
+  });
 
   const { data: collaborators = [], isLoading } = useQuery<Collaborator[]>({
     queryKey: ["/api/settings/collaborators"],
@@ -634,8 +777,8 @@ function CollaboratorsSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/collaborators"] });
-      toast({ title: "Collaborateur ajouté", description: "Le collaborateur a été créé avec succès." });
-      setShowInviteDialog(false);
+      toast({ title: "Collaborateur invité", description: "Un email d'invitation a été envoyé au collaborateur." });
+      setShowInviteSheet(false);
       form.reset();
     },
     onError: (error: Error) => {
@@ -670,28 +813,28 @@ function CollaboratorsSection() {
   });
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold">Collaborateurs</h2>
           <p className="text-muted-foreground">Gérez les membres de votre organisation et leurs permissions.</p>
         </div>
-        <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-          <DialogTrigger asChild>
+        <Sheet open={showInviteSheet} onOpenChange={setShowInviteSheet}>
+          <SheetTrigger asChild>
             <Button data-testid="button-invite-collaborator">
               <UserPlus className="w-4 h-4 mr-2" />
               Ajouter
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Ajouter un collaborateur</DialogTitle>
-              <DialogDescription>
-                Créez un compte pour un nouveau membre de votre organisation.
-              </DialogDescription>
-            </DialogHeader>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Ajouter un collaborateur</SheetTitle>
+              <SheetDescription>
+                Invitez un nouveau membre à rejoindre votre organisation.
+              </SheetDescription>
+            </SheetHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit((data) => inviteMutation.mutate(data))} className="space-y-4">
+              <form onSubmit={form.handleSubmit((data) => inviteMutation.mutate(data))} className="space-y-4 mt-6">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -747,27 +890,31 @@ function CollaboratorsSection() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="ADMIN">Administrateur</SelectItem>
-                          <SelectItem value="CHIRURGIEN">Praticien</SelectItem>
+                          <SelectItem value="CHIRURGIEN">Collaborateur</SelectItem>
                           <SelectItem value="ASSISTANT">Assistant</SelectItem>
                         </SelectContent>
                       </Select>
+                      <FormDescription className="flex items-center gap-2 text-muted-foreground">
+                        <Mail className="w-4 h-4" />
+                        Un email sera envoyé au collaborateur afin de l'inviter à se connecter à Cassius.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setShowInviteDialog(false)}>
+                <SheetFooter className="mt-6">
+                  <Button type="button" variant="outline" onClick={() => setShowInviteSheet(false)}>
                     Annuler
                   </Button>
                   <Button type="submit" disabled={inviteMutation.isPending} data-testid="button-submit-invite">
                     {inviteMutation.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
-                    Ajouter
+                    Inviter
                   </Button>
-                </DialogFooter>
+                </SheetFooter>
               </form>
             </Form>
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
       </div>
 
       <Card>
@@ -783,7 +930,7 @@ function CollaboratorsSection() {
               </p>
             </div>
             <div className="flex items-start gap-3">
-              <Badge variant="secondary">Praticien</Badge>
+              <Badge variant="secondary">Collaborateur</Badge>
               <p className="text-muted-foreground">
                 Accès métier : patients, actes, implants, documents, calendrier
               </p>
@@ -824,40 +971,76 @@ function CollaboratorsSection() {
                       <User className="w-5 h-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-medium">
-                        {collab.prenom && collab.nom
-                          ? `${collab.prenom} ${collab.nom}`
-                          : collab.username}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{collab.username}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">
+                          {collab.prenom && collab.nom
+                            ? `${collab.prenom} ${collab.nom}`
+                            : collab.username}
+                        </p>
+                        {collab.status === "PENDING" ? (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+                            Invitation envoyée
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950/30">
+                            Compte activé
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{collab.email || collab.username}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Select
                       defaultValue={collab.role}
                       onValueChange={(role) => updateRoleMutation.mutate({ id: collab.id, role })}
+                      disabled={collab.type === "invitation"}
                     >
                       <SelectTrigger className="w-40" data-testid={`select-role-${collab.id}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ADMIN">Administrateur</SelectItem>
-                        <SelectItem value="CHIRURGIEN">Praticien</SelectItem>
+                        <SelectItem value="CHIRURGIEN">Collaborateur</SelectItem>
                         <SelectItem value="ASSISTANT">Assistant</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        if (confirm("Êtes-vous sûr de vouloir supprimer ce collaborateur ?")) {
-                          deleteCollaboratorMutation.mutate(collab.id);
-                        }
-                      }}
-                      data-testid={`button-delete-${collab.id}`}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    {/* Hide delete button for current user (type=user and same id) */}
+                    {!(collab.type === "user" && collab.id === currentUser?.id) && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-testid={`button-delete-${collab.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              {collab.type === "invitation" ? "Annuler l'invitation" : "Supprimer le collaborateur"}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {collab.type === "invitation"
+                                ? `Êtes-vous sûr de vouloir annuler l'invitation pour ${collab.email} ?`
+                                : `Êtes-vous sûr de vouloir supprimer ${collab.prenom && collab.nom ? `${collab.prenom} ${collab.nom}` : collab.username} ? Cette action est irréversible.`}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteCollaboratorMutation.mutate(collab.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              data-testid={`button-confirm-delete-${collab.id}`}
+                            >
+                              {collab.type === "invitation" ? "Annuler l'invitation" : "Supprimer"}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </div>
               ))}
@@ -923,7 +1106,7 @@ function OrganizationSection() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Organisation</h2>
         <p className="text-muted-foreground">Informations et paramètres de votre cabinet.</p>
@@ -1020,6 +1203,190 @@ function OrganizationSection() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface NotificationPreference {
+  id: string;
+  category: string;
+  userId: string;
+  inAppEnabled: boolean;
+  emailEnabled: boolean;
+  frequency: "NONE" | "IMMEDIATE" | "DIGEST";
+  digestTime?: string;
+}
+
+const NOTIFICATION_TYPE_LABELS: Record<string, { label: string; description: string }> = {
+  ALERTS_REMINDERS: { label: "Alertes et rappels", description: "Mesures ISQ, rendez-vous, rappels cliniques" },
+  TEAM_ACTIVITY: { label: "Activité équipe", description: "Modifications de dossiers, documents ajoutés" },
+  IMPORTS: { label: "Imports", description: "Résultats des imports de patients" },
+  SYSTEM: { label: "Système", description: "Mises à jour et annonces du système" },
+};
+
+const FREQUENCY_LABELS: Record<string, string> = {
+  NONE: "Désactivé",
+  IMMEDIATE: "Immédiat",
+  DIGEST: "Résumé quotidien",
+};
+
+function NotificationsSection() {
+  const { toast } = useToast();
+  
+  const { data: preferences, isLoading } = useQuery<NotificationPreference[]>({
+    queryKey: ["/api/notifications/preferences"],
+  });
+  
+  const updatePreferenceMutation = useMutation({
+    mutationFn: async ({ category, updates }: { category: string; updates: Partial<NotificationPreference> }) => {
+      return apiRequest("PATCH", `/api/notifications/preferences/${category}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/preferences"] });
+      toast({ title: "Préférences mises à jour" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    },
+  });
+  
+  const getPreference = (type: string) => {
+    return preferences?.find(p => p.category === type) || {
+      category: type,
+      inAppEnabled: true,
+      emailEnabled: false,
+      frequency: "IMMEDIATE" as const,
+    };
+  };
+  
+  const handleFrequencyChange = (type: string, frequency: string) => {
+    updatePreferenceMutation.mutate({ 
+      category: type, 
+      updates: { frequency: frequency as NotificationPreference["frequency"] } 
+    });
+  };
+  
+  const handleToggleInApp = (type: string, enabled: boolean) => {
+    updatePreferenceMutation.mutate({ 
+      category: type, 
+      updates: { inAppEnabled: enabled } 
+    });
+  };
+  
+  const handleToggleEmail = (type: string, enabled: boolean) => {
+    updatePreferenceMutation.mutate({ 
+      category: type, 
+      updates: { emailEnabled: enabled } 
+    });
+  };
+  
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold">Notifications</h2>
+        <p className="text-muted-foreground">Configurez comment et quand vous recevez les notifications.</p>
+      </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5" />
+            Préférences par type
+          </CardTitle>
+          <CardDescription>
+            Personnalisez les notifications pour chaque catégorie
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {Object.entries(NOTIFICATION_TYPE_LABELS).map(([type, { label, description }]) => {
+                const pref = getPreference(type);
+                return (
+                  <div key={type} className="pb-6 border-b last:border-b-0 last:pb-0">
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div>
+                        <h4 className="font-medium">{label}</h4>
+                        <p className="text-sm text-muted-foreground">{description}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div>
+                        <Label className="text-sm text-muted-foreground mb-2 block">Fréquence</Label>
+                        <Select 
+                          value={pref.frequency} 
+                          onValueChange={(v) => handleFrequencyChange(type, v)}
+                          disabled={updatePreferenceMutation.isPending}
+                        >
+                          <SelectTrigger data-testid={`select-frequency-${type}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="NONE">{FREQUENCY_LABELS.NONE}</SelectItem>
+                            <SelectItem value="IMMEDIATE">{FREQUENCY_LABELS.IMMEDIATE}</SelectItem>
+                            <SelectItem value="DAILY_DIGEST">{FREQUENCY_LABELS.DAILY_DIGEST}</SelectItem>
+                            <SelectItem value="WEEKLY_DIGEST">{FREQUENCY_LABELS.WEEKLY_DIGEST}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id={`inapp-${type}`}
+                          checked={pref.inAppEnabled}
+                          onCheckedChange={(v) => handleToggleInApp(type, v)}
+                          disabled={updatePreferenceMutation.isPending || pref.frequency === "NONE"}
+                          data-testid={`switch-inapp-${type}`}
+                        />
+                        <Label htmlFor={`inapp-${type}`} className="text-sm">
+                          Dans l'app
+                        </Label>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id={`email-${type}`}
+                          checked={pref.emailEnabled}
+                          onCheckedChange={(v) => handleToggleEmail(type, v)}
+                          disabled={updatePreferenceMutation.isPending || pref.frequency === "NONE"}
+                          data-testid={`switch-email-${type}`}
+                        />
+                        <Label htmlFor={`email-${type}`} className="text-sm">
+                          Email
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Résumés par email
+          </CardTitle>
+          <CardDescription>
+            Recevez un récapitulatif de vos notifications non lues
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Si vous choisissez "Résumé quotidien" ou "Résumé hebdomadaire" pour une catégorie, 
+            vous recevrez un email récapitulatif à la fréquence choisie, regroupant toutes les 
+            notifications non lues de cette catégorie.
+          </p>
         </CardContent>
       </Card>
     </div>

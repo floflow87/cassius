@@ -1,0 +1,235 @@
+Contexte
+
+Cassius est une app SaaS multi-tenant. L’architecture actuelle est globalement saine (client/, server/, shared/, migrations/), mais le backend commence à grossir (routes, storage, intégrations, emails, calendar, documents, flags, etc.).
+
+Objectif : faire un mini rework structurel pour garder le code maintenable, en refactor progressif et sans casser l’app.
+
+🎯 Objectifs (priorité)
+
+Créer une arborescence modulaire côté server/ (modules)
+
+Extraire les briques transverses dans server/lib/
+
+Préparer les traitements async/cron dans server/jobs/
+
+Garder les routes existantes intactes au début, puis migrer progressivement
+
+Éliminer les sources de vérité multiples autour du schéma DB (éviter schema.sql en source active)
+
+✅ Contraintes
+
+Aucun breaking change d’API
+
+Même URLs / mêmes réponses JSON
+
+Même auth / même multi-tenant checks
+
+Ajouter des tests simples ou “smoke tests” (à minima scripts) pour valider les endpoints critiques
+
+Refactor en “strangler pattern” : on déplace par petites étapes
+
+1) Nouvelle structure à créer
+
+Créer ces dossiers :
+
+server/
+  modules/
+    patients/
+      routes.ts
+      service.ts
+      repo.ts
+      schemas.ts
+      types.ts
+    implants/
+    operations/
+    appointments/
+    documents/
+    flags/
+    notifications/
+    integrations/
+      google-calendar/
+        routes.ts
+        service.ts
+        client.ts
+        schemas.ts
+        types.ts
+    auth/
+      routes.ts
+      service.ts
+      repo.ts
+      schemas.ts
+      email.ts
+  lib/
+    env.ts
+    logger.ts
+    auth.ts
+    supabase.ts
+    db.ts
+    storage.ts
+    resend.ts
+    errors.ts
+    pagination.ts
+  jobs/
+    index.ts
+    email_outbox.worker.ts
+    digests.cron.ts
+    google_sync.worker.ts
+
+
+Notes :
+
+routes.ts = uniquement routing + validation + appel service
+
+service.ts = logique métier (orchestration)
+
+repo.ts = accès DB (drizzle queries)
+
+schemas.ts = zod + DTO d’input
+
+lib/ = réutilisable partout
+
+jobs/ = async / cron / retry
+
+2) Étape 1 — Refactor minimal (sans déplacer tout)
+2.1 Créer server/lib/env.ts (obligatoire)
+
+Centraliser la lecture des env vars
+
+Ajouter une validation (zod) pour éviter les env manquantes silencieuses
+
+Exposer ENV + helpers isProd, isStaging, etc.
+
+Les secrets doivent être lus depuis process.env
+
+2.2 Créer server/lib/logger.ts
+
+Logger simple (console) mais structuré
+
+Ajout de requestId si déjà existant sinon minimal
+
+2.3 Créer server/lib/db.ts
+
+Centraliser l’instanciation drizzle + pool
+
+S’appuyer sur l’env actuelle (SUPABASE_DB_URL_DEV/PROD etc.)
+
+Empêcher une deuxième “source DB” (ex: éviter DATABASE_URL si ce n’est pas la DB cible)
+
+3) Étape 2 — Router “composite” propre
+
+Créer un fichier server/http.ts ou server/app.ts (selon ton setup) :
+
+server/routes.ts devient un agrégateur
+
+On garde les routes existantes mais on prépare le split :
+
+Ex :
+
+import patientsRouter from "./modules/patients/routes";
+app.use("/api/patients", patientsRouter);
+
+
+Au début, tu peux faire :
+
+patientsRouter redirige vers les handlers existants (wrappers)
+
+Puis on migre feature par feature
+
+4) Étape 3 — Migration progressive (ordre recommandé)
+
+Refactor par “morceaux” (dans cet ordre), en gardant l’app fonctionnelle :
+
+documents (car déjà bien isolé)
+
+integrations/google-calendar
+
+auth + emails (resend / outbox)
+
+notifications (ton prochain gros chantier)
+
+appointments
+
+patients / implants / operations (cœur CRM)
+
+Pour chaque module :
+
+déplacer les fonctions DB dans repo.ts
+
+déplacer la logique dans service.ts
+
+routes = validation zod + auth + appel service
+
+5) DB — “source de vérité” (important)
+5.1 Clarifier le schéma
+
+shared/schema.ts = source de vérité Drizzle
+
+migrations/ = seules migrations officielles
+
+5.2 db/schema.sql
+
+le conserver uniquement comme snapshot/documentation
+
+ne plus l’utiliser comme source d’évolution
+
+Ajouter un README dans /db :
+
+“Ne pas modifier schema.sql pour la prod”
+
+“Utiliser drizzle migrations”
+
+6) Jobs / Async (préparer sans implémenter lourd)
+
+Créer un système minimal :
+
+server/jobs/email_outbox.worker.ts : traite PENDING -> SENT/FAILED
+
+server/jobs/digests.cron.ts : stub (pas encore actif)
+
+server/jobs/google_sync.worker.ts : stub (ou déplacer le sync existant)
+
+Au début :
+
+un setInterval simple en dev
+
+en prod : un endpoint admin “run jobs” ou Render cron (selon infra)
+
+7) Critères d’acceptation (non négociables)
+
+L’application compile et tourne
+
+Aucun endpoint ne change (URL + payload)
+
+Les pages principales fonctionnent :
+
+Patients list + patient detail
+
+Implants list + implant detail
+
+Documents
+
+Calendar
+
+Flags affichés
+
+Auth + forgot password emails
+
+Ajout d’un script npm run smoke :
+
+ping /api/health
+
+call 3–5 endpoints clés avec un user test / token (si possible)
+
+Ajout d’un document docs/architecture.md décrivant la structure
+
+8) Deliverables attendus
+
+Nouvelle arborescence créée
+
+server/lib/* en place et utilisé
+
+Au moins 1 module migré complètement (Documents recommandé)
+
+server/routes.ts devenu agrégateur propre
+
+Doc courte dans docs/architecture.md

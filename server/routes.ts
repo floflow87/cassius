@@ -3,12 +3,15 @@ import { createServer, type Server } from "http";
 import { storage, computeLatestIsq } from "./storage";
 import { requireJwtOrSession } from "./jwtMiddleware";
 import * as supabaseStorage from "./supabaseStorage";
+import { createDocumentsRouter } from "./modules/documents/routes";
+import { setStorageProvider as setDocumentsStorageProvider } from "./modules/documents/service";
 import { getTopSlowestEndpoints, getTopDbHeavyEndpoints, getAllStats, clearStats } from "./instrumentation";
 import { runFlagDetection } from "./flagEngine";
 import * as googleCalendar from "./googleCalendar";
 import * as emailService from "./emailService";
 import { sendEmail, getPreviewHtml, getBaseUrl, TemplateName } from "./emails";
 import { randomBytes, scryptSync } from "crypto";
+import notificationService from "./notifications/notificationService";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -28,6 +31,7 @@ import {
   insertFlagSchema,
   patients,
   importJobs,
+  users,
 } from "@shared/schema";
 import type {
   Patient,
@@ -311,6 +315,25 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Initialize and mount modular Documents router
+  setDocumentsStorageProvider({
+    isStorageConfigured: supabaseStorage.isStorageConfigured,
+    createSignedUploadUrl: supabaseStorage.createSignedUploadUrl,
+    getSignedDownloadUrl: supabaseStorage.getSignedDownloadUrl,
+    deleteFile: supabaseStorage.deleteFile,
+  });
+  
+  const documentsRouter = createDocumentsRouter(
+    requireJwtOrSession,
+    (req, res) => getOrganisationId(req, res) ?? undefined,
+    (req) => req.jwtUser?.userId
+  );
+  app.use("/api/documents", documentsRouter);
 
   app.get("/api/health/db", requireJwtOrSession, async (_req, res) => {
     const result = await testConnection();
@@ -1392,8 +1415,12 @@ export async function registerRoutes(
   });
 
   // ========== DOCUMENTS (PDF) ==========
+  // NOTE: /api/documents/* routes are now handled by the modular Documents router
+  // mounted above via app.use("/api/documents", documentsRouter).
+  // TODO: Remove deprecated routes and migrate /api/files, /api/patients/:patientId/documents
   
-  // Get document tree structure for explorer
+  // DEPRECATED: All /api/documents/* routes below are disabled - module handles them
+  if (false) {
   app.get("/api/documents/tree", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -1434,8 +1461,9 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to fetch documents" });
     }
   });
+  } // End of first deprecated block
 
-  // Get unified files list (documents + radios combined)
+  // Get unified files list (documents + radios combined) - KEEP ACTIVE
   app.get("/api/files", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -1462,6 +1490,8 @@ export async function registerRoutes(
     }
   });
 
+  // DEPRECATED: Continue disabling /api/documents routes
+  if (false) {
   // Get signed upload URL for client-side document upload
   app.post("/api/documents/upload-url", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -1500,8 +1530,9 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to get upload URL" });
     }
   });
+  } // End of second deprecated block
 
-  // Get all documents for a patient (signed URLs fetched on-demand)
+  // Get all documents for a patient (signed URLs fetched on-demand) - KEEP ACTIVE
   app.get("/api/patients/:patientId/documents", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -1518,6 +1549,8 @@ export async function registerRoutes(
     }
   });
 
+  // DEPRECATED: Continue disabling remaining /api/documents routes
+  if (false) {
   // Get single document with fresh signed URL
   app.get("/api/documents/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -1617,6 +1650,19 @@ export async function registerRoutes(
       const data = insertDocumentSchema.parse(req.body);
       const userId = req.jwtUser?.userId || null;
       const doc = await storage.createDocument(organisationId, { ...data, createdBy: userId });
+      
+      // Send notification about new document
+      if (userId) {
+        await notificationService.notificationEvents.onDocumentUploaded({
+          organisationId,
+          recipientUserId: userId,
+          actorUserId: userId,
+          documentId: doc.id,
+          documentName: doc.title || doc.fileName,
+          patientId: doc.patientId || undefined,
+        });
+      }
+      
       res.status(201).json(doc);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1681,6 +1727,7 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to delete document" });
     }
   });
+  } // End of third deprecated block - all /api/documents routes now disabled
 
   // ========== VISITES ==========
   app.get("/api/implants/:id/visites", requireJwtOrSession, async (req, res) => {
@@ -1725,6 +1772,25 @@ export async function registerRoutes(
             console.error("Flag detection failed after visite ISQ sync:", err)
           );
           console.log(`[VISITE-ISQ] Synced ISQ=${data.isq} to surgery_implant=${surgeryImplantId}`);
+          
+          // Send notification for low ISQ (< 60)
+          if (data.isq < 60) {
+            const userId = req.jwtUser?.userId;
+            if (userId) {
+              notificationService.createNotification({
+                organisationId,
+                recipientUserId: userId,
+                kind: "ALERT",
+                type: "ISQ_LOW",
+                severity: data.isq < 50 ? "CRITICAL" : "WARNING",
+                title: `ISQ faible detecte: ${data.isq}`,
+                body: `L'implant sur le site a un ISQ de ${data.isq}, ce qui est en dessous du seuil recommande.`,
+                entityType: "IMPLANT",
+                entityId: surgeryImplantId,
+                dedupeKey: `isq_low_${surgeryImplantId}_${data.isq}`,
+              }).catch(err => console.error("[Notification] ISQ_LOW notification failed:", err));
+            }
+          }
         }
       }
       
@@ -2056,6 +2122,20 @@ export async function registerRoutes(
       const { patientId } = req.params;
       const appointmentData = insertAppointmentSchema.parse({ ...req.body, patientId });
       const appointment = await storage.createAppointment(organisationId, appointmentData);
+      
+      // Send notification about new appointment
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        await notificationService.notificationEvents.onAppointmentCreated({
+          organisationId,
+          recipientUserId: userId,
+          actorUserId: userId,
+          appointmentId: appointment.id,
+          appointmentDate: appointment.dateStart.toISOString(),
+          patientId,
+        });
+      }
+      
       res.status(201).json(appointment);
     } catch (error) {
       console.error("Error creating appointment:", error);
@@ -3515,6 +3595,18 @@ export async function registerRoutes(
       // Update job to completed
       await patientImport.updateImportJobStatus(jobId, "completed", stats);
       
+      // Send notification about import completion
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        await notificationService.notificationEvents.onImportCompleted({
+          organisationId,
+          recipientUserId: userId,
+          importId: jobId,
+          successCount: stats.toCreate + stats.toUpdate,
+          failureCount: stats.error,
+        });
+      }
+      
       res.json({
         jobId,
         status: "completed",
@@ -3759,6 +3851,38 @@ export async function registerRoutes(
       res.status(500).json({ error: "Erreur lors de la récupération du profil" });
     }
   });
+
+  // PUT /api/settings/profile - Update user profile (nom, prenom)
+  const profileUpdateSchema = z.object({
+    nom: z.string().trim().max(100, "Le nom ne peut pas dépasser 100 caractères").optional(),
+    prenom: z.string().trim().max(100, "Le prénom ne peut pas dépasser 100 caractères").optional(),
+  });
+
+  app.put("/api/settings/profile", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const parsed = profileUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0]?.message || "Données invalides" });
+      }
+      
+      const { nom, prenom } = parsed.data;
+      
+      await storage.updateUser(userId, { 
+        nom: nom || null, 
+        prenom: prenom || null 
+      });
+      
+      res.json({ success: true, message: "Profil mis à jour" });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error updating profile:", error);
+      res.status(500).json({ error: "Erreur lors de la mise à jour du profil" });
+    }
+  });
   
   // POST /api/settings/password - Change password
   app.post("/api/settings/password", requireJwtOrSession, async (req, res) => {
@@ -3896,7 +4020,8 @@ export async function registerRoutes(
       const organisationName = org?.nom || "Cabinet dentaire";
       
       // Get inviter name
-      const inviter = await storage.getUserById(req.jwtUser?.id || "");
+      const inviterId = req.jwtUser?.userId || "";
+      const inviter = await storage.getUserById(inviterId);
       const inviterName = inviter ? `${inviter.prenom || ""} ${inviter.nom || ""}`.trim() || inviter.username : "Un administrateur";
       
       // Generate secure invitation token
@@ -3910,7 +4035,7 @@ export async function registerRoutes(
         role: role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT",
         tokenHash,
         expiresAt,
-        invitedByUserId: req.jwtUser?.id || "",
+        invitedByUserId: inviterId,
         nom: nom || null,
         prenom: prenom || null,
       });
@@ -4012,23 +4137,30 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Vous ne pouvez pas supprimer votre propre compte" });
       }
       
+      // First try to find as user
       const user = await storage.getUserById(id);
-      if (!user || user.organisationId !== organisationId) {
-        return res.status(404).json({ error: "Collaborateur non trouvé" });
-      }
-      
-      // Prevent removing the last admin
-      if (user.role === "ADMIN") {
-        const admins = await storage.getUsersByOrganisation(organisationId);
-        const adminCount = admins.filter(u => u.role === "ADMIN").length;
-        if (adminCount <= 1) {
-          return res.status(400).json({ error: "Impossible de supprimer le dernier administrateur" });
+      if (user && user.organisationId === organisationId) {
+        // Prevent removing the last admin
+        if (user.role === "ADMIN") {
+          const admins = await storage.getUsersByOrganisation(organisationId);
+          const adminCount = admins.filter(u => u.role === "ADMIN").length;
+          if (adminCount <= 1) {
+            return res.status(400).json({ error: "Impossible de supprimer le dernier administrateur" });
+          }
         }
+        
+        await storage.deleteUser(id);
+        return res.json({ success: true });
       }
       
-      await storage.deleteUser(id);
+      // Try to find as invitation
+      const invitation = await storage.getInvitationById(id);
+      if (invitation && invitation.organisationId === organisationId) {
+        await storage.deleteInvitation(id);
+        return res.json({ success: true });
+      }
       
-      res.json({ success: true });
+      return res.status(404).json({ error: "Collaborateur non trouvé" });
     } catch (error: any) {
       console.error("[SETTINGS] Error deleting collaborator:", error);
       res.status(500).json({ error: "Erreur lors de la suppression du collaborateur" });
@@ -4053,8 +4185,8 @@ export async function registerRoutes(
       res.json({
         id: org.id,
         nom: org.nom,
-        adresse: (org as any).adresse || null,
-        timezone: (org as any).timezone || "Europe/Paris",
+        adresse: org.adresse || null,
+        timezone: org.timezone || "Europe/Paris",
         createdAt: org.createdAt,
       });
     } catch (error: any) {
@@ -4086,8 +4218,8 @@ export async function registerRoutes(
       res.json({
         id: updated?.id,
         nom: updated?.nom,
-        adresse: (updated as any)?.adresse || null,
-        timezone: (updated as any)?.timezone || "Europe/Paris",
+        adresse: updated?.adresse || null,
+        timezone: updated?.timezone || "Europe/Paris",
         createdAt: updated?.createdAt,
       });
     } catch (error: any) {
@@ -4173,10 +4305,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Un compte existe déjà avec cet email" });
       }
       
-      // Hash password
+      // Hash password (format: hashedPassword.salt - same as auth.ts)
       const salt = randomBytes(16).toString('hex');
       const hashedPassword = scryptSync(password, salt, 64).toString('hex');
-      const passwordWithSalt = `${salt}:${hashedPassword}`;
+      const passwordWithSalt = `${hashedPassword}.${salt}`;
       
       // Create user
       const newUser = await storage.createUser({
@@ -4520,6 +4652,7 @@ export async function registerRoutes(
           'securityNotice',
           'integrationConnected',
           'systemAlert',
+          'notificationDigest',
         ];
         return res.json({
           message: "Templates disponibles",
@@ -4535,6 +4668,7 @@ export async function registerRoutes(
         'securityNotice',
         'integrationConnected',
         'systemAlert',
+        'notificationDigest',
       ];
       
       if (!validTemplates.includes(template as TemplateName)) {
@@ -4549,6 +4683,286 @@ export async function registerRoutes(
       res.send(html);
     } catch (error: any) {
       console.error("[DEV] Error previewing email:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== NOTIFICATION ROUTES ====================
+
+  // Get notifications list
+  app.get("/api/notifications", requireJwtOrSession, async (req, res) => {
+    try {
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const { kind, unreadOnly, page, pageSize } = req.query;
+      
+      const result = await notificationService.getNotifications(userId, organisationId, {
+        kind: kind as any,
+        unreadOnly: unreadOnly === 'true',
+        page: page ? parseInt(page as string) : 1,
+        pageSize: pageSize ? parseInt(pageSize as string) : 20,
+      });
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Notifications] Error fetching notifications:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get unread count
+  app.get("/api/notifications/unread-count", requireJwtOrSession, async (req, res) => {
+    try {
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const count = await notificationService.getUnreadCount(userId, organisationId);
+      res.json({ count });
+    } catch (error: any) {
+      console.error("[Notifications] Error fetching unread count:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Mark notification as read
+  app.patch("/api/notifications/:id/read", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const { id } = req.params;
+      const success = await notificationService.markAsRead(id, userId);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Notification non trouvee" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Notifications] Error marking notification as read:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Mark all notifications as read
+  app.post("/api/notifications/mark-all-read", requireJwtOrSession, async (req, res) => {
+    try {
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const count = await notificationService.markAllAsRead(userId, organisationId);
+      res.json({ success: true, count });
+    } catch (error: any) {
+      console.error("[Notifications] Error marking all as read:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Archive a notification
+  app.patch("/api/notifications/:id/archive", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const { id } = req.params;
+      const success = await notificationService.archiveNotification(id, userId);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Notification non trouvee" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Notifications] Error archiving notification:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get user notification preferences
+  app.get("/api/notifications/preferences", requireJwtOrSession, async (req, res) => {
+    try {
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const preferences = await notificationService.getUserPreferences(userId, organisationId);
+      res.json(preferences);
+    } catch (error: any) {
+      console.error("[Notifications] Error fetching preferences:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update a notification preference
+  app.patch("/api/notifications/preferences/:category", requireJwtOrSession, async (req, res) => {
+    try {
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const { category } = req.params;
+      const { frequency, inAppEnabled, emailEnabled, digestTime } = req.body;
+      
+      const preference = await notificationService.updatePreference(
+        userId,
+        organisationId,
+        category as any,
+        { frequency, inAppEnabled, emailEnabled, digestTime }
+      );
+      
+      res.json(preference);
+    } catch (error: any) {
+      console.error("[Notifications] Error updating preference:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Manual digest trigger (admin only - requires CHIRURGIEN or ADMIN role)
+  app.post("/api/admin/digest/daily", requireJwtOrSession, async (req, res) => {
+    try {
+      const userRole = req.jwtUser?.role;
+      if (!userRole || !["CHIRURGIEN", "ADMIN"].includes(userRole)) {
+        return res.status(403).json({ error: "Acces refuse - Administrateur requis" });
+      }
+      
+      const { runDailyDigest } = await import("./notifications/digestScheduler");
+      const result = await runDailyDigest();
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("[Digest] Error running daily digest:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Debug endpoint for testing notification flow (admin only)
+  app.get("/api/notifications/debug", requireJwtOrSession, async (req, res) => {
+    try {
+      const userRole = req.jwtUser?.role;
+      if (!userRole || userRole !== "ADMIN") {
+        return res.status(403).json({ error: "Acces refuse - Administrateur requis" });
+      }
+
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      
+      const eventType = req.query.event as string || "ISQ_CRITICAL";
+      
+      // Get all users in the organisation
+      const orgUsers = await db.select({
+        id: users.id,
+        username: users.username,
+        nom: users.nom,
+        prenom: users.prenom,
+        role: users.role,
+      }).from(users).where(eq(users.organisationId, organisationId));
+      
+      // Get preferences for each user
+      const userDebugInfo = await Promise.all(orgUsers.map(async (user) => {
+        const allPrefs = await notificationService.getUserPreferences(user.id, organisationId);
+        
+        // Map event type to category
+        let category = "ALERTS_REMINDERS";
+        if (eventType.includes("IMPORT")) category = "IMPORTS";
+        else if (eventType.includes("ACTIVITY") || eventType.includes("TEAM")) category = "TEAM_ACTIVITY";
+        else if (eventType.includes("SYSTEM")) category = "SYSTEM";
+        
+        const relevantPref = allPrefs.find(p => p.category === category);
+        const defaultPref = { frequency: "IMMEDIATE", inAppEnabled: true, emailEnabled: false };
+        const effectivePref = relevantPref || defaultPref;
+        
+        const wouldReceiveInApp = effectivePref.frequency !== "NONE" && (effectivePref.inAppEnabled || effectivePref.emailEnabled);
+        const wouldReceiveEmail = effectivePref.emailEnabled && effectivePref.frequency === "IMMEDIATE";
+        
+        let skipReason: string | null = null;
+        if (effectivePref.frequency === "NONE") {
+          skipReason = "Frequency set to NONE";
+        } else if (!effectivePref.inAppEnabled && !effectivePref.emailEnabled) {
+          skipReason = "Both in-app and email disabled";
+        }
+        
+        return {
+          user: {
+            id: user.id,
+            email: user.username,
+            name: `${user.prenom || ""} ${user.nom || ""}`.trim() || user.username,
+            role: user.role,
+          },
+          preferences: {
+            category,
+            frequency: effectivePref.frequency,
+            inAppEnabled: effectivePref.inAppEnabled,
+            emailEnabled: effectivePref.emailEnabled,
+            source: relevantPref ? "custom" : "default",
+          },
+          result: {
+            wouldReceiveInApp,
+            wouldReceiveEmail,
+            wouldReceiveDigest: effectivePref.emailEnabled && effectivePref.frequency === "DIGEST",
+            skipReason,
+          },
+        };
+      }));
+      
+      res.json({
+        eventType,
+        organisation: organisationId,
+        timestamp: new Date().toISOString(),
+        targetedUsers: userDebugInfo,
+        summary: {
+          totalUsers: userDebugInfo.length,
+          wouldReceiveInApp: userDebugInfo.filter(u => u.result.wouldReceiveInApp).length,
+          wouldReceiveImmediateEmail: userDebugInfo.filter(u => u.result.wouldReceiveEmail).length,
+          wouldReceiveDigest: userDebugInfo.filter(u => u.result.wouldReceiveDigest).length,
+          skipped: userDebugInfo.filter(u => u.result.skipReason).length,
+        },
+      });
+    } catch (error: any) {
+      console.error("[Notifications] Debug endpoint error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Test notification creation (admin only)
+  app.post("/api/notifications/test", requireJwtOrSession, async (req, res) => {
+    try {
+      const userRole = req.jwtUser?.role;
+      if (!userRole || userRole !== "ADMIN") {
+        return res.status(403).json({ error: "Acces refuse - Administrateur requis" });
+      }
+
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+      
+      const { type = "TEST", severity = "INFO", title, body } = req.body;
+      
+      const notification = await notificationService.createNotification({
+        organisationId,
+        recipientUserId: userId,
+        kind: "SYSTEM",
+        type,
+        severity,
+        title: title || "Notification de test",
+        body: body || "Ceci est une notification de test pour verifier le systeme.",
+      });
+      
+      if (notification) {
+        res.json({ success: true, notification });
+      } else {
+        res.json({ success: false, reason: "Notification skipped (check preferences or deduplication)" });
+      }
+    } catch (error: any) {
+      console.error("[Notifications] Test notification error:", error);
       res.status(500).json({ error: error.message });
     }
   });
