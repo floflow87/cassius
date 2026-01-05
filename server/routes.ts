@@ -29,6 +29,7 @@ import {
   insertFlagSchema,
   patients,
   importJobs,
+  users,
 } from "@shared/schema";
 import type {
   Patient,
@@ -1746,13 +1747,13 @@ export async function registerRoutes(
             if (userId) {
               notificationService.createNotification({
                 organisationId,
-                userId,
+                recipientUserId: userId,
                 kind: "ALERT",
                 type: "ISQ_LOW",
-                severity: data.isq < 50 ? "ERROR" : "WARNING",
+                severity: data.isq < 50 ? "CRITICAL" : "WARNING",
                 title: `ISQ faible detecte: ${data.isq}`,
                 body: `L'implant sur le site a un ISQ de ${data.isq}, ce qui est en dessous du seuil recommande.`,
-                entityType: "SURGERY_IMPLANT",
+                entityType: "IMPLANT",
                 entityId: surgeryImplantId,
                 dedupeKey: `isq_low_${surgeryImplantId}_${data.isq}`,
               }).catch(err => console.error("[Notification] ISQ_LOW notification failed:", err));
@@ -4802,6 +4803,129 @@ export async function registerRoutes(
     }
   });
 
+  // Debug endpoint for testing notification flow (admin only)
+  app.get("/api/notifications/debug", requireJwtOrSession, async (req, res) => {
+    try {
+      const userRole = req.jwtUser?.role;
+      if (!userRole || userRole !== "ADMIN") {
+        return res.status(403).json({ error: "Acces refuse - Administrateur requis" });
+      }
+
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      
+      const eventType = req.query.event as string || "ISQ_CRITICAL";
+      
+      // Get all users in the organisation
+      const orgUsers = await db.select({
+        id: users.id,
+        username: users.username,
+        nom: users.nom,
+        prenom: users.prenom,
+        role: users.role,
+      }).from(users).where(eq(users.organisationId, organisationId));
+      
+      // Get preferences for each user
+      const userDebugInfo = await Promise.all(orgUsers.map(async (user) => {
+        const allPrefs = await notificationService.getUserPreferences(user.id, organisationId);
+        
+        // Map event type to category
+        let category = "ALERTS_REMINDERS";
+        if (eventType.includes("IMPORT")) category = "IMPORTS";
+        else if (eventType.includes("ACTIVITY") || eventType.includes("TEAM")) category = "TEAM_ACTIVITY";
+        else if (eventType.includes("SYSTEM")) category = "SYSTEM";
+        
+        const relevantPref = allPrefs.find(p => p.category === category);
+        const defaultPref = { frequency: "IMMEDIATE", inAppEnabled: true, emailEnabled: false };
+        const effectivePref = relevantPref || defaultPref;
+        
+        const wouldReceiveInApp = effectivePref.frequency !== "NONE" && (effectivePref.inAppEnabled || effectivePref.emailEnabled);
+        const wouldReceiveEmail = effectivePref.emailEnabled && effectivePref.frequency === "IMMEDIATE";
+        
+        let skipReason: string | null = null;
+        if (effectivePref.frequency === "NONE") {
+          skipReason = "Frequency set to NONE";
+        } else if (!effectivePref.inAppEnabled && !effectivePref.emailEnabled) {
+          skipReason = "Both in-app and email disabled";
+        }
+        
+        return {
+          user: {
+            id: user.id,
+            email: user.username,
+            name: `${user.prenom || ""} ${user.nom || ""}`.trim() || user.username,
+            role: user.role,
+          },
+          preferences: {
+            category,
+            frequency: effectivePref.frequency,
+            inAppEnabled: effectivePref.inAppEnabled,
+            emailEnabled: effectivePref.emailEnabled,
+            source: relevantPref ? "custom" : "default",
+          },
+          result: {
+            wouldReceiveInApp,
+            wouldReceiveEmail,
+            wouldReceiveDigest: effectivePref.emailEnabled && effectivePref.frequency === "DIGEST",
+            skipReason,
+          },
+        };
+      }));
+      
+      res.json({
+        eventType,
+        organisation: organisationId,
+        timestamp: new Date().toISOString(),
+        targetedUsers: userDebugInfo,
+        summary: {
+          totalUsers: userDebugInfo.length,
+          wouldReceiveInApp: userDebugInfo.filter(u => u.result.wouldReceiveInApp).length,
+          wouldReceiveImmediateEmail: userDebugInfo.filter(u => u.result.wouldReceiveEmail).length,
+          wouldReceiveDigest: userDebugInfo.filter(u => u.result.wouldReceiveDigest).length,
+          skipped: userDebugInfo.filter(u => u.result.skipReason).length,
+        },
+      });
+    } catch (error: any) {
+      console.error("[Notifications] Debug endpoint error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Test notification creation (admin only)
+  app.post("/api/notifications/test", requireJwtOrSession, async (req, res) => {
+    try {
+      const userRole = req.jwtUser?.role;
+      if (!userRole || userRole !== "ADMIN") {
+        return res.status(403).json({ error: "Acces refuse - Administrateur requis" });
+      }
+
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+      
+      const { type = "TEST", severity = "INFO", title, body } = req.body;
+      
+      const notification = await notificationService.createNotification({
+        organisationId,
+        recipientUserId: userId,
+        kind: "SYSTEM",
+        type,
+        severity,
+        title: title || "Notification de test",
+        body: body || "Ceci est une notification de test pour verifier le systeme.",
+      });
+      
+      if (notification) {
+        res.json({ success: true, notification });
+      } else {
+        res.json({ success: false, reason: "Notification skipped (check preferences or deduplication)" });
+      }
+    } catch (error: any) {
+      console.error("[Notifications] Test notification error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   return httpServer;
 }

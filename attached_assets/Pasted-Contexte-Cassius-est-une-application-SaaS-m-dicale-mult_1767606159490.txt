@@ -1,0 +1,218 @@
+Contexte
+
+Cassius est une application SaaS médicale multi-tenant.
+Nous devons implémenter un système de notifications robuste, centralisé et traçable, déclenché par des événements métier (ex : ISQ faible, rendez-vous, imports, activité équipe).
+
+Actuellement :
+
+Les événements sont bien créés (ex : ISQ = 25)
+
+Les préférences utilisateur existent (In-app / Email / Fréquence)
+
+❌ Les notifications ne sont ni visibles dans le bandeau, ni envoyées par email
+
+Objectif : un système fiable, cohérent, et extensible.
+
+🧠 Principe fondamental
+
+👉 Toute notification passe par UNE seule source de vérité
+Aucune notification ne doit être envoyée directement depuis une feature métier.
+
+🧱 Architecture attendue
+1️⃣ Notification Engine (obligatoire)
+
+Créer un Notification Engine central :
+
+notify(event: NotificationEvent)
+
+
+Tous les modules (ISQ, rendez-vous, imports, documents, etc.) appellent exclusivement ce moteur.
+
+2️⃣ Types d’événements normalisés
+
+Créer une enum claire :
+
+NotificationType =
+  | ISQ_CRITICAL
+  | ISQ_WARNING
+  | APPOINTMENT_REMINDER
+  | APPOINTMENT_UPDATED
+  | IMPORT_COMPLETED
+  | IMPORT_FAILED
+  | DOCUMENT_ADDED
+  | TEAM_ACTIVITY
+  | SYSTEM_UPDATE
+
+
+Chaque événement contient :
+
+{
+  type: NotificationType
+  organisationId
+  patientId?        // jamais de données sensibles en clair
+  entityId?         // implant, visite, document…
+  severity?: 'INFO' | 'WARNING' | 'CRITICAL'
+  payload?: Record<string, any>
+  createdAt
+}
+
+3️⃣ Table notifications (In-app)
+
+Créer une table dédiée :
+
+notifications (
+  id uuid PK
+  organisation_id
+  user_id
+  type
+  severity
+  title
+  message
+  entity_type
+  entity_id
+  is_read boolean default false
+  created_at
+)
+
+
+👉 Toute notification visible dans le bandeau doit être stockée ici.
+
+4️⃣ Table notification_preferences
+
+Par utilisateur et par catégorie :
+
+notification_preferences (
+  user_id
+  category   -- alerts, activity, imports, system
+  in_app boolean
+  email boolean
+  frequency enum('IMMEDIATE','DAILY','WEEKLY','NONE')
+)
+
+🔄 Flow complet (EXEMPLE ISQ = 25)
+Étape 1 — Événement métier
+
+Lorsqu’un ISQ est créé ou modifié :
+
+if (isq < 55) {
+  notify({
+    type: ISQ_CRITICAL,
+    severity: 'CRITICAL',
+    patientId,
+    entityId: implantId,
+    organisationId
+  })
+}
+
+Étape 2 — Notification Engine
+
+Le moteur :
+
+Identifie les utilisateurs concernés (organisation + rôle)
+
+Charge leurs notification_preferences
+
+Pour chaque utilisateur :
+
+si in_app = true → crée une ligne notifications
+
+si email = true → enqueue email (voir plus bas)
+
+⚠️ Aucune notification n’est affichée si elle n’est pas en base
+
+Étape 3 — Bandeau In-app (Frontend)
+
+Le bandeau :
+
+appelle GET /api/notifications
+
+affiche :
+
+badge compteur (unread)
+
+icône par sévérité
+
+marque comme lu via POST /api/notifications/:id/read
+
+Étape 4 — Emails (asynchrones)
+
+Créer une table email_outbox :
+
+email_outbox (
+  id uuid
+  user_id
+  type
+  subject
+  template
+  payload
+  status enum('PENDING','SENT','FAILED')
+  error_message?
+  created_at
+  sent_at?
+)
+
+
+Le moteur :
+
+écrit en PENDING
+
+un worker traite l’envoi (Resend)
+
+met à jour SENT ou FAILED
+
+👉 Jamais d’email envoyé directement depuis un controller
+
+📧 Règles Email (sécurité & UX)
+
+Aucune donnée patient en clair
+
+Liens signés uniquement
+
+CTA du type :
+
+“Voir l’alerte dans Cassius”
+
+Expiration des liens
+
+Langue : FR par défaut (prévoir i18n plus tard)
+
+⏱ Gestion de la fréquence
+
+IMMEDIATE → notification instantanée
+
+DAILY / WEEKLY → stocker dans une table notification_digest
+
+Cron job pour générer les emails groupés
+
+✅ Cas d’acceptation obligatoires
+
+ ISQ < 55 → notification visible immédiatement dans le bandeau
+
+ Badge compteur mis à jour sans refresh
+
+ Email envoyé si activé dans préférences
+
+ Désactiver email → in-app uniquement
+
+ Aucun email si fréquence ≠ immédiat
+
+ Logs clairs en cas d’échec email
+
+ Aucune notif si préférences désactivées
+
+🧪 Debug obligatoire
+
+Ajouter un endpoint admin :
+
+GET /api/notifications/debug?event=ISQ_CRITICAL
+
+
+Retourne :
+
+utilisateurs ciblés
+
+préférences appliquées
+
+in_app créé ? email enqueue ?
+
+raison si ignoré
