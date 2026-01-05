@@ -36,6 +36,7 @@ async function runDigestForFrequency(
 
   try {
     const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
     const prefsWithDigest = await db
       .select({
         userId: notificationPreferences.userId,
@@ -52,13 +53,22 @@ async function runDigestForFrequency(
       );
 
     const filteredPrefs = prefsWithDigest.filter((pref) => {
-      if (!pref.digestTime) return currentHour === 8;
-      const prefHour = parseInt(pref.digestTime.split(":")[0], 10);
-      return prefHour === currentHour;
+      const timeStr = pref.digestTime?.trim();
+      if (!timeStr || !/^\d{1,2}:\d{2}$/.test(timeStr)) {
+        console.log(`[DIGEST] Invalid digestTime "${pref.digestTime}" for user ${pref.userId}, defaulting to 08:00`);
+        return currentHour === 8 && currentMinute === 0;
+      }
+      const [hourStr, minStr] = timeStr.split(":");
+      const prefHour = parseInt(hourStr, 10);
+      const prefMinute = parseInt(minStr, 10);
+      return prefHour === currentHour && prefMinute === currentMinute;
     });
 
     if (filteredPrefs.length === 0) {
-      console.log(`[DIGEST] No users with digest preferences for hour ${currentHour}`);
+      // Only log at :00 to reduce noise
+      if (currentMinute === 0) {
+        console.log(`[DIGEST] No users with digest preferences for ${String(currentHour).padStart(2, '0')}:00`);
+      }
       return { processed: 0, results: [] };
     }
 
@@ -259,39 +269,41 @@ async function runDigestForFrequency(
   }
 }
 
-let hourlyTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let minuteIntervalId: ReturnType<typeof setInterval> | null = null;
+let isRunning = false;
 
 export function startDigestScheduler(): void {
-  console.log("[DIGEST] Starting hourly digest scheduler...");
+  console.log("[DIGEST] Starting digest scheduler (runs every minute)...");
 
-  function scheduleNextHourly() {
-    const now = new Date();
-    const nextHour = new Date(now);
-    nextHour.setMinutes(0, 0, 0);
-    nextHour.setHours(nextHour.getHours() + 1);
-    const msUntilNext = nextHour.getTime() - now.getTime();
-
-    console.log(`[DIGEST] Next digest check scheduled for ${nextHour.toISOString()}`);
-
-    hourlyTimeoutId = setTimeout(async () => {
-      try {
-        console.log("[DIGEST] Running hourly digest check...");
-        const result = await runDailyDigest();
+  async function runDigestCheck() {
+    if (isRunning) {
+      console.log("[DIGEST] Skipping - previous run still in progress");
+      return;
+    }
+    isRunning = true;
+    try {
+      const result = await runDailyDigest();
+      if (result.processed > 0) {
         console.log(`[DIGEST] Digest check complete: ${result.processed} digests sent`);
-      } catch (error) {
-        console.error("[DIGEST] Digest check failed:", error);
       }
-      scheduleNextHourly();
-    }, msUntilNext);
+    } catch (error) {
+      // Errors are caught here - runDailyDigest exceptions don't escape
+      console.error("[DIGEST] Digest check failed:", error);
+    } finally {
+      // Always reset mutex - finally runs after catch handles any error
+      isRunning = false;
+    }
   }
 
-  scheduleNextHourly();
+  // Run immediately on startup, then every minute
+  runDigestCheck();
+  minuteIntervalId = setInterval(runDigestCheck, 60 * 1000);
 }
 
 export function stopDigestScheduler(): void {
-  if (hourlyTimeoutId) {
-    clearTimeout(hourlyTimeoutId);
-    hourlyTimeoutId = null;
+  if (minuteIntervalId) {
+    clearInterval(minuteIntervalId);
+    minuteIntervalId = null;
   }
   console.log("[DIGEST] Digest scheduler stopped");
 }
