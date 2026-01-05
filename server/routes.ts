@@ -314,6 +314,10 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   app.get("/api/health/db", requireJwtOrSession, async (_req, res) => {
     const result = await testConnection();
     const env = getDbEnv();
