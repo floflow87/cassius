@@ -1046,26 +1046,25 @@ function OrganizationSection() {
 
 interface NotificationPreference {
   id: string;
+  category: string;
   userId: string;
-  notificationType: string;
   inAppEnabled: boolean;
   emailEnabled: boolean;
-  frequency: "NONE" | "IMMEDIATE" | "DAILY_DIGEST" | "WEEKLY_DIGEST";
+  frequency: "NONE" | "IMMEDIATE" | "DIGEST";
+  digestTime?: string;
 }
 
 const NOTIFICATION_TYPE_LABELS: Record<string, { label: string; description: string }> = {
-  ISQ_UPDATE: { label: "Mises à jour ISQ", description: "Alertes sur les mesures ISQ (faibles, progrès, rappels)" },
-  APPOINTMENT: { label: "Rendez-vous", description: "Rappels et confirmations de rendez-vous" },
-  DOCUMENT: { label: "Documents", description: "Nouveaux documents ajoutés à vos patients" },
-  IMPORT: { label: "Imports", description: "Résultats des imports de patients" },
+  ALERTS_REMINDERS: { label: "Alertes et rappels", description: "Mesures ISQ, rendez-vous, rappels cliniques" },
+  TEAM_ACTIVITY: { label: "Activité équipe", description: "Modifications de dossiers, documents ajoutés" },
+  IMPORTS: { label: "Imports", description: "Résultats des imports de patients" },
   SYSTEM: { label: "Système", description: "Mises à jour et annonces du système" },
 };
 
 const FREQUENCY_LABELS: Record<string, string> = {
   NONE: "Désactivé",
   IMMEDIATE: "Immédiat",
-  DAILY_DIGEST: "Résumé quotidien",
-  WEEKLY_DIGEST: "Résumé hebdomadaire",
+  DIGEST: "Résumé quotidien",
 };
 
 function NotificationsSection() {
@@ -1076,8 +1075,8 @@ function NotificationsSection() {
   });
   
   const updatePreferenceMutation = useMutation({
-    mutationFn: async ({ notificationType, updates }: { notificationType: string; updates: Partial<NotificationPreference> }) => {
-      return apiRequest("PATCH", `/api/notifications/preferences/${notificationType}`, updates);
+    mutationFn: async ({ category, updates }: { category: string; updates: Partial<NotificationPreference> }) => {
+      return apiRequest("PATCH", `/api/notifications/preferences/${category}`, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/preferences"] });
@@ -1089,8 +1088,8 @@ function NotificationsSection() {
   });
   
   const getPreference = (type: string) => {
-    return preferences?.find(p => p.notificationType === type) || {
-      notificationType: type,
+    return preferences?.find(p => p.category === type) || {
+      category: type,
       inAppEnabled: true,
       emailEnabled: false,
       frequency: "IMMEDIATE" as const,
@@ -1099,21 +1098,21 @@ function NotificationsSection() {
   
   const handleFrequencyChange = (type: string, frequency: string) => {
     updatePreferenceMutation.mutate({ 
-      notificationType: type, 
+      category: type, 
       updates: { frequency: frequency as NotificationPreference["frequency"] } 
     });
   };
   
   const handleToggleInApp = (type: string, enabled: boolean) => {
     updatePreferenceMutation.mutate({ 
-      notificationType: type, 
+      category: type, 
       updates: { inAppEnabled: enabled } 
     });
   };
   
   const handleToggleEmail = (type: string, enabled: boolean) => {
     updatePreferenceMutation.mutate({ 
-      notificationType: type, 
+      category: type, 
       updates: { emailEnabled: enabled } 
     });
   };
