@@ -41,6 +41,9 @@ import {
 import { SiGoogle } from "react-icons/si";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import googleCalendarIcon from "@assets/Google_Calendar_icon_(2020).svg_1767601723458.png";
+import gmailIcon from "@assets/gmail_1767602212820.png";
+import outlookIcon from "@assets/Microsoft_Outlook_Icon_(2025–present).svg_1767602593769.png";
+import googleMeetIcon from "@assets/google-meet_1767602721784.png";
 
 const profileFormSchema = z.object({
   nom: z.string().max(100, "Le nom ne peut pas dépasser 100 caractères"),
@@ -110,7 +113,7 @@ const inviteSchema = z.object({
 function getRoleLabel(role: string): string {
   switch (role) {
     case "ADMIN": return "Administrateur";
-    case "CHIRURGIEN": return "Praticien";
+    case "CHIRURGIEN": return "Collaborateur";
     case "ASSISTANT": return "Assistant";
     default: return role;
   }
@@ -544,176 +547,195 @@ function IntegrationsSection() {
   });
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Intégrations</h2>
         <p className="text-muted-foreground">Connectez vos services externes pour synchroniser vos données.</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <img src={googleCalendarIcon} alt="Google Calendar" className="w-10 h-10" />
-              <div>
-                <CardTitle>Google Calendar</CardTitle>
-                <CardDescription>Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Google Calendar - Active Integration */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <img src={googleCalendarIcon} alt="Google Calendar" className="w-10 h-10" />
+                <div>
+                  <CardTitle className="text-base">Google Calendar</CardTitle>
+                  <CardDescription>Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
+                </div>
               </div>
+              {googleStatus?.connected ? (
+                <Badge variant="default" className="bg-green-600" data-testid="badge-google-connected">
+                  <Check className="w-3 h-3 mr-1" />
+                  Connecté
+                </Badge>
+              ) : (
+                <Badge variant="outline" data-testid="badge-google-disconnected">
+                  <X className="w-3 h-3 mr-1" />
+                  Non connecté
+                </Badge>
+              )}
             </div>
-            {googleStatus?.connected ? (
-              <Badge variant="default" className="bg-green-600" data-testid="badge-google-connected">
-                <Check className="w-3 h-3 mr-1" />
-                Connecté
-              </Badge>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {googleLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Chargement...
+              </div>
+            ) : googleStatus?.connected ? (
+              <>
+                {googleStatus.email && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Compte connecté</Label>
+                    <p className="font-medium text-sm">{googleStatus.email}</p>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <Label className="text-sm">Synchronisation automatique</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Les rendez-vous sont synchronisés automatiquement
+                    </p>
+                  </div>
+                  <Switch
+                    checked={googleStatus.integration?.isEnabled ?? false}
+                    onCheckedChange={(checked) => toggleSyncMutation.mutate(checked)}
+                    disabled={toggleSyncMutation.isPending}
+                    data-testid="switch-google-sync"
+                  />
+                </div>
+
+                {googleStatus.integration?.targetCalendarName && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Calendrier cible</Label>
+                    <p className="font-medium text-sm flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      {googleStatus.integration.targetCalendarName}
+                    </p>
+                  </div>
+                )}
+
+                {googleStatus.integration?.lastSyncAt && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Dernière synchronisation</Label>
+                    <p className="text-sm">
+                      {new Date(googleStatus.integration.lastSyncAt).toLocaleString("fr-FR")}
+                    </p>
+                  </div>
+                )}
+
+                {googleStatus.integration?.syncErrorCount && googleStatus.integration.syncErrorCount > 0 && (
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-sm">{googleStatus.integration.syncErrorCount} erreurs de synchronisation</span>
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncNowMutation.mutate()}
+                    disabled={syncNowMutation.isPending}
+                    data-testid="button-sync-now"
+                  >
+                    {syncNowMutation.isPending ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Synchroniser maintenant
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => disconnectGoogleMutation.mutate()}
+                    disabled={disconnectGoogleMutation.isPending}
+                    className="text-destructive"
+                    data-testid="button-disconnect-google"
+                  >
+                    Déconnecter
+                  </Button>
+                </div>
+              </>
             ) : (
-              <Badge variant="outline" data-testid="badge-google-disconnected">
-                <X className="w-3 h-3 mr-1" />
-                Non connecté
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {googleLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              Chargement...
-            </div>
-          ) : googleStatus?.connected ? (
-            <>
-              {googleStatus.email && (
-                <div>
-                  <Label className="text-muted-foreground text-sm">Compte connecté</Label>
-                  <p className="font-medium">{googleStatus.email}</p>
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Synchronisation automatique</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Les rendez-vous sont synchronisés automatiquement
-                  </p>
-                </div>
-                <Switch
-                  checked={googleStatus.integration?.isEnabled ?? false}
-                  onCheckedChange={(checked) => toggleSyncMutation.mutate(checked)}
-                  disabled={toggleSyncMutation.isPending}
-                  data-testid="switch-google-sync"
-                />
-              </div>
-
-              {googleStatus.integration?.targetCalendarName && (
-                <div>
-                  <Label className="text-muted-foreground text-sm">Calendrier cible</Label>
-                  <p className="font-medium flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    {googleStatus.integration.targetCalendarName}
-                  </p>
-                </div>
-              )}
-
-              {googleStatus.integration?.lastSyncAt && (
-                <div>
-                  <Label className="text-muted-foreground text-sm">Dernière synchronisation</Label>
-                  <p className="text-sm">
-                    {new Date(googleStatus.integration.lastSyncAt).toLocaleString("fr-FR")}
-                  </p>
-                </div>
-              )}
-
-              {googleStatus.integration?.syncErrorCount && googleStatus.integration.syncErrorCount > 0 && (
-                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-sm">{googleStatus.integration.syncErrorCount} erreurs de synchronisation</span>
-                </div>
-              )}
-
-              <Separator />
-
-              <div className="flex gap-2 flex-wrap">
+              <div className="space-y-3">
+                {!googleStatus?.configured && (
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span className="text-sm">L'intégration Google n'est pas configurée. Contactez l'administrateur.</span>
+                  </div>
+                )}
                 <Button
-                  variant="outline"
-                  onClick={() => syncNowMutation.mutate()}
-                  disabled={syncNowMutation.isPending}
-                  data-testid="button-sync-now"
+                  onClick={() => connectGoogleMutation.mutate()}
+                  disabled={connectGoogleMutation.isPending || !googleStatus?.configured}
+                  data-testid="button-connect-google"
                 >
-                  {syncNowMutation.isPending ? (
+                  {connectGoogleMutation.isPending ? (
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
+                    <SiGoogle className="w-4 h-4 mr-2" />
                   )}
-                  Synchroniser maintenant
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => disconnectGoogleMutation.mutate()}
-                  disabled={disconnectGoogleMutation.isPending}
-                  className="text-destructive"
-                  data-testid="button-disconnect-google"
-                >
-                  Déconnecter
+                  Connecter Google Calendar
                 </Button>
               </div>
-            </>
-          ) : (
-            <div className="space-y-4">
-              {!googleStatus?.configured && (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-sm">L'intégration Google n'est pas configurée. Contactez l'administrateur.</span>
-                </div>
-              )}
-              <Button
-                onClick={() => connectGoogleMutation.mutate()}
-                disabled={connectGoogleMutation.isPending || !googleStatus?.configured}
-                data-testid="button-connect-google"
-              >
-                {connectGoogleMutation.isPending ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <SiGoogle className="w-4 h-4 mr-2" />
-                )}
-                Connecter Google Calendar
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
 
-      <Card className="opacity-60">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+        {/* Gmail - Coming Soon */}
+        <Card className="opacity-60">
+          <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-muted">
-                <Mail className="w-5 h-5 text-muted-foreground" />
-              </div>
+              <img src={gmailIcon} alt="Gmail" className="w-10 h-10" />
               <div>
-                <CardTitle>Notifications Email</CardTitle>
-                <CardDescription>Rappels de rendez-vous par email</CardDescription>
+                <CardTitle className="text-base">Gmail</CardTitle>
+                <CardDescription>Synchronisez vos emails avec Google Gmail</CardDescription>
               </div>
             </div>
+          </CardHeader>
+          <CardContent>
             <Badge variant="outline">Bientôt disponible</Badge>
-          </div>
-        </CardHeader>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card className="opacity-60">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+        {/* Google Meet - Coming Soon */}
+        <Card className="opacity-60">
+          <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-muted">
-                <Building2 className="w-5 h-5 text-muted-foreground" />
-              </div>
+              <img src={googleMeetIcon} alt="Google Meet" className="w-10 h-10" />
               <div>
-                <CardTitle>Facturation Stripe</CardTitle>
-                <CardDescription>Gestion des paiements et abonnements</CardDescription>
+                <CardTitle className="text-base">Google Meet</CardTitle>
+                <CardDescription>Intégrez vos visioconférences avec Google Meet</CardDescription>
               </div>
             </div>
+          </CardHeader>
+          <CardContent>
             <Badge variant="outline">Bientôt disponible</Badge>
-          </div>
-        </CardHeader>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* Microsoft Outlook - Coming Soon */}
+        <Card className="opacity-60">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <img src={outlookIcon} alt="Microsoft Outlook" className="w-10 h-10" />
+              <div>
+                <CardTitle className="text-base">Microsoft Outlook</CardTitle>
+                <CardDescription>Synchronisez vos emails avec Microsoft Outlook</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Badge variant="outline">Bientôt disponible</Badge>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -891,7 +913,7 @@ function CollaboratorsSection() {
               </p>
             </div>
             <div className="flex items-start gap-3">
-              <Badge variant="secondary">Praticien</Badge>
+              <Badge variant="secondary">Collaborateur</Badge>
               <p className="text-muted-foreground">
                 Accès métier : patients, actes, implants, documents, calendrier
               </p>
@@ -950,7 +972,7 @@ function CollaboratorsSection() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ADMIN">Administrateur</SelectItem>
-                        <SelectItem value="CHIRURGIEN">Praticien</SelectItem>
+                        <SelectItem value="CHIRURGIEN">Collaborateur</SelectItem>
                         <SelectItem value="ASSISTANT">Assistant</SelectItem>
                       </SelectContent>
                     </Select>

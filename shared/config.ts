@@ -162,7 +162,7 @@ export type SexeKey = keyof typeof SEXES;
 // ============================================================================
 
 export const ROLES = {
-  CHIRURGIEN: { value: "CHIRURGIEN", label: "Chirurgien", description: "Praticien implantologue", color: "blue" },
+  CHIRURGIEN: { value: "CHIRURGIEN", label: "Collaborateur", description: "Collaborateur implantologue", color: "blue" },
   ASSISTANT: { value: "ASSISTANT", label: "Assistant(e)", description: "Assistant(e) dentaire", color: "gray" },
   ADMIN: { value: "ADMIN", label: "Administrateur", description: "Administrateur du cabinet", color: "purple" },
 } as const;
