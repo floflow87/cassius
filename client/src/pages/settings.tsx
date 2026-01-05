@@ -556,7 +556,7 @@ function IntegrationsSection() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
         {/* Google Calendar - Active Integration */}
-        <Card className="flex flex-col bg-background">
+        <Card className="flex flex-col !bg-white dark:!bg-zinc-900">
           <CardHeader className="pb-3">
             <div className="flex justify-end mb-2">
               {googleStatus?.connected ? (
@@ -689,7 +689,7 @@ function IntegrationsSection() {
         </Card>
 
         {/* Gmail - Coming Soon */}
-        <Card className="flex flex-col bg-background">
+        <Card className="flex flex-col !bg-white dark:!bg-zinc-900">
           <CardHeader className="pb-3">
             <div className="flex justify-end mb-2">
               <Badge variant="outline" className="text-[11px]">Bientôt disponible</Badge>
@@ -706,7 +706,7 @@ function IntegrationsSection() {
         </Card>
 
         {/* Google Meet - Coming Soon */}
-        <Card className="flex flex-col bg-background">
+        <Card className="flex flex-col !bg-white dark:!bg-zinc-900">
           <CardHeader className="pb-3">
             <div className="flex justify-end mb-2">
               <Badge variant="outline" className="text-[11px]">Bientôt disponible</Badge>
@@ -723,7 +723,7 @@ function IntegrationsSection() {
         </Card>
 
         {/* Microsoft Outlook - Coming Soon */}
-        <Card className="flex flex-col bg-background">
+        <Card className="flex flex-col !bg-white dark:!bg-zinc-900">
           <CardHeader className="pb-3">
             <div className="flex justify-end mb-2">
               <Badge variant="outline" className="text-[11px]">Bientôt disponible</Badge>
