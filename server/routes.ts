@@ -1739,6 +1739,25 @@ export async function registerRoutes(
             console.error("Flag detection failed after visite ISQ sync:", err)
           );
           console.log(`[VISITE-ISQ] Synced ISQ=${data.isq} to surgery_implant=${surgeryImplantId}`);
+          
+          // Send notification for low ISQ (< 60)
+          if (data.isq < 60) {
+            const userId = req.jwtUser?.userId;
+            if (userId) {
+              notificationService.createNotification({
+                organisationId,
+                userId,
+                kind: "ALERT",
+                type: "ISQ_LOW",
+                severity: data.isq < 50 ? "ERROR" : "WARNING",
+                title: `ISQ faible detecte: ${data.isq}`,
+                body: `L'implant sur le site a un ISQ de ${data.isq}, ce qui est en dessous du seuil recommande.`,
+                entityType: "SURGERY_IMPLANT",
+                entityId: surgeryImplantId,
+                dedupeKey: `isq_low_${surgeryImplantId}_${data.isq}`,
+              }).catch(err => console.error("[Notification] ISQ_LOW notification failed:", err));
+            }
+          }
         }
       }
       
