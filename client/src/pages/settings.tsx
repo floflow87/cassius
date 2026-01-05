@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
@@ -744,8 +745,13 @@ function IntegrationsSection() {
 }
 
 function CollaboratorsSection() {
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
   const { toast } = useToast();
+
+  // Get current user to prevent self-deletion
+  const { data: currentUser } = useQuery<UserProfile>({
+    queryKey: ["/api/auth/me"],
+  });
 
   const { data: collaborators = [], isLoading } = useQuery<Collaborator[]>({
     queryKey: ["/api/settings/collaborators"],
@@ -767,8 +773,8 @@ function CollaboratorsSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/collaborators"] });
-      toast({ title: "Collaborateur ajouté", description: "Le collaborateur a été créé avec succès." });
-      setShowInviteDialog(false);
+      toast({ title: "Collaborateur invité", description: "Un email d'invitation a été envoyé au collaborateur." });
+      setShowInviteSheet(false);
       form.reset();
     },
     onError: (error: Error) => {
@@ -809,22 +815,22 @@ function CollaboratorsSection() {
           <h2 className="text-2xl font-bold">Collaborateurs</h2>
           <p className="text-muted-foreground">Gérez les membres de votre organisation et leurs permissions.</p>
         </div>
-        <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-          <DialogTrigger asChild>
+        <Sheet open={showInviteSheet} onOpenChange={setShowInviteSheet}>
+          <SheetTrigger asChild>
             <Button data-testid="button-invite-collaborator">
               <UserPlus className="w-4 h-4 mr-2" />
               Ajouter
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Ajouter un collaborateur</DialogTitle>
-              <DialogDescription>
-                Créez un compte pour un nouveau membre de votre organisation.
-              </DialogDescription>
-            </DialogHeader>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Ajouter un collaborateur</SheetTitle>
+              <SheetDescription>
+                Invitez un nouveau membre à rejoindre votre organisation.
+              </SheetDescription>
+            </SheetHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit((data) => inviteMutation.mutate(data))} className="space-y-4">
+              <form onSubmit={form.handleSubmit((data) => inviteMutation.mutate(data))} className="space-y-4 mt-6">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -880,27 +886,31 @@ function CollaboratorsSection() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="ADMIN">Administrateur</SelectItem>
-                          <SelectItem value="CHIRURGIEN">Praticien</SelectItem>
+                          <SelectItem value="CHIRURGIEN">Collaborateur</SelectItem>
                           <SelectItem value="ASSISTANT">Assistant</SelectItem>
                         </SelectContent>
                       </Select>
+                      <FormDescription className="flex items-center gap-2 text-muted-foreground">
+                        <Mail className="w-4 h-4" />
+                        Un email sera envoyé au collaborateur afin de l'inviter à se connecter à Cassius.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setShowInviteDialog(false)}>
+                <SheetFooter className="mt-6">
+                  <Button type="button" variant="outline" onClick={() => setShowInviteSheet(false)}>
                     Annuler
                   </Button>
                   <Button type="submit" disabled={inviteMutation.isPending} data-testid="button-submit-invite">
                     {inviteMutation.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
-                    Ajouter
+                    Inviter
                   </Button>
-                </DialogFooter>
+                </SheetFooter>
               </form>
             </Form>
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
       </div>
 
       <Card>
@@ -979,35 +989,38 @@ function CollaboratorsSection() {
                         <SelectItem value="ASSISTANT">Assistant</SelectItem>
                       </SelectContent>
                     </Select>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          data-testid={`button-delete-${collab.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Supprimer le collaborateur</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Êtes-vous sûr de vouloir supprimer {collab.prenom && collab.nom ? `${collab.prenom} ${collab.nom}` : collab.username} ? Cette action est irréversible.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Annuler</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteCollaboratorMutation.mutate(collab.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            data-testid={`button-confirm-delete-${collab.id}`}
+                    {/* Hide delete button for current user (account creator cannot delete themselves) */}
+                    {currentUser?.id !== collab.id && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-testid={`button-delete-${collab.id}`}
                           >
-                            Supprimer
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Supprimer le collaborateur</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Êtes-vous sûr de vouloir supprimer {collab.prenom && collab.nom ? `${collab.prenom} ${collab.nom}` : collab.username} ? Cette action est irréversible.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteCollaboratorMutation.mutate(collab.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              data-testid={`button-confirm-delete-${collab.id}`}
+                            >
+                              Supprimer
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </div>
               ))}

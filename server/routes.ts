@@ -3988,7 +3988,8 @@ export async function registerRoutes(
       const organisationName = org?.nom || "Cabinet dentaire";
       
       // Get inviter name
-      const inviter = await storage.getUserById(req.jwtUser?.id || "");
+      const inviterId = req.jwtUser?.userId || "";
+      const inviter = await storage.getUserById(inviterId);
       const inviterName = inviter ? `${inviter.prenom || ""} ${inviter.nom || ""}`.trim() || inviter.username : "Un administrateur";
       
       // Generate secure invitation token
@@ -4002,7 +4003,7 @@ export async function registerRoutes(
         role: role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT",
         tokenHash,
         expiresAt,
-        invitedByUserId: req.jwtUser?.id || "",
+        invitedByUserId: inviterId,
         nom: nom || null,
         prenom: prenom || null,
       });
