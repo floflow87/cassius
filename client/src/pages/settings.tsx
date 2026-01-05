@@ -44,7 +44,7 @@ import googleCalendarIcon from "@assets/Google_Calendar_icon_(2020).svg_17676017
 import gmailIcon from "@assets/gmail_1767602212820.png";
 import outlookIcon from "@assets/Microsoft_Outlook_Icon_(2025–present).svg_1767602593769.png";
 import googleMeetIcon from "@assets/google-meet_1767602721784.png";
-import googleLogo from "@assets/logo_Google_1767604296843.png";
+import googleLogo from "@assets/logo_Google_1767604702248.png";
 
 const profileFormSchema = z.object({
   nom: z.string().max(100, "Le nom ne peut pas dépasser 100 caractères"),
@@ -147,7 +147,7 @@ export default function SettingsPage() {
 
   return (
     <div className="h-full overflow-auto p-6" data-testid="settings-page">
-      <div className="max-w-4xl mx-auto">
+      <div className="w-full">
         <h1 className="text-2xl font-bold mb-6">Paramètres</h1>
         
         <Tabs defaultValue="security" className="w-full">
@@ -155,10 +155,6 @@ export default function SettingsPage() {
             <TabsTrigger value="security" className="gap-2" data-testid="nav-security">
               <Shield className="w-4 h-4" />
               Informations & Sécurité
-            </TabsTrigger>
-            <TabsTrigger value="integrations" className="gap-2" data-testid="nav-integrations">
-              <Link2 className="w-4 h-4" />
-              Intégrations
             </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2" data-testid="nav-notifications">
               <Bell className="w-4 h-4" />
@@ -176,14 +172,14 @@ export default function SettingsPage() {
                 Organisation
               </TabsTrigger>
             )}
+            <TabsTrigger value="integrations" className="gap-2" data-testid="nav-integrations">
+              <Link2 className="w-4 h-4" />
+              Intégrations
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="security">
             {profile && <SecuritySection profile={profile} onProfileUpdate={() => queryClient.invalidateQueries({ queryKey: ["/api/settings/profile"] })} />}
-          </TabsContent>
-          
-          <TabsContent value="integrations">
-            <IntegrationsSection />
           </TabsContent>
           
           <TabsContent value="notifications">
@@ -201,6 +197,10 @@ export default function SettingsPage() {
               <OrganizationSection />
             </TabsContent>
           )}
+          
+          <TabsContent value="integrations">
+            <IntegrationsSection />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
@@ -554,28 +554,28 @@ function IntegrationsSection() {
         <p className="text-muted-foreground">Connectez vos services externes pour synchroniser vos données.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
         {/* Google Calendar - Active Integration */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col bg-background">
           <CardHeader className="pb-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <img src={googleCalendarIcon} alt="Google Calendar" className="w-10 h-10" />
-                <div>
-                  <CardTitle className="text-base">Google Calendar</CardTitle>
-                  <CardDescription>Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
-                </div>
-              </div>
+            <div className="flex justify-end mb-2">
               {googleStatus?.connected ? (
-                <Badge variant="default" className="bg-green-600 flex-shrink-0" data-testid="badge-google-connected">
+                <Badge variant="default" className="bg-green-600 text-[11px]" data-testid="badge-google-connected">
                   <Check className="w-3 h-3 mr-1" />
                   Connecté
                 </Badge>
               ) : (
-                <Badge variant="outline" className="flex-shrink-0" data-testid="badge-google-disconnected">
+                <Badge variant="outline" className="text-[11px]" data-testid="badge-google-disconnected">
                   Non connecté
                 </Badge>
               )}
+            </div>
+            <div className="flex items-start gap-3">
+              <img src={googleCalendarIcon} alt="Google Calendar" className="w-10 h-10 flex-shrink-0" />
+              <div>
+                <CardTitle className="text-base whitespace-nowrap">Google Calendar</CardTitle>
+                <CardDescription>Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 flex-1">
@@ -691,15 +691,15 @@ function IntegrationsSection() {
         {/* Gmail - Coming Soon */}
         <Card className="flex flex-col bg-background">
           <CardHeader className="pb-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <img src={gmailIcon} alt="Gmail" className="w-10 h-10" />
-                <div>
-                  <CardTitle className="text-base">Gmail</CardTitle>
-                  <CardDescription>Synchronisez vos emails avec Google Gmail</CardDescription>
-                </div>
+            <div className="flex justify-end mb-2">
+              <Badge variant="outline" className="text-[11px]">Bientôt disponible</Badge>
+            </div>
+            <div className="flex items-start gap-3">
+              <img src={gmailIcon} alt="Gmail" className="w-10 h-10 flex-shrink-0" />
+              <div>
+                <CardTitle className="text-base whitespace-nowrap">Gmail</CardTitle>
+                <CardDescription>Synchronisez vos emails avec Google Gmail</CardDescription>
               </div>
-              <Badge variant="outline" className="flex-shrink-0">Bientôt disponible</Badge>
             </div>
           </CardHeader>
           <CardContent className="flex-1" />
@@ -708,15 +708,15 @@ function IntegrationsSection() {
         {/* Google Meet - Coming Soon */}
         <Card className="flex flex-col bg-background">
           <CardHeader className="pb-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <img src={googleMeetIcon} alt="Google Meet" className="w-10 h-10" />
-                <div>
-                  <CardTitle className="text-base">Google Meet</CardTitle>
-                  <CardDescription>Intégrez vos visioconférences avec Google Meet</CardDescription>
-                </div>
+            <div className="flex justify-end mb-2">
+              <Badge variant="outline" className="text-[11px]">Bientôt disponible</Badge>
+            </div>
+            <div className="flex items-start gap-3">
+              <img src={googleMeetIcon} alt="Google Meet" className="w-10 h-10 flex-shrink-0" />
+              <div>
+                <CardTitle className="text-base whitespace-nowrap">Google Meet</CardTitle>
+                <CardDescription>Intégrez vos visioconférences avec Google Meet</CardDescription>
               </div>
-              <Badge variant="outline" className="flex-shrink-0">Bientôt disponible</Badge>
             </div>
           </CardHeader>
           <CardContent className="flex-1" />
@@ -725,15 +725,15 @@ function IntegrationsSection() {
         {/* Microsoft Outlook - Coming Soon */}
         <Card className="flex flex-col bg-background">
           <CardHeader className="pb-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <img src={outlookIcon} alt="Microsoft Outlook" className="w-10 h-10" />
-                <div>
-                  <CardTitle className="text-base">Microsoft Outlook</CardTitle>
-                  <CardDescription>Synchronisez vos emails avec Microsoft Outlook</CardDescription>
-                </div>
+            <div className="flex justify-end mb-2">
+              <Badge variant="outline" className="text-[11px]">Bientôt disponible</Badge>
+            </div>
+            <div className="flex items-start gap-3">
+              <img src={outlookIcon} alt="Microsoft Outlook" className="w-10 h-10 flex-shrink-0" />
+              <div>
+                <CardTitle className="text-base whitespace-nowrap">Microsoft Outlook</CardTitle>
+                <CardDescription>Synchronisez vos emails avec Microsoft Outlook</CardDescription>
               </div>
-              <Badge variant="outline" className="flex-shrink-0">Bientôt disponible</Badge>
             </div>
           </CardHeader>
           <CardContent className="flex-1" />
