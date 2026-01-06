@@ -144,9 +144,11 @@ export function DocumentUploadForm({
 
   const radioMutation = useMutation({
     mutationFn: async (data: RadioFormData) => {
-      const res = await apiRequest("POST", `/api/patients/${patientId}/radios`, {
-        typeRadio: data.typeRadio,
-        dateRadio: format(data.dateRadio, "yyyy-MM-dd"),
+      const res = await apiRequest("POST", `/api/radios`, {
+        patientId,
+        type: data.typeRadio,
+        title: data.fileName || `Radio ${data.typeRadio}`,
+        date: format(data.dateRadio, "yyyy-MM-dd"),
         filePath: data.filePath,
         fileName: data.fileName,
         mimeType: data.mimeType,
@@ -279,7 +281,11 @@ export function DocumentUploadForm({
     setIsUploading(true);
 
     try {
-      const urlRes = await apiRequest("POST", "/api/documents/upload-url", {
+      const uploadEndpoint = fileType === "radio" 
+        ? "/api/radios/upload-url" 
+        : "/api/documents/upload-url";
+      
+      const urlRes = await apiRequest("POST", uploadEndpoint, {
         patientId,
         fileName: file.name,
         mimeType: file.type,
