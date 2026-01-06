@@ -984,9 +984,6 @@ export default function DocumentsPage() {
             <DialogTitle className="flex items-center gap-2 pr-8">
               {viewingFile && getFileIcon(viewingFile.file.mimeType)}
               <span className="truncate">{viewingFile?.file.title}</span>
-              {viewingFile?.file.sourceType === 'radio' && (
-                <Badge variant="outline" className="text-xs ml-2">Radio</Badge>
-              )}
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto min-h-0">
