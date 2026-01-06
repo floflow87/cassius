@@ -59,9 +59,11 @@ const PERIOD_OPTIONS = [
 
 const TYPE_LABELS: Record<string, string> = {
   POSE_IMPLANT: "Pose d'implant",
-  EXTRACTION: "Extraction",
-  GREFFE: "Greffe osseuse",
-  MISE_EN_CHARGE: "Mise en charge",
+  GREFFE_OSSEUSE: "Greffe osseuse",
+  SINUS_LIFT: "Sinus lift",
+  EXTRACTION_IMPLANT_IMMEDIATE: "Extraction + implant immédiat",
+  REPRISE_IMPLANT: "Reprise d'implant",
+  CHIRURGIE_GUIDEE: "Chirurgie guidée",
   AUTRE: "Autre",
 };
 
@@ -77,12 +79,22 @@ const ISQ_COLORS = {
   "Élevé (>70)": "hsl(142, 76%, 36%)",
 };
 
+type SearchSuggestion = {
+  id: string;
+  type: "patient" | "operation";
+  label: string;
+  sublabel?: string;
+};
+
 export default function StatsPage() {
   const [period, setPeriod] = useState("1m");
   const [customFrom, setCustomFrom] = useState<Date>();
   const [customTo, setCustomTo] = useState<Date>();
   const [fromCalendarOpen, setFromCalendarOpen] = useState(false);
   const [toCalendarOpen, setToCalendarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState<SearchSuggestion[]>([]);
   const [isqDistributionFilter, setIsqDistributionFilter] = useState<string>("all");
   const [isqEvolutionFilter, setIsqEvolutionFilter] = useState<string>("all");
   const [patientSearch, setPatientSearch] = useState("");
@@ -112,14 +124,63 @@ export default function StatsPage() {
 
   const dateRange = getDateRange();
 
-  // Main stats query (no implant filter - used for KPIs, activity charts, etc.)
+  // Fetch patients for search suggestions
+  const { data: patientsData = [] } = useQuery<Array<{id: string; nom: string; prenom: string}>>({
+    queryKey: ["/api/patients/summary"],
+  });
+
+  // Fetch operations for search suggestions  
+  const { data: operationsData = [] } = useQuery<Array<{id: string; patientNom: string; patientPrenom: string; dateOperation: string; typeIntervention: string}>>({
+    queryKey: ["/api/operations/summary"],
+  });
+
+  // Build search suggestions from patients and operations
+  const searchSuggestions = useMemo(() => {
+    const suggestions: SearchSuggestion[] = [];
+    
+    patientsData.forEach(p => {
+      suggestions.push({
+        id: p.id,
+        type: "patient",
+        label: `${p.prenom} ${p.nom}`,
+        sublabel: "Patient",
+      });
+    });
+    
+    operationsData.forEach(op => {
+      const typeLabel = TYPE_LABELS[op.typeIntervention] || op.typeIntervention;
+      suggestions.push({
+        id: op.id,
+        type: "operation",
+        label: `${op.patientPrenom} ${op.patientNom} - ${typeLabel}`,
+        sublabel: op.dateOperation ? format(new Date(op.dateOperation), "dd/MM/yyyy") : undefined,
+      });
+    });
+    
+    return suggestions.filter(s => 
+      searchQuery === "" || 
+      s.label.toLowerCase().includes(searchQuery.toLowerCase())
+    ).slice(0, 10);
+  }, [patientsData, operationsData, searchQuery]);
+
+  // Extract selected patient and operation IDs for filtering
+  const selectedPatientIds = selectedFilters.filter(f => f.type === "patient").map(f => f.id);
+  const selectedOperationIds = selectedFilters.filter(f => f.type === "operation").map(f => f.id);
+
+  // Main stats query (with optional patient/operation filters)
   const { data: stats, isLoading } = useQuery<ClinicalStats>({
-    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to],
+    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, selectedPatientIds, selectedOperationIds],
     queryFn: async () => {
       const params = new URLSearchParams({
         from: dateRange.from,
         to: dateRange.to,
       });
+      if (selectedPatientIds.length > 0) {
+        params.append("patientIds", selectedPatientIds.join(","));
+      }
+      if (selectedOperationIds.length > 0) {
+        params.append("operationIds", selectedOperationIds.join(","));
+      }
       const res = await fetch(`/api/stats/clinical?${params.toString()}`, {
         credentials: "include",
       });
@@ -129,9 +190,9 @@ export default function StatsPage() {
     enabled: period !== "custom" || (!!customFrom && !!customTo),
   });
 
-  // Separate query for ISQ Distribution (filtered by model)
+  // Separate query for ISQ Distribution (filtered by model + patient/operation filters)
   const { data: isqDistributionStats } = useQuery<ClinicalStats>({
-    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-distribution", isqDistributionFilter],
+    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-distribution", isqDistributionFilter, selectedPatientIds, selectedOperationIds],
     queryFn: async () => {
       const params = new URLSearchParams({
         from: dateRange.from,
@@ -139,6 +200,12 @@ export default function StatsPage() {
       });
       if (isqDistributionFilter && isqDistributionFilter !== "all") {
         params.append("implantModelId", isqDistributionFilter);
+      }
+      if (selectedPatientIds.length > 0) {
+        params.append("patientIds", selectedPatientIds.join(","));
+      }
+      if (selectedOperationIds.length > 0) {
+        params.append("operationIds", selectedOperationIds.join(","));
       }
       const res = await fetch(`/api/stats/clinical?${params.toString()}`, {
         credentials: "include",
@@ -149,9 +216,9 @@ export default function StatsPage() {
     enabled: (period !== "custom" || (!!customFrom && !!customTo)) && isqDistributionFilter !== "all",
   });
 
-  // Separate query for ISQ Evolution (filtered by model)
+  // Separate query for ISQ Evolution (filtered by model + patient/operation filters)
   const { data: isqEvolutionStats } = useQuery<ClinicalStats>({
-    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-evolution", isqEvolutionFilter],
+    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-evolution", isqEvolutionFilter, selectedPatientIds, selectedOperationIds],
     queryFn: async () => {
       const params = new URLSearchParams({
         from: dateRange.from,
@@ -159,6 +226,12 @@ export default function StatsPage() {
       });
       if (isqEvolutionFilter && isqEvolutionFilter !== "all") {
         params.append("implantModelId", isqEvolutionFilter);
+      }
+      if (selectedPatientIds.length > 0) {
+        params.append("patientIds", selectedPatientIds.join(","));
+      }
+      if (selectedOperationIds.length > 0) {
+        params.append("operationIds", selectedOperationIds.join(","));
       }
       const res = await fetch(`/api/stats/clinical?${params.toString()}`, {
         credentials: "include",
@@ -345,8 +418,95 @@ export default function StatsPage() {
         </Card>
       </div>
 
-      {/* Period selector */}
+      {/* Search and Period selector */}
       <div className="flex flex-wrap items-center gap-2">
+        {/* Multi-select search for patients and operations */}
+        <div className="flex-1 min-w-[200px] max-w-md">
+          <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+            <PopoverTrigger asChild>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filtrer par patient ou acte..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (!searchOpen) setSearchOpen(true);
+                  }}
+                  onFocus={() => setSearchOpen(true)}
+                  className="pl-9 bg-white dark:bg-zinc-900"
+                  data-testid="input-stats-search"
+                />
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="start">
+              <div className="p-2">
+                {searchSuggestions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground p-2">Aucun résultat</p>
+                ) : (
+                  <div className="space-y-1">
+                    {searchSuggestions.map((suggestion) => (
+                      <div
+                        key={`${suggestion.type}-${suggestion.id}`}
+                        className="flex items-center justify-between p-2 rounded hover-elevate cursor-pointer"
+                        onClick={() => {
+                          if (!selectedFilters.find(f => f.id === suggestion.id && f.type === suggestion.type)) {
+                            setSelectedFilters([...selectedFilters, suggestion]);
+                          }
+                          setSearchQuery("");
+                          setSearchOpen(false);
+                        }}
+                        data-testid={`suggestion-${suggestion.type}-${suggestion.id}`}
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{suggestion.label}</p>
+                          {suggestion.sublabel && (
+                            <p className="text-xs text-muted-foreground">{suggestion.sublabel}</p>
+                          )}
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {suggestion.type === "patient" ? "Patient" : "Acte"}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Selected filter badges */}
+        {selectedFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            {selectedFilters.map((filter) => (
+              <Badge
+                key={`${filter.type}-${filter.id}`}
+                variant="secondary"
+                className="cursor-pointer gap-1"
+                onClick={() => setSelectedFilters(selectedFilters.filter(f => !(f.id === filter.id && f.type === filter.type)))}
+                data-testid={`filter-badge-${filter.type}-${filter.id}`}
+              >
+                {filter.label}
+                <span className="text-muted-foreground hover:text-foreground ml-1">x</span>
+              </Badge>
+            ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedFilters([])}
+              className="text-muted-foreground h-6 px-2"
+              data-testid="button-clear-filters"
+            >
+              Effacer tout
+            </Button>
+          </div>
+        )}
+
+        {/* Spacer to push period selector to the right */}
+        <div className="flex-1" />
+
+        {/* Period selector */}
         <Select value={period} onValueChange={setPeriod}>
           <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-period">
             <SelectValue />

@@ -182,7 +182,7 @@ export interface IStorage {
   // Stats methods
   getStats(organisationId: string): Promise<DashboardStats>;
   getAdvancedStats(organisationId: string): Promise<AdvancedStats>;
-  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string): Promise<ClinicalStats>;
+  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[]): Promise<ClinicalStats>;
   getPatientStats(organisationId: string): Promise<import("@shared/types").PatientStats[]>;
 
   // User methods (not tenant-filtered, users are global)
@@ -1768,20 +1768,54 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string): Promise<ClinicalStats> {
+  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[]): Promise<ClinicalStats> {
     const now = new Date();
     const defaultFrom = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().split('T')[0];
     const defaultTo = now.toISOString().split('T')[0];
     const fromDate = dateFrom || defaultFrom;
     const toDate = dateTo || defaultTo;
 
+    // Build base operation conditions
+    const opConditions = [
+      eq(operations.organisationId, organisationId),
+      gte(operations.dateOperation, fromDate),
+      lte(operations.dateOperation, toDate)
+    ];
+    
+    // Add patient filter if provided
+    if (patientIds && patientIds.length > 0) {
+      opConditions.push(inArray(operations.patientId, patientIds));
+    }
+    
+    // Add operation filter if provided
+    if (operationIds && operationIds.length > 0) {
+      opConditions.push(inArray(operations.id, operationIds));
+    }
+
     const allOperations = await db.select().from(operations)
-      .where(and(
-        eq(operations.organisationId, organisationId),
-        gte(operations.dateOperation, fromDate),
-        lte(operations.dateOperation, toDate)
-      ))
+      .where(and(...opConditions))
       .orderBy(operations.dateOperation);
+
+    // Build surgery implant conditions
+    const siConditions: SQL[] = [
+      eq(surgeryImplants.organisationId, organisationId),
+      gte(surgeryImplants.datePose, fromDate),
+      lte(surgeryImplants.datePose, toDate)
+    ];
+    
+    // Filter by operation IDs if provided
+    if (operationIds && operationIds.length > 0) {
+      siConditions.push(inArray(surgeryImplants.surgeryId, operationIds));
+    }
+    
+    // Get operation IDs for patient filter
+    const operationIdsFromPatients = patientIds && patientIds.length > 0 
+      ? allOperations.map(op => op.id) 
+      : undefined;
+    
+    if (operationIdsFromPatients && operationIdsFromPatients.length > 0) {
+      siConditions.push(inArray(surgeryImplants.surgeryId, operationIdsFromPatients));
+    }
 
     const allSurgeryImplantsWithDetails = await db.select({
       id: surgeryImplants.id,
@@ -1795,11 +1829,7 @@ export class DatabaseStorage implements IStorage {
       referenceFabricant: implants.referenceFabricant,
     }).from(surgeryImplants)
       .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
-      .where(and(
-        eq(surgeryImplants.organisationId, organisationId),
-        gte(surgeryImplants.datePose, fromDate),
-        lte(surgeryImplants.datePose, toDate)
-      ));
+      .where(and(...siConditions));
 
     const allSurgeryImplants = allSurgeryImplantsWithDetails;
 
@@ -2018,7 +2048,7 @@ export class DatabaseStorage implements IStorage {
     const allFlags = await db.select().from(flags)
       .where(and(
         eq(flags.organisationId, organisationId),
-        eq(flags.resolved, false)
+        isNull(flags.resolvedAt)
       ));
 
     const operationsByPatient: Record<string, string[]> = {};

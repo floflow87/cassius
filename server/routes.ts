@@ -645,6 +645,31 @@ export async function registerRoutes(
     }
   });
 
+  // Operations summary for search autocomplete
+  app.get("/api/operations/summary", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const operations = await storage.getAllOperations(organisationId);
+      const patients = await storage.getPatients(organisationId);
+      const patientsMap: Record<string, { nom: string; prenom: string }> = {};
+      patients.forEach((p: { id: string; nom: string; prenom: string }) => { patientsMap[p.id] = { nom: p.nom, prenom: p.prenom }; });
+      
+      const summary = operations.map(op => ({
+        id: op.id,
+        patientNom: patientsMap[op.patientId]?.nom || '',
+        patientPrenom: patientsMap[op.patientId]?.prenom || '',
+        dateOperation: op.dateOperation,
+        typeIntervention: op.typeIntervention,
+      }));
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching operations summary:", error);
+      res.status(500).json({ error: "Failed to fetch operations summary" });
+    }
+  });
+
   // Zod schema for acte (operation) filter validation
   const acteFilterRuleSchema = z.object({
     id: z.string(),
@@ -1867,11 +1892,13 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const { from, to, implantModelId } = req.query;
+      const { from, to, implantModelId, patientIds, operationIds } = req.query;
       const dateFrom = from ? String(from) : undefined;
       const dateTo = to ? String(to) : undefined;
       const implantModel = implantModelId ? String(implantModelId) : undefined;
-      const stats = await storage.getClinicalStats(organisationId, dateFrom, dateTo, implantModel);
+      const patientIdList = patientIds ? String(patientIds).split(",").filter(Boolean) : undefined;
+      const operationIdList = operationIds ? String(operationIds).split(",").filter(Boolean) : undefined;
+      const stats = await storage.getClinicalStats(organisationId, dateFrom, dateTo, implantModel, patientIdList, operationIdList);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching clinical stats:", error);
