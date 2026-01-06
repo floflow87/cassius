@@ -2065,8 +2065,14 @@ export class DatabaseStorage implements IStorage {
 
       const successRate = total > 0 ? Math.round((successCount / total) * 100) : 0;
 
-      const birthDate = new Date(patient.dateNaissance);
-      const age = Math.floor((now.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+      let age = 0;
+      if (patient.dateNaissance) {
+        const birthDate = new Date(patient.dateNaissance);
+        if (!isNaN(birthDate.getTime())) {
+          age = Math.floor((now.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+          if (age < 0) age = 0;
+        }
+      }
 
       results.push({
         patientId: patient.id,

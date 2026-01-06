@@ -143,6 +143,11 @@ export default function StatsPage() {
   // Fetch patient stats
   const { data: patientStatsData = [] } = useQuery<PatientStats[]>({
     queryKey: ["/api/stats/patients"],
+    queryFn: async () => {
+      const res = await fetch("/api/stats/patients", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch patient stats");
+      return res.json();
+    },
   });
 
   // Filter patient stats
@@ -851,7 +856,7 @@ export default function StatsPage() {
                         </Link>
                       </TableCell>
                       <TableCell className="text-center text-muted-foreground">
-                        {p.age} ans
+                        {p.age > 0 ? `${p.age} ans` : "-"}
                       </TableCell>
                       <TableCell className="text-center">
                         <HoverCard>
