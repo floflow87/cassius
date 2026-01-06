@@ -42,9 +42,11 @@ import { FlagBadge } from "@/components/flag-badge";
 import { formatDistanceToNow } from "date-fns";
 
 const PERIOD_OPTIONS = [
+  { value: "1m", label: "Ce mois" },
   { value: "3m", label: "3 derniers mois" },
   { value: "6m", label: "6 derniers mois" },
   { value: "12m", label: "12 derniers mois" },
+  { value: "all", label: "Toujours" },
   { value: "custom", label: "Période personnalisée" },
 ];
 
@@ -69,7 +71,7 @@ const ISQ_COLORS = {
 };
 
 export default function StatsPage() {
-  const [period, setPeriod] = useState("6m");
+  const [period, setPeriod] = useState("1m");
   const [customFrom, setCustomFrom] = useState<Date>();
   const [customTo, setCustomTo] = useState<Date>();
   const [fromCalendarOpen, setFromCalendarOpen] = useState(false);
@@ -83,7 +85,13 @@ export default function StatsPage() {
         to: format(customTo, "yyyy-MM-dd"),
       };
     }
-    const months = period === "3m" ? 3 : period === "12m" ? 12 : 6;
+    if (period === "all") {
+      return {
+        from: "2000-01-01",
+        to: format(now, "yyyy-MM-dd"),
+      };
+    }
+    const months = period === "1m" ? 1 : period === "3m" ? 3 : period === "12m" ? 12 : 6;
     return {
       from: format(subMonths(now, months), "yyyy-MM-dd"),
       to: format(now, "yyyy-MM-dd"),
@@ -180,7 +188,7 @@ export default function StatsPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-48" data-testid="select-period">
+            <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-period">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -306,12 +314,20 @@ export default function StatsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Activité par mois
-            </CardTitle>
-            <CardDescription>Nombre d'actes chirurgicaux réalisés</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Activité par mois
+              </CardTitle>
+              <CardDescription>Nombre d'actes chirurgicaux réalisés</CardDescription>
+            </div>
+            <Link href={`/actes?from=${dateRange.from}&to=${dateRange.to}`}>
+              <Button variant="outline" size="sm" data-testid="button-view-operations">
+                Voir les actes
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
