@@ -153,31 +153,49 @@ export default function SettingsPage() {
   return (
     <div className="h-full overflow-auto p-6" data-testid="settings-page">
       <div className="w-full">
-        <h1 className="text-2xl font-bold mb-6">Paramètres</h1>
-        
         <Tabs defaultValue="security" className="w-full">
-          <TabsList className="mb-6 flex-wrap">
-            <TabsTrigger value="security" className="gap-2" data-testid="nav-security">
+          <TabsList className="bg-transparent p-0 h-auto gap-6 border-b-0 mb-6">
+            <TabsTrigger 
+              value="security" 
+              className="text-sm font-light rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2 gap-2" 
+              data-testid="nav-security"
+            >
               <Shield className="w-4 h-4" />
               Informations & Sécurité
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2" data-testid="nav-notifications">
+            <TabsTrigger 
+              value="notifications" 
+              className="text-sm font-light rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2 gap-2" 
+              data-testid="nav-notifications"
+            >
               <Bell className="w-4 h-4" />
               Notifications
             </TabsTrigger>
             {userIsAdmin && (
-              <TabsTrigger value="collaborators" className="gap-2" data-testid="nav-collaborators">
+              <TabsTrigger 
+                value="collaborators" 
+                className="text-sm font-light rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2 gap-2" 
+                data-testid="nav-collaborators"
+              >
                 <Users className="w-4 h-4" />
                 Collaborateurs
               </TabsTrigger>
             )}
             {userIsAdmin && (
-              <TabsTrigger value="organization" className="gap-2" data-testid="nav-organization">
+              <TabsTrigger 
+                value="organization" 
+                className="text-sm font-light rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2 gap-2" 
+                data-testid="nav-organization"
+              >
                 <Building2 className="w-4 h-4" />
                 Organisation
               </TabsTrigger>
             )}
-            <TabsTrigger value="integrations" className="gap-2" data-testid="nav-integrations">
+            <TabsTrigger 
+              value="integrations" 
+              className="text-sm font-light rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2 gap-2" 
+              data-testid="nav-integrations"
+            >
               <Link2 className="w-4 h-4" />
               Intégrations
             </TabsTrigger>
@@ -278,15 +296,10 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Informations & Sécurité</h2>
-        <p className="text-muted-foreground">Gérez vos informations personnelles et la sécurité de votre compte.</p>
-      </div>
-
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 font-light">
               <User className="w-5 h-5" />
               Profil utilisateur
             </CardTitle>
@@ -333,7 +346,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label className="text-muted-foreground text-sm">Nom</Label>
+              <Label className="text-muted-foreground text-sm font-light">Nom</Label>
               {isEditingProfile ? (
                 <Input
                   value={profileFormData.nom}
@@ -341,11 +354,11 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                   data-testid="input-user-nom"
                 />
               ) : (
-                <p className="font-medium" data-testid="text-user-nom">{profile.nom || "—"}</p>
+                <p className="font-light" data-testid="text-user-nom">{profile.nom || "—"}</p>
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground text-sm">Prénom</Label>
+              <Label className="text-muted-foreground text-sm font-light">Prénom</Label>
               {isEditingProfile ? (
                 <Input
                   value={profileFormData.prenom}
@@ -353,15 +366,15 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                   data-testid="input-user-prenom"
                 />
               ) : (
-                <p className="font-medium" data-testid="text-user-prenom">{profile.prenom || "—"}</p>
+                <p className="font-light" data-testid="text-user-prenom">{profile.prenom || "—"}</p>
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground text-sm">Email / Identifiant</Label>
-              <p className="font-medium" data-testid="text-user-username">{profile.username}</p>
+              <Label className="text-muted-foreground text-sm font-light">Email / Identifiant</Label>
+              <p className="font-light" data-testid="text-user-username">{profile.username}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground text-sm">Rôle</Label>
+              <Label className="text-muted-foreground text-sm font-light">Rôle</Label>
               <div className="mt-1">
                 <Badge variant={getRoleBadgeVariant(profile.role)} data-testid="badge-user-role">
                   {getRoleLabel(profile.role)}
@@ -371,8 +384,8 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
           </div>
           {profile.organisationNom && (
             <div>
-              <Label className="text-muted-foreground text-sm">Organisation</Label>
-              <p className="font-medium" data-testid="text-user-org">{profile.organisationNom}</p>
+              <Label className="text-muted-foreground text-sm font-light">Organisation</Label>
+              <p className="font-light" data-testid="text-user-org">{profile.organisationNom}</p>
             </div>
           )}
         </CardContent>
@@ -380,37 +393,37 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 font-light">
             <Lock className="w-5 h-5" />
             Sécurité du compte
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="font-light">
             Modifiez votre mot de passe pour sécuriser votre compte.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-            <DialogTrigger asChild>
+          <Sheet open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+            <SheetTrigger asChild>
               <Button variant="outline" data-testid="button-change-password">
                 <Lock className="w-4 h-4 mr-2" />
                 Modifier le mot de passe
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Modifier le mot de passe</DialogTitle>
-                <DialogDescription>
+            </SheetTrigger>
+            <SheetContent>
+              <SheetHeader>
+                <SheetTitle className="font-light">Modifier le mot de passe</SheetTitle>
+                <SheetDescription className="font-light">
                   Entrez votre mot de passe actuel et choisissez un nouveau mot de passe sécurisé.
-                </DialogDescription>
-              </DialogHeader>
+                </SheetDescription>
+              </SheetHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmitPassword)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(onSubmitPassword)} className="space-y-4 mt-6">
                   <FormField
                     control={form.control}
                     name="currentPassword"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Mot de passe actuel</FormLabel>
+                        <FormLabel className="font-light">Mot de passe actuel</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <Input
@@ -438,7 +451,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                     name="newPassword"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nouveau mot de passe</FormLabel>
+                        <FormLabel className="font-light">Nouveau mot de passe</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <Input
@@ -457,6 +470,9 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                             </Button>
                           </div>
                         </FormControl>
+                        <p className="text-sm text-destructive/70 italic font-light mt-1">
+                          Le nouveau mot de passe doit contenir au moins 8 caractères
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -466,7 +482,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                     name="confirmPassword"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Confirmer le mot de passe</FormLabel>
+                        <FormLabel className="font-light">Confirmer le mot de passe</FormLabel>
                         <FormControl>
                           <Input type="password" {...field} data-testid="input-confirm-password" />
                         </FormControl>
@@ -474,7 +490,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                       </FormItem>
                     )}
                   />
-                  <DialogFooter>
+                  <SheetFooter className="mt-6">
                     <Button type="button" variant="outline" onClick={() => setShowPasswordDialog(false)}>
                       Annuler
                     </Button>
@@ -484,11 +500,11 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                       ) : null}
                       Modifier
                     </Button>
-                  </DialogFooter>
+                  </SheetFooter>
                 </form>
               </Form>
-            </DialogContent>
-          </Dialog>
+            </SheetContent>
+          </Sheet>
         </CardContent>
       </Card>
     </div>

@@ -575,7 +575,9 @@ export default function StatsPage() {
         <div className="flex flex-wrap items-center gap-2 mt-4">
           {/* Multi-select search for patients and operations */}
           <div className="flex-1 min-w-[200px] max-w-md">
-            <Popover open={searchOpen} onOpenChange={setSearchOpen} modal={false}>
+            <Popover open={searchOpen && searchQuery.length > 0} onOpenChange={(open) => {
+              if (!open) setSearchOpen(false);
+            }} modal={false}>
               <PopoverTrigger asChild>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -584,13 +586,12 @@ export default function StatsPage() {
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
-                      if (!searchOpen) setSearchOpen(true);
+                      if (e.target.value.length > 0) {
+                        setSearchOpen(true);
+                      } else {
+                        setSearchOpen(false);
+                      }
                     }}
-                    onFocus={(e) => {
-                      e.stopPropagation();
-                      setSearchOpen(true);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
                     className="pl-9 bg-white dark:bg-zinc-900"
                     data-testid="input-stats-search"
                   />
