@@ -100,10 +100,12 @@ const RADIO_TYPE_LABELS: Record<TypeRadio, string> = {
 };
 
 const RADIO_TYPE_COLORS: Record<TypeRadio, string> = {
-  PANORAMIQUE: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  CBCT: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  RETROALVEOLAIRE: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  PANORAMIQUE: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
+  CBCT: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
+  RETROALVEOLAIRE: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
 };
+
+const RADIO_BADGE_COLOR = "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
 
 function getFileIcon(mimeType: string | null) {
   if (!mimeType) return <File className="h-5 w-5 text-muted-foreground" />;
@@ -232,6 +234,11 @@ function FileRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm truncate">{file.title}</span>
+          {isRadio && (
+            <Badge variant="secondary" className={`text-xs ${RADIO_BADGE_COLOR}`}>
+              Radio
+            </Badge>
+          )}
           {isRadio && file.radioType && (
             <Badge variant="secondary" className={`text-xs ${RADIO_TYPE_COLORS[file.radioType] || ''}`}>
               {RADIO_TYPE_LABELS[file.radioType] || file.radioType}
