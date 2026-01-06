@@ -1867,14 +1867,28 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const { from, to } = req.query;
+      const { from, to, implantModelId } = req.query;
       const dateFrom = from ? String(from) : undefined;
       const dateTo = to ? String(to) : undefined;
-      const stats = await storage.getClinicalStats(organisationId, dateFrom, dateTo);
+      const implantModel = implantModelId ? String(implantModelId) : undefined;
+      const stats = await storage.getClinicalStats(organisationId, dateFrom, dateTo, implantModel);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching clinical stats:", error);
       res.status(500).json({ error: "Failed to fetch clinical stats" });
+    }
+  });
+
+  app.get("/api/stats/patients", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const stats = await storage.getPatientStats(organisationId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching patient stats:", error);
+      res.status(500).json({ error: "Failed to fetch patient stats" });
     }
   });
 

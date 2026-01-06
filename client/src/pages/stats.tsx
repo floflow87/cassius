@@ -42,10 +42,11 @@ import {
   Legend,
 } from "recharts";
 import { Link } from "wouter";
-import type { ClinicalStats } from "@shared/types";
+import type { ClinicalStats, PatientStats } from "@shared/types";
 import type { FlagWithEntity } from "@shared/schema";
 import { FlagBadge } from "@/components/flag-badge";
 import { formatDistanceToNow } from "date-fns";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const PERIOD_OPTIONS = [
   { value: "1m", label: "Ce mois" },
@@ -111,9 +112,16 @@ export default function StatsPage() {
   const dateRange = getDateRange();
 
   const { data: stats, isLoading } = useQuery<ClinicalStats>({
-    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to],
+    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, selectedImplantModel],
     queryFn: async () => {
-      const res = await fetch(`/api/stats/clinical?from=${dateRange.from}&to=${dateRange.to}`, {
+      const params = new URLSearchParams({
+        from: dateRange.from,
+        to: dateRange.to,
+      });
+      if (selectedImplantModel && selectedImplantModel !== "all") {
+        params.append("implantModelId", selectedImplantModel);
+      }
+      const res = await fetch(`/api/stats/clinical?${params.toString()}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch clinical stats");
@@ -132,6 +140,30 @@ export default function StatsPage() {
     },
   });
 
+  // Fetch patient stats
+  const { data: patientStatsData = [] } = useQuery<PatientStats[]>({
+    queryKey: ["/api/stats/patients"],
+  });
+
+  // Filter patient stats
+  const filteredPatientStats = useMemo(() => {
+    return patientStatsData.filter(p => {
+      const matchesSearch = patientSearch === "" || 
+        `${p.nom} ${p.prenom}`.toLowerCase().includes(patientSearch.toLowerCase());
+      
+      const matchesAlert = patientAlertFilter === "all" ||
+        (patientAlertFilter === "with-alerts" && p.activeAlerts > 0) ||
+        (patientAlertFilter === "no-alerts" && p.activeAlerts === 0);
+
+      const matchesSuccess = patientSuccessFilter === "all" ||
+        (patientSuccessFilter === "high" && p.successRate >= 80) ||
+        (patientSuccessFilter === "medium" && p.successRate >= 50 && p.successRate < 80) ||
+        (patientSuccessFilter === "low" && p.successRate < 50);
+
+      return matchesSearch && matchesAlert && matchesSuccess;
+    });
+  }, [patientStatsData, patientSearch, patientAlertFilter, patientSuccessFilter]);
+
   // Sort and group flags by level
   const sortedFlags = [...flagsData].filter(f => !f.resolvedAt).sort((a, b) => {
     const levelOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 };
@@ -145,9 +177,6 @@ export default function StatsPage() {
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Statistiques cliniques</h1>
-        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i} className="animate-pulse">
@@ -189,74 +218,6 @@ export default function StatsPage() {
 
   return (
     <div className="p-6 space-y-6 overflow-auto h-full">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Statistiques cliniques</h1>
-          <p className="text-muted-foreground">
-            Analyse de l'activité et des résultats cliniques
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-period">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PERIOD_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {period === "custom" && (
-            <div className="flex items-center gap-2">
-              <Popover open={fromCalendarOpen} onOpenChange={setFromCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="default" data-testid="button-date-from">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    {customFrom ? format(customFrom, "dd/MM/yyyy") : "Du"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={customFrom}
-                    onSelect={(date) => {
-                      setCustomFrom(date);
-                      setFromCalendarOpen(false);
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <Popover open={toCalendarOpen} onOpenChange={setToCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="default" data-testid="button-date-to">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    {customTo ? format(customTo, "dd/MM/yyyy") : "Au"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={customTo}
-                    onSelect={(date) => {
-                      setCustomTo(date);
-                      setToCalendarOpen(false);
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card data-testid="stat-card-activity">
           <CardContent className="p-6">
@@ -321,6 +282,66 @@ export default function StatsPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Period selector */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-period">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIOD_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {period === "custom" && (
+          <div className="flex items-center gap-2">
+            <Popover open={fromCalendarOpen} onOpenChange={setFromCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="default" data-testid="button-date-from">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  {customFrom ? format(customFrom, "dd/MM/yyyy") : "Du"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={customFrom}
+                  onSelect={(date) => {
+                    setCustomFrom(date);
+                    setFromCalendarOpen(false);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Popover open={toCalendarOpen} onOpenChange={setToCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="default" data-testid="button-date-to">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  {customTo ? format(customTo, "dd/MM/yyyy") : "Au"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={customTo}
+                  onSelect={(date) => {
+                    setCustomTo(date);
+                    setToCalendarOpen(false);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -446,9 +467,24 @@ export default function StatsPage() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Distribution ISQ</CardTitle>
-            <CardDescription>Stabilité des implants à la pose</CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+            <div>
+              <CardTitle>Distribution ISQ</CardTitle>
+              <CardDescription>Stabilité des implants à la pose</CardDescription>
+            </div>
+            <Select value={selectedImplantModel} onValueChange={setSelectedImplantModel}>
+              <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-model">
+                <SelectValue placeholder="Tous les implants" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les implants</SelectItem>
+                {stats?.availableImplantModels.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -536,12 +572,27 @@ export default function StatsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Évolution ISQ moyen
-            </CardTitle>
-            <CardDescription>Stabilité moyenne des implants par mois</CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Évolution ISQ moyen
+              </CardTitle>
+              <CardDescription>Stabilité moyenne des implants par mois</CardDescription>
+            </div>
+            <Select value={selectedImplantModel} onValueChange={setSelectedImplantModel}>
+              <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-evolution-model">
+                <SelectValue placeholder="Tous les implants" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les implants</SelectItem>
+                {stats?.availableImplantModels.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -606,7 +657,7 @@ export default function StatsPage() {
                           {item.patientNom} {item.patientPrenom}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Site {item.siteFdi} - {item.marque} - Posé le {format(new Date(item.datePose), "dd/MM/yyyy")}
+                          Site {item.siteFdi} - {item.marque}{item.referenceFabricant ? ` (${item.referenceFabricant})` : ''} - Posé le {format(new Date(item.datePose), "dd/MM/yyyy")}
                         </p>
                       </div>
                     </div>
@@ -719,6 +770,148 @@ export default function StatsPage() {
               {sortedFlags.length > 20 && (
                 <p className="text-center text-sm text-muted-foreground mt-4">
                   Affichage des 20 premiers flags sur {sortedFlags.length} au total
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Patient stats table */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Patients avec implants
+            </CardTitle>
+            <CardDescription>
+              {filteredPatientStats.length} patient{filteredPatientStats.length > 1 ? "s" : ""} sur {patientStatsData.length} au total
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher..."
+                value={patientSearch}
+                onChange={(e) => setPatientSearch(e.target.value)}
+                className="pl-9 w-48 bg-white dark:bg-zinc-900"
+                data-testid="input-patient-search"
+              />
+            </div>
+            <Select value={patientAlertFilter} onValueChange={setPatientAlertFilter}>
+              <SelectTrigger className="w-40 bg-white dark:bg-zinc-900" data-testid="select-alert-filter">
+                <SelectValue placeholder="Alertes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes alertes</SelectItem>
+                <SelectItem value="with-alerts">Avec alertes</SelectItem>
+                <SelectItem value="no-alerts">Sans alerte</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={patientSuccessFilter} onValueChange={setPatientSuccessFilter}>
+              <SelectTrigger className="w-40 bg-white dark:bg-zinc-900" data-testid="select-success-filter">
+                <SelectValue placeholder="Taux succès" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous taux</SelectItem>
+                <SelectItem value="high">80%+</SelectItem>
+                <SelectItem value="medium">50-79%</SelectItem>
+                <SelectItem value="low">0-49%</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {filteredPatientStats.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="h-12 w-12 mx-auto mb-2" />
+              <p>Aucun patient avec implants</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Patient</TableHead>
+                    <TableHead className="text-center">Âge</TableHead>
+                    <TableHead className="text-center">Implants</TableHead>
+                    <TableHead className="text-center">Taux succès</TableHead>
+                    <TableHead className="text-center">Alertes</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPatientStats.slice(0, 50).map((p) => (
+                    <TableRow key={p.patientId} data-testid={`row-patient-${p.patientId}`}>
+                      <TableCell>
+                        <Link href={`/patients/${p.patientId}`} className="hover:underline">
+                          <span className="font-medium">{p.prenom} {p.nom}</span>
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-center text-muted-foreground">
+                        {p.age} ans
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <Badge variant="secondary" className="cursor-pointer">
+                              {p.totalImplants}
+                            </Badge>
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-72" align="center">
+                            <div className="space-y-2">
+                              <h4 className="font-semibold text-sm">Implants ({p.totalImplants})</h4>
+                              <ScrollArea className="h-32">
+                                <div className="space-y-1">
+                                  {p.implants.map((imp) => (
+                                    <div key={imp.id} className="flex items-center justify-between text-sm p-1 rounded bg-muted/50">
+                                      <span>Site {imp.siteFdi} - {imp.marque}</span>
+                                      <Badge variant={
+                                        imp.statut === "SUCCES" ? "default" :
+                                        imp.statut === "COMPLICATION" ? "outline" :
+                                        imp.statut === "ECHEC" ? "destructive" : "secondary"
+                                      } className="text-xs">
+                                        {imp.statut}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
+                              </ScrollArea>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={p.successRate >= 80 ? "default" : p.successRate >= 50 ? "outline" : "destructive"}
+                          className={p.successRate >= 80 ? "bg-green-600" : ""}
+                        >
+                          {p.successRate}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {p.activeAlerts > 0 ? (
+                          <Badge variant="destructive">{p.activeAlerts}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" asChild>
+                          <Link href={`/patients/${p.patientId}`}>
+                            <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {filteredPatientStats.length > 50 && (
+                <p className="text-center text-sm text-muted-foreground mt-4">
+                  Affichage des 50 premiers patients sur {filteredPatientStats.length}
                 </p>
               )}
             </div>

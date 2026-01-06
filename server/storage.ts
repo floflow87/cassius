@@ -182,7 +182,8 @@ export interface IStorage {
   // Stats methods
   getStats(organisationId: string): Promise<DashboardStats>;
   getAdvancedStats(organisationId: string): Promise<AdvancedStats>;
-  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string): Promise<ClinicalStats>;
+  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string): Promise<ClinicalStats>;
+  getPatientStats(organisationId: string): Promise<import("@shared/types").PatientStats[]>;
 
   // User methods (not tenant-filtered, users are global)
   getUserById(id: string): Promise<User | undefined>;
@@ -1767,7 +1768,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string): Promise<ClinicalStats> {
+  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string): Promise<ClinicalStats> {
     const now = new Date();
     const defaultFrom = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().split('T')[0];
     const defaultTo = now.toISOString().split('T')[0];
@@ -1866,14 +1867,24 @@ export class DatabaseStorage implements IStorage {
     const complicationRate = total > 0 ? Math.round((statusCounts.COMPLICATION / total) * 100) : 0;
     const failureRate = total > 0 ? Math.round((statusCounts.ECHEC / total) * 100) : 0;
 
+    // Filter surgery implants for ISQ data if implantModelId is provided
+    const isqFilteredImplants = implantModelId 
+      ? allSurgeryImplants.filter(si => si.implantId === implantModelId)
+      : allSurgeryImplants;
+
+    const filteredIsqValues: number[] = [];
+    isqFilteredImplants.forEach(si => {
+      if (si.isqPose) filteredIsqValues.push(si.isqPose);
+    });
+
     const isqDistribution = [
-      { category: "Faible (<55)", count: isqValues.filter(v => v < 55).length },
-      { category: "Modéré (55-70)", count: isqValues.filter(v => v >= 55 && v <= 70).length },
-      { category: "Élevé (>70)", count: isqValues.filter(v => v > 70).length },
+      { category: "Faible (<55)", count: filteredIsqValues.filter(v => v < 55).length },
+      { category: "Modéré (55-70)", count: filteredIsqValues.filter(v => v >= 55 && v <= 70).length },
+      { category: "Élevé (>70)", count: filteredIsqValues.filter(v => v > 70).length },
     ];
 
     const isqByMonth: Record<string, { sum: number; count: number }> = {};
-    allSurgeryImplants.forEach(si => {
+    isqFilteredImplants.forEach(si => {
       const month = si.datePose.substring(0, 7);
       if (si.isqPose) {
         if (!isqByMonth[month]) isqByMonth[month] = { sum: 0, count: 0 };
@@ -1984,6 +1995,101 @@ export class DatabaseStorage implements IStorage {
       implantsWithoutFollowup: implantsWithoutFollowup.slice(0, 20),
       availableImplantModels: availableModels,
     };
+  }
+
+  async getPatientStats(organisationId: string): Promise<import("@shared/types").PatientStats[]> {
+    const allPatients = await db.select().from(patients)
+      .where(eq(patients.organisationId, organisationId));
+
+    const allOperations = await db.select().from(operations)
+      .where(eq(operations.organisationId, organisationId));
+
+    const allSurgeryImplants = await db.select({
+      id: surgeryImplants.id,
+      surgeryId: surgeryImplants.surgeryId,
+      siteFdi: surgeryImplants.siteFdi,
+      statut: surgeryImplants.statut,
+      isqPose: surgeryImplants.isqPose,
+      marque: implants.marque,
+    }).from(surgeryImplants)
+      .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
+      .where(eq(surgeryImplants.organisationId, organisationId));
+
+    const allFlags = await db.select().from(flags)
+      .where(and(
+        eq(flags.organisationId, organisationId),
+        eq(flags.resolved, false)
+      ));
+
+    const operationsByPatient: Record<string, string[]> = {};
+    allOperations.forEach(op => {
+      if (!operationsByPatient[op.patientId]) operationsByPatient[op.patientId] = [];
+      operationsByPatient[op.patientId].push(op.id);
+    });
+
+    const implantsBySurgery: Record<string, typeof allSurgeryImplants> = {};
+    allSurgeryImplants.forEach(si => {
+      if (!implantsBySurgery[si.surgeryId]) implantsBySurgery[si.surgeryId] = [];
+      implantsBySurgery[si.surgeryId].push(si);
+    });
+
+    const flagsByPatient: Record<string, number> = {};
+    allFlags.forEach(f => {
+      if (f.patientId) {
+        flagsByPatient[f.patientId] = (flagsByPatient[f.patientId] || 0) + 1;
+      }
+    });
+
+    const now = new Date();
+    const results: import("@shared/types").PatientStats[] = [];
+
+    for (const patient of allPatients) {
+      const patientOpIds = operationsByPatient[patient.id] || [];
+      const patientImplants: typeof allSurgeryImplants = [];
+      patientOpIds.forEach(opId => {
+        const opImplants = implantsBySurgery[opId] || [];
+        patientImplants.push(...opImplants);
+      });
+
+      const total = patientImplants.length;
+      let successCount = 0;
+      let complicationCount = 0;
+      let failureCount = 0;
+
+      patientImplants.forEach(si => {
+        const status = si.statut || "EN_SUIVI";
+        if (status === "SUCCES") successCount++;
+        if (status === "COMPLICATION") complicationCount++;
+        if (status === "ECHEC") failureCount++;
+      });
+
+      const successRate = total > 0 ? Math.round((successCount / total) * 100) : 0;
+
+      const birthDate = new Date(patient.dateNaissance);
+      const age = Math.floor((now.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+
+      results.push({
+        patientId: patient.id,
+        nom: patient.nom,
+        prenom: patient.prenom,
+        dateNaissance: patient.dateNaissance,
+        age,
+        totalImplants: total,
+        successRate,
+        complicationCount,
+        failureCount,
+        activeAlerts: flagsByPatient[patient.id] || 0,
+        implants: patientImplants.map(si => ({
+          id: si.id,
+          siteFdi: si.siteFdi,
+          marque: si.marque || '',
+          statut: si.statut || 'EN_SUIVI',
+          isqPose: si.isqPose,
+        })),
+      });
+    }
+
+    return results.sort((a, b) => b.activeAlerts - a.activeAlerts || b.totalImplants - a.totalImplants);
   }
 
   // ========== USERS (not tenant-filtered) ==========
