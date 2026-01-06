@@ -439,7 +439,7 @@ export default function DocumentsPage() {
   const [currentPath, setCurrentPath] = useState<FolderPath[]>([
     { type: 'root', name: 'Documents' }
   ]);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['patients', 'operations']));
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['patients']));
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'size'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
@@ -760,27 +760,6 @@ export default function DocumentsPage() {
                         node={{ name: p.name, count: p.count, type: 'patient', id: pid }}
                         isSelected={currentFolder.type === 'patient' && currentFolder.id === pid}
                         onSelect={() => handleFolderSelect('patient', pid, p.name)}
-                      />
-                    </div>
-                  );
-                })}
-                
-                <FolderTreeItem
-                  node={{ name: 'Actes', count: tree?.operations.reduce((acc, o) => acc + o.count, 0) || 0, type: 'operations' }}
-                  isOpen={expandedFolders.has('operations')}
-                  isSelected={currentFolder.type === 'operations'}
-                  hasChildren={(tree?.operations.length || 0) > 0}
-                  onToggle={() => toggleFolder('operations')}
-                  onSelect={() => handleFolderSelect('operations')}
-                />
-                {expandedFolders.has('operations') && tree?.operations.map(o => {
-                  const oid = o.operationId || o.id;
-                  return (
-                    <div key={o.id} style={{ paddingLeft: '24px' }}>
-                      <FolderTreeItem
-                        node={{ name: o.name, count: o.count, type: 'operation', id: oid }}
-                        isSelected={currentFolder.type === 'operation' && currentFolder.id === oid}
-                        onSelect={() => handleFolderSelect('operation', oid, o.name)}
                       />
                     </div>
                   );
