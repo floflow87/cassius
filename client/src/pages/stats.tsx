@@ -198,9 +198,12 @@ export default function StatsPage() {
     },
   });
 
-  // Filter patient stats
+  // Filter patient stats - only show patients with at least one implant
   const filteredPatientStats = useMemo(() => {
     return patientStatsData.filter(p => {
+      // Only include patients with at least one implant
+      if (p.totalImplants === 0) return false;
+      
       const matchesSearch = patientSearch === "" || 
         `${p.nom} ${p.prenom}`.toLowerCase().includes(patientSearch.toLowerCase());
       
@@ -216,6 +219,11 @@ export default function StatsPage() {
       return matchesSearch && matchesAlert && matchesSuccess;
     });
   }, [patientStatsData, patientSearch, patientAlertFilter, patientSuccessFilter]);
+
+  // Count of all patients with implants (before search/filter)
+  const totalPatientsWithImplants = useMemo(() => {
+    return patientStatsData.filter(p => p.totalImplants > 0).length;
+  }, [patientStatsData]);
 
   // Sort and group flags by level
   const sortedFlags = [...flagsData].filter(f => !f.resolvedAt).sort((a, b) => {
@@ -839,7 +847,7 @@ export default function StatsPage() {
               Patients avec implants
             </CardTitle>
             <CardDescription>
-              {filteredPatientStats.length} patient{filteredPatientStats.length > 1 ? "s" : ""} sur {patientStatsData.length} au total
+              {filteredPatientStats.length} patient{filteredPatientStats.length > 1 ? "s" : ""} sur {totalPatientsWithImplants} au total
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
