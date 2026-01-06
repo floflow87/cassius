@@ -2109,7 +2109,9 @@ export class DatabaseStorage implements IStorage {
 
       patientImplants.forEach(si => {
         const status = si.statut || "EN_SUIVI";
-        if (status === "SUCCES") successCount++;
+        // Count SUCCES and EN_SUIVI as successful outcomes
+        // EN_SUIVI = implant in post-operative surveillance (default healthy state)
+        if (status === "SUCCES" || status === "EN_SUIVI") successCount++;
         if (status === "COMPLICATION") complicationCount++;
         if (status === "ECHEC") failureCount++;
       });

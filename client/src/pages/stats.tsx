@@ -575,7 +575,7 @@ export default function StatsPage() {
         <div className="flex flex-wrap items-center gap-2 mt-4">
           {/* Multi-select search for patients and operations */}
           <div className="flex-1 min-w-[200px] max-w-md">
-            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+            <Popover open={searchOpen} onOpenChange={setSearchOpen} modal={false}>
               <PopoverTrigger asChild>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -586,13 +586,17 @@ export default function StatsPage() {
                       setSearchQuery(e.target.value);
                       if (!searchOpen) setSearchOpen(true);
                     }}
-                    onFocus={() => setSearchOpen(true)}
+                    onFocus={(e) => {
+                      e.stopPropagation();
+                      setSearchOpen(true);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                     className="pl-9 bg-white dark:bg-zinc-900"
                     data-testid="input-stats-search"
                   />
                 </div>
               </PopoverTrigger>
-              <PopoverContent className="w-80 p-0" align="start">
+              <PopoverContent className="w-80 p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                 <div className="p-2">
                   {searchSuggestions.length === 0 ? (
                     <p className="text-sm text-muted-foreground p-2">Aucun résultat</p>
@@ -977,8 +981,8 @@ export default function StatsPage() {
                     <p>Tous les implants ont un suivi récent</p>
                   </div>
                 ) : (
-                  <ScrollArea className="h-64">
-                    <div className="space-y-2 pr-4">
+                  <div className="h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+                    <div className="space-y-2 pr-2">
                       {stats.implantsWithoutFollowup.slice(0, 20).map((item) => (
                         <div
                           key={item.implantId}
@@ -1005,7 +1009,7 @@ export default function StatsPage() {
                         </div>
                       ))}
                     </div>
-                  </ScrollArea>
+                  </div>
                 )}
               </CardContent>
             </Card>
