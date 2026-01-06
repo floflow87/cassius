@@ -977,9 +977,9 @@ export default function StatsPage() {
                     <p>Tous les implants ont un suivi récent</p>
                   </div>
                 ) : (
-                  <ScrollArea className="h-48">
-                    <div className="space-y-2">
-                      {stats.implantsWithoutFollowup.slice(0, 10).map((item) => (
+                  <ScrollArea className="h-64">
+                    <div className="space-y-2 pr-4">
+                      {stats.implantsWithoutFollowup.slice(0, 20).map((item) => (
                         <div
                           key={item.implantId}
                           className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-sm"
@@ -1321,7 +1321,7 @@ export default function StatsPage() {
                       <tr className="border-b">
                         <th className="text-left py-2 px-3 font-medium">Niveau</th>
                         <th className="text-left py-2 px-3 font-medium">Type</th>
-                        <th className="text-left py-2 px-3 font-medium">Entité</th>
+                        <th className="text-left py-2 px-3 font-medium">Patient</th>
                         <th className="text-left py-2 px-3 font-medium">Description</th>
                         <th className="text-left py-2 px-3 font-medium">Créé</th>
                       </tr>
