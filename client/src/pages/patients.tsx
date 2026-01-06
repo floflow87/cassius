@@ -50,6 +50,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { Patient, FlagWithEntity } from "@shared/schema";
 import type { FilterRule, PatientSearchResult, TopFlag } from "@shared/types";
 import { AlertTriangle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 interface PatientsPageProps {
   searchQuery: string;
@@ -80,6 +82,100 @@ const defaultColumns: ColumnConfig[] = [
 const STORAGE_KEY_COLUMNS = "cassius_patients_columns_order";
 const STORAGE_KEY_SORT = "cassius_patients_sort";
 const STORAGE_KEY_VIEW_MODE = "cassius_patients_view_mode";
+
+// Component to show implant details with ISQ on hover
+interface SurgeryImplantISQ {
+  id: string;
+  siteFdi: string;
+  statut: string;
+  isqPose: number | null;
+  isq2m: number | null;
+  isq3m: number | null;
+  isq6m: number | null;
+  datePose: string | null;
+  implant: {
+    marque: string;
+    diametre: string | null;
+    longueur: string | null;
+  };
+}
+
+function ImplantHoverList({ patientId, implantCount }: { patientId: string; implantCount: number }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const { data: implants, isLoading } = useQuery<SurgeryImplantISQ[]>({
+    queryKey: ["/api/patients", patientId, "implants"],
+    enabled: isOpen && implantCount > 0,
+  });
+  
+  if (implantCount === 0) {
+    return (
+      <span className="text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">0</span> implants
+      </span>
+    );
+  }
+  
+  const getLatestISQ = (imp: SurgeryImplantISQ) => 
+    imp.isq6m ?? imp.isq3m ?? imp.isq2m ?? imp.isqPose ?? null;
+  
+  const getISQColor = (isq: number | null) => {
+    if (isq === null) return "text-muted-foreground";
+    if (isq >= 70) return "text-green-600 dark:text-green-400";
+    if (isq >= 60) return "text-amber-600 dark:text-amber-400";
+    return "text-red-600 dark:text-red-400";
+  };
+  
+  return (
+    <HoverCard openDelay={300} closeDelay={100} onOpenChange={setIsOpen}>
+      <HoverCardTrigger asChild>
+        <span className="text-sm text-muted-foreground cursor-pointer underline decoration-dotted">
+          <span className="font-medium text-foreground">{implantCount}</span> implant{implantCount !== 1 ? 's' : ''}
+        </span>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-80" side="right" align="start">
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">Implants ({implantCount})</h4>
+          {isLoading ? (
+            <div className="text-xs text-muted-foreground py-2">Chargement...</div>
+          ) : implants && implants.length > 0 ? (
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {implants.map((imp) => {
+                const latestISQ = getLatestISQ(imp);
+                return (
+                  <div key={imp.id} className="border rounded-md p-2 text-xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium">Site {imp.siteFdi}</span>
+                      <span className={`font-semibold ${getISQColor(latestISQ)}`}>
+                        ISQ: {latestISQ ?? "-"}
+                      </span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {imp.implant.marque}
+                      {imp.implant.diametre && imp.implant.longueur && (
+                        <span> - {imp.implant.diametre}x{imp.implant.longueur}mm</span>
+                      )}
+                    </div>
+                    {(imp.isqPose || imp.isq2m || imp.isq3m || imp.isq6m) && (
+                      <div className="mt-1 flex gap-2 text-muted-foreground">
+                        {imp.isqPose != null && <span>Pose: {imp.isqPose}</span>}
+                        {imp.isq2m != null && <span>2m: {imp.isq2m}</span>}
+                        {imp.isq3m != null && <span>3m: {imp.isq3m}</span>}
+                        {imp.isq6m != null && <span>6m: {imp.isq6m}</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground py-2">Aucun implant trouvé</div>
+          )}
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
 
 export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPageProps) {
   const [, setLocation] = useLocation();
@@ -570,9 +666,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
       case "implants":
         const implantCount = implantCounts?.[patient.id] || 0;
         return (
-          <span className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{implantCount}</span> implant{implantCount !== 1 ? 's' : ''}
-          </span>
+          <ImplantHoverList patientId={patient.id} implantCount={implantCount} />
         );
       case "derniereVisite":
         const lastVisit = lastVisits?.[patient.id];
@@ -630,7 +724,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           activeFilterCount={activeFilterCount}
         />
 
-        <div className="flex items-center border rounded-md">
+        <div className="flex items-center border rounded-md bg-white dark:bg-zinc-900">
           <Button
             variant={viewMode === "table" ? "secondary" : "ghost"}
             size="icon"
@@ -690,12 +784,16 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           </>
         )}
 
-        <Link href="/patients/import">
-          <Button variant="outline" className="gap-2 shrink-0" data-testid="button-import-patients">
-            <Upload className="h-4 w-4" />
-            Importer
-          </Button>
-        </Link>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link href="/patients/import">
+              <Button variant="outline" size="icon" className="shrink-0 bg-white dark:bg-zinc-900" data-testid="button-import-patients">
+                <Upload className="h-4 w-4" />
+              </Button>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent>Importer des patients</TooltipContent>
+        </Tooltip>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button className="gap-2 shrink-0" data-testid="button-new-patient">

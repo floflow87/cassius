@@ -252,7 +252,7 @@ export function AdvancedFilterDrawer({ filters, onFiltersChange, activeFilterCou
   return (
     <Sheet open={isOpen} onOpenChange={handleOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="default" data-testid="button-advanced-filter">
+        <Button variant="outline" size="default" className="bg-white dark:bg-zinc-900" data-testid="button-advanced-filter">
           <Filter className="h-4 w-4 mr-2" />
           Filtres avancés
           {activeFilterCount > 0 && (

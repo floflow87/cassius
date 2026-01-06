@@ -338,11 +338,11 @@ function FileGridItem({
   
   return (
     <div
-      className={`relative flex flex-col items-center p-3 rounded-md hover-elevate cursor-pointer border ${isSelected ? 'bg-accent border-primary' : 'border-transparent'}`}
+      className={`relative flex flex-col items-center p-4 rounded-lg hover-elevate cursor-pointer border shadow-sm ${isSelected ? 'bg-accent border-primary' : 'bg-white dark:bg-zinc-900 border-border'}`}
       onClick={onView}
       data-testid={`file-grid-${file.sourceType}-${file.id}`}
     >
-      <div className="absolute top-2 left-2" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute top-3 left-3" onClick={(e) => e.stopPropagation()}>
         <Checkbox 
           checked={isSelected} 
           onCheckedChange={onToggleSelect}
@@ -350,11 +350,11 @@ function FileGridItem({
         />
       </div>
       
-      <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute top-3 right-3" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              <MoreHorizontal className="h-3 w-3" />
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -399,22 +399,22 @@ function FileGridItem({
         </DropdownMenu>
       </div>
       
-      <div className="w-20 h-20 flex items-center justify-center mb-2 bg-muted/50 rounded-md overflow-hidden">
+      <div className="w-24 h-24 flex items-center justify-center mb-3 bg-muted/30 rounded-lg overflow-hidden">
         {thumbnailUrl && isImage ? (
           <img src={thumbnailUrl} alt={file.title} className="w-full h-full object-cover" />
         ) : isPdf ? (
-          <FileText className="h-10 w-10 text-red-500" />
+          <FileText className="h-12 w-12 text-red-500" />
         ) : isImage ? (
-          <Image className="h-10 w-10 text-blue-500" />
+          <Image className="h-12 w-12 text-blue-500" />
         ) : (
-          <File className="h-10 w-10 text-muted-foreground" />
+          <File className="h-12 w-12 text-muted-foreground" />
         )}
       </div>
       
-      <span className="text-xs text-center truncate w-full max-w-[100px]" title={file.title}>
+      <span className="text-sm text-center truncate w-full max-w-[140px] font-medium" title={file.title}>
         {file.title}
       </span>
-      <span className="text-xs text-muted-foreground">
+      <span className="text-xs text-muted-foreground mt-1">
         {format(new Date(file.createdAt), "dd/MM/yy", { locale: fr })}
       </span>
     </div>
@@ -891,7 +891,7 @@ export default function DocumentsPage() {
                 />
                 <span>{totalCount} fichier{totalCount > 1 ? 's' : ''}</span>
               </div>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
                 {files.map(file => (
                   <FileGridItem
                     key={`${file.sourceType}-${file.id}`}

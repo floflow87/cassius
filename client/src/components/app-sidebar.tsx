@@ -67,7 +67,33 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0 overflow-visible">
+    <Sidebar collapsible="icon" className="border-r-0 overflow-visible relative">
+      {/* Straddling toggle button */}
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-50">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleToggle}
+              className="rounded-full bg-white dark:bg-zinc-900"
+              aria-expanded={isExpanded}
+              aria-label={isExpanded ? "Réduire le menu" : "Agrandir le menu"}
+              data-testid="button-toggle-sidebar"
+            >
+              {isExpanded ? (
+                <ChevronLeft className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
+            {isExpanded ? "Réduire le menu" : "Agrandir le menu"}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
       <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center h-16 px-4 border-b">
         <a 
           href="/dashboard" 
@@ -111,7 +137,7 @@ export function AppSidebar() {
                   <item.lucideIcon className="h-5 w-5 text-white shrink-0" strokeWidth={2.5} />
                 )}
                 {isExpanded && (
-                  <span className="text-sm font-medium text-white truncate">
+                  <span className={`text-sm truncate ${active ? 'font-medium text-foreground' : 'font-light text-white/80'}`}>
                     {item.title}
                   </span>
                 )}
@@ -140,56 +166,15 @@ export function AppSidebar() {
 
       <SidebarFooter className="bg-primary px-2 py-2 pb-4 mt-auto">
         <SidebarMenu className="gap-1">
-          {/* Toggle button - first */}
-          <SidebarMenuItem className="px-0">
-            {isExpanded ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleToggle}
-                    className="flex h-10 w-full items-center justify-end px-3 text-white hover:bg-white/10"
-                    aria-expanded={isExpanded}
-                    aria-label="Réduire le menu"
-                    data-testid="button-toggle-sidebar"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
-                  Réduire le menu
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleToggle}
-                    className="flex h-10 w-full items-center justify-center text-white hover:bg-white/10"
-                    aria-expanded={isExpanded}
-                    aria-label="Agrandir le menu"
-                    data-testid="button-toggle-sidebar"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
-                  Agrandir le menu
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </SidebarMenuItem>
-
-          {/* Settings button - second */}
+          {/* Settings button */}
           <SidebarMenuItem className="px-0">
             {isExpanded ? (
               <a
                 href="/settings"
                 onClick={handleNavClick("/settings")}
-                className="flex h-10 w-full items-center justify-start px-3 gap-3 rounded-[5px] bg-transparent hover:bg-white/10"
+                className={`flex h-10 w-full items-center justify-start px-3 gap-3 rounded-[5px] ${
+                  isActive("/settings") ? "bg-secondary" : "bg-transparent hover:bg-white/10"
+                }`}
                 data-testid="link-settings"
               >
                 <img 
@@ -197,7 +182,7 @@ export function AppSidebar() {
                   alt="Paramètres"
                   className="h-5 w-auto brightness-0 invert shrink-0"
                 />
-                <span className="text-sm font-medium text-white truncate">
+                <span className={`text-sm truncate ${isActive("/settings") ? 'font-medium text-foreground' : 'font-light text-white/80'}`}>
                   Paramètres
                 </span>
               </a>
