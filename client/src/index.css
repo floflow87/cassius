@@ -56,6 +56,32 @@
   --font-mono: Menlo, monospace;
   /* Border gray #E5E7EB */
   --border-gray: 220 13% 91%;
+  
+  /* Stats Design System - Premium Palette */
+  /* Primary #2563EB */
+  --stats-primary: 217 91% 53%;
+  --stats-primary-soft: 217 91% 65%;
+  /* Success #16A34A (bg #DCFCE7) */
+  --stats-success: 142 76% 36%;
+  --stats-success-bg: 142 77% 93%;
+  /* Warning #F59E0B (bg #FEF3C7) */
+  --stats-warning: 38 92% 50%;
+  --stats-warning-bg: 48 96% 89%;
+  /* Danger #EF4444 (bg #FEE2E2) */
+  --stats-danger: 0 84% 60%;
+  --stats-danger-bg: 0 93% 94%;
+  /* Neutrals */
+  --stats-text: 222 47% 11%;
+  --stats-text-secondary: 215 16% 47%;
+  --stats-border: 214 32% 91%;
+  --stats-page-bg: 210 40% 98%;
+  --stats-card-bg: 0 0% 100%;
+  /* Desaturated chart colors */
+  --stats-isq-high: 142 50% 45%;
+  --stats-isq-medium: 38 70% 55%;
+  --stats-isq-low: 0 60% 60%;
+  --stats-gray-muted: 220 13% 85%;
+  
   --radius: 0.8rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
@@ -129,6 +155,26 @@
   --muted-foreground: 45 15% 46%;
   /* Border gray - darker in dark mode */
   --border-gray: 220 13% 25%;
+  
+  /* Stats Design System - Dark Mode */
+  --stats-primary: 217 91% 60%;
+  --stats-primary-soft: 217 70% 50%;
+  --stats-success: 142 70% 45%;
+  --stats-success-bg: 142 50% 15%;
+  --stats-warning: 38 85% 55%;
+  --stats-warning-bg: 38 50% 15%;
+  --stats-danger: 0 75% 55%;
+  --stats-danger-bg: 0 50% 15%;
+  --stats-text: 210 40% 96%;
+  --stats-text-secondary: 215 20% 60%;
+  --stats-border: 220 13% 25%;
+  --stats-page-bg: 20 14% 4%;
+  --stats-card-bg: 20 14% 8%;
+  --stats-isq-high: 142 45% 50%;
+  --stats-isq-medium: 38 60% 55%;
+  --stats-isq-low: 0 55% 55%;
+  --stats-gray-muted: 220 10% 40%;
+  
   --accent: 25 45% 20%;
   --accent-foreground: 45 25% 85%;
   --destructive: 356.3033 90.5579% 54.3137%;
