@@ -187,20 +187,6 @@ export default function StatsPage() {
     implants: d.implants || [],
   })) || [];
 
-  // Filter ISQ data by selected implant model
-  const filteredIsqData = useMemo(() => {
-    if (!stats) return [];
-    return stats.isqDistribution;
-  }, [stats]);
-
-  const filteredIsqEvolutionData = useMemo(() => {
-    if (!stats) return [];
-    return stats.isqEvolution.map((d) => ({
-      ...d,
-      month: format(new Date(d.period + "-01"), "MMM", { locale: fr }),
-    }));
-  }, [stats]);
-
   return (
     <div className="p-6 space-y-6 overflow-auto h-full">
       <div className="flex flex-wrap items-center justify-between gap-4">

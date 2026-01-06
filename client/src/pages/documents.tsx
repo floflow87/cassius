@@ -431,7 +431,19 @@ export default function DocumentsPage() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['patients', 'operations']));
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'size'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('documents-view-mode');
+      return (saved === 'grid' || saved === 'list') ? saved : 'list';
+    }
+    return 'list';
+  });
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('documents-view-mode', viewMode);
+    }
+  }, [viewMode]);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [viewingFile, setViewingFile] = useState<{ file: UnifiedFile; url: string } | null>(null);
   const [editingDoc, setEditingDoc] = useState<UnifiedFile | null>(null);
