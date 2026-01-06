@@ -1151,7 +1151,7 @@ function OrganizationSection() {
           ) : isEditing ? (
             <div className="space-y-4">
               <div>
-                <Label htmlFor="org-nom">Nom du cabinet</Label>
+                <Label htmlFor="org-nom" className="font-light">Nom du cabinet</Label>
                 <Input
                   id="org-nom"
                   value={formData.nom}
@@ -1160,7 +1160,7 @@ function OrganizationSection() {
                 />
               </div>
               <div>
-                <Label htmlFor="org-adresse">Adresse</Label>
+                <Label htmlFor="org-adresse" className="font-light">Adresse</Label>
                 <Input
                   id="org-adresse"
                   value={formData.adresse}
@@ -1169,7 +1169,7 @@ function OrganizationSection() {
                 />
               </div>
               <div>
-                <Label htmlFor="org-timezone">Fuseau horaire</Label>
+                <Label htmlFor="org-timezone" className="font-light">Fuseau horaire</Label>
                 <Select
                   value={formData.timezone}
                   onValueChange={(value) => setFormData({ ...formData, timezone: value })}
@@ -1198,19 +1198,19 @@ function OrganizationSection() {
           ) : (
             <div className="space-y-4">
               <div>
-                <Label className="text-muted-foreground text-sm">Nom du cabinet</Label>
+                <Label className="text-muted-foreground text-sm font-light">Nom du cabinet</Label>
                 <p className="font-medium" data-testid="text-org-nom">{organisation?.nom || "—"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground text-sm">Adresse</Label>
+                <Label className="text-muted-foreground text-sm font-light">Adresse</Label>
                 <p className="font-medium" data-testid="text-org-adresse">{organisation?.adresse || "—"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground text-sm">Fuseau horaire</Label>
+                <Label className="text-muted-foreground text-sm font-light">Fuseau horaire</Label>
                 <p className="font-medium" data-testid="text-org-timezone">{organisation?.timezone || "Europe/Paris"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground text-sm">Date de création</Label>
+                <Label className="text-muted-foreground text-sm font-light">Date de création</Label>
                 <p className="text-sm text-muted-foreground">
                   {organisation?.createdAt
                     ? new Date(organisation.createdAt).toLocaleDateString("fr-FR")

@@ -100,9 +100,9 @@ const RADIO_TYPE_LABELS: Record<TypeRadio, string> = {
 };
 
 const RADIO_TYPE_COLORS: Record<TypeRadio, string> = {
-  PANORAMIQUE: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
-  CBCT: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
-  RETROALVEOLAIRE: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
+  PANORAMIQUE: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  CBCT: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  RETROALVEOLAIRE: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
 };
 
 function getFileIcon(mimeType: string | null) {
@@ -799,15 +799,6 @@ export default function DocumentsPage() {
           <Breadcrumb path={currentPath} onNavigate={handleNavigate} />
           
           <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setUploadSheetOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              data-testid="button-upload-document"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Ajouter un document
-            </Button>
-            
             {getSelectedFilesData().length > 0 && (
               <div className="flex items-center gap-2 mr-2 pr-2 border-r">
                 <span className="text-sm text-muted-foreground">
@@ -899,6 +890,15 @@ export default function DocumentsPage() {
                 <Grid className="h-4 w-4" />
               </Button>
             </div>
+            
+            <Button
+              onClick={() => setUploadSheetOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="button-upload-document"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Ajouter un document
+            </Button>
           </div>
         </div>
         
