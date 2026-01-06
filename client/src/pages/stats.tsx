@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Filter,
   Search,
+  Package,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart,
   Bar,
@@ -87,6 +89,7 @@ type SearchSuggestion = {
 };
 
 export default function StatsPage() {
+  const [activeTab, setActiveTab] = useState("activite");
   const [period, setPeriod] = useState("1m");
   const [customFrom, setCustomFrom] = useState<Date>();
   const [customTo, setCustomTo] = useState<Date>();
@@ -358,6 +361,7 @@ export default function StatsPage() {
 
   return (
     <div className="p-6 space-y-6 overflow-auto h-full">
+      {/* Summary stat cards - always visible */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card data-testid="stat-card-activity">
           <CardContent className="p-6">
@@ -424,7 +428,7 @@ export default function StatsPage() {
         </Card>
       </div>
 
-      {/* Search and Period selector */}
+      {/* Search and Period selector - always visible */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Multi-select search for patients and operations */}
         <div className="flex-1 min-w-[200px] max-w-md">
@@ -571,23 +575,42 @@ export default function StatsPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Activité par mois
-              </CardTitle>
-              <CardDescription>Nombre d'actes chirurgicaux réalisés</CardDescription>
-            </div>
-            <Link href={`/actes?from=${dateRange.from}&to=${dateRange.to}`}>
-              <Button variant="outline" size="sm" data-testid="button-view-operations">
-                Voir les actes
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </Link>
-          </CardHeader>
+      {/* Tabs for different stat views */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsTrigger value="activite" className="flex items-center gap-2" data-testid="tab-activite">
+            <Activity className="h-4 w-4" />
+            Activité
+          </TabsTrigger>
+          <TabsTrigger value="patient" className="flex items-center gap-2" data-testid="tab-patient">
+            <Users className="h-4 w-4" />
+            Patient
+          </TabsTrigger>
+          <TabsTrigger value="implant" className="flex items-center gap-2" data-testid="tab-implant">
+            <Package className="h-4 w-4" />
+            Implant
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ========== ONGLET ACTIVITÉ ========== */}
+        <TabsContent value="activite" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Activité par mois
+                  </CardTitle>
+                  <CardDescription>Nombre d'actes chirurgicaux réalisés</CardDescription>
+                </div>
+                <Link href={`/actes?from=${dateRange.from}&to=${dateRange.to}`}>
+                  <Button variant="outline" size="sm" data-testid="button-view-operations">
+                    Voir les actes
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </Link>
+              </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={activityData}>
@@ -644,105 +667,10 @@ export default function StatsPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Résultats cliniques</CardTitle>
-            <CardDescription>Répartition des issues</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={outcomeData.filter((d) => d.value > 0)}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={2}
-                  dataKey="value"
-                  nameKey="name"
-                  label={({ name, value }) => `${name}: ${value}%`}
-                  labelLine={false}
-                >
-                  {outcomeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value) => `${value}%`}
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "6px",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex justify-center gap-4 mt-4">
-              {outcomeData.map((item) => (
-                <div key={item.name} className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span className="text-sm text-muted-foreground">{item.name}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-            <div>
-              <CardTitle>Distribution ISQ</CardTitle>
-              <CardDescription>Stabilité des implants à la pose</CardDescription>
-            </div>
-            <Select value={isqDistributionFilter} onValueChange={setIsqDistributionFilter}>
-              <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-model">
-                <SelectValue placeholder="Tous les implants" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les implants</SelectItem>
-                {stats?.availableImplantModels.map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {isqData.map((item) => {
-                const total = isqData.reduce((sum, d) => sum + d.count, 0);
-                const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
-                return (
-                  <div key={item.category}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>{item.category}</span>
-                      <span className="font-medium">{item.count} ({percentage}%)</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${percentage}%`,
-                          backgroundColor: ISQ_COLORS[item.category as keyof typeof ISQ_COLORS] || "hsl(var(--primary))",
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Types d'interventions</CardTitle>
+      {/* Types d'interventions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Types d'interventions</CardTitle>
             <CardDescription>Répartition par type</CardDescription>
           </CardHeader>
           <CardContent>
@@ -795,19 +723,176 @@ export default function StatsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </TabsContent>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Évolution ISQ moyen
-              </CardTitle>
-              <CardDescription>Stabilité moyenne des implants par mois</CardDescription>
-            </div>
-            <Select value={isqEvolutionFilter} onValueChange={setIsqEvolutionFilter}>
+        {/* ========== ONGLET IMPLANT ========== */}
+        <TabsContent value="implant" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Résultats cliniques */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Résultats cliniques</CardTitle>
+                <CardDescription>Répartition des issues</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={outcomeData.filter((d) => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, value }) => `${name}: ${value}%`}
+                      labelLine={false}
+                    >
+                      {outcomeData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value) => `${value}%`}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "6px",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex justify-center gap-4 mt-4">
+                  {outcomeData.map((item) => (
+                    <div key={item.name} className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-sm text-muted-foreground">{item.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Distribution ISQ */}
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                <div>
+                  <CardTitle>Distribution ISQ</CardTitle>
+                  <CardDescription>Stabilité des implants à la pose</CardDescription>
+                </div>
+                <Select value={isqDistributionFilter} onValueChange={setIsqDistributionFilter}>
+                  <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-model">
+                    <SelectValue placeholder="Tous les implants" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les implants</SelectItem>
+                    {stats?.availableImplantModels.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {isqData.map((item) => {
+                    const total = isqData.reduce((sum, d) => sum + d.count, 0);
+                    const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
+                    return (
+                      <div key={item.category}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span>{item.category}</span>
+                          <span className="font-medium">{item.count} ({percentage}%)</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${percentage}%`,
+                              backgroundColor: ISQ_COLORS[item.category as keyof typeof ISQ_COLORS] || "hsl(var(--primary))",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Implants sans suivi récent */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    Implants sans suivi
+                  </CardTitle>
+                  <CardDescription>Plus de 3 mois sans visite</CardDescription>
+                </div>
+                {stats?.implantsWithoutFollowup && stats.implantsWithoutFollowup.length > 0 && (
+                  <Badge variant="outline" className="text-amber-600 border-amber-300">
+                    {stats.implantsWithoutFollowup.length}
+                  </Badge>
+                )}
+              </CardHeader>
+              <CardContent>
+                {!stats?.implantsWithoutFollowup || stats.implantsWithoutFollowup.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-green-500" />
+                    <p>Tous les implants ont un suivi récent</p>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-48">
+                    <div className="space-y-2">
+                      {stats.implantsWithoutFollowup.slice(0, 10).map((item) => (
+                        <div
+                          key={item.implantId}
+                          className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-sm"
+                          data-testid={`row-followup-${item.implantId}`}
+                        >
+                          <div>
+                            <p className="font-medium">{item.patientNom} {item.patientPrenom}</p>
+                            <p className="text-xs text-muted-foreground">Site {item.siteFdi} - {item.marque}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Badge
+                              variant="outline"
+                              className={item.daysSinceVisit === null || item.daysSinceVisit > 180 ? "text-red-600 border-red-300" : "text-amber-600 border-amber-300"}
+                            >
+                              {item.daysSinceVisit === null ? "Jamais" : `${item.daysSinceVisit}j`}
+                            </Badge>
+                            <Button variant="ghost" size="icon" asChild>
+                              <Link href={`/surgery-implants/${item.implantId}`}>
+                                <ExternalLink className="h-3 w-3" />
+                              </Link>
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Évolution ISQ moyen */}
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Évolution ISQ moyen
+                </CardTitle>
+                <CardDescription>Stabilité moyenne des implants par mois</CardDescription>
+              </div>
+              <Select value={isqEvolutionFilter} onValueChange={setIsqEvolutionFilter}>
               <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-evolution-model">
                 <SelectValue placeholder="Tous les implants" />
               </SelectTrigger>
@@ -847,82 +932,11 @@ export default function StatsPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+        </TabsContent>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-500" />
-                Implants sans suivi récent
-              </CardTitle>
-              <CardDescription>Plus de 3 mois sans visite de contrôle</CardDescription>
-            </div>
-            {stats?.implantsWithoutFollowup && stats.implantsWithoutFollowup.length > 0 && (
-              <Badge variant="outline" className="text-amber-600 border-amber-300">
-                {stats.implantsWithoutFollowup.length} implant(s)
-              </Badge>
-            )}
-          </CardHeader>
-          <CardContent>
-            {!stats?.implantsWithoutFollowup || stats.implantsWithoutFollowup.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-green-500" />
-                <p>Tous les implants ont un suivi récent</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {stats.implantsWithoutFollowup.map((item) => (
-                  <div
-                    key={item.implantId}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                    data-testid={`row-followup-${item.implantId}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium text-sm">
-                          {item.patientNom} {item.patientPrenom}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Site {item.siteFdi} - {item.marque}{item.referenceFabricant ? ` (${item.referenceFabricant})` : ''} - Posé le {format(new Date(item.datePose), "dd/MM/yyyy")}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className={
-                          item.daysSinceVisit === null
-                            ? "text-red-600 border-red-300"
-                            : item.daysSinceVisit > 180
-                            ? "text-red-600 border-red-300"
-                            : "text-amber-600 border-amber-300"
-                        }
-                      >
-                        {item.daysSinceVisit === null
-                          ? "Jamais"
-                          : `${item.daysSinceVisit}j`}
-                      </Badge>
-                      <Button variant="ghost" size="icon" asChild data-testid={`button-view-implant-${item.implantId}`}>
-                        <Link href={`/surgery-implants/${item.implantId}`}>
-                          <ExternalLink className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" size="icon" asChild data-testid={`button-view-patient-${item.implantId}`}>
-                        <Link href={`/patients/${item.patientId}`}>
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Flags actifs section */}
+        {/* ========== ONGLET PATIENT ========== */}
+        <TabsContent value="patient" className="space-y-6">
+          {/* Flags actifs section */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
           <div>
@@ -1145,6 +1159,8 @@ export default function StatsPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
