@@ -1825,6 +1825,7 @@ export class DatabaseStorage implements IStorage {
       isqPose: surgeryImplants.isqPose,
       statut: surgeryImplants.statut,
       datePose: surgeryImplants.datePose,
+      boneLossScore: surgeryImplants.boneLossScore,
       marque: implants.marque,
       referenceFabricant: implants.referenceFabricant,
     }).from(surgeryImplants)
@@ -1892,8 +1893,28 @@ export class DatabaseStorage implements IStorage {
       if (si.isqPose) isqValues.push(si.isqPose);
     });
 
+    // Helper: convert bone loss score (0-5) to success rate (100-0%)
+    const boneLossToSuccessRate = (score: number | null): number | null => {
+      if (score === null || score === undefined) return null;
+      const rates = [100, 80, 60, 40, 20, 0];
+      return rates[score] ?? null;
+    };
+
+    // Calculate success rate from boneLossScore (like individual implant stats)
+    const implantsWithBoneLoss = allSurgeryImplants.filter(si => 
+      si.boneLossScore !== null && si.boneLossScore !== undefined
+    );
+    
+    let successRate = 0;
+    if (implantsWithBoneLoss.length > 0) {
+      const totalSuccessRate = implantsWithBoneLoss.reduce((sum, si) => {
+        const rate = boneLossToSuccessRate(si.boneLossScore);
+        return sum + (rate ?? 0);
+      }, 0);
+      successRate = Math.round(totalSuccessRate / implantsWithBoneLoss.length);
+    }
+
     const total = allSurgeryImplants.length;
-    const successRate = total > 0 ? Math.round((statusCounts.SUCCES / total) * 100) : 0;
     const complicationRate = total > 0 ? Math.round((statusCounts.COMPLICATION / total) * 100) : 0;
     const failureRate = total > 0 ? Math.round((statusCounts.ECHEC / total) * 100) : 0;
 

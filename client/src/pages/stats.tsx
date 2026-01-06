@@ -124,38 +124,44 @@ export default function StatsPage() {
 
   const dateRange = getDateRange();
 
-  // Fetch patients for search suggestions
-  const { data: patientsData = [] } = useQuery<Array<{id: string; nom: string; prenom: string}>>({
+  // Fetch patients for search suggestions (endpoint returns object with patients array)
+  const { data: patientsResponse } = useQuery<{ patients: Array<{id: string; nom: string; prenom: string}> }>({
     queryKey: ["/api/patients/summary"],
   });
+  const patientsData = patientsResponse?.patients || [];
 
   // Fetch operations for search suggestions  
-  const { data: operationsData = [] } = useQuery<Array<{id: string; patientNom: string; patientPrenom: string; dateOperation: string; typeIntervention: string}>>({
+  const { data: operationsResponse } = useQuery<Array<{id: string; patientNom: string; patientPrenom: string; dateOperation: string; typeIntervention: string}>>({
     queryKey: ["/api/operations/summary"],
   });
+  const operationsData = operationsResponse || [];
 
   // Build search suggestions from patients and operations
   const searchSuggestions = useMemo(() => {
     const suggestions: SearchSuggestion[] = [];
     
-    patientsData.forEach(p => {
-      suggestions.push({
-        id: p.id,
-        type: "patient",
-        label: `${p.prenom} ${p.nom}`,
-        sublabel: "Patient",
+    if (Array.isArray(patientsData)) {
+      patientsData.forEach(p => {
+        suggestions.push({
+          id: p.id,
+          type: "patient",
+          label: `${p.prenom} ${p.nom}`,
+          sublabel: "Patient",
+        });
       });
-    });
+    }
     
-    operationsData.forEach(op => {
-      const typeLabel = TYPE_LABELS[op.typeIntervention] || op.typeIntervention;
-      suggestions.push({
-        id: op.id,
-        type: "operation",
-        label: `${op.patientPrenom} ${op.patientNom} - ${typeLabel}`,
-        sublabel: op.dateOperation ? format(new Date(op.dateOperation), "dd/MM/yyyy") : undefined,
+    if (Array.isArray(operationsData)) {
+      operationsData.forEach(op => {
+        const typeLabel = TYPE_LABELS[op.typeIntervention] || op.typeIntervention;
+        suggestions.push({
+          id: op.id,
+          type: "operation",
+          label: `${op.patientPrenom} ${op.patientNom} - ${typeLabel}`,
+          sublabel: op.dateOperation ? format(new Date(op.dateOperation), "dd/MM/yyyy") : undefined,
+        });
       });
-    });
+    }
     
     return suggestions.filter(s => 
       searchQuery === "" || 
