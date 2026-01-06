@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, subMonths } from "date-fns";
+import { format, subMonths, differenceInYears } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   BarChart3,
@@ -13,6 +13,9 @@ import {
   Users,
   Clock,
   ChevronRight,
+  ExternalLink,
+  Filter,
+  Search,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +23,9 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   BarChart,
   Bar,
@@ -76,6 +82,10 @@ export default function StatsPage() {
   const [customTo, setCustomTo] = useState<Date>();
   const [fromCalendarOpen, setFromCalendarOpen] = useState(false);
   const [toCalendarOpen, setToCalendarOpen] = useState(false);
+  const [selectedImplantModel, setSelectedImplantModel] = useState<string>("all");
+  const [patientSearch, setPatientSearch] = useState("");
+  const [patientAlertFilter, setPatientAlertFilter] = useState<string>("all");
+  const [patientSuccessFilter, setPatientSuccessFilter] = useState<string>("all");
 
   const getDateRange = () => {
     const now = new Date();
@@ -174,7 +184,22 @@ export default function StatsPage() {
   const typeData = stats?.actsByType.map((d) => ({
     type: TYPE_LABELS[d.type] || d.type,
     count: d.count,
+    implants: d.implants || [],
   })) || [];
+
+  // Filter ISQ data by selected implant model
+  const filteredIsqData = useMemo(() => {
+    if (!stats) return [];
+    return stats.isqDistribution;
+  }, [stats]);
+
+  const filteredIsqEvolutionData = useMemo(() => {
+    if (!stats) return [];
+    return stats.isqEvolution.map((d) => ({
+      ...d,
+      month: format(new Date(d.period + "-01"), "MMM", { locale: fr }),
+    }));
+  }, [stats]);
 
   return (
     <div className="p-6 space-y-6 overflow-auto h-full">
@@ -482,7 +507,40 @@ export default function StatsPage() {
                     />
                     <span className="text-sm">{item.type}</span>
                   </div>
-                  <Badge variant="secondary">{item.count}</Badge>
+                  {item.implants && item.implants.length > 0 ? (
+                    <HoverCard>
+                      <HoverCardTrigger asChild>
+                        <Badge variant="secondary" className="cursor-pointer" data-testid={`badge-type-count-${index}`}>
+                          {item.count}
+                        </Badge>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80" align="end">
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm">Implants posés ({item.implants.length})</h4>
+                          <ScrollArea className="h-48">
+                            <div className="space-y-2">
+                              {item.implants.map((imp) => (
+                                <Link
+                                  key={imp.id}
+                                  href={`/implants/${imp.id}`}
+                                  className="flex items-center justify-between p-2 rounded hover-elevate bg-muted/50 text-sm"
+                                  data-testid={`link-implant-${imp.id}`}
+                                >
+                                  <div>
+                                    <span className="font-medium">{imp.patientPrenom} {imp.patientNom}</span>
+                                    <p className="text-xs text-muted-foreground">Site {imp.siteFdi} - {imp.marque}</p>
+                                  </div>
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                </Link>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                  ) : (
+                    <Badge variant="secondary">{item.count}</Badge>
+                  )}
                 </div>
               ))}
             </div>
@@ -550,11 +608,10 @@ export default function StatsPage() {
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {stats.implantsWithoutFollowup.map((item) => (
-                  <Link
+                  <div
                     key={item.implantId}
-                    href={`/patients/${item.patientId}`}
-                    className="flex items-center justify-between p-3 rounded-lg hover-elevate bg-muted/50 group"
-                    data-testid={`link-followup-${item.implantId}`}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                    data-testid={`row-followup-${item.implantId}`}
                   >
                     <div className="flex items-center gap-3">
                       <Users className="h-4 w-4 text-muted-foreground" />
@@ -563,7 +620,7 @@ export default function StatsPage() {
                           {item.patientNom} {item.patientPrenom}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Site {item.siteFdi} - Posé le {format(new Date(item.datePose), "dd/MM/yyyy")}
+                          Site {item.siteFdi} - {item.marque} - Posé le {format(new Date(item.datePose), "dd/MM/yyyy")}
                         </p>
                       </div>
                     </div>
@@ -582,9 +639,18 @@ export default function StatsPage() {
                           ? "Jamais"
                           : `${item.daysSinceVisit}j`}
                       </Badge>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Button variant="ghost" size="icon" asChild data-testid={`button-view-implant-${item.implantId}`}>
+                        <Link href={`/implants/${item.implantId}`}>
+                          <ExternalLink className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" size="icon" asChild data-testid={`button-view-patient-${item.implantId}`}>
+                        <Link href={`/patients/${item.patientId}`}>
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}

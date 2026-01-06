@@ -1782,18 +1782,38 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(operations.dateOperation);
 
-    const allSurgeryImplants = await db.select().from(surgeryImplants)
+    const allSurgeryImplantsWithDetails = await db.select({
+      id: surgeryImplants.id,
+      surgeryId: surgeryImplants.surgeryId,
+      implantId: surgeryImplants.implantId,
+      siteFdi: surgeryImplants.siteFdi,
+      isqPose: surgeryImplants.isqPose,
+      statut: surgeryImplants.statut,
+      datePose: surgeryImplants.datePose,
+      marque: implants.marque,
+      referenceFabricant: implants.referenceFabricant,
+    }).from(surgeryImplants)
+      .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
       .where(and(
         eq(surgeryImplants.organisationId, organisationId),
         gte(surgeryImplants.datePose, fromDate),
         lte(surgeryImplants.datePose, toDate)
       ));
 
+    const allSurgeryImplants = allSurgeryImplantsWithDetails;
+
     const allCompletedAppointments = await db.select().from(appointments)
       .where(and(
         eq(appointments.organisationId, organisationId),
         eq(appointments.status, 'COMPLETED')
       ));
+
+    // Build patients map early (needed for actsByType)
+    const patientsMap: Record<string, { nom: string; prenom: string }> = {};
+    const patientsList = await db.select({ id: patients.id, nom: patients.nom, prenom: patients.prenom })
+      .from(patients)
+      .where(eq(patients.organisationId, organisationId));
+    patientsList.forEach(p => { patientsMap[p.id] = { nom: p.nom, prenom: p.prenom }; });
 
     const activityByMonth: Record<string, number> = {};
     allOperations.forEach(op => {
@@ -1807,10 +1827,30 @@ export class DatabaseStorage implements IStorage {
       implantsByMonth[month] = (implantsByMonth[month] || 0) + 1;
     });
 
-    const actsByType: Record<string, number> = {};
+    // Build maps for implants per operation type
+    const surgeryImplantsByOp: Record<string, typeof allSurgeryImplants> = {};
+    allSurgeryImplants.forEach(si => {
+      if (!surgeryImplantsByOp[si.surgeryId]) surgeryImplantsByOp[si.surgeryId] = [];
+      surgeryImplantsByOp[si.surgeryId].push(si);
+    });
+
+    const actsByTypeMap: Record<string, { count: number; implants: { id: string; siteFdi: string; patientNom: string; patientPrenom: string; marque: string }[] }> = {};
     allOperations.forEach(op => {
       const type = op.typeIntervention || "AUTRE";
-      actsByType[type] = (actsByType[type] || 0) + 1;
+      if (!actsByTypeMap[type]) actsByTypeMap[type] = { count: 0, implants: [] };
+      actsByTypeMap[type].count++;
+      
+      const opImplants = surgeryImplantsByOp[op.id] || [];
+      const patient = patientsMap[op.patientId];
+      opImplants.forEach(si => {
+        actsByTypeMap[type].implants.push({
+          id: si.id,
+          siteFdi: si.siteFdi,
+          patientNom: patient?.nom || '',
+          patientPrenom: patient?.prenom || '',
+          marque: si.marque || '',
+        });
+      });
     });
 
     const statusCounts = { SUCCES: 0, COMPLICATION: 0, ECHEC: 0, EN_SUIVI: 0 };
@@ -1867,22 +1907,24 @@ export class DatabaseStorage implements IStorage {
 
     const avgDelayToFirstVisit = delayCount > 0 ? Math.round(totalDelayDays / delayCount) : null;
 
-    const patientsMap: Record<string, { nom: string; prenom: string }> = {};
-    const patientsList = await db.select({ id: patients.id, nom: patients.nom, prenom: patients.prenom })
-      .from(patients)
-      .where(eq(patients.organisationId, organisationId));
-    patientsList.forEach(p => { patientsMap[p.id] = { nom: p.nom, prenom: p.prenom }; });
-
     const operationsMap: Record<string, string> = {};
     allOperations.forEach(op => { operationsMap[op.id] = op.patientId; });
 
     const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
     const implantsWithoutFollowup: ClinicalStats["implantsWithoutFollowup"] = [];
     
-    const allOrgSurgeryImplants = await db.select().from(surgeryImplants)
+    const allOrgSurgeryImplantsWithDetails = await db.select({
+      id: surgeryImplants.id,
+      surgeryId: surgeryImplants.surgeryId,
+      siteFdi: surgeryImplants.siteFdi,
+      datePose: surgeryImplants.datePose,
+      marque: implants.marque,
+      referenceFabricant: implants.referenceFabricant,
+    }).from(surgeryImplants)
+      .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
       .where(eq(surgeryImplants.organisationId, organisationId));
 
-    for (const si of allOrgSurgeryImplants) {
+    for (const si of allOrgSurgeryImplantsWithDetails) {
       const siVisites = visitesPerSurgeryImplant[si.id] || [];
       const lastVisit = siVisites.length > 0 
         ? siVisites.sort((a, b) => b.getTime() - a.getTime())[0] 
@@ -1905,10 +1947,21 @@ export class DatabaseStorage implements IStorage {
             datePose: si.datePose,
             lastVisitDate: lastVisit ? lastVisit.toISOString().split('T')[0] : null,
             daysSinceVisit: daysSince,
+            marque: si.marque || '',
+            referenceFabricant: si.referenceFabricant || null,
           });
         }
       }
     }
+
+    // Get available implant models for filter
+    const availableModels = await db.selectDistinct({
+      id: implants.id,
+      marque: implants.marque,
+      referenceFabricant: implants.referenceFabricant,
+    }).from(implants)
+      .where(eq(implants.organisationId, organisationId))
+      .orderBy(implants.marque);
 
     return {
       activityByPeriod: Object.entries(activityByMonth)
@@ -1918,8 +1971,8 @@ export class DatabaseStorage implements IStorage {
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([period, count]) => ({ period, count })),
       totalImplantsInPeriod: allSurgeryImplants.length,
-      actsByType: Object.entries(actsByType)
-        .map(([type, count]) => ({ type, count })),
+      actsByType: Object.entries(actsByTypeMap)
+        .map(([type, data]) => ({ type, count: data.count, implants: data.implants })),
       successRate,
       complicationRate,
       failureRate,
@@ -1929,6 +1982,7 @@ export class DatabaseStorage implements IStorage {
         .map(([period, data]) => ({ period, avgIsq: Math.round(data.sum / data.count) })),
       avgDelayToFirstVisit,
       implantsWithoutFollowup: implantsWithoutFollowup.slice(0, 20),
+      availableImplantModels: availableModels,
     };
   }
 
