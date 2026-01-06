@@ -391,10 +391,15 @@ export default function StatsPage() {
   }, [filteredSurgeryImplants, successRateDimension]);
 
   // Filter patient stats - only show patients with at least one implant
+  // Also filter by selected patient IDs from the search bar
   const filteredPatientStats = useMemo(() => {
     return patientStatsData.filter(p => {
       // Only include patients with at least one implant
       if (p.totalImplants === 0) return false;
+      
+      // Filter by selected patients from search bar
+      const matchesSelectedPatients = selectedPatientIds.length === 0 || 
+        selectedPatientIds.includes(p.patientId);
       
       const matchesSearch = patientSearch === "" || 
         `${p.nom} ${p.prenom}`.toLowerCase().includes(patientSearch.toLowerCase());
@@ -415,9 +420,9 @@ export default function StatsPage() {
         (patientAgeFilter === "61-80" && p.age >= 61 && p.age <= 80) ||
         (patientAgeFilter === "81+" && p.age >= 81);
 
-      return matchesSearch && matchesAlert && matchesSuccess && matchesAge;
+      return matchesSelectedPatients && matchesSearch && matchesAlert && matchesSuccess && matchesAge;
     });
-  }, [patientStatsData, patientSearch, patientAlertFilter, patientSuccessFilter, patientAgeFilter]);
+  }, [patientStatsData, patientSearch, patientAlertFilter, patientSuccessFilter, patientAgeFilter, selectedPatientIds]);
 
   // Count of all patients with implants (before search/filter)
   const totalPatientsWithImplants = useMemo(() => {
@@ -425,10 +430,16 @@ export default function StatsPage() {
   }, [patientStatsData]);
 
   // Sort and group flags by level
-  const sortedFlags = [...flagsData].filter(f => !f.resolvedAt).sort((a, b) => {
-    const levelOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 };
-    return levelOrder[a.level] - levelOrder[b.level];
-  });
+  // Also filter by selected patient IDs from the search bar
+  const sortedFlags = useMemo(() => {
+    return [...flagsData]
+      .filter(f => !f.resolvedAt)
+      .filter(f => selectedPatientIds.length === 0 || (f.patientId && selectedPatientIds.includes(f.patientId)))
+      .sort((a, b) => {
+        const levelOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+        return levelOrder[a.level] - levelOrder[b.level];
+      });
+  }, [flagsData, selectedPatientIds]);
 
   const criticalCount = sortedFlags.filter(f => f.level === "CRITICAL").length;
   const warningCount = sortedFlags.filter(f => f.level === "WARNING").length;

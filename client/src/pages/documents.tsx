@@ -53,6 +53,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -61,7 +67,8 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { DocumentWithDetails } from "@shared/schema";
+import { DocumentUploadForm } from "@/components/document-upload-form";
+import type { DocumentWithDetails, Patient } from "@shared/schema";
 import type { DocumentTree, DocumentTreeNode, DocumentFilters, UnifiedFile, TypeRadio } from "@shared/types";
 
 type FolderPath = {
@@ -451,6 +458,8 @@ export default function DocumentsPage() {
   const [editTitle, setEditTitle] = useState("");
   const [deletingFile, setDeletingFile] = useState<UnifiedFile | null>(null);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
+  const [uploadPatientId, setUploadPatientId] = useState<string>("");
 
   const currentFolder = currentPath[currentPath.length - 1];
 
@@ -483,6 +492,16 @@ export default function DocumentsPage() {
 
   const { data: tree, isLoading: treeLoading } = useQuery<DocumentTree>({
     queryKey: ["/api/documents/tree"],
+  });
+
+  // Fetch patients for upload form
+  const { data: patientsData = [] } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
+    queryFn: async () => {
+      const res = await fetch("/api/patients", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch patients");
+      return res.json();
+    },
   });
 
   const { data: filesData, isLoading: filesLoading } = useQuery<{ files: UnifiedFile[]; totalCount: number }>({
@@ -780,6 +799,15 @@ export default function DocumentsPage() {
           <Breadcrumb path={currentPath} onNavigate={handleNavigate} />
           
           <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setUploadSheetOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="button-upload-document"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Ajouter un document
+            </Button>
+            
             {getSelectedFilesData().length > 0 && (
               <div className="flex items-center gap-2 mr-2 pr-2 border-r">
                 <span className="text-sm text-muted-foreground">
@@ -1078,6 +1106,42 @@ export default function DocumentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Sheet open={uploadSheetOpen} onOpenChange={setUploadSheetOpen}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Ajouter un document</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Patient</Label>
+              <Select value={uploadPatientId} onValueChange={setUploadPatientId}>
+                <SelectTrigger data-testid="select-upload-patient">
+                  <SelectValue placeholder="Sélectionner un patient" />
+                </SelectTrigger>
+                <SelectContent>
+                  {patientsData.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.prenom} {p.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {uploadPatientId && (
+              <DocumentUploadForm
+                patientId={uploadPatientId}
+                onSuccess={() => {
+                  setUploadSheetOpen(false);
+                  setUploadPatientId("");
+                  queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/documents/tree"] });
+                }}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

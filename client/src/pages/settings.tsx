@@ -299,7 +299,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-2 font-light">
+            <CardTitle className="flex items-center gap-2 font-semibold">
               <User className="w-5 h-5" />
               Profil utilisateur
             </CardTitle>
@@ -393,7 +393,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-light">
+          <CardTitle className="flex items-center gap-2 font-semibold">
             <Lock className="w-5 h-5" />
             Sécurité du compte
           </CardTitle>
@@ -470,7 +470,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                             </Button>
                           </div>
                         </FormControl>
-                        <p className="text-sm text-destructive/70 italic font-light mt-1">
+                        <p className="text-sm text-destructive italic font-light mt-1">
                           Le nouveau mot de passe doit contenir au moins 8 caractères
                         </p>
                         <FormMessage />
