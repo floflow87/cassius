@@ -90,7 +90,7 @@ type SearchSuggestion = {
 
 export default function StatsPage() {
   const [activeTab, setActiveTab] = useState("patient");
-  const [period, setPeriod] = useState("1m");
+  const [period, setPeriod] = useState("3m");
   const [customFrom, setCustomFrom] = useState<Date>();
   const [customTo, setCustomTo] = useState<Date>();
   const [fromCalendarOpen, setFromCalendarOpen] = useState(false);
@@ -100,6 +100,7 @@ export default function StatsPage() {
   const [selectedFilters, setSelectedFilters] = useState<SearchSuggestion[]>([]);
   const [isqDistributionFilter, setIsqDistributionFilter] = useState<string>("all");
   const [isqEvolutionFilter, setIsqEvolutionFilter] = useState<string>("all");
+  const [successRateDimension, setSuccessRateDimension] = useState<string>("marque");
   const [patientSearch, setPatientSearch] = useState("");
   const [patientAlertFilter, setPatientAlertFilter] = useState<string>("all");
   const [patientSuccessFilter, setPatientSuccessFilter] = useState<string>("all");
@@ -281,6 +282,114 @@ export default function StatsPage() {
     },
   });
 
+  // Fetch surgery implants for success rate by dimension
+  interface SurgeryImplantForStats {
+    id: string;
+    siteFdi: string;
+    typeOs: string | null;
+    miseEnCharge: string | null;
+    greffeOsseuse: boolean | null;
+    typeChirurgieTemps: string | null;
+    statut: string;
+    isqPose: number | null;
+    datePose: string | null;
+    implant: {
+      marque: string;
+      diametre: number;
+    };
+  }
+  const { data: surgeryImplantsData = [] } = useQuery<SurgeryImplantForStats[]>({
+    queryKey: ["/api/surgery-implants"],
+    queryFn: async () => {
+      const res = await fetch("/api/surgery-implants", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch surgery implants");
+      return res.json();
+    },
+  });
+
+  // Filter surgery implants by selected period
+  const filteredSurgeryImplants = useMemo(() => {
+    if (!surgeryImplantsData) return [];
+    const fromDate = new Date(dateRange.from);
+    // Set toDate to end of day (23:59:59.999) to include all implants on the end date
+    const toDate = new Date(dateRange.to);
+    toDate.setHours(23, 59, 59, 999);
+    return surgeryImplantsData.filter((implant) => {
+      if (!implant.datePose) return true; // Include implants without date
+      const implantDate = new Date(implant.datePose);
+      return implantDate >= fromDate && implantDate <= toDate;
+    });
+  }, [surgeryImplantsData, dateRange.from, dateRange.to]);
+
+  // Calculate success rate by dimension
+  // Success is defined as: SUCCES or EN_SUIVI (healthy implants in follow-up)
+  // Failure is: ECHEC or COMPLICATION
+  const successRateByDimension = useMemo(() => {
+    if (!filteredSurgeryImplants || filteredSurgeryImplants.length === 0) return [];
+
+    const groupBy = (key: string): Map<string, { total: number; success: number; avgIsq: number; isqCount: number }> => {
+      const groups = new Map<string, { total: number; success: number; avgIsq: number; isqCount: number }>();
+      
+      filteredSurgeryImplants.forEach((implant) => {
+        let groupValue: string;
+        switch (key) {
+          case "marque":
+            groupValue = implant.implant?.marque || "Non spécifié";
+            break;
+          case "diametre":
+            groupValue = implant.implant?.diametre ? `${implant.implant.diametre}mm` : "Non spécifié";
+            break;
+          case "localisation":
+            groupValue = implant.siteFdi || "Non spécifié";
+            break;
+          case "greffe":
+            groupValue = implant.greffeOsseuse === true ? "Avec greffe" : implant.greffeOsseuse === false ? "Sans greffe" : "Non spécifié";
+            break;
+          case "miseEnCharge":
+            groupValue = implant.miseEnCharge === "IMMEDIATE" ? "Immédiate" : 
+                        implant.miseEnCharge === "PRECOCE" ? "Précoce" :
+                        implant.miseEnCharge === "DIFFEREE" ? "Différée" : "Non spécifié";
+            break;
+          case "chirurgie":
+            groupValue = implant.typeChirurgieTemps === "UN_TEMPS" ? "Chirurgie simple" :
+                        implant.typeChirurgieTemps === "DEUX_TEMPS" ? "Deux temps" :
+                        implant.typeChirurgieTemps === "STIMULATION_ENDOSTEE" ? "Stimulation endostée" : "Non spécifié";
+            break;
+          case "typeOs":
+            groupValue = implant.typeOs || "Non spécifié";
+            break;
+          default:
+            groupValue = "Non spécifié";
+        }
+        
+        const current = groups.get(groupValue) || { total: 0, success: 0, avgIsq: 0, isqCount: 0 };
+        current.total += 1;
+        // Count SUCCES and EN_SUIVI as successful outcomes
+        if (implant.statut === "SUCCES" || implant.statut === "EN_SUIVI") {
+          current.success += 1;
+        }
+        if (implant.isqPose !== null && implant.isqPose > 0) {
+          current.avgIsq += implant.isqPose;
+          current.isqCount += 1;
+        }
+        groups.set(groupValue, current);
+      });
+      
+      return groups;
+    };
+
+    const groups = groupBy(successRateDimension);
+    return Array.from(groups.entries())
+      .map(([name, data]) => ({
+        name,
+        total: data.total,
+        successRate: data.total > 0 ? Math.round((data.success / data.total) * 100) : 0,
+        avgIsq: data.isqCount > 0 ? Math.round(data.avgIsq / data.isqCount) : 0,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+  }, [filteredSurgeryImplants, successRateDimension]);
+
   // Filter patient stats - only show patients with at least one implant
   const filteredPatientStats = useMemo(() => {
     return patientStatsData.filter(p => {
@@ -300,10 +409,11 @@ export default function StatsPage() {
         (patientSuccessFilter === "low" && p.successRate < 50);
 
       const matchesAge = patientAgeFilter === "all" ||
-        (patientAgeFilter === "0-30" && p.age >= 0 && p.age <= 30) ||
-        (patientAgeFilter === "31-50" && p.age >= 31 && p.age <= 50) ||
-        (patientAgeFilter === "51-70" && p.age >= 51 && p.age <= 70) ||
-        (patientAgeFilter === "70+" && p.age > 70);
+        (patientAgeFilter === "0-20" && p.age >= 0 && p.age <= 20) ||
+        (patientAgeFilter === "21-40" && p.age >= 21 && p.age <= 40) ||
+        (patientAgeFilter === "41-60" && p.age >= 41 && p.age <= 60) ||
+        (patientAgeFilter === "61-80" && p.age >= 61 && p.age <= 80) ||
+        (patientAgeFilter === "81+" && p.age >= 81);
 
       return matchesSearch && matchesAlert && matchesSuccess && matchesAge;
     });
@@ -951,6 +1061,80 @@ export default function StatsPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
+          {/* Taux de réussite par dimension */}
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Taux de réussite et ISQ
+                </CardTitle>
+                <CardDescription>Analyse des implants par critère</CardDescription>
+              </div>
+              <Select value={successRateDimension} onValueChange={setSuccessRateDimension}>
+                <SelectTrigger className="w-56 bg-white dark:bg-zinc-900" data-testid="select-success-dimension">
+                  <SelectValue placeholder="Afficher par" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="marque">Marque d'implant</SelectItem>
+                  <SelectItem value="diametre">Diamètre</SelectItem>
+                  <SelectItem value="localisation">Localisation (site FDI)</SelectItem>
+                  <SelectItem value="greffe">Greffe ou non</SelectItem>
+                  <SelectItem value="miseEnCharge">Mise en charge</SelectItem>
+                  <SelectItem value="chirurgie">Type de chirurgie</SelectItem>
+                  <SelectItem value="typeOs">Type d'os (D1-D4)</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent>
+              {successRateByDimension.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-2" />
+                  <p>Aucune donnée disponible</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={successRateByDimension} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis type="number" domain={[0, 100]} className="text-xs" tickFormatter={(v) => `${v}%`} />
+                    <YAxis type="category" dataKey="name" className="text-xs" width={120} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "6px",
+                      }}
+                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload || payload.length === 0) return null;
+                        const data = payload[0]?.payload;
+                        return (
+                          <div className="p-2 bg-card border rounded-md shadow-lg">
+                            <p className="font-medium text-sm">{label}</p>
+                            <p className="text-sm text-muted-foreground">{data.total} implants</p>
+                            <p className="text-sm text-green-600">Taux de réussite: {data.successRate}%</p>
+                            {data.avgIsq > 0 && (
+                              <p className="text-sm text-primary">ISQ moyen: {data.avgIsq}</p>
+                            )}
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar dataKey="successRate" name="Taux de réussite" fill="hsl(142, 76%, 36%)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {successRateByDimension.map((item) => (
+                  <div key={item.name} className="p-2 rounded-lg bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground truncate" title={item.name}>{item.name}</p>
+                    <p className="text-sm font-semibold">{item.total} implants</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ========== ONGLET PATIENTS ========== */}
@@ -978,18 +1162,6 @@ export default function StatsPage() {
                     data-testid="input-patient-search"
                   />
                 </div>
-                <Select value={patientAgeFilter} onValueChange={setPatientAgeFilter}>
-                  <SelectTrigger className="w-32 bg-white dark:bg-zinc-900" data-testid="select-age-filter">
-                    <SelectValue placeholder="Âge" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous âges</SelectItem>
-                    <SelectItem value="0-30">0-30 ans</SelectItem>
-                    <SelectItem value="31-50">31-50 ans</SelectItem>
-                    <SelectItem value="51-70">51-70 ans</SelectItem>
-                    <SelectItem value="70+">70+ ans</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Select value={patientAlertFilter} onValueChange={setPatientAlertFilter}>
                   <SelectTrigger className="w-40 bg-white dark:bg-zinc-900" data-testid="select-alert-filter">
                     <SelectValue placeholder="Alertes" />
@@ -998,6 +1170,19 @@ export default function StatsPage() {
                     <SelectItem value="all">Toutes alertes</SelectItem>
                     <SelectItem value="with-alerts">Avec alertes</SelectItem>
                     <SelectItem value="no-alerts">Sans alerte</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={patientAgeFilter} onValueChange={setPatientAgeFilter}>
+                  <SelectTrigger className="w-32 bg-white dark:bg-zinc-900" data-testid="select-age-filter">
+                    <SelectValue placeholder="Âge" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous âges</SelectItem>
+                    <SelectItem value="0-20">0-20 ans</SelectItem>
+                    <SelectItem value="21-40">21-40 ans</SelectItem>
+                    <SelectItem value="41-60">41-60 ans</SelectItem>
+                    <SelectItem value="61-80">61-80 ans</SelectItem>
+                    <SelectItem value="81+">81+ ans</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={patientSuccessFilter} onValueChange={setPatientSuccessFilter}>

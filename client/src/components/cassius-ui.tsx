@@ -140,7 +140,7 @@ interface CassiusSearchInputProps extends React.InputHTMLAttributes<HTMLInputEle
 export const CassiusSearchInput = forwardRef<HTMLInputElement, CassiusSearchInputProps>(
   ({ className, icon, ...props }, ref) => {
     return (
-      <div className="relative flex-1">
+      <div className="relative flex-1 min-w-[280px]">
         {icon && (
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
             {icon}
