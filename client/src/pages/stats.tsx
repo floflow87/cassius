@@ -89,7 +89,7 @@ type SearchSuggestion = {
 };
 
 export default function StatsPage() {
-  const [activeTab, setActiveTab] = useState("activite");
+  const [activeTab, setActiveTab] = useState("patient");
   const [period, setPeriod] = useState("1m");
   const [customFrom, setCustomFrom] = useState<Date>();
   const [customTo, setCustomTo] = useState<Date>();
@@ -103,6 +103,7 @@ export default function StatsPage() {
   const [patientSearch, setPatientSearch] = useState("");
   const [patientAlertFilter, setPatientAlertFilter] = useState<string>("all");
   const [patientSuccessFilter, setPatientSuccessFilter] = useState<string>("all");
+  const [patientAgeFilter, setPatientAgeFilter] = useState<string>("all");
 
   const getDateRange = () => {
     const now = new Date();
@@ -298,9 +299,15 @@ export default function StatsPage() {
         (patientSuccessFilter === "medium" && p.successRate >= 50 && p.successRate < 80) ||
         (patientSuccessFilter === "low" && p.successRate < 50);
 
-      return matchesSearch && matchesAlert && matchesSuccess;
+      const matchesAge = patientAgeFilter === "all" ||
+        (patientAgeFilter === "0-30" && p.age >= 0 && p.age <= 30) ||
+        (patientAgeFilter === "31-50" && p.age >= 31 && p.age <= 50) ||
+        (patientAgeFilter === "51-70" && p.age >= 51 && p.age <= 70) ||
+        (patientAgeFilter === "70+" && p.age > 70);
+
+      return matchesSearch && matchesAlert && matchesSuccess && matchesAge;
     });
-  }, [patientStatsData, patientSearch, patientAlertFilter, patientSuccessFilter]);
+  }, [patientStatsData, patientSearch, patientAlertFilter, patientSuccessFilter, patientAgeFilter]);
 
   // Count of all patients with implants (before search/filter)
   const totalPatientsWithImplants = useMemo(() => {
@@ -428,301 +435,313 @@ export default function StatsPage() {
         </Card>
       </div>
 
-      {/* Search and Period selector - always visible */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Multi-select search for patients and operations */}
-        <div className="flex-1 min-w-[200px] max-w-md">
-          <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-            <PopoverTrigger asChild>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Filtrer par patient ou acte..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    if (!searchOpen) setSearchOpen(true);
-                  }}
-                  onFocus={() => setSearchOpen(true)}
-                  className="pl-9 bg-white dark:bg-zinc-900"
-                  data-testid="input-stats-search"
-                />
-              </div>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="start">
-              <div className="p-2">
-                {searchSuggestions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground p-2">Aucun résultat</p>
-                ) : (
-                  <div className="space-y-1">
-                    {searchSuggestions.map((suggestion) => (
-                      <div
-                        key={`${suggestion.type}-${suggestion.id}`}
-                        className="flex items-center justify-between p-2 rounded hover-elevate cursor-pointer"
-                        onClick={() => {
-                          if (!selectedFilters.find(f => f.id === suggestion.id && f.type === suggestion.type)) {
-                            setSelectedFilters([...selectedFilters, suggestion]);
-                          }
-                          setSearchQuery("");
-                          setSearchOpen(false);
-                        }}
-                        data-testid={`suggestion-${suggestion.type}-${suggestion.id}`}
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{suggestion.label}</p>
-                          {suggestion.sublabel && (
-                            <p className="text-xs text-muted-foreground">{suggestion.sublabel}</p>
-                          )}
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {suggestion.type === "patient" ? "Patient" : "Acte"}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Selected filter badges */}
-        {selectedFilters.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1">
-            {selectedFilters.map((filter) => (
-              <Badge
-                key={`${filter.type}-${filter.id}`}
-                variant="secondary"
-                className="cursor-pointer gap-1"
-                onClick={() => setSelectedFilters(selectedFilters.filter(f => !(f.id === filter.id && f.type === filter.type)))}
-                data-testid={`filter-badge-${filter.type}-${filter.id}`}
-              >
-                {filter.label}
-                <span className="text-muted-foreground hover:text-foreground ml-1">x</span>
-              </Badge>
-            ))}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedFilters([])}
-              className="text-muted-foreground h-6 px-2"
-              data-testid="button-clear-filters"
-            >
-              Effacer tout
-            </Button>
-          </div>
-        )}
-
-        {/* Spacer to push period selector to the right */}
-        <div className="flex-1" />
-
-        {/* Period selector */}
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-period">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PERIOD_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {period === "custom" && (
-          <div className="flex items-center gap-2">
-            <Popover open={fromCalendarOpen} onOpenChange={setFromCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="default" data-testid="button-date-from">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  {customFrom ? format(customFrom, "dd/MM/yyyy") : "Du"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent
-                  mode="single"
-                  selected={customFrom}
-                  onSelect={(date) => {
-                    setCustomFrom(date);
-                    setFromCalendarOpen(false);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-
-            <Popover open={toCalendarOpen} onOpenChange={setToCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="default" data-testid="button-date-to">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  {customTo ? format(customTo, "dd/MM/yyyy") : "Au"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent
-                  mode="single"
-                  selected={customTo}
-                  onSelect={(date) => {
-                    setCustomTo(date);
-                    setToCalendarOpen(false);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
-      </div>
-
       {/* Tabs for different stat views */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="activite" className="flex items-center gap-2" data-testid="tab-activite">
-            <Activity className="h-4 w-4" />
-            Activité
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="bg-transparent p-0 h-auto gap-6 border-b-0">
+          <TabsTrigger 
+            value="patient" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-patient"
+          >
+            Patients
           </TabsTrigger>
-          <TabsTrigger value="patient" className="flex items-center gap-2" data-testid="tab-patient">
-            <Users className="h-4 w-4" />
-            Patient
+          <TabsTrigger 
+            value="implant" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-implant"
+          >
+            Implants
           </TabsTrigger>
-          <TabsTrigger value="implant" className="flex items-center gap-2" data-testid="tab-implant">
-            <Package className="h-4 w-4" />
-            Implant
+          <TabsTrigger 
+            value="activite" 
+            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            data-testid="tab-activite"
+          >
+            Activités
           </TabsTrigger>
         </TabsList>
 
-        {/* ========== ONGLET ACTIVITÉ ========== */}
-        <TabsContent value="activite" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    Activité par mois
-                  </CardTitle>
-                  <CardDescription>Nombre d'actes chirurgicaux réalisés</CardDescription>
+        {/* Search and Period selector - below tabs */}
+        <div className="flex flex-wrap items-center gap-2 mt-4">
+          {/* Multi-select search for patients and operations */}
+          <div className="flex-1 min-w-[200px] max-w-md">
+            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+              <PopoverTrigger asChild>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Filtrer par patient ou acte..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      if (!searchOpen) setSearchOpen(true);
+                    }}
+                    onFocus={() => setSearchOpen(true)}
+                    className="pl-9 bg-white dark:bg-zinc-900"
+                    data-testid="input-stats-search"
+                  />
                 </div>
-                <Link href={`/actes?from=${dateRange.from}&to=${dateRange.to}`}>
-                  <Button variant="outline" size="sm" data-testid="button-view-operations">
-                    Voir les actes
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </Link>
-              </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={activityData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" className="text-xs" />
-                <YAxis className="text-xs" allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "6px",
-                  }}
-                  labelStyle={{ color: "hsl(var(--foreground))" }}
-                />
-                <Bar dataKey="count" name="Actes" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Implants posés par mois
-            </CardTitle>
-            <CardDescription>Évolution du nombre d'implants</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={implantData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" className="text-xs" />
-                <YAxis className="text-xs" allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "6px",
-                  }}
-                  labelStyle={{ color: "hsl(var(--foreground))" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="count"
-                  name="Implants"
-                  stroke="hsl(142, 76%, 36%)"
-                  strokeWidth={2}
-                  dot={{ fill: "hsl(142, 76%, 36%)", strokeWidth: 0, r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Types d'interventions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Types d'interventions</CardTitle>
-            <CardDescription>Répartition par type</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {typeData.map((item, index) => (
-                <div key={item.type} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: `hsl(${(index * 60) % 360}, 70%, 50%)` }}
-                    />
-                    <span className="text-sm">{item.type}</span>
-                  </div>
-                  {item.implants && item.implants.length > 0 ? (
-                    <HoverCard>
-                      <HoverCardTrigger asChild>
-                        <Badge variant="secondary" className="cursor-pointer" data-testid={`badge-type-count-${index}`}>
-                          {item.count}
-                        </Badge>
-                      </HoverCardTrigger>
-                      <HoverCardContent className="w-80" align="end">
-                        <div className="space-y-2">
-                          <h4 className="font-semibold text-sm">Implants posés ({item.implants.length})</h4>
-                          <ScrollArea className="h-48">
-                            <div className="space-y-2">
-                              {item.implants.map((imp) => (
-                                <Link
-                                  key={imp.id}
-                                  href={`/implants/${imp.id}`}
-                                  className="flex items-center justify-between p-2 rounded hover-elevate bg-muted/50 text-sm"
-                                  data-testid={`link-implant-${imp.id}`}
-                                >
-                                  <div>
-                                    <span className="font-medium">{imp.patientPrenom} {imp.patientNom}</span>
-                                    <p className="text-xs text-muted-foreground">Site {imp.siteFdi} - {imp.marque}</p>
-                                  </div>
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                </Link>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        </div>
-                      </HoverCardContent>
-                    </HoverCard>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="start">
+                <div className="p-2">
+                  {searchSuggestions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground p-2">Aucun résultat</p>
                   ) : (
-                    <Badge variant="secondary">{item.count}</Badge>
+                    <div className="space-y-1">
+                      {searchSuggestions.map((suggestion) => (
+                        <div
+                          key={`${suggestion.type}-${suggestion.id}`}
+                          className="flex items-center justify-between p-2 rounded hover-elevate cursor-pointer"
+                          onClick={() => {
+                            if (!selectedFilters.find(f => f.id === suggestion.id && f.type === suggestion.type)) {
+                              setSelectedFilters([...selectedFilters, suggestion]);
+                            }
+                            setSearchQuery("");
+                            setSearchOpen(false);
+                          }}
+                          data-testid={`suggestion-${suggestion.type}-${suggestion.id}`}
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{suggestion.label}</p>
+                            {suggestion.sublabel && (
+                              <p className="text-xs text-muted-foreground">{suggestion.sublabel}</p>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {suggestion.type === "patient" ? "Patient" : "Acte"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Selected filter badges */}
+          {selectedFilters.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1">
+              {selectedFilters.map((filter) => (
+                <Badge
+                  key={`${filter.type}-${filter.id}`}
+                  variant="secondary"
+                  className="cursor-pointer gap-1"
+                  onClick={() => setSelectedFilters(selectedFilters.filter(f => !(f.id === filter.id && f.type === filter.type)))}
+                  data-testid={`filter-badge-${filter.type}-${filter.id}`}
+                >
+                  {filter.label}
+                  <span className="text-muted-foreground hover:text-foreground ml-1">x</span>
+                </Badge>
               ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedFilters([])}
+                className="text-muted-foreground h-6 px-2"
+                data-testid="button-clear-filters"
+              >
+                Effacer tout
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          )}
+
+          {/* Spacer to push period selector to the right */}
+          <div className="flex-1" />
+
+          {/* Period selector */}
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-period">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIOD_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {period === "custom" && (
+            <div className="flex items-center gap-2">
+              <Popover open={fromCalendarOpen} onOpenChange={setFromCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="default" data-testid="button-date-from">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    {customFrom ? format(customFrom, "dd/MM/yyyy") : "Du"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={customFrom}
+                    onSelect={(date) => {
+                      setCustomFrom(date);
+                      setFromCalendarOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Popover open={toCalendarOpen} onOpenChange={setToCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="default" data-testid="button-date-to">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    {customTo ? format(customTo, "dd/MM/yyyy") : "Au"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={customTo}
+                    onSelect={(date) => {
+                      setCustomTo(date);
+                      setToCalendarOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+        </div>
+
+        {/* ========== ONGLET ACTIVITÉS ========== */}
+        <TabsContent value="activite" className="space-y-6">
+          {/* Full width activity chart */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Activité par mois
+                </CardTitle>
+                <CardDescription>Nombre d'actes chirurgicaux réalisés</CardDescription>
+              </div>
+              <Link href={`/actes?from=${dateRange.from}&to=${dateRange.to}`}>
+                <Button variant="outline" size="sm" data-testid="button-view-operations">
+                  Voir les actes
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={activityData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="month" className="text-xs" />
+                  <YAxis className="text-xs" allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "6px",
+                    }}
+                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                  />
+                  <Bar dataKey="count" name="Actes" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Half-width row: Types d'interventions + Implants par mois */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Types d'interventions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Types d'interventions</CardTitle>
+                <CardDescription>Répartition par type</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {typeData.map((item, index) => (
+                    <div key={item.type} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: `hsl(${(index * 60) % 360}, 70%, 50%)` }}
+                        />
+                        <span className="text-sm">{item.type}</span>
+                      </div>
+                      {item.implants && item.implants.length > 0 ? (
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <Badge variant="secondary" className="cursor-pointer" data-testid={`badge-type-count-${index}`}>
+                              {item.count}
+                            </Badge>
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-80" align="end">
+                            <div className="space-y-2">
+                              <h4 className="font-semibold text-sm">Implants posés ({item.implants.length})</h4>
+                              <ScrollArea className="h-48">
+                                <div className="space-y-2">
+                                  {item.implants.map((imp) => (
+                                    <Link
+                                      key={imp.id}
+                                      href={`/implants/${imp.id}`}
+                                      className="flex items-center justify-between p-2 rounded hover-elevate bg-muted/50 text-sm"
+                                      data-testid={`link-implant-${imp.id}`}
+                                    >
+                                      <div>
+                                        <span className="font-medium">{imp.patientPrenom} {imp.patientNom}</span>
+                                        <p className="text-xs text-muted-foreground">Site {imp.siteFdi} - {imp.marque}</p>
+                                      </div>
+                                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                    </Link>
+                                  ))}
+                                </div>
+                              </ScrollArea>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      ) : (
+                        <Badge variant="secondary">{item.count}</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Implants posés par mois */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Implants posés par mois
+                </CardTitle>
+                <CardDescription>Évolution du nombre d'implants</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={implantData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-xs" />
+                    <YAxis className="text-xs" allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "6px",
+                      }}
+                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      name="Implants"
+                      stroke="hsl(142, 76%, 36%)"
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(142, 76%, 36%)", strokeWidth: 0, r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* ========== ONGLET IMPLANT ========== */}
@@ -934,231 +953,227 @@ export default function StatsPage() {
         </Card>
         </TabsContent>
 
-        {/* ========== ONGLET PATIENT ========== */}
+        {/* ========== ONGLET PATIENTS ========== */}
         <TabsContent value="patient" className="space-y-6">
-          {/* Flags actifs section */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Flags actifs
-            </CardTitle>
-            <CardDescription>Alertes cliniques et points d'attention</CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            {criticalCount > 0 && (
-              <Badge variant="destructive">{criticalCount} critique{criticalCount > 1 ? "s" : ""}</Badge>
-            )}
-            {warningCount > 0 && (
-              <Badge className="bg-orange-500 text-white">{warningCount} warning{warningCount > 1 ? "s" : ""}</Badge>
-            )}
-            {infoCount > 0 && (
-              <Badge variant="secondary">{infoCount} info{infoCount > 1 ? "s" : ""}</Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {sortedFlags.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-green-500" />
-              <p>Aucun flag actif</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-3 font-medium">Niveau</th>
-                    <th className="text-left py-2 px-3 font-medium">Type</th>
-                    <th className="text-left py-2 px-3 font-medium">Entité</th>
-                    <th className="text-left py-2 px-3 font-medium">Description</th>
-                    <th className="text-left py-2 px-3 font-medium">Créé</th>
-                    <th className="text-left py-2 px-3 font-medium">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedFlags.slice(0, 20).map((flag) => (
-                    <tr key={flag.id} className="border-b hover:bg-muted/30" data-testid={`row-flag-${flag.id}`}>
-                      <td className="py-2 px-3">
-                        <FlagBadge flag={flag} compact />
-                      </td>
-                      <td className="py-2 px-3 text-muted-foreground">{flag.label}</td>
-                      <td className="py-2 px-3">
-                        {flag.patientNom ? (
-                          <span className="font-medium">{flag.patientPrenom} {flag.patientNom}</span>
-                        ) : (
-                          <span className="text-muted-foreground">{flag.entityName || flag.entityType}</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-3 text-muted-foreground max-w-xs truncate">{flag.description}</td>
-                      <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
-                        {flag.createdAt ? formatDistanceToNow(new Date(flag.createdAt), { addSuffix: true, locale: fr }) : "-"}
-                      </td>
-                      <td className="py-2 px-3">
-                        {flag.patientId ? (
-                          <Link href={`/patients/${flag.patientId}`}>
-                            <Button variant="ghost" size="sm" data-testid={`button-view-flag-${flag.id}`}>
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                        ) : null}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {sortedFlags.length > 20 && (
-                <p className="text-center text-sm text-muted-foreground mt-4">
-                  Affichage des 20 premiers flags sur {sortedFlags.length} au total
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Patient stats table */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Patients avec implants
-            </CardTitle>
-            <CardDescription>
-              {filteredPatientStats.length} patient{filteredPatientStats.length > 1 ? "s" : ""} sur {totalPatientsWithImplants} au total
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher..."
-                value={patientSearch}
-                onChange={(e) => setPatientSearch(e.target.value)}
-                className="pl-9 w-48 bg-white dark:bg-zinc-900"
-                data-testid="input-patient-search"
-              />
-            </div>
-            <Select value={patientAlertFilter} onValueChange={setPatientAlertFilter}>
-              <SelectTrigger className="w-40 bg-white dark:bg-zinc-900" data-testid="select-alert-filter">
-                <SelectValue placeholder="Alertes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes alertes</SelectItem>
-                <SelectItem value="with-alerts">Avec alertes</SelectItem>
-                <SelectItem value="no-alerts">Sans alerte</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={patientSuccessFilter} onValueChange={setPatientSuccessFilter}>
-              <SelectTrigger className="w-40 bg-white dark:bg-zinc-900" data-testid="select-success-filter">
-                <SelectValue placeholder="Taux succès" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous taux</SelectItem>
-                <SelectItem value="high">80%+</SelectItem>
-                <SelectItem value="medium">50-79%</SelectItem>
-                <SelectItem value="low">0-49%</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredPatientStats.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Users className="h-12 w-12 mx-auto mb-2" />
-              <p>Aucun patient avec implants</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Patient</TableHead>
-                    <TableHead className="text-center">Âge</TableHead>
-                    <TableHead className="text-center">Implants</TableHead>
-                    <TableHead className="text-center">Taux succès</TableHead>
-                    <TableHead className="text-center">Alertes</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPatientStats.slice(0, 50).map((p) => (
-                    <TableRow key={p.patientId} data-testid={`row-patient-${p.patientId}`}>
-                      <TableCell>
-                        <Link href={`/patients/${p.patientId}`} className="hover:underline">
-                          <span className="font-medium">{p.prenom} {p.nom}</span>
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-center text-muted-foreground">
-                        {p.age > 0 ? `${p.age} ans` : "-"}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <HoverCard>
-                          <HoverCardTrigger asChild>
-                            <Badge variant="secondary" className="cursor-pointer">
-                              {p.totalImplants}
-                            </Badge>
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-72" align="center">
-                            <div className="space-y-2">
-                              <h4 className="font-semibold text-sm">Implants ({p.totalImplants})</h4>
-                              <ScrollArea className="h-32">
-                                <div className="space-y-1">
-                                  {p.implants.map((imp) => (
-                                    <div key={imp.id} className="flex items-center justify-between text-sm p-1 rounded bg-muted/50">
-                                      <span>Site {imp.siteFdi} - {imp.marque}</span>
-                                      <Badge variant={
-                                        imp.statut === "SUCCES" ? "default" :
-                                        imp.statut === "COMPLICATION" ? "outline" :
-                                        imp.statut === "ECHEC" ? "destructive" : "secondary"
-                                      } className="text-xs">
-                                        {imp.statut}
-                                      </Badge>
+          {/* Patient stats table - FIRST */}
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Patients avec implants
+                </CardTitle>
+                <CardDescription>
+                  {filteredPatientStats.length} patient{filteredPatientStats.length > 1 ? "s" : ""} sur {totalPatientsWithImplants} au total
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher..."
+                    value={patientSearch}
+                    onChange={(e) => setPatientSearch(e.target.value)}
+                    className="pl-9 w-48 bg-white dark:bg-zinc-900"
+                    data-testid="input-patient-search"
+                  />
+                </div>
+                <Select value={patientAgeFilter} onValueChange={setPatientAgeFilter}>
+                  <SelectTrigger className="w-32 bg-white dark:bg-zinc-900" data-testid="select-age-filter">
+                    <SelectValue placeholder="Âge" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous âges</SelectItem>
+                    <SelectItem value="0-30">0-30 ans</SelectItem>
+                    <SelectItem value="31-50">31-50 ans</SelectItem>
+                    <SelectItem value="51-70">51-70 ans</SelectItem>
+                    <SelectItem value="70+">70+ ans</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={patientAlertFilter} onValueChange={setPatientAlertFilter}>
+                  <SelectTrigger className="w-40 bg-white dark:bg-zinc-900" data-testid="select-alert-filter">
+                    <SelectValue placeholder="Alertes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes alertes</SelectItem>
+                    <SelectItem value="with-alerts">Avec alertes</SelectItem>
+                    <SelectItem value="no-alerts">Sans alerte</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={patientSuccessFilter} onValueChange={setPatientSuccessFilter}>
+                  <SelectTrigger className="w-40 bg-white dark:bg-zinc-900" data-testid="select-success-filter">
+                    <SelectValue placeholder="Taux succès" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous taux</SelectItem>
+                    <SelectItem value="high">80%+</SelectItem>
+                    <SelectItem value="medium">50-79%</SelectItem>
+                    <SelectItem value="low">0-49%</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {filteredPatientStats.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-2" />
+                  <p>Aucun patient avec implants</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Patient</TableHead>
+                        <TableHead className="text-center">Âge</TableHead>
+                        <TableHead className="text-center">Implants</TableHead>
+                        <TableHead className="text-center">Taux succès</TableHead>
+                        <TableHead className="text-center">Alertes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPatientStats.slice(0, 50).map((p) => (
+                        <TableRow key={p.patientId} className="cursor-pointer hover-elevate" data-testid={`row-patient-${p.patientId}`}>
+                          <TableCell>
+                            <Link href={`/patients/${p.patientId}`} className="hover:underline">
+                              <span className="font-medium">{p.prenom} {p.nom}</span>
+                            </Link>
+                          </TableCell>
+                          <TableCell className="text-center text-muted-foreground">
+                            {p.age > 0 ? `${p.age} ans` : "-"}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <HoverCard>
+                              <HoverCardTrigger asChild>
+                                <Badge variant="secondary" className="cursor-pointer">
+                                  {p.totalImplants}
+                                </Badge>
+                              </HoverCardTrigger>
+                              <HoverCardContent className="w-72" align="center">
+                                <div className="space-y-2">
+                                  <h4 className="font-semibold text-sm">Implants ({p.totalImplants})</h4>
+                                  <ScrollArea className="h-32">
+                                    <div className="space-y-1">
+                                      {p.implants.map((imp) => (
+                                        <div key={imp.id} className="flex items-center justify-between text-sm p-1 rounded bg-muted/50">
+                                          <span>Site {imp.siteFdi} - {imp.marque}</span>
+                                          <Badge variant={
+                                            imp.statut === "SUCCES" ? "default" :
+                                            imp.statut === "COMPLICATION" ? "outline" :
+                                            imp.statut === "ECHEC" ? "destructive" : "secondary"
+                                          } className="text-xs">
+                                            {imp.statut}
+                                          </Badge>
+                                        </div>
+                                      ))}
                                     </div>
-                                  ))}
+                                  </ScrollArea>
                                 </div>
-                              </ScrollArea>
-                            </div>
-                          </HoverCardContent>
-                        </HoverCard>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          variant={p.successRate >= 80 ? "default" : p.successRate >= 50 ? "outline" : "destructive"}
-                          className={p.successRate >= 80 ? "bg-green-600" : ""}
-                        >
-                          {p.successRate}%
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {p.activeAlerts > 0 ? (
-                          <Badge variant="destructive">{p.activeAlerts}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" asChild>
-                          <Link href={`/patients/${p.patientId}`}>
-                            <ChevronRight className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {filteredPatientStats.length > 50 && (
-                <p className="text-center text-sm text-muted-foreground mt-4">
-                  Affichage des 50 premiers patients sur {filteredPatientStats.length}
-                </p>
+                              </HoverCardContent>
+                            </HoverCard>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant={p.successRate >= 80 ? "default" : p.successRate >= 50 ? "outline" : "destructive"}
+                              className={p.successRate >= 80 ? "bg-green-600" : ""}
+                            >
+                              {p.successRate}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {p.activeAlerts > 0 ? (
+                              <Badge variant="destructive">{p.activeAlerts}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {filteredPatientStats.length > 50 && (
+                    <p className="text-center text-sm text-muted-foreground mt-4">
+                      Affichage des 50 premiers patients sur {filteredPatientStats.length}
+                    </p>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          {/* Flags actifs section - SECOND */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Flags actifs
+                </CardTitle>
+                <CardDescription>Alertes cliniques et points d'attention</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {criticalCount > 0 && (
+                  <Badge variant="destructive">{criticalCount} critique{criticalCount > 1 ? "s" : ""}</Badge>
+                )}
+                {warningCount > 0 && (
+                  <Badge className="bg-orange-500 text-white">{warningCount} warning{warningCount > 1 ? "s" : ""}</Badge>
+                )}
+                {infoCount > 0 && (
+                  <Badge variant="secondary">{infoCount} info{infoCount > 1 ? "s" : ""}</Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {sortedFlags.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-green-500" />
+                  <p>Aucun flag actif</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-3 font-medium">Niveau</th>
+                        <th className="text-left py-2 px-3 font-medium">Type</th>
+                        <th className="text-left py-2 px-3 font-medium">Entité</th>
+                        <th className="text-left py-2 px-3 font-medium">Description</th>
+                        <th className="text-left py-2 px-3 font-medium">Créé</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedFlags.slice(0, 20).map((flag) => (
+                        <tr key={flag.id} className="border-b hover:bg-muted/30" data-testid={`row-flag-${flag.id}`}>
+                          <td className="py-2 px-3">
+                            <FlagBadge flag={flag} compact />
+                          </td>
+                          <td className="py-2 px-3 text-muted-foreground">{flag.label}</td>
+                          <td className="py-2 px-3">
+                            {flag.patientId ? (
+                              <Link href={`/patients/${flag.patientId}`} className="hover:underline">
+                                <span className="font-medium">{flag.patientPrenom} {flag.patientNom}</span>
+                              </Link>
+                            ) : (
+                              <span className="text-muted-foreground">{flag.entityName || flag.entityType}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-muted-foreground max-w-xs truncate">{flag.description}</td>
+                          <td className="py-2 px-3 text-muted-foreground whitespace-nowrap">
+                            {flag.createdAt ? formatDistanceToNow(new Date(flag.createdAt), { addSuffix: true, locale: fr }) : "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {sortedFlags.length > 20 && (
+                    <p className="text-center text-sm text-muted-foreground mt-4">
+                      Affichage des 20 premiers flags sur {sortedFlags.length} au total
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
