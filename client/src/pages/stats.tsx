@@ -83,7 +83,8 @@ export default function StatsPage() {
   const [customTo, setCustomTo] = useState<Date>();
   const [fromCalendarOpen, setFromCalendarOpen] = useState(false);
   const [toCalendarOpen, setToCalendarOpen] = useState(false);
-  const [selectedImplantModel, setSelectedImplantModel] = useState<string>("all");
+  const [isqDistributionFilter, setIsqDistributionFilter] = useState<string>("all");
+  const [isqEvolutionFilter, setIsqEvolutionFilter] = useState<string>("all");
   const [patientSearch, setPatientSearch] = useState("");
   const [patientAlertFilter, setPatientAlertFilter] = useState<string>("all");
   const [patientSuccessFilter, setPatientSuccessFilter] = useState<string>("all");
@@ -111,16 +112,14 @@ export default function StatsPage() {
 
   const dateRange = getDateRange();
 
+  // Main stats query (no implant filter - used for KPIs, activity charts, etc.)
   const { data: stats, isLoading } = useQuery<ClinicalStats>({
-    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, selectedImplantModel],
+    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to],
     queryFn: async () => {
       const params = new URLSearchParams({
         from: dateRange.from,
         to: dateRange.to,
       });
-      if (selectedImplantModel && selectedImplantModel !== "all") {
-        params.append("implantModelId", selectedImplantModel);
-      }
       const res = await fetch(`/api/stats/clinical?${params.toString()}`, {
         credentials: "include",
       });
@@ -129,6 +128,55 @@ export default function StatsPage() {
     },
     enabled: period !== "custom" || (!!customFrom && !!customTo),
   });
+
+  // Separate query for ISQ Distribution (filtered by model)
+  const { data: isqDistributionStats } = useQuery<ClinicalStats>({
+    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-distribution", isqDistributionFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        from: dateRange.from,
+        to: dateRange.to,
+      });
+      if (isqDistributionFilter && isqDistributionFilter !== "all") {
+        params.append("implantModelId", isqDistributionFilter);
+      }
+      const res = await fetch(`/api/stats/clinical?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch ISQ distribution stats");
+      return res.json();
+    },
+    enabled: (period !== "custom" || (!!customFrom && !!customTo)) && isqDistributionFilter !== "all",
+  });
+
+  // Separate query for ISQ Evolution (filtered by model)
+  const { data: isqEvolutionStats } = useQuery<ClinicalStats>({
+    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-evolution", isqEvolutionFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        from: dateRange.from,
+        to: dateRange.to,
+      });
+      if (isqEvolutionFilter && isqEvolutionFilter !== "all") {
+        params.append("implantModelId", isqEvolutionFilter);
+      }
+      const res = await fetch(`/api/stats/clinical?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch ISQ evolution stats");
+      return res.json();
+    },
+    enabled: (period !== "custom" || (!!customFrom && !!customTo)) && isqEvolutionFilter !== "all",
+  });
+
+  // Use filtered data when filter is applied, otherwise use main stats
+  const isqDistributionData = isqDistributionFilter !== "all" 
+    ? (isqDistributionStats?.isqDistribution || [])
+    : (stats?.isqDistribution || []);
+  
+  const isqEvolutionData = isqEvolutionFilter !== "all"
+    ? (isqEvolutionStats?.isqEvolution || [])
+    : (stats?.isqEvolution || []);
 
   // Fetch all active flags with entity info
   const { data: flagsData = [] } = useQuery<FlagWithEntity[]>({
@@ -209,11 +257,11 @@ export default function StatsPage() {
     { name: "Échecs", value: stats?.failureRate || 0, color: STATUS_COLORS.failure },
   ];
 
-  const isqData = stats?.isqDistribution || [];
-  const isqEvolutionData = stats?.isqEvolution.map((d) => ({
+  const isqData = isqDistributionData;
+  const isqEvolutionChartData = isqEvolutionData.map((d) => ({
     ...d,
     month: format(new Date(d.period + "-01"), "MMM", { locale: fr }),
-  })) || [];
+  }));
 
   const typeData = stats?.actsByType.map((d) => ({
     type: TYPE_LABELS[d.type] || d.type,
@@ -477,7 +525,7 @@ export default function StatsPage() {
               <CardTitle>Distribution ISQ</CardTitle>
               <CardDescription>Stabilité des implants à la pose</CardDescription>
             </div>
-            <Select value={selectedImplantModel} onValueChange={setSelectedImplantModel}>
+            <Select value={isqDistributionFilter} onValueChange={setIsqDistributionFilter}>
               <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-model">
                 <SelectValue placeholder="Tous les implants" />
               </SelectTrigger>
@@ -585,7 +633,7 @@ export default function StatsPage() {
               </CardTitle>
               <CardDescription>Stabilité moyenne des implants par mois</CardDescription>
             </div>
-            <Select value={selectedImplantModel} onValueChange={setSelectedImplantModel}>
+            <Select value={isqEvolutionFilter} onValueChange={setIsqEvolutionFilter}>
               <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-evolution-model">
                 <SelectValue placeholder="Tous les implants" />
               </SelectTrigger>
@@ -601,7 +649,7 @@ export default function StatsPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={isqEvolutionData}>
+              <LineChart data={isqEvolutionChartData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" className="text-xs" />
                 <YAxis domain={[40, 90]} className="text-xs" />
@@ -682,7 +730,7 @@ export default function StatsPage() {
                           : `${item.daysSinceVisit}j`}
                       </Badge>
                       <Button variant="ghost" size="icon" asChild data-testid={`button-view-implant-${item.implantId}`}>
-                        <Link href={`/implants/${item.implantId}`}>
+                        <Link href={`/surgery-implants/${item.implantId}`}>
                           <ExternalLink className="h-4 w-4" />
                         </Link>
                       </Button>

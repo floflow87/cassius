@@ -2634,7 +2634,7 @@ export class DatabaseStorage implements IStorage {
       )
       SELECT 
         (SELECT json_agg(json_build_object('id', patient_id, 'name', nom || ' ' || prenom, 'type', 'patient', 'count', count, 'patientId', patient_id)) FROM patient_counts) as patients,
-        (SELECT json_agg(json_build_object('id', operation_id, 'name', patient_nom || ' ' || patient_prenom || ' - ' || UPPER(LEFT(type_intervention, 1)), 'type', 'operation', 'count', count, 'operationId', operation_id, 'patientId', patient_id)) FROM operation_counts) as operations,
+        (SELECT json_agg(json_build_object('id', operation_id, 'name', patient_nom || ' ' || patient_prenom || ' - ' || TO_CHAR(date_operation, 'DD/MM/YYYY') || ' - ' || CASE type_intervention WHEN 'POSE_IMPLANT' THEN 'Pose' WHEN 'GREFFE_OSSEUSE' THEN 'Greffe' WHEN 'SINUS_LIFT' THEN 'Sinus Lift' WHEN 'EXTRACTION_IMPLANT_IMMEDIATE' THEN 'Extraction' WHEN 'REPRISE_IMPLANT' THEN 'Reprise' WHEN 'CHIRURGIE_GUIDEE' THEN 'Guidée' ELSE type_intervention END, 'type', 'operation', 'count', count, 'operationId', operation_id, 'patientId', patient_id)) FROM operation_counts) as operations,
         (SELECT count FROM unclassified_count) as unclassified_count,
         (SELECT count FROM total_count) as total_count
     `, [organisationId]);
