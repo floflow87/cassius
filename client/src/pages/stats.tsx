@@ -42,6 +42,7 @@ import {
   PieChart,
   Pie,
   Legend,
+  ReferenceLine,
 } from "recharts";
 import { Link } from "wouter";
 import type { ClinicalStats, PatientStats } from "@shared/types";
@@ -69,16 +70,35 @@ const TYPE_LABELS: Record<string, string> = {
   AUTRE: "Autre",
 };
 
+// Design System Color Tokens - using CSS variables
+const STATS_COLORS = {
+  primary: "hsl(var(--stats-primary))",
+  primarySoft: "hsl(var(--stats-primary-soft))",
+  success: "hsl(var(--stats-success))",
+  successBg: "hsl(var(--stats-success-bg))",
+  warning: "hsl(var(--stats-warning))",
+  warningBg: "hsl(var(--stats-warning-bg))",
+  danger: "hsl(var(--stats-danger))",
+  dangerBg: "hsl(var(--stats-danger-bg))",
+  grayMuted: "hsl(var(--stats-gray-muted))",
+  border: "hsl(var(--stats-border))",
+  textSecondary: "hsl(var(--stats-text-secondary))",
+  // Desaturated ISQ colors
+  isqHigh: "hsl(var(--stats-isq-high))",
+  isqMedium: "hsl(var(--stats-isq-medium))",
+  isqLow: "hsl(var(--stats-isq-low))",
+};
+
 const STATUS_COLORS = {
-  success: "hsl(142, 76%, 36%)",
-  complication: "hsl(38, 92%, 50%)",
-  failure: "hsl(0, 84%, 60%)",
+  success: STATS_COLORS.success,
+  complication: STATS_COLORS.warning,
+  failure: STATS_COLORS.danger,
 };
 
 const ISQ_COLORS = {
-  "Faible (<55)": "hsl(0, 84%, 60%)",
-  "Modéré (55-70)": "hsl(38, 92%, 50%)",
-  "Élevé (>70)": "hsl(142, 76%, 36%)",
+  "Faible (<55)": STATS_COLORS.isqLow,
+  "Modéré (55-70)": STATS_COLORS.isqMedium,
+  "Élevé (>70)": STATS_COLORS.isqHigh,
 };
 
 type SearchSuggestion = {
@@ -469,10 +489,12 @@ export default function StatsPage() {
     month: format(new Date(d.period + "-01"), "MMM", { locale: fr }),
   })) || [];
 
+  // Donut chart: success green + light gray only (premium, less aggressive)
+  const successValue = stats?.successRate || 0;
+  const otherValue = 100 - successValue;
   const outcomeData = [
-    { name: "Succès", value: stats?.successRate || 0, color: STATUS_COLORS.success },
-    { name: "Complications", value: stats?.complicationRate || 0, color: STATUS_COLORS.complication },
-    { name: "Échecs", value: stats?.failureRate || 0, color: STATUS_COLORS.failure },
+    { name: "Succès", value: successValue, color: STATS_COLORS.success },
+    { name: "Autre", value: otherValue, color: STATS_COLORS.grayMuted },
   ];
 
   const isqData = isqDistributionData;
@@ -499,8 +521,8 @@ export default function StatsPage() {
                 <p className="text-3xl font-bold">{stats?.activityByPeriod.reduce((sum, d) => sum + d.count, 0) || 0}</p>
                 <p className="text-xs text-muted-foreground mt-1">sur la période</p>
               </div>
-              <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="p-3 rounded-lg bg-stats-primary/10">
+                <Activity className="h-5 w-5 text-stats-primary" />
               </div>
             </div>
           </CardContent>
@@ -514,8 +536,8 @@ export default function StatsPage() {
                 <p className="text-3xl font-bold">{stats?.totalImplantsInPeriod || 0}</p>
                 <p className="text-xs text-muted-foreground mt-1">sur la période</p>
               </div>
-              <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900/30">
-                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <div className="p-3 rounded-lg bg-stats-success-bg">
+                <CheckCircle2 className="h-5 w-5 text-stats-success" />
               </div>
             </div>
           </CardContent>
@@ -531,8 +553,8 @@ export default function StatsPage() {
                   {stats?.complicationRate || 0}% complications
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="p-3 rounded-lg bg-stats-success-bg">
+                <TrendingUp className="h-5 w-5 text-stats-success" />
               </div>
             </div>
           </CardContent>
@@ -548,8 +570,8 @@ export default function StatsPage() {
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">en moyenne</p>
               </div>
-              <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              <div className="p-3 rounded-lg bg-stats-primary/10">
+                <Clock className="h-5 w-5 text-stats-primary" />
               </div>
             </div>
           </CardContent>
@@ -756,18 +778,18 @@ export default function StatsPage() {
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={activityData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" className="text-xs" />
-                  <YAxis className="text-xs" allowDecimals={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
+                  <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
+                  <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
+                      border: `1px solid ${STATS_COLORS.border}`,
                       borderRadius: "6px",
                     }}
                     labelStyle={{ color: "hsl(var(--foreground))" }}
                   />
-                  <Bar dataKey="count" name="Actes" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" name="Actes" fill={STATS_COLORS.primarySoft} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -788,7 +810,7 @@ export default function StatsPage() {
                       <div className="flex items-center gap-2">
                         <div
                           className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: `hsl(${(index * 60) % 360}, 70%, 50%)` }}
+                          style={{ backgroundColor: index === 0 ? STATS_COLORS.primary : index === 1 ? STATS_COLORS.success : index === 2 ? STATS_COLORS.warning : STATS_COLORS.grayMuted }}
                         />
                         <span className="text-sm">{item.type}</span>
                       </div>
@@ -844,13 +866,13 @@ export default function StatsPage() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
                   <LineChart data={implantData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="month" className="text-xs" />
-                    <YAxis className="text-xs" allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
+                    <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
+                    <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
+                        border: `1px solid ${STATS_COLORS.border}`,
                         borderRadius: "6px",
                       }}
                       labelStyle={{ color: "hsl(var(--foreground))" }}
@@ -859,9 +881,9 @@ export default function StatsPage() {
                       type="monotone"
                       dataKey="count"
                       name="Implants"
-                      stroke="hsl(142, 76%, 36%)"
+                      stroke={STATS_COLORS.primary}
                       strokeWidth={2}
-                      dot={{ fill: "hsl(142, 76%, 36%)", strokeWidth: 0, r: 4 }}
+                      dot={{ fill: STATS_COLORS.primary, strokeWidth: 0, r: 4 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -975,13 +997,13 @@ export default function StatsPage() {
               <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    <AlertTriangle className="h-5 w-5 text-stats-warning" />
                     Implants sans suivi
                   </CardTitle>
                   <CardDescription>Plus de 3 mois sans visite</CardDescription>
                 </div>
                 {stats?.implantsWithoutFollowup && stats.implantsWithoutFollowup.length > 0 && (
-                  <Badge variant="outline" className="text-amber-600 border-amber-300">
+                  <Badge variant="outline" className="text-stats-warning border-stats-warning/30">
                     {stats.implantsWithoutFollowup.length}
                   </Badge>
                 )}
@@ -989,7 +1011,7 @@ export default function StatsPage() {
               <CardContent>
                 {!stats?.implantsWithoutFollowup || stats.implantsWithoutFollowup.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-green-500" />
+                    <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-stats-success" />
                     <p>Tous les implants ont un suivi récent</p>
                   </div>
                 ) : (
@@ -1008,7 +1030,7 @@ export default function StatsPage() {
                           <div className="flex items-center gap-1">
                             <Badge
                               variant="outline"
-                              className={item.daysSinceVisit === null || item.daysSinceVisit > 180 ? "text-red-600 border-red-300" : "text-amber-600 border-amber-300"}
+                              className={item.daysSinceVisit === null || item.daysSinceVisit > 180 ? "text-stats-danger border-stats-danger/30" : "text-stats-warning border-stats-warning/30"}
                             >
                               {item.daysSinceVisit === null ? "Jamais" : `${item.daysSinceVisit}j`}
                             </Badge>
@@ -1054,13 +1076,15 @@ export default function StatsPage() {
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={isqEvolutionChartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" className="text-xs" />
-                <YAxis domain={[40, 90]} className="text-xs" />
+                <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
+                <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
+                <YAxis domain={[40, 90]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <ReferenceLine y={60} stroke={STATS_COLORS.grayMuted} strokeDasharray="5 5" strokeOpacity={0.7} />
+                <ReferenceLine y={70} stroke={STATS_COLORS.grayMuted} strokeDasharray="5 5" strokeOpacity={0.7} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
+                    border: `1px solid ${STATS_COLORS.border}`,
                     borderRadius: "6px",
                   }}
                   labelStyle={{ color: "hsl(var(--foreground))" }}
@@ -1069,9 +1093,9 @@ export default function StatsPage() {
                   type="monotone"
                   dataKey="avgIsq"
                   name="ISQ moyen"
-                  stroke="hsl(var(--primary))"
+                  stroke={STATS_COLORS.primary}
                   strokeWidth={2}
-                  dot={{ fill: "hsl(var(--primary))", strokeWidth: 0, r: 4 }}
+                  dot={{ fill: STATS_COLORS.primary, strokeWidth: 0, r: 4 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -1112,13 +1136,13 @@ export default function StatsPage() {
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={successRateByDimension} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis type="number" domain={[0, 100]} className="text-xs" tickFormatter={(v) => `${v}%`} />
-                    <YAxis type="category" dataKey="name" className="text-xs" width={120} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} tickFormatter={(v) => `${v}%`} />
+                    <YAxis type="category" dataKey="name" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} width={120} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
+                        border: `1px solid ${STATS_COLORS.border}`,
                         borderRadius: "6px",
                       }}
                       labelStyle={{ color: "hsl(var(--foreground))" }}
@@ -1129,15 +1153,15 @@ export default function StatsPage() {
                           <div className="p-2 bg-card border rounded-md shadow-lg">
                             <p className="font-medium text-sm">{label}</p>
                             <p className="text-sm text-muted-foreground">{data.total} implants</p>
-                            <p className="text-sm text-green-600">Taux de réussite: {data.successRate}%</p>
+                            <p className="text-sm text-stats-success">Taux de réussite: {data.successRate}%</p>
                             {data.avgIsq > 0 && (
-                              <p className="text-sm text-primary">ISQ moyen: {data.avgIsq}</p>
+                              <p className="text-sm text-stats-primary">ISQ moyen: {data.avgIsq}</p>
                             )}
                           </div>
                         );
                       }}
                     />
-                    <Bar dataKey="successRate" name="Taux de réussite" fill="hsl(142, 76%, 36%)" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="successRate" name="Taux de réussite" fill={STATS_COLORS.success} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
