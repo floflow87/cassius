@@ -217,7 +217,7 @@ function FileRow({
   
   return (
     <div
-      className="flex items-center gap-3 px-4 py-2.5 border-b hover-elevate cursor-pointer"
+      className="flex items-center gap-3 px-4 py-2.5 border-b hover-elevate cursor-pointer bg-white dark:bg-card"
       onClick={onView}
       data-testid={`file-row-${file.sourceType}-${file.id}`}
     >
