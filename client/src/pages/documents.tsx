@@ -161,7 +161,9 @@ function FolderTreeItem({
 }) {
   return (
     <button
-      onClick={() => {
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
         if (hasChildren && onToggle) onToggle();
         onSelect();
       }}
@@ -249,11 +251,6 @@ function FileRow({
               {TAG_LABELS[tag] || tag}
             </Badge>
           ))}
-          {isRadio && (
-            <Badge variant="outline" className="text-xs">
-              Radio
-            </Badge>
-          )}
         </div>
         <div className="flex items-center gap-4 text-xs text-muted-foreground mt-0.5">
           {file.patient && (
@@ -760,15 +757,18 @@ export default function DocumentsPage() {
                   onToggle={() => toggleFolder('patients')}
                   onSelect={() => handleFolderSelect('patients')}
                 />
-                {expandedFolders.has('patients') && tree?.patients.map(p => (
-                  <div key={p.id} style={{ paddingLeft: '24px' }}>
-                    <FolderTreeItem
-                      node={{ name: p.name, count: p.count, type: 'patient', id: p.patientId }}
-                      isSelected={currentFolder.type === 'patient' && currentFolder.id === p.patientId}
-                      onSelect={() => handleFolderSelect('patient', p.patientId, p.name)}
-                    />
-                  </div>
-                ))}
+                {expandedFolders.has('patients') && tree?.patients.map(p => {
+                  const pid = p.patientId || p.id;
+                  return (
+                    <div key={p.id} style={{ paddingLeft: '24px' }}>
+                      <FolderTreeItem
+                        node={{ name: p.name, count: p.count, type: 'patient', id: pid }}
+                        isSelected={currentFolder.type === 'patient' && currentFolder.id === pid}
+                        onSelect={() => handleFolderSelect('patient', pid, p.name)}
+                      />
+                    </div>
+                  );
+                })}
                 
                 <FolderTreeItem
                   node={{ name: 'Actes', count: tree?.operations.reduce((acc, o) => acc + o.count, 0) || 0, type: 'operations' }}
@@ -778,15 +778,18 @@ export default function DocumentsPage() {
                   onToggle={() => toggleFolder('operations')}
                   onSelect={() => handleFolderSelect('operations')}
                 />
-                {expandedFolders.has('operations') && tree?.operations.map(o => (
-                  <div key={o.id} style={{ paddingLeft: '24px' }}>
-                    <FolderTreeItem
-                      node={{ name: o.name, count: o.count, type: 'operation', id: o.operationId }}
-                      isSelected={currentFolder.type === 'operation' && currentFolder.id === o.operationId}
-                      onSelect={() => handleFolderSelect('operation', o.operationId, o.name)}
-                    />
-                  </div>
-                ))}
+                {expandedFolders.has('operations') && tree?.operations.map(o => {
+                  const oid = o.operationId || o.id;
+                  return (
+                    <div key={o.id} style={{ paddingLeft: '24px' }}>
+                      <FolderTreeItem
+                        node={{ name: o.name, count: o.count, type: 'operation', id: oid }}
+                        isSelected={currentFolder.type === 'operation' && currentFolder.id === oid}
+                        onSelect={() => handleFolderSelect('operation', oid, o.name)}
+                      />
+                    </div>
+                  );
+                })}
                 
                 {(tree?.unclassifiedCount || 0) > 0 && (
                   <FolderTreeItem
