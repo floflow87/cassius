@@ -436,7 +436,6 @@ export default function DocumentsPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [patientFilter, setPatientFilter] = useState<string>("all");
   const [currentPath, setCurrentPath] = useState<FolderPath[]>([
     { type: 'root', name: 'Documents' }
   ]);
@@ -487,12 +486,8 @@ export default function DocumentsPage() {
       f.operationId = currentFolder.id;
     }
     
-    if (patientFilter && patientFilter !== "all" && (currentFolder.type === 'root' || currentFolder.type === 'patients')) {
-      f.patientId = patientFilter;
-    }
-    
     return f;
-  }, [currentFolder, sortBy, sortDir, searchQuery, patientFilter]);
+  }, [currentFolder, sortBy, sortDir, searchQuery]);
 
   const { data: tree, isLoading: treeLoading } = useQuery<DocumentTree>({
     queryKey: ["/api/documents/tree"],
@@ -845,20 +840,6 @@ export default function DocumentsPage() {
                 data-testid="input-search-documents"
               />
             </div>
-            
-            <Select value={patientFilter} onValueChange={setPatientFilter}>
-              <SelectTrigger className="w-40" data-testid="select-patient-filter">
-                <SelectValue placeholder="Tous les patients" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les patients</SelectItem>
-                {tree?.patients.filter((p) => p.patientId).map((p) => (
-                  <SelectItem key={p.patientId} value={p.patientId!}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
               <SelectTrigger className="w-28" data-testid="select-sort">
