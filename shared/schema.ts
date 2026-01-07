@@ -1136,6 +1136,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
   emailEnabled: boolean("email_enabled").default(false).notNull(),
   digestTime: text("digest_time").default("08:30"),
   disabledTypes: text("disabled_types").array().default([]),
+  disabledEmailTypes: text("disabled_email_types").array().default([]),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

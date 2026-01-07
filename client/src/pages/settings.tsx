@@ -1293,8 +1293,18 @@ const CATEGORY_LABELS: Record<string, { label: string; icon: typeof Bell }> = {
   SYSTEM: { label: "Système", icon: Shield },
 };
 
+type TypePreferenceMode = "inapp" | "email" | "both" | "disabled";
+
+interface TypePreferences {
+  [type: string]: {
+    inApp: boolean;
+    email: boolean;
+  };
+}
+
 function NotificationsSection() {
   const { toast } = useToast();
+  const [localPrefs, setLocalPrefs] = useState<Record<string, TypePreferences>>({});
   
   const { data: preferences, isLoading } = useQuery<NotificationPreference[]>({
     queryKey: ["/api/notifications/preferences"],
@@ -1311,6 +1321,23 @@ function NotificationsSection() {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     },
   });
+
+  useEffect(() => {
+    if (preferences) {
+      const prefs: Record<string, TypePreferences> = {};
+      NOTIFICATION_TYPES.forEach(nt => {
+        if (!prefs[nt.category]) prefs[nt.category] = {};
+        const catPref = preferences.find(p => p.category === nt.category);
+        const disabledTypes = catPref?.disabledTypes || [];
+        const disabledEmails = (catPref as any)?.disabledEmailTypes || [];
+        prefs[nt.category][nt.type] = {
+          inApp: !disabledTypes.includes(nt.type),
+          email: !disabledEmails.includes(nt.type),
+        };
+      });
+      setLocalPrefs(prefs);
+    }
+  }, [preferences]);
   
   const getPreference = (category: string): NotificationPreference => {
     return preferences?.find(p => p.category === category) || {
@@ -1324,13 +1351,11 @@ function NotificationsSection() {
     };
   };
 
-  const isTypeEnabled = (category: string, type: string): boolean => {
-    const pref = getPreference(category);
-    const disabledTypes = pref.disabledTypes || [];
-    return !disabledTypes.includes(type);
+  const getTypePrefs = (category: string, type: string) => {
+    return localPrefs[category]?.[type] || { inApp: true, email: false };
   };
 
-  const handleToggleType = (category: string, type: string, enabled: boolean) => {
+  const handleToggleInApp = (category: string, type: string, enabled: boolean) => {
     const pref = getPreference(category);
     const currentDisabled = pref.disabledTypes || [];
     
@@ -1341,14 +1366,57 @@ function NotificationsSection() {
       newDisabled = [...currentDisabled, type];
     }
     
+    setLocalPrefs(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [type]: { ...prev[category]?.[type], inApp: enabled }
+      }
+    }));
+    
     updatePreferenceMutation.mutate({
       category,
       updates: { disabledTypes: newDisabled }
     });
   };
 
+  const handleToggleEmail = (category: string, type: string, enabled: boolean) => {
+    const pref = getPreference(category) as any;
+    const currentDisabled = pref.disabledEmailTypes || [];
+    
+    let newDisabled: string[];
+    if (enabled) {
+      newDisabled = currentDisabled.filter((t: string) => t !== type);
+    } else {
+      newDisabled = [...currentDisabled, type];
+    }
+    
+    setLocalPrefs(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [type]: { ...prev[category]?.[type], email: enabled }
+      }
+    }));
+    
+    updatePreferenceMutation.mutate({
+      category,
+      updates: { disabledEmailTypes: newDisabled } as any
+    });
+  };
+
   const handleToggleCategory = (category: string, enabled: boolean) => {
     const typesInCategory = NOTIFICATION_TYPES.filter(t => t.category === category).map(t => t.type);
+    
+    const newCatPrefs: TypePreferences = {};
+    typesInCategory.forEach(type => {
+      newCatPrefs[type] = { inApp: enabled, email: false };
+    });
+    
+    setLocalPrefs(prev => ({
+      ...prev,
+      [category]: newCatPrefs
+    }));
     
     updatePreferenceMutation.mutate({
       category,
@@ -1360,17 +1428,20 @@ function NotificationsSection() {
   };
 
   const isCategoryFullyEnabled = (category: string): boolean => {
-    const pref = getPreference(category);
-    return (pref.disabledTypes || []).length === 0 && pref.inAppEnabled;
+    const typesInCategory = NOTIFICATION_TYPES.filter(t => t.category === category);
+    return typesInCategory.every(nt => {
+      const prefs = getTypePrefs(category, nt.type);
+      return prefs.inApp || prefs.email;
+    });
   };
 
   const isCategoryPartiallyEnabled = (category: string): boolean => {
-    const pref = getPreference(category);
     const typesInCategory = NOTIFICATION_TYPES.filter(t => t.category === category);
-    const disabledCount = (pref.disabledTypes || []).filter(t => 
-      typesInCategory.some(nt => nt.type === t)
-    ).length;
-    return disabledCount > 0 && disabledCount < typesInCategory.length;
+    const enabledCount = typesInCategory.filter(nt => {
+      const prefs = getTypePrefs(category, nt.type);
+      return prefs.inApp || prefs.email;
+    }).length;
+    return enabledCount > 0 && enabledCount < typesInCategory.length;
   };
 
   const categories = ["ALERTS_REMINDERS", "TEAM_ACTIVITY", "IMPORTS", "SYSTEM"] as const;
@@ -1426,29 +1497,41 @@ function NotificationsSection() {
                 <CardContent className="pt-0">
                   <div className="border rounded-md divide-y">
                     <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-muted/50 text-xs font-medium text-muted-foreground">
-                      <div className="col-span-5">Type</div>
-                      <div className="col-span-5">Description</div>
-                      <div className="col-span-2 text-center">Actif</div>
+                      <div className="col-span-4">Type</div>
+                      <div className="col-span-4">Description</div>
+                      <div className="col-span-2 text-center">In-App</div>
+                      <div className="col-span-2 text-center">Email</div>
                     </div>
                     {typesInCategory.map((notifType) => {
-                      const enabled = isTypeEnabled(category, notifType.type);
+                      const typePrefs = getTypePrefs(category, notifType.type);
+                      const isDisabled = !typePrefs.inApp && !typePrefs.email;
                       return (
                         <div 
                           key={notifType.type} 
-                          className="grid grid-cols-12 gap-2 px-4 py-3 items-center hover-elevate"
+                          className={`grid grid-cols-12 gap-2 px-4 py-3 items-center ${isDisabled ? "opacity-50" : ""}`}
                         >
-                          <div className="col-span-5">
-                            <span className="text-sm font-medium">{notifType.label}</span>
+                          <div className="col-span-4">
+                            <span className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : ""}`}>
+                              {notifType.label}
+                            </span>
                           </div>
-                          <div className="col-span-5">
+                          <div className="col-span-4">
                             <span className="text-xs text-muted-foreground">{notifType.description}</span>
                           </div>
                           <div className="col-span-2 flex justify-center">
                             <Switch
-                              checked={enabled}
-                              onCheckedChange={(v) => handleToggleType(category, notifType.type, v)}
+                              checked={typePrefs.inApp}
+                              onCheckedChange={(v) => handleToggleInApp(category, notifType.type, v)}
                               disabled={updatePreferenceMutation.isPending}
-                              data-testid={`switch-type-${notifType.type}`}
+                              data-testid={`switch-inapp-${notifType.type}`}
+                            />
+                          </div>
+                          <div className="col-span-2 flex justify-center">
+                            <Switch
+                              checked={typePrefs.email}
+                              onCheckedChange={(v) => handleToggleEmail(category, notifType.type, v)}
+                              disabled={updatePreferenceMutation.isPending}
+                              data-testid={`switch-email-${notifType.type}`}
                             />
                           </div>
                         </div>

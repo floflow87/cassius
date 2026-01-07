@@ -352,6 +352,7 @@ export async function updatePreference(
     emailEnabled?: boolean;
     digestTime?: string;
     disabledTypes?: string[];
+    disabledEmailTypes?: string[];
   }
 ): Promise<NotificationPreference> {
   const existing = await db
@@ -388,6 +389,7 @@ export async function updatePreference(
         emailEnabled: updates.emailEnabled ?? false,
         digestTime: updates.digestTime || "08:30",
         disabledTypes: updates.disabledTypes || [],
+        disabledEmailTypes: updates.disabledEmailTypes || [],
       })
       .returning();
     return created;
