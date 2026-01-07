@@ -823,8 +823,10 @@ export default function StatsPage() {
                     <BarChart data={typeData} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
                       <XAxis type="number" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} allowDecimals={false} />
-                      <YAxis type="category" dataKey="type" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} width={140} />
+                      <YAxis type="category" dataKey="type" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 14 }} axisLine={false} tickLine={false} width={160} />
                       <Tooltip
+                        position={{ x: 200, y: 0 }}
+                        wrapperStyle={{ zIndex: 100 }}
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
                           border: `1px solid ${STATS_COLORS.border}`,
@@ -844,16 +846,13 @@ export default function StatsPage() {
                               {implants.length > 0 && (
                                 <>
                                   <p className="text-xs font-medium text-muted-foreground mb-1">Implants posés ({implants.length}):</p>
-                                  <div className="max-h-32 overflow-y-auto space-y-1">
-                                    {implants.slice(0, 8).map((imp: {id: string; siteFdi: string; patientNom: string; patientPrenom: string; marque: string}) => (
+                                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                                    {implants.map((imp: {id: string; siteFdi: string; patientNom: string; patientPrenom: string; marque: string}) => (
                                       <div key={imp.id} className="text-xs p-1 rounded bg-muted/50">
                                         <span className="font-medium">{imp.patientPrenom} {imp.patientNom}</span>
                                         <span className="text-muted-foreground"> - Site {imp.siteFdi}</span>
                                       </div>
                                     ))}
-                                    {implants.length > 8 && (
-                                      <p className="text-xs text-muted-foreground">+{implants.length - 8} autres...</p>
-                                    )}
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-2">{uniquePatients.length} patient{uniquePatients.length > 1 ? "s" : ""} concerné{uniquePatients.length > 1 ? "s" : ""}</p>
                                 </>
@@ -862,7 +861,12 @@ export default function StatsPage() {
                           );
                         }}
                       />
-                      <Bar dataKey="count" name="Interventions" fill={STATS_COLORS.chart1} radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="count" name="Interventions" radius={[0, 4, 4, 0]}>
+                        {typeData.map((_, index) => {
+                          const barColors = ["#d399ff", "#676da2", "#3c83f6", "#9dc1fb", "#3abff8"];
+                          return <Cell key={`cell-${index}`} fill={barColors[index % barColors.length]} />;
+                        })}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}

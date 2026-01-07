@@ -14,7 +14,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, FolderClosed, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { FaFolder, FaCalendarAlt } from "react-icons/fa";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
 import logoFull from "@assets/logo_Cassius_Plan_de_travail_1_copie_1765897934649.png";
@@ -29,7 +30,7 @@ type MenuItem = {
   title: string;
   url: string;
   icon?: string;
-  lucideIcon?: typeof FolderClosed;
+  reactIcon?: typeof FaFolder;
 };
 
 const menuItems: MenuItem[] = [
@@ -37,8 +38,8 @@ const menuItems: MenuItem[] = [
   { title: "Patients", url: "/patients", icon: patientIcon },
   { title: "Implants", url: "/implants", icon: implantsIcon },
   { title: "Actes", url: "/actes", icon: actesIcon },
-  { title: "Documents", url: "/documents", lucideIcon: FolderClosed },
-  { title: "Calendrier", url: "/calendar", lucideIcon: Calendar },
+  { title: "Documents", url: "/documents", reactIcon: FaFolder },
+  { title: "Calendrier", url: "/calendar", reactIcon: FaCalendarAlt },
   { title: "Statistiques", url: "/stats", icon: statsIcon },
 ];
 
@@ -108,8 +109,8 @@ export function AppSidebar() {
                     alt={item.title}
                     className="h-[18px] w-auto brightness-0 invert shrink-0"
                   />
-                ) : item.lucideIcon && (
-                  <item.lucideIcon className="h-[18px] w-[18px] text-white shrink-0" strokeWidth={1.5} />
+                ) : item.reactIcon && (
+                  <item.reactIcon className="h-[16px] w-[16px] text-white shrink-0" />
                 )}
                 {isExpanded && (
                   <span className={`text-sm truncate ${active ? 'font-medium text-white' : 'font-light text-white/80'}`}>
