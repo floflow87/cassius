@@ -52,7 +52,7 @@ import type {
 } from "@shared/types";
 import { z } from "zod";
 import { db, pool, testConnection, getDbEnv, getDbConnectionInfo } from "./db";
-import { eq, sql, and, inArray, desc } from "drizzle-orm";
+import { eq, sql, and, inArray, notInArray, desc } from "drizzle-orm";
 
 function getOrganisationId(req: Request, res: Response): string | null {
   const organisationId = req.jwtUser?.organisationId;
@@ -4969,6 +4969,58 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("[DEV] Error creating test notifications:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/dev/clear-notifications - Clear all notifications except last N (DEV only)
+  app.delete("/api/dev/clear-notifications", requireJwtOrSession, async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: "Non disponible en production" });
+      }
+
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const keepLast = parseInt(req.query.keep as string) || 0;
+      
+      // Get IDs to keep
+      const toKeep = await db
+        .select({ id: notifications.id })
+        .from(notifications)
+        .where(eq(notifications.recipientUserId, userId))
+        .orderBy(desc(notifications.createdAt))
+        .limit(keepLast);
+      
+      const keepIds = toKeep.map(n => n.id);
+      
+      // Delete all except those
+      let deletedCount = 0;
+      if (keepIds.length > 0) {
+        const result = await db
+          .delete(notifications)
+          .where(and(
+            eq(notifications.recipientUserId, userId),
+            notInArray(notifications.id, keepIds)
+          ));
+        deletedCount = result.rowCount || 0;
+      } else {
+        const result = await db
+          .delete(notifications)
+          .where(eq(notifications.recipientUserId, userId));
+        deletedCount = result.rowCount || 0;
+      }
+
+      res.json({
+        success: true,
+        message: `${deletedCount} notifications supprimees, ${keepIds.length} conservees`,
+        kept: keepIds,
+      });
+    } catch (error: any) {
+      console.error("[DEV] Error clearing notifications:", error);
       res.status(500).json({ error: error.message });
     }
   });
