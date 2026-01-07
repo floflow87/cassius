@@ -169,7 +169,7 @@ export default function SettingsPage() {
           <TabsList className="bg-transparent p-0 h-auto gap-1 border-b-0 mb-6">
             <TabsTrigger 
               value="security" 
-              className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
+              className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
               data-testid="nav-security"
             >
               <Shield className="w-4 h-4" />
@@ -177,7 +177,7 @@ export default function SettingsPage() {
             </TabsTrigger>
             <TabsTrigger 
               value="notifications" 
-              className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
+              className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
               data-testid="nav-notifications"
             >
               <Bell className="w-4 h-4" />
@@ -186,7 +186,7 @@ export default function SettingsPage() {
             {userIsAdmin && (
               <TabsTrigger 
                 value="collaborators" 
-                className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
+                className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
                 data-testid="nav-collaborators"
               >
                 <Users className="w-4 h-4" />
@@ -196,7 +196,7 @@ export default function SettingsPage() {
             {userIsAdmin && (
               <TabsTrigger 
                 value="organization" 
-                className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
+                className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
                 data-testid="nav-organization"
               >
                 <Building2 className="w-4 h-4" />
@@ -205,7 +205,7 @@ export default function SettingsPage() {
             )}
             <TabsTrigger 
               value="integrations" 
-              className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
+              className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
               data-testid="nav-integrations"
             >
               <Link2 className="w-4 h-4" />
