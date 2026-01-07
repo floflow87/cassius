@@ -5150,6 +5150,26 @@ export async function registerRoutes(
     }
   });
 
+  // Mark notification as unread
+  app.patch("/api/notifications/:id/unread", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifié" });
+
+      const { id } = req.params;
+      const success = await notificationService.markAsUnread(id, userId);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Notification non trouvée" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Notifications] Error marking notification as unread:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Mark all notifications as read
   app.post("/api/notifications/mark-all-read", requireJwtOrSession, async (req, res) => {
     try {

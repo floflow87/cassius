@@ -14,7 +14,8 @@ import {
   CheckCheck, 
   Loader2,
   Settings,
-  Filter
+  Filter,
+  MailOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ interface Notification {
   entityId?: string;
   createdAt: string;
   readAt?: string;
+  isVirtual?: boolean;
 }
 
 const KIND_ICONS: Record<string, typeof AlertCircle> = {
@@ -75,12 +77,14 @@ function NotificationRow({
   notification, 
   selected,
   onSelect,
-  onMarkAsRead 
+  onMarkAsRead,
+  onMarkAsUnread
 }: { 
   notification: Notification;
   selected: boolean;
   onSelect: (id: string) => void;
   onMarkAsRead: (id: string) => void;
+  onMarkAsUnread: (id: string) => void;
 }) {
   const Icon = KIND_ICONS[notification.kind] || Bell;
   const severityColor = SEVERITY_COLORS[notification.severity] || "text-muted-foreground";
@@ -152,20 +156,30 @@ function NotificationRow({
                 <Link href={link}>Voir</Link>
               </Button>
             )}
-            {isUnread ? (
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
-                onClick={() => onMarkAsRead(notification.id)}
-                data-testid={`button-mark-read-${notification.id}`}
-              >
-                <Check className="h-4 w-4" />
-              </Button>
-            ) : (
-              <div className="h-9 w-9 flex items-center justify-center rounded-md bg-green-100 dark:bg-green-900/30">
-                <Check className="h-4 w-4 text-green-600" />
-              </div>
+            {!notification.isVirtual && (
+              isUnread ? (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
+                  onClick={() => onMarkAsRead(notification.id)}
+                  data-testid={`button-mark-read-${notification.id}`}
+                  title="Marquer comme lu"
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="text-muted-foreground hover:text-foreground hover:bg-muted"
+                  onClick={() => onMarkAsUnread(notification.id)}
+                  data-testid={`button-mark-unread-${notification.id}`}
+                  title="Marquer comme non lu"
+                >
+                  <MailOpen className="h-4 w-4" />
+                </Button>
+              )
             )}
           </div>
         </div>
@@ -210,6 +224,14 @@ export default function NotificationsPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
       setSelectedIds(new Set());
+    },
+  });
+  
+  const markAsUnreadMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("PATCH", `/api/notifications/${id}/unread`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
     },
   });
   
@@ -390,6 +412,7 @@ export default function NotificationsPage() {
                     selected={selectedIds.has(notification.id)}
                     onSelect={toggleSelect}
                     onMarkAsRead={(id) => markAsReadMutation.mutate(id)}
+                    onMarkAsUnread={(id) => markAsUnreadMutation.mutate(id)}
                   />
                 ))}
               </div>

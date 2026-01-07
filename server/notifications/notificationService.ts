@@ -280,6 +280,21 @@ export async function markAsRead(notificationId: string, userId: string): Promis
   return !!updated;
 }
 
+export async function markAsUnread(notificationId: string, userId: string): Promise<boolean> {
+  const [updated] = await db
+    .update(notifications)
+    .set({ readAt: null })
+    .where(
+      and(
+        eq(notifications.id, notificationId),
+        eq(notifications.recipientUserId, userId)
+      )
+    )
+    .returning();
+
+  return !!updated;
+}
+
 export async function markAllAsRead(userId: string, organisationId: string): Promise<number> {
   const result = await db
     .update(notifications)
@@ -827,6 +842,7 @@ export default {
   getNotifications,
   getUnreadCount,
   markAsRead,
+  markAsUnread,
   markAllAsRead,
   archiveNotification,
   getUserPreferences,
