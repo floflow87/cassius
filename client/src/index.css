@@ -374,19 +374,35 @@
 }
 
 /* Tab slide animation */
-[data-state="active"][role="tab"] {
+[role="tab"] {
   transition: all 0.2s ease-in-out;
+  position: relative;
 }
 
-[data-state="inactive"][role="tab"] {
-  transition: all 0.2s ease-in-out;
+[data-state="active"][role="tab"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: tab-indicator-slide 0.2s ease-out;
+}
+
+@keyframes tab-indicator-slide {
+  from {
+    transform: scaleX(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
 }
 
 [role="tabpanel"] {
-  animation: tab-slide-in 0.25s ease-out;
+  animation: tab-content-slide 0.25s ease-out;
 }
 
-@keyframes tab-slide-in {
+@keyframes tab-content-slide {
   from {
     opacity: 0;
     transform: translateX(10px);

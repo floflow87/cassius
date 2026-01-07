@@ -128,7 +128,7 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
         <Button 
           variant="ghost" 
           size="icon" 
-          className="text-muted-foreground" 
+          className="text-primary bg-primary/10 hover:bg-primary/20" 
           data-testid="button-calendar"
           onClick={() => setLocation("/calendar")}
         >

@@ -2087,26 +2087,29 @@ export default function PatientDetailsPage() {
             <>
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center border rounded-md p-0.5">
+                  <div className="flex items-center bg-white dark:bg-zinc-900 rounded-full p-1 gap-1">
                     <Button
-                      variant={implantTypeFilter === "all" ? "secondary" : "ghost"}
+                      variant="ghost"
                       size="sm"
+                      className={`rounded-full ${implantTypeFilter === "all" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
                       onClick={() => setImplantTypeFilter("all")}
                       data-testid="button-filter-all"
                     >
                       Tous
                     </Button>
                     <Button
-                      variant={implantTypeFilter === "IMPLANT" ? "secondary" : "ghost"}
+                      variant="ghost"
                       size="sm"
+                      className={`rounded-full ${implantTypeFilter === "IMPLANT" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
                       onClick={() => setImplantTypeFilter("IMPLANT")}
                       data-testid="button-filter-implants"
                     >
                       Implants
                     </Button>
                     <Button
-                      variant={implantTypeFilter === "MINI_IMPLANT" ? "secondary" : "ghost"}
+                      variant="ghost"
                       size="sm"
+                      className={`rounded-full ${implantTypeFilter === "MINI_IMPLANT" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
                       onClick={() => setImplantTypeFilter("MINI_IMPLANT")}
                       data-testid="button-filter-mini-implants"
                     >
@@ -2117,18 +2120,20 @@ export default function PatientDetailsPage() {
                     {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
                   </span>
                 </div>
-                <div className="flex items-center gap-1 border rounded-md p-0.5">
+                <div className="flex items-center bg-white dark:bg-zinc-900 rounded-full p-1 gap-1">
                   <Button
-                    variant={implantViewMode === "table" ? "secondary" : "ghost"}
+                    variant="ghost"
                     size="sm"
+                    className={`rounded-full ${implantViewMode === "table" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
                     onClick={() => setImplantViewMode("table")}
                     data-testid="button-view-table"
                   >
                     <LayoutList className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={implantViewMode === "cards" ? "secondary" : "ghost"}
+                    variant="ghost"
                     size="sm"
+                    className={`rounded-full ${implantViewMode === "cards" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
                     onClick={() => setImplantViewMode("cards")}
                     data-testid="button-view-cards"
                   >
