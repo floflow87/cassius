@@ -2,6 +2,7 @@ import { db } from "../db";
 import { 
   notifications, 
   notificationPreferences, 
+  users,
   InsertNotification,
   Notification,
   NotificationPreference
@@ -161,8 +162,8 @@ async function sendImmediateEmailNotification(notification: Notification, userId
   try {
     const [user] = await db
       .select()
-      .from(require("@shared/schema").users)
-      .where(eq(require("@shared/schema").users.id, userId))
+      .from(users)
+      .where(eq(users.id, userId))
       .limit(1);
 
     if (!user || !user.username) {

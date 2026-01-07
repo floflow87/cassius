@@ -133,17 +133,8 @@ export function NotificationBell() {
     },
   });
   
-  const generateTestNotificationsMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/dev/test-notifications"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
-    },
-  });
-  
   const unreadCount = unreadData?.count || 0;
   const notifications = notificationsData?.notifications || [];
-  const isDev = import.meta.env.DEV;
   
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -200,21 +191,6 @@ export function NotificationBell() {
             <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
               <Bell className="h-8 w-8 text-muted-foreground/50 mb-2" />
               <p className="text-sm text-muted-foreground">Aucune notification</p>
-              {isDev && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-3 text-xs"
-                  onClick={() => generateTestNotificationsMutation.mutate()}
-                  disabled={generateTestNotificationsMutation.isPending}
-                  data-testid="button-generate-test-notifications"
-                >
-                  {generateTestNotificationsMutation.isPending ? (
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  ) : null}
-                  Générer des notifications de test
-                </Button>
-              )}
             </div>
           ) : (
             <div className="divide-y">
