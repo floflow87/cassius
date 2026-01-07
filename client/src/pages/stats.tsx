@@ -803,60 +803,69 @@ export default function StatsPage() {
 
           {/* Half-width row: Types d'interventions + Implants par mois */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Types d'interventions */}
+            {/* Types d'interventions - Horizontal Bar Chart */}
             <Card>
               <CardHeader>
-                <CardTitle>Types d'interventions</CardTitle>
-                <CardDescription>Répartition par type</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Types d'interventions
+                </CardTitle>
+                <CardDescription>Répartition par type avec détails au survol</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {typeData.map((item, index) => (
-                    <div key={item.type} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: index === 0 ? STATS_COLORS.primary : index === 1 ? STATS_COLORS.success : index === 2 ? STATS_COLORS.warning : STATS_COLORS.grayMuted }}
-                        />
-                        <span className="text-sm">{item.type}</span>
-                      </div>
-                      {item.implants && item.implants.length > 0 ? (
-                        <HoverCard>
-                          <HoverCardTrigger asChild>
-                            <Badge variant="secondary" className="cursor-pointer" data-testid={`badge-type-count-${index}`}>
-                              {item.count}
-                            </Badge>
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-80" align="end">
-                            <div className="space-y-2">
-                              <h4 className="font-semibold text-sm">Implants posés ({item.implants.length})</h4>
-                              <ScrollArea className="h-48">
-                                <div className="space-y-2">
-                                  {item.implants.map((imp) => (
-                                    <Link
-                                      key={imp.id}
-                                      href={`/implants/${imp.id}`}
-                                      className="flex items-center justify-between p-2 rounded hover-elevate bg-muted/50 text-sm"
-                                      data-testid={`link-implant-${imp.id}`}
-                                    >
-                                      <div>
+                {typeData.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Package className="h-12 w-12 mx-auto mb-2" />
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={Math.max(200, typeData.length * 50)}>
+                    <BarChart data={typeData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
+                      <XAxis type="number" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} allowDecimals={false} />
+                      <YAxis type="category" dataKey="type" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} width={140} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: `1px solid ${STATS_COLORS.border}`,
+                          borderRadius: "6px",
+                          maxWidth: "320px",
+                        }}
+                        labelStyle={{ color: "hsl(var(--foreground))" }}
+                        content={({ active, payload }) => {
+                          if (!active || !payload || payload.length === 0) return null;
+                          const data = payload[0]?.payload;
+                          const implants = data.implants || [];
+                          const uniquePatients = Array.from(new Map(implants.map((i: {patientNom: string; patientPrenom: string}) => [`${i.patientNom}-${i.patientPrenom}`, i])).values());
+                          return (
+                            <div className="p-3 bg-card border rounded-md shadow-lg max-w-xs">
+                              <p className="font-semibold text-sm mb-2">{data.type}</p>
+                              <p className="text-sm text-muted-foreground mb-2">{data.count} intervention{data.count > 1 ? "s" : ""}</p>
+                              {implants.length > 0 && (
+                                <>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Implants posés ({implants.length}):</p>
+                                  <div className="max-h-32 overflow-y-auto space-y-1">
+                                    {implants.slice(0, 8).map((imp: {id: string; siteFdi: string; patientNom: string; patientPrenom: string; marque: string}) => (
+                                      <div key={imp.id} className="text-xs p-1 rounded bg-muted/50">
                                         <span className="font-medium">{imp.patientPrenom} {imp.patientNom}</span>
-                                        <p className="text-xs text-muted-foreground">Site {imp.siteFdi} - {imp.marque}</p>
+                                        <span className="text-muted-foreground"> - Site {imp.siteFdi}</span>
                                       </div>
-                                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                    </Link>
-                                  ))}
-                                </div>
-                              </ScrollArea>
+                                    ))}
+                                    {implants.length > 8 && (
+                                      <p className="text-xs text-muted-foreground">+{implants.length - 8} autres...</p>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2">{uniquePatients.length} patient{uniquePatients.length > 1 ? "s" : ""} concerné{uniquePatients.length > 1 ? "s" : ""}</p>
+                                </>
+                              )}
                             </div>
-                          </HoverCardContent>
-                        </HoverCard>
-                      ) : (
-                        <Badge variant="secondary">{item.count}</Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                          );
+                        }}
+                      />
+                      <Bar dataKey="count" name="Interventions" fill={STATS_COLORS.chart1} radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 

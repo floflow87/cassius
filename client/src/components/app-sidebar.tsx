@@ -106,10 +106,10 @@ export function AppSidebar() {
                   <img 
                     src={item.icon} 
                     alt={item.title}
-                    className="h-5 w-auto brightness-0 invert shrink-0"
+                    className="h-[18px] w-auto brightness-0 invert shrink-0"
                   />
                 ) : item.lucideIcon && (
-                  <item.lucideIcon className="h-5 w-5 text-white shrink-0" strokeWidth={2.5} />
+                  <item.lucideIcon className="h-[18px] w-[18px] text-white shrink-0" strokeWidth={1.5} />
                 )}
                 {isExpanded && (
                   <span className={`text-sm truncate ${active ? 'font-medium text-white' : 'font-light text-white/80'}`}>
@@ -156,7 +156,7 @@ export function AppSidebar() {
                   <img 
                     src={settingsIcon} 
                     alt="Paramètres"
-                    className="h-5 w-auto brightness-0 invert shrink-0"
+                    className="h-[18px] w-auto brightness-0 invert shrink-0"
                   />
                   <span className={`text-sm truncate ${isActive("/settings") ? 'font-medium text-white' : 'font-light text-white/80'}`}>
                     Paramètres
@@ -174,7 +174,7 @@ export function AppSidebar() {
                       <img 
                         src={settingsIcon} 
                         alt="Paramètres"
-                        className="h-5 w-auto brightness-0 invert"
+                        className="h-[18px] w-auto brightness-0 invert"
                       />
                     </a>
                   </TooltipTrigger>
