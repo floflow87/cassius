@@ -598,6 +598,7 @@ export async function registerRoutes(
   app.patch("/api/patients/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    const userId = req.jwtUser?.userId;
 
     try {
       const data = insertPatientSchema.partial().parse(req.body);
@@ -605,6 +606,25 @@ export async function registerRoutes(
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
+      
+      // Notify other team members about patient modification
+      if (userId) {
+        const orgUsers = await storage.getUsersByOrganisation(organisationId);
+        const changedFields = Object.keys(data);
+        
+        for (const user of orgUsers) {
+          if (user.id !== userId) {
+            notificationService.notificationEvents.onPatientUpdated({
+              organisationId,
+              recipientUserId: user.id,
+              actorUserId: userId,
+              patientId: patient.id,
+              changes: changedFields,
+            }).catch(err => console.error("[Notification] Patient updated notification failed:", err));
+          }
+        }
+      }
+      
       res.json(patient);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1375,6 +1395,28 @@ export async function registerRoutes(
         createdBy: userId || null,
       };
       const radio = await storage.createRadio(organisationId, radioData);
+      
+      // Send notification about new radio to other team members
+      if (userId && data.patientId) {
+        const patient = await storage.getPatient(organisationId, data.patientId);
+        const patientName = patient ? `${patient.prenom} ${patient.nom}` : "Patient";
+        const orgUsers = await storage.getUsersByOrganisation(organisationId);
+        
+        // Notify all other users in the organization
+        for (const user of orgUsers) {
+          if (user.id !== userId) {
+            notificationService.notificationEvents.onRadioAdded({
+              organisationId,
+              recipientUserId: user.id,
+              actorUserId: userId,
+              patientId: data.patientId,
+              patientName,
+              radioType: data.type,
+            }).catch(err => console.error("[Notification] Radio added notification failed:", err));
+          }
+        }
+      }
+      
       res.status(201).json(radio);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1676,16 +1718,22 @@ export async function registerRoutes(
       const userId = req.jwtUser?.userId || null;
       const doc = await storage.createDocument(organisationId, { ...data, createdBy: userId });
       
-      // Send notification about new document
+      // Send notification about new document to other team members
       if (userId) {
-        await notificationService.notificationEvents.onDocumentUploaded({
-          organisationId,
-          recipientUserId: userId,
-          actorUserId: userId,
-          documentId: doc.id,
-          documentName: doc.title || doc.fileName,
-          patientId: doc.patientId || undefined,
-        });
+        const orgUsers = await storage.getUsersByOrganisation(organisationId);
+        
+        for (const user of orgUsers) {
+          if (user.id !== userId) {
+            notificationService.notificationEvents.onDocumentUploaded({
+              organisationId,
+              recipientUserId: user.id,
+              actorUserId: userId,
+              documentId: doc.id,
+              documentName: doc.title || doc.fileName,
+              patientId: doc.patientId || undefined,
+            }).catch(err => console.error("[Notification] Document uploaded notification failed:", err));
+          }
+        }
       }
       
       res.status(201).json(doc);
@@ -1785,6 +1833,13 @@ export async function registerRoutes(
         );
         
         if (surgeryImplantId) {
+          // Get previous ISQ before syncing
+          const previousVisites = await storage.getImplantVisites(organisationId, data.implantId);
+          const sortedVisites = previousVisites
+            .filter(v => v.isq !== null && v.id !== visite.id)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          const previousIsq = sortedVisites.length > 0 ? sortedVisites[0].isq : null;
+          
           await storage.syncVisiteIsqToSurgeryImplant(
             organisationId, 
             surgeryImplantId, 
@@ -1798,22 +1853,65 @@ export async function registerRoutes(
           );
           console.log(`[VISITE-ISQ] Synced ISQ=${data.isq} to surgery_implant=${surgeryImplantId}`);
           
+          const userId = req.jwtUser?.userId;
+          
           // Send notification for low ISQ (< 60)
-          if (data.isq < 60) {
-            const userId = req.jwtUser?.userId;
-            if (userId) {
-              notificationService.createNotification({
+          if (data.isq < 60 && userId) {
+            notificationService.createNotification({
+              organisationId,
+              recipientUserId: userId,
+              kind: "ALERT",
+              type: "ISQ_LOW",
+              severity: data.isq < 50 ? "CRITICAL" : "WARNING",
+              title: `ISQ faible detecte: ${data.isq}`,
+              body: `L'implant sur le site a un ISQ de ${data.isq}, ce qui est en dessous du seuil recommande.`,
+              entityType: "IMPLANT",
+              entityId: surgeryImplantId,
+              dedupeKey: `isq_low_${surgeryImplantId}_${data.isq}`,
+            }).catch(err => console.error("[Notification] ISQ_LOW notification failed:", err));
+          }
+          
+          // Check for significant ISQ drop (10+ points)
+          if (previousIsq !== null && userId) {
+            const isqDrop = previousIsq - data.isq;
+            if (isqDrop >= 10) {
+              const patient = await storage.getPatient(organisationId, data.patientId);
+              const patientName = patient ? `${patient.prenom} ${patient.nom}` : "Patient";
+              const surgeryImplant = await storage.getSurgeryImplant(organisationId, surgeryImplantId);
+              const implantSite = surgeryImplant?.siteFdi || "inconnu";
+              
+              notificationService.notificationEvents.onIsqDeclining({
                 organisationId,
                 recipientUserId: userId,
-                kind: "ALERT",
-                type: "ISQ_LOW",
-                severity: data.isq < 50 ? "CRITICAL" : "WARNING",
-                title: `ISQ faible detecte: ${data.isq}`,
-                body: `L'implant sur le site a un ISQ de ${data.isq}, ce qui est en dessous du seuil recommande.`,
-                entityType: "IMPLANT",
-                entityId: surgeryImplantId,
-                dedupeKey: `isq_low_${surgeryImplantId}_${data.isq}`,
-              }).catch(err => console.error("[Notification] ISQ_LOW notification failed:", err));
+                patientId: data.patientId,
+                patientName,
+                implantSite,
+                previousIsq,
+                currentIsq: data.isq,
+                drop: isqDrop,
+              }).catch(err => console.error("[Notification] ISQ_DECLINING notification failed:", err));
+            }
+            
+            // Check for unstable ISQ history (3+ consecutive low ISQs)
+            const recentIsqValues = sortedVisites.slice(0, 3).map(v => v.isq as number);
+            recentIsqValues.unshift(data.isq);
+            const lowIsqCount = recentIsqValues.filter(v => v < 60).length;
+            
+            if (lowIsqCount >= 3) {
+              const patient = await storage.getPatient(organisationId, data.patientId);
+              const patientName = patient ? `${patient.prenom} ${patient.nom}` : "Patient";
+              const surgeryImplant = await storage.getSurgeryImplant(organisationId, surgeryImplantId);
+              const implantSite = surgeryImplant?.siteFdi || "inconnu";
+              
+              notificationService.notificationEvents.onUnstableIsqHistory({
+                organisationId,
+                recipientUserId: userId,
+                patientId: data.patientId,
+                patientName,
+                implantSite,
+                lowIsqCount,
+                recentIsqValues: recentIsqValues.slice(0, lowIsqCount),
+              }).catch(err => console.error("[Notification] UNSTABLE_ISQ notification failed:", err));
             }
           }
         }
@@ -2927,6 +3025,17 @@ export async function registerRoutes(
           message = "Permissions insuffisantes. Veuillez reconnecter Google Calendar avec les bons scopes.";
           step = "google_auth";
         }
+      }
+      
+      // Send sync error notification
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        notificationService.notificationEvents.onSyncError({
+          organisationId,
+          recipientUserId: userId,
+          integrationName: "Google Calendar",
+          errorMessage: message,
+        }).catch(err => console.error("[Notification] Sync error notification failed:", err));
       }
       
       res.status(500).json({ 
@@ -4106,6 +4215,16 @@ export async function registerRoutes(
       
       console.log(`[SETTINGS] Invitation created for: ${normalizedEmail}, email sent: ${result.success}`);
       
+      // Send notification to the inviting user about invitation sent
+      if (inviterId) {
+        notificationService.notificationEvents.onInvitationSent({
+          organisationId,
+          recipientUserId: inviterId,
+          inviteeEmail: normalizedEmail,
+          role,
+        }).catch(err => console.error("[Notification] Invitation sent notification failed:", err));
+      }
+      
       res.status(201).json({
         id: invitation.id,
         email: invitation.email,
@@ -4152,7 +4271,24 @@ export async function registerRoutes(
         }
       }
       
+      const previousRole = user.role;
       await storage.updateUser(id, { role: role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT" });
+      
+      // Notify all admins about role change
+      const actorUserId = req.jwtUser?.userId || "";
+      const orgUsers = await storage.getUsersByOrganisation(organisationId);
+      const userName = `${user.prenom || ""} ${user.nom || ""}`.trim() || user.username;
+      
+      for (const admin of orgUsers.filter(u => u.role === "ADMIN")) {
+        notificationService.notificationEvents.onRoleChanged({
+          organisationId,
+          recipientUserId: admin.id,
+          affectedUserName: userName,
+          previousRole,
+          newRole: role,
+          actorUserId,
+        }).catch(err => console.error("[Notification] Role changed notification failed:", err));
+      }
       
       res.json({ success: true });
     } catch (error: any) {
@@ -4363,6 +4499,20 @@ export async function registerRoutes(
       
       // Mark invitation as accepted
       await storage.acceptInvitation(invitation.id);
+      
+      // Notify all admins about new member joining
+      const orgUsers = await storage.getUsersByOrganisation(invitation.organisationId);
+      const newMemberName = `${prenom || invitation.prenom || ""} ${nom || invitation.nom || ""}`.trim() || invitation.email;
+      
+      for (const admin of orgUsers.filter(u => u.role === "ADMIN" && u.id !== newUser.id)) {
+        notificationService.notificationEvents.onNewMemberJoined({
+          organisationId: invitation.organisationId,
+          recipientUserId: admin.id,
+          newMemberName,
+          newMemberEmail: invitation.email,
+          role: invitation.role,
+        }).catch(err => console.error("[Notification] New member notification failed:", err));
+      }
       
       console.log("[AUTH] Invitation accepted, user created:", newUser.id);
       res.json({

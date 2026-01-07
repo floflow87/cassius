@@ -89,6 +89,39 @@ All email functions handle missing Resend credentials gracefully - they return s
 - `/accept-invitation` - Invitation acceptance form (with token validation)
 - `/verify-email` - Email verification page
 
+## Notification System
+The application includes a comprehensive in-app notification system with user preferences:
+
+**Notification Categories:**
+- **ALERTS_REMINDERS:** Clinical alerts (ISQ low, ISQ declining, unstable ISQ history)
+- **TEAM_ACTIVITY:** Team updates (radio/document uploads, patient updates, role changes)
+- **IMPORTS:** Import completion notifications
+- **SYSTEM:** Technical notifications (sync errors, integration issues)
+
+**Notification Types (15+):**
+- Clinical: ISQ_LOW, ISQ_DECLINING, UNSTABLE_ISQ_HISTORY
+- Team: RADIO_ADDED, DOCUMENT_UPLOADED, PATIENT_UPDATED, NEW_MEMBER, ROLE_CHANGED, INVITATION_SENT
+- System: SYNC_ERROR, IMPORT_COMPLETED
+
+**Notification Triggers:**
+- ISQ < 60: Creates low ISQ alert
+- ISQ drop ≥ 10 points: Creates ISQ declining alert
+- 3+ consecutive low ISQs: Creates unstable ISQ history alert
+- Radio/document uploads: Notifies other team members
+- Patient updates: Notifies other team members
+- Role changes: Notifies all admins
+- New member joins: Notifies all admins
+- Google Calendar sync errors: Notifies the user
+- CSV import completion: Notifies the importer
+
+**API Endpoints:**
+- GET /api/notifications - List notifications (with pagination, filtering)
+- GET /api/notifications/unread-count - Get unread count
+- PATCH /api/notifications/:id/read - Mark as read
+- PATCH /api/notifications/read-all - Mark all as read
+- GET /api/notifications/preferences - Get user preferences
+- PUT /api/notifications/preferences - Update user preferences
+
 ## Database Configuration
 **Important:** The application uses `SUPABASE_DB_URL_DEV` (Supabase PostgreSQL) for development, NOT `DATABASE_URL` (Replit PostgreSQL). 
 - `drizzle.config.ts` uses `DATABASE_URL` for migrations
