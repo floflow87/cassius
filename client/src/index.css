@@ -373,6 +373,30 @@
   }
 }
 
+/* Tab slide animation */
+[data-state="active"][role="tab"] {
+  transition: all 0.2s ease-in-out;
+}
+
+[data-state="inactive"][role="tab"] {
+  transition: all 0.2s ease-in-out;
+}
+
+[role="tabpanel"] {
+  animation: tab-slide-in 0.25s ease-out;
+}
+
+@keyframes tab-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* FullCalendar custom styling */
 .fc {
   --fc-border-color: hsl(var(--border));

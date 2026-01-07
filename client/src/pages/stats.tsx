@@ -586,7 +586,7 @@ export default function StatsPage() {
 
       {/* Tabs for different stat views */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-transparent p-0 h-auto gap-1 border-b-0">
+        <TabsList className="bg-white dark:bg-zinc-900 p-1 h-auto gap-1 border-b-0 rounded-full">
           <TabsTrigger 
             value="patient" 
             className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
