@@ -289,7 +289,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="px-6 pb-6 space-y-6">
       <h1 className="text-lg font-medium" data-testid="text-welcome-title">
         Bienvenue {getUserFirstName()}
       </h1>

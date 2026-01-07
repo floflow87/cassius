@@ -297,7 +297,7 @@ function AuthenticatedApp() {
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0 bg-muted/30 pt-2">
           <PageHeader user={user} onLogout={handleLogout} patientCount={patients?.length} />
-          <main className="flex-1 overflow-auto px-6 pt-4">
+          <main className="flex-1 overflow-auto pt-4">
             <Router searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
           </main>
         </div>

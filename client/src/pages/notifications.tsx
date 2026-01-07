@@ -285,7 +285,7 @@ export default function NotificationsPage() {
   };
   
   return (
-    <div className="p-6 w-full" data-testid="page-notifications">
+    <div className="px-6 pb-6 w-full" data-testid="page-notifications">
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Notifications</h1>

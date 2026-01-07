@@ -697,14 +697,14 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
 
   if (isLoading) {
     return (
-      <div className="p-6">
+      <div className="px-6 pb-6">
         <PatientsListSkeleton />
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="px-6 pb-6">
       <div className="flex items-center gap-4 mb-5">
         <CassiusSearchInput
           placeholder="Rechercher un patient..."

@@ -525,7 +525,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
 
   if (isLoading) {
     return (
-      <div className="p-6">
+      <div className="px-6 pb-6">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
@@ -534,7 +534,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   }
 
   return (
-    <div className="p-6">
+    <div className="px-6 pb-6">
       <div className="flex items-center gap-4 mb-5">
         <CassiusSearchInput 
           value={searchQuery}

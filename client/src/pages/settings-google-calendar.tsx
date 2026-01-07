@@ -555,7 +555,7 @@ export default function GoogleCalendarIntegration() {
   const openConflictsCount = conflicts.filter(c => c.status === "open").length;
 
   return (
-    <div className="p-6" data-testid="settings-google-calendar">
+    <div className="px-6 pb-6" data-testid="settings-google-calendar">
       <div className="flex items-center gap-3 mb-8">
         <Link href="/settings/integrations">
           <Button variant="ghost" size="icon" data-testid="button-back">

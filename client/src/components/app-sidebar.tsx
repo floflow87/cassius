@@ -79,9 +79,9 @@ export function AppSidebar() {
             data-testid="link-logo-home"
           >
             {isExpanded ? (
-              <img src={logoFull} alt="Cassius" className="h-9 w-auto" />
+              <img src={logoFull} alt="Cassius" className="h-11 w-auto" />
             ) : (
-              <img src={logoIcon} alt="Cassius" className="h-8 w-8 shrink-0 brightness-0 invert" />
+              <img src={logoIcon} alt="Cassius" className="h-9 w-9 shrink-0 brightness-0 invert" />
             )}
           </a>
         </div>
