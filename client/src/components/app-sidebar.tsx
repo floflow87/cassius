@@ -70,19 +70,21 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0 overflow-visible relative">
 
-      <SidebarHeader className="bg-sidebar flex items-end justify-start h-24 pl-5 pr-2 pb-4">
-        <a 
-          href="/dashboard" 
-          onClick={handleNavClick("/dashboard")}
-          className="flex items-center justify-start cursor-pointer"
-          data-testid="link-logo-home"
-        >
-          {isExpanded ? (
-            <img src={logoFull} alt="Cassius" className="h-7 w-auto" />
-          ) : (
-            <img src={logoIcon} alt="Cassius" className="h-8 w-8 shrink-0 brightness-0 invert" />
-          )}
-        </a>
+      <SidebarHeader className="bg-sidebar h-24 pb-2 px-2">
+        <div className="flex items-end h-full pl-3">
+          <a 
+            href="/dashboard" 
+            onClick={handleNavClick("/dashboard")}
+            className="cursor-pointer"
+            data-testid="link-logo-home"
+          >
+            {isExpanded ? (
+              <img src={logoFull} alt="Cassius" className="h-7 w-auto" />
+            ) : (
+              <img src={logoIcon} alt="Cassius" className="h-8 w-8 shrink-0 brightness-0 invert" />
+            )}
+          </a>
+        </div>
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar px-0 py-0">
