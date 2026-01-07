@@ -111,7 +111,7 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
   };
 
   return (
-    <header className="flex items-center justify-between gap-4 px-6 h-14 bg-white dark:bg-gray-950 sticky top-2 z-50 shrink-0 mx-4 rounded-[15px] shadow-sm">
+    <header className="flex items-center justify-between gap-4 px-6 h-[59px] bg-white dark:bg-gray-950 sticky top-2 z-50 shrink-0 mx-6 rounded-[15px]">
       <div className="flex items-center gap-2">
         <h1 className="text-base font-semibold text-foreground" data-testid="text-page-title">
           {title}
@@ -283,7 +283,7 @@ function AuthenticatedApp() {
   };
 
   const style = {
-    "--sidebar-width": "15rem",
+    "--sidebar-width": "16rem",
     "--sidebar-width-icon": "4.5rem",
   };
 
@@ -297,7 +297,7 @@ function AuthenticatedApp() {
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0 bg-muted/30 pt-2">
           <PageHeader user={user} onLogout={handleLogout} patientCount={patients?.length} />
-          <main className="flex-1 overflow-auto px-4 pt-4">
+          <main className="flex-1 overflow-auto px-6 pt-4">
             <Router searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
           </main>
         </div>
