@@ -18,7 +18,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { FaFolder, FaCalendarAlt } from "react-icons/fa";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
-import logoFull from "@assets/logo_Cassius_Plan_de_travail_1_copie_1765897934649.png";
+import logoFull from "@assets/logo_Cassius_Plan_de_travail_1_copie_Plan_de_travail_1_copie_2_1767822114601.png";
 import homeIcon from "/assets/icons/home.png";
 import patientIcon from "/assets/icons/patient.png";
 import implantsIcon from "/assets/icons/implants.png";
@@ -70,17 +70,17 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0 overflow-visible relative">
 
-      <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center h-16 px-4 border-b">
+      <SidebarHeader className="bg-sidebar flex items-center justify-start h-16 px-5">
         <a 
           href="/dashboard" 
           onClick={handleNavClick("/dashboard")}
-          className="flex items-center justify-center w-full cursor-pointer"
+          className="flex items-center justify-start cursor-pointer"
           data-testid="link-logo-home"
         >
           {isExpanded ? (
-            <img src={logoFull} alt="Cassius" className="h-8 w-auto" />
+            <img src={logoFull} alt="Cassius" className="h-6 w-auto" />
           ) : (
-            <img src={logoIcon} alt="Cassius" className="h-8 w-8 shrink-0" />
+            <img src={logoIcon} alt="Cassius" className="h-8 w-8 shrink-0 brightness-0 invert" />
           )}
         </a>
       </SidebarHeader>
