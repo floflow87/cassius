@@ -33,6 +33,7 @@ import {
   importJobs,
   users,
   notifications,
+  flags,
 } from "@shared/schema";
 import type {
   Patient,
@@ -5013,6 +5014,24 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("[DEV] Error clearing notifications:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/dev/clear-flags - Clear all flags (DEV only)
+  app.delete("/api/dev/clear-flags", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: "Non disponible en production" });
+      }
+
+      const result = await db.delete(flags);
+      res.json({
+        success: true,
+        message: `${result.rowCount || 0} flags supprimés`,
+      });
+    } catch (error: any) {
+      console.error("[DEV] Error clearing flags:", error);
       res.status(500).json({ error: error.message });
     }
   });
