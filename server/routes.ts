@@ -32,6 +32,7 @@ import {
   patients,
   importJobs,
   users,
+  notifications,
 } from "@shared/schema";
 import type {
   Patient,
@@ -4974,24 +4975,19 @@ export async function registerRoutes(
   });
 
   // DELETE /api/dev/clear-notifications - Clear all notifications except last N (DEV only)
-  app.delete("/api/dev/clear-notifications", requireJwtOrSession, async (req, res) => {
+  app.delete("/api/dev/clear-notifications", async (req, res) => {
     try {
       if (process.env.NODE_ENV === 'production') {
         return res.status(403).json({ error: "Non disponible en production" });
       }
 
-      const organisationId = getOrganisationId(req, res);
-      if (!organisationId) return;
-      const userId = req.jwtUser?.userId;
-      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
-
+      // In dev mode, clear all notifications for all users
       const keepLast = parseInt(req.query.keep as string) || 0;
       
-      // Get IDs to keep
+      // Get IDs to keep (most recent N globally)
       const toKeep = await db
         .select({ id: notifications.id })
         .from(notifications)
-        .where(eq(notifications.recipientUserId, userId))
         .orderBy(desc(notifications.createdAt))
         .limit(keepLast);
       
@@ -5002,15 +4998,11 @@ export async function registerRoutes(
       if (keepIds.length > 0) {
         const result = await db
           .delete(notifications)
-          .where(and(
-            eq(notifications.recipientUserId, userId),
-            notInArray(notifications.id, keepIds)
-          ));
+          .where(notInArray(notifications.id, keepIds));
         deletedCount = result.rowCount || 0;
       } else {
         const result = await db
-          .delete(notifications)
-          .where(eq(notifications.recipientUserId, userId));
+          .delete(notifications);
         deletedCount = result.rowCount || 0;
       }
 
