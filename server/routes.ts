@@ -4730,7 +4730,76 @@ export async function registerRoutes(
 
   // ==================== NOTIFICATION ROUTES ====================
 
-  // Get notifications list
+  // Helper: Convert flags to notification-like objects
+  function flagsToNotifications(flags: any[]): any[] {
+    const severityMap: Record<string, string> = {
+      CRITICAL: "CRITICAL",
+      WARNING: "WARNING",
+      INFO: "INFO",
+    };
+    
+    const titleMap: Record<string, string> = {
+      ISQ_LOW: "ISQ bas detecte",
+      ISQ_CRITICAL: "ISQ critique",
+      NO_POSTOP_FOLLOWUP: "Suivi post-operatoire manquant",
+      INCOMPLETE_DATA: "Donnees incompletes",
+      OVERDUE_APPOINTMENT: "Rendez-vous en retard",
+      MISSING_XRAY: "Radiographie manquante",
+    };
+    
+    return flags.map((flag) => ({
+      id: `flag-${flag.id}`,
+      kind: "ALERT",
+      type: flag.type,
+      severity: severityMap[flag.severity] || "INFO",
+      title: titleMap[flag.type] || flag.type,
+      body: flag.message || `Alerte pour le patient ${flag.patient?.prenom || ""} ${flag.patient?.nom || ""}`.trim(),
+      entityType: "PATIENT",
+      entityId: flag.patientId,
+      createdAt: flag.createdAt || new Date().toISOString(),
+      readAt: flag.resolvedAt || null,
+      isVirtual: true,
+      patientName: flag.patient ? `${flag.patient.prenom || ""} ${flag.patient.nom || ""}`.trim() : null,
+    }));
+  }
+
+  // Helper: Convert upcoming appointments to notification-like objects
+  function appointmentsToNotifications(appointments: any[]): any[] {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date(tomorrow);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+
+    return appointments
+      .filter((apt) => {
+        const aptDate = new Date(apt.dateHeure);
+        return aptDate >= today && aptDate < dayAfter;
+      })
+      .map((apt) => {
+        const aptDate = new Date(apt.dateHeure);
+        const isToday = aptDate >= today && aptDate < tomorrow;
+        const timeStr = aptDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+        
+        return {
+          id: `apt-${apt.id}`,
+          kind: "REMINDER",
+          type: "UPCOMING_APPOINTMENT",
+          severity: isToday ? "WARNING" : "INFO",
+          title: isToday ? `RDV aujourd'hui a ${timeStr}` : `RDV demain a ${timeStr}`,
+          body: apt.patient ? `${apt.patient.prenom || ""} ${apt.patient.nom || ""} - ${apt.type}`.trim() : apt.type,
+          entityType: "APPOINTMENT",
+          entityId: apt.id,
+          createdAt: apt.createdAt || new Date().toISOString(),
+          readAt: null,
+          isVirtual: true,
+          patientName: apt.patient ? `${apt.patient.prenom || ""} ${apt.patient.nom || ""}`.trim() : null,
+        };
+      });
+  }
+
+  // Get notifications list (including flags and upcoming appointments)
   app.get("/api/notifications", requireJwtOrSession, async (req, res) => {
     try {
       const organisationId = getOrganisationId(req, res);
@@ -4740,6 +4809,7 @@ export async function registerRoutes(
 
       const { kind, unreadOnly, page, pageSize } = req.query;
       
+      // Get stored notifications
       const result = await notificationService.getNotifications(userId, organisationId, {
         kind: kind as any,
         unreadOnly: unreadOnly === 'true',
@@ -4747,14 +4817,39 @@ export async function registerRoutes(
         pageSize: pageSize ? parseInt(pageSize as string) : 20,
       });
       
-      res.json(result);
+      // Also get flags and upcoming appointments as virtual notifications
+      const [flags, appointments] = await Promise.all([
+        storage.getFlagsWithEntity(organisationId, false), // unresolved flags only
+        storage.getAppointments(organisationId),
+      ]);
+      
+      const virtualFromFlags = flagsToNotifications(flags);
+      const virtualFromAppointments = appointmentsToNotifications(appointments);
+      
+      // Merge and sort by date (newest first)
+      const allNotifications = [
+        ...result.notifications,
+        ...virtualFromFlags,
+        ...virtualFromAppointments,
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      // Paginate the merged results
+      const pageNum = page ? parseInt(page as string) : 1;
+      const pageSizeNum = pageSize ? parseInt(pageSize as string) : 20;
+      const startIdx = (pageNum - 1) * pageSizeNum;
+      const paginatedNotifications = allNotifications.slice(startIdx, startIdx + pageSizeNum);
+      
+      res.json({
+        notifications: paginatedNotifications,
+        total: allNotifications.length,
+      });
     } catch (error: any) {
       console.error("[Notifications] Error fetching notifications:", error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Get unread count
+  // Get unread count (including flags and upcoming appointments)
   app.get("/api/notifications/unread-count", requireJwtOrSession, async (req, res) => {
     try {
       const organisationId = getOrganisationId(req, res);
@@ -4762,8 +4857,28 @@ export async function registerRoutes(
       const userId = req.jwtUser?.userId;
       if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
 
-      const count = await notificationService.getUnreadCount(userId, organisationId);
-      res.json({ count });
+      // Get stored notification count
+      const storedCount = await notificationService.getUnreadCount(userId, organisationId);
+      
+      // Also count unresolved flags and upcoming appointments
+      const [flags, appointments] = await Promise.all([
+        storage.getFlagsWithEntity(organisationId, false),
+        storage.getAppointments(organisationId),
+      ]);
+      
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dayAfterTomorrow = new Date(today);
+      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+      
+      const upcomingAppointmentsCount = appointments.filter((apt: any) => {
+        const aptDate = new Date(apt.dateHeure);
+        return aptDate >= today && aptDate < dayAfterTomorrow;
+      }).length;
+      
+      const totalCount = storedCount + flags.length + upcomingAppointmentsCount;
+      
+      res.json({ count: totalCount });
     } catch (error: any) {
       console.error("[Notifications] Error fetching unread count:", error);
       res.status(500).json({ error: error.message });
