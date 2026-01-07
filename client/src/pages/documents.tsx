@@ -863,7 +863,6 @@ export default function DocumentsPage() {
             
             <Button
               onClick={() => setUploadSheetOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
               data-testid="button-upload-document"
             >
               <Upload className="h-4 w-4 mr-2" />

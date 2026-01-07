@@ -202,7 +202,14 @@ export default function SettingsPage() {
           </TabsList>
 
           <TabsContent value="security">
-            {profile && <SecuritySection profile={profile} onProfileUpdate={() => queryClient.invalidateQueries({ queryKey: ["/api/settings/profile"] })} />}
+            {profile ? (
+              <SecuritySection profile={profile} onProfileUpdate={() => queryClient.invalidateQueries({ queryKey: ["/api/settings/profile"] })} />
+            ) : (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                Chargement du profil...
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="notifications">

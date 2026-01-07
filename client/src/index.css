@@ -66,9 +66,9 @@
   /* Legacy aliases */
   --stats-primary: 217 91% 60%;
   --stats-primary-soft: 215 93% 80%;
-  /* Success #16A34A (bg #DCFCE7) */
-  --stats-success: 142 76% 36%;
-  --stats-success-bg: 142 77% 93%;
+  /* Success - using violet #d399ff for stats */
+  --stats-success: 277 100% 80%;
+  --stats-success-bg: 277 100% 95%;
   /* Warning #F59E0B (bg #FEF3C7) */
   --stats-warning: 38 92% 50%;
   --stats-warning-bg: 48 96% 89%;
@@ -177,8 +177,8 @@
   /* Legacy aliases */
   --stats-primary: 217 91% 60%;
   --stats-primary-soft: 215 93% 75%;
-  --stats-success: 142 70% 45%;
-  --stats-success-bg: 142 50% 15%;
+  --stats-success: 277 100% 75%;
+  --stats-success-bg: 277 50% 20%;
   --stats-warning: 38 85% 55%;
   --stats-warning-bg: 38 50% 15%;
   --stats-danger: 0 75% 55%;

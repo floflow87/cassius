@@ -40,7 +40,7 @@ export const tailwindColors = {
 /** Classes Tailwind utilitaires pour les statuts d'implants */
 export const implantStatusClasses = {
   EN_SUIVI: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  SUCCES: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+  SUCCES: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
   COMPLICATION: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
   ECHEC: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
 } as const;

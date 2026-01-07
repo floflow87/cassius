@@ -102,10 +102,10 @@ export const implantStatusColors = {
     hex: "#3B82F6",
   },
   SUCCES: {
-    bg: "bg-green-100 dark:bg-green-900/30",
-    text: "text-green-700 dark:text-green-300",
-    border: "border-green-200 dark:border-green-800",
-    hex: "#22C55E",
+    bg: "bg-emerald-100 dark:bg-emerald-900/30",
+    text: "text-emerald-700 dark:text-emerald-300",
+    border: "border-emerald-200 dark:border-emerald-800",
+    hex: "#61e294",
   },
   COMPLICATION: {
     bg: "bg-orange-100 dark:bg-orange-900/30",
