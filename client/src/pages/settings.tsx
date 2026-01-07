@@ -589,11 +589,6 @@ function IntegrationsSection() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Intégrations</h2>
-        <p className="text-muted-foreground">Connectez vos services externes pour synchroniser vos données.</p>
-      </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
         {/* Google Calendar - Active Integration */}
         <Card className="flex flex-col !bg-white dark:!bg-zinc-900">
@@ -849,11 +844,7 @@ function CollaboratorsSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl font-bold">Collaborateurs</h2>
-          <p className="text-muted-foreground">Gérez les membres de votre organisation et leurs permissions.</p>
-        </div>
+      <div className="flex items-center justify-end gap-4 flex-wrap">
         <Sheet open={showInviteSheet} onOpenChange={setShowInviteSheet}>
           <SheetTrigger asChild>
             <Button data-testid="button-invite-collaborator">
@@ -1142,11 +1133,6 @@ function OrganizationSection() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Organisation</h2>
-        <p className="text-muted-foreground">Informations et paramètres de votre cabinet.</p>
-      </div>
-
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -1446,12 +1432,53 @@ function NotificationsSection() {
 
   const categories = ["ALERTS_REMINDERS", "TEAM_ACTIVITY", "IMPORTS", "SYSTEM"] as const;
 
+  const [digestFrequency, setDigestFrequency] = useState<"none" | "daily" | "weekly">("none");
+  const [digestEnabled, setDigestEnabled] = useState(false);
+
+  const handleDigestChange = (value: string) => {
+    setDigestFrequency(value as "none" | "daily" | "weekly");
+    setDigestEnabled(value !== "none");
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Notifications</h2>
-        <p className="text-muted-foreground">Configurez précisément les notifications que vous souhaitez recevoir.</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-md bg-muted">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Notifications par email</CardTitle>
+                <CardDescription className="text-xs">
+                  Les notifications par email sont envoyées immédiatement pour les alertes critiques.
+                </CardDescription>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4 p-4 border rounded-md">
+              <div>
+                <p className="text-sm font-medium">Résumé par email</p>
+                <p className="text-xs text-muted-foreground">Recevez un récapitulatif de vos notifications non lues</p>
+              </div>
+              <Select value={digestFrequency} onValueChange={handleDigestChange}>
+                <SelectTrigger className="w-[200px]" data-testid="select-digest-frequency">
+                  <SelectValue placeholder="Fréquence" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Désactivé</SelectItem>
+                  <SelectItem value="daily">Tous les soirs, 19h</SelectItem>
+                  <SelectItem value="weekly">Tous les vendredis, 19h</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
@@ -1544,19 +1571,6 @@ function NotificationsSection() {
           })}
         </div>
       )}
-      
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Mail className="w-4 h-4" />
-            Notifications par email
-          </CardTitle>
-          <CardDescription>
-            Les notifications par email sont envoyées immédiatement pour les alertes critiques.
-            Un résumé quotidien peut être configuré dans les paramètres avancés.
-          </CardDescription>
-        </CardHeader>
-      </Card>
     </div>
   );
 }
