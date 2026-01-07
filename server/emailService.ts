@@ -962,3 +962,550 @@ export async function sendFollowupRequiredEmail(
     return { success: false, error: err.message };
   }
 }
+
+export async function sendNoRecentVisitEmail(
+  toEmail: string,
+  firstName: string,
+  lastVisitLabel: string,
+  thresholdLabel: string,
+  contextLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Visite recommandée',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Un patient n'a pas eu de visite récente, selon vos règles de notification.</p>
+      `,
+      infoBox: {
+        title: 'Résumé',
+        lines: [
+          `Dernière visite : <b>${lastVisitLabel}</b>`,
+          `Seuil : ${thresholdLabel}`,
+          `Contexte : ${contextLabel}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Ouvrir dans Cassius'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Visite recommandée — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send no recent visit email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending no recent visit email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendFollowupNotPlannedEmail(
+  toEmail: string,
+  firstName: string,
+  surgeryDateLabel: string,
+  contextLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Suivi à planifier',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Une chirurgie n'a pas de suivi planifié.</p>
+      `,
+      infoBox: {
+        title: 'Résumé',
+        lines: [
+          `Date de chirurgie : <b>${surgeryDateLabel}</b>`,
+          `Contexte : ${contextLabel}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Planifier un suivi'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Suivi à planifier — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send followup not planned email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending followup not planned email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendNewMemberJoinedEmail(
+  toEmail: string,
+  firstName: string,
+  memberName: string,
+  memberRole: string,
+  joinedAtLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Nouveau membre dans l\'équipe',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Un nouveau collaborateur a rejoint votre organisation.</p>
+      `,
+      infoBox: {
+        title: 'Détail',
+        lines: [
+          `Nom : <b>${memberName}</b>`,
+          `Rôle : ${memberRole}`,
+          `Date : ${joinedAtLabel}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Voir l\'équipe'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Nouveau membre dans l'équipe — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send new member joined email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending new member joined email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendRoleChangedEmail(
+  toEmail: string,
+  firstName: string,
+  memberName: string,
+  oldRole: string,
+  newRole: string,
+  changedByName: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Rôle modifié',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Le rôle d'un membre de l'équipe a été modifié.</p>
+      `,
+      infoBox: {
+        title: 'Détail',
+        lines: [
+          `Membre : <b>${memberName}</b>`,
+          `Ancien rôle : ${oldRole}`,
+          `Nouveau rôle : ${newRole}`,
+          `Modifié par : ${changedByName}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Voir l\'équipe'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Rôle modifié — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send role changed email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending role changed email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendInvitationSentEmail(
+  toEmail: string,
+  firstName: string,
+  inviteeEmail: string,
+  inviteeRole: string,
+  sentByName: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Invitation envoyée',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Une invitation a été envoyée à un nouveau collaborateur.</p>
+      `,
+      infoBox: {
+        title: 'Détail',
+        lines: [
+          `Email : <b>${inviteeEmail}</b>`,
+          `Rôle proposé : ${inviteeRole}`,
+          `Envoyée par : ${sentByName}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Voir les invitations'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Invitation envoyée — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send invitation sent email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending invitation sent email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendImportStartedEmail(
+  toEmail: string,
+  firstName: string,
+  importType: string,
+  fileName: string,
+  startedAtLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Import démarré',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Un import de données a démarré.</p>
+      `,
+      infoBox: {
+        title: 'Détail',
+        lines: [
+          `Type : <b>${importType}</b>`,
+          `Fichier : ${fileName}`,
+          `Démarré le : ${startedAtLabel}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Suivre l\'import'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Import démarré — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send import started email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending import started email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendImportPartialEmail(
+  toEmail: string,
+  firstName: string,
+  importType: string,
+  successCount: number,
+  errorCount: number,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Import terminé avec des erreurs',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">L'import s'est terminé avec des erreurs partielles.</p>
+      `,
+      warningBox: {
+        title: 'Résumé',
+        lines: [
+          `Type : <b>${importType}</b>`,
+          `Réussis : ${successCount}`,
+          `Erreurs : ${errorCount}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Voir les détails'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Import terminé avec des erreurs — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send import partial email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending import partial email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendImportFailedEmail(
+  toEmail: string,
+  firstName: string,
+  importType: string,
+  errorMessage: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Import échoué',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">L'import a échoué.</p>
+      `,
+      warningBox: {
+        title: 'Détail',
+        lines: [
+          `Type : <b>${importType}</b>`,
+          `Erreur : ${errorMessage}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Réessayer'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Import échoué — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send import failed email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending import failed email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendEmailErrorEmail(
+  toEmail: string,
+  firstName: string,
+  originalEmailType: string,
+  errorMessage: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Erreur d\'envoi d\'email',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Un email n'a pas pu être envoyé.</p>
+      `,
+      warningBox: {
+        title: 'Détail',
+        lines: [
+          `Type d'email : <b>${originalEmailType}</b>`,
+          `Erreur : ${errorMessage}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Vérifier les paramètres'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Erreur d'envoi d'email — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send email error email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending email error email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendSystemMaintenanceEmail(
+  toEmail: string,
+  firstName: string,
+  maintenanceTitle: string,
+  scheduledDateLabel: string,
+  durationLabel: string,
+  description: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Maintenance programmée',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Une maintenance système est programmée.</p>
+      `,
+      infoBox: {
+        title: maintenanceTitle,
+        lines: [
+          `Date : <b>${scheduledDateLabel}</b>`,
+          `Durée estimée : ${durationLabel}`,
+          `${description}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Plus d\'informations'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Maintenance programmée — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send system maintenance email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending system maintenance email:', err);
+    return { success: false, error: err.message };
+  }
+}

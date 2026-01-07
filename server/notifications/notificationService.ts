@@ -19,7 +19,17 @@ import {
   sendPatientUpdatedEmail,
   sendAppointmentReminderEmail,
   sendSyncErrorEmail,
-  sendFollowupRequiredEmail
+  sendFollowupRequiredEmail,
+  sendNoRecentVisitEmail,
+  sendFollowupNotPlannedEmail,
+  sendNewMemberJoinedEmail,
+  sendRoleChangedEmail,
+  sendInvitationSentEmail,
+  sendImportStartedEmail,
+  sendImportPartialEmail,
+  sendImportFailedEmail,
+  sendEmailErrorEmail,
+  sendSystemMaintenanceEmail
 } from "../emailService";
 
 type NotificationKind = "ALERT" | "REMINDER" | "ACTIVITY" | "IMPORT" | "SYSTEM";
@@ -264,6 +274,7 @@ async function sendImmediateEmailNotification(notification: Notification, userId
         break;
       
       case 'DOCUMENT_UPLOADED':
+      case 'DOCUMENT_ADDED':
         await sendDocumentAddedEmail(
           user.username,
           firstName,
@@ -340,6 +351,116 @@ async function sendImmediateEmailNotification(notification: Notification, userId
           metadata.lastFollowupLabel || 'Aucun',
           metadata.thresholdLabel || '',
           metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'NO_RECENT_VISIT':
+        await sendNoRecentVisitEmail(
+          user.username,
+          firstName,
+          metadata.lastVisitLabel || 'Aucune',
+          metadata.thresholdLabel || '',
+          metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'SURGERY_NO_FOLLOWUP_PLANNED':
+      case 'FOLLOWUP_TO_SCHEDULE':
+        await sendFollowupNotPlannedEmail(
+          user.username,
+          firstName,
+          metadata.surgeryDateLabel || '',
+          metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'NEW_MEMBER_JOINED':
+        await sendNewMemberJoinedEmail(
+          user.username,
+          firstName,
+          metadata.memberName || 'Nouveau membre',
+          metadata.memberRole || '',
+          metadata.joinedAtLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'ROLE_CHANGED':
+        await sendRoleChangedEmail(
+          user.username,
+          firstName,
+          metadata.memberName || '',
+          metadata.oldRole || '',
+          metadata.newRole || '',
+          metadata.changedByName || '',
+          deepLink
+        );
+        break;
+      
+      case 'INVITATION_SENT':
+        await sendInvitationSentEmail(
+          user.username,
+          firstName,
+          metadata.inviteeEmail || '',
+          metadata.inviteeRole || '',
+          metadata.sentByName || '',
+          deepLink
+        );
+        break;
+      
+      case 'IMPORT_STARTED':
+        await sendImportStartedEmail(
+          user.username,
+          firstName,
+          metadata.importType || 'Données',
+          metadata.fileName || '',
+          metadata.startedAtLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'IMPORT_PARTIAL':
+        await sendImportPartialEmail(
+          user.username,
+          firstName,
+          metadata.importType || 'Données',
+          metadata.successCount || 0,
+          metadata.errorCount || 0,
+          deepLink
+        );
+        break;
+      
+      case 'IMPORT_FAILED':
+        await sendImportFailedEmail(
+          user.username,
+          firstName,
+          metadata.importType || 'Données',
+          metadata.errorMessage || 'Erreur inconnue',
+          deepLink
+        );
+        break;
+      
+      case 'EMAIL_ERROR':
+        await sendEmailErrorEmail(
+          user.username,
+          firstName,
+          metadata.originalEmailType || '',
+          metadata.errorMessage || 'Erreur inconnue',
+          deepLink
+        );
+        break;
+      
+      case 'SYSTEM_MAINTENANCE':
+        await sendSystemMaintenanceEmail(
+          user.username,
+          firstName,
+          metadata.maintenanceTitle || 'Maintenance',
+          metadata.scheduledDateLabel || '',
+          metadata.durationLabel || '',
+          metadata.description || '',
           deepLink
         );
         break;
