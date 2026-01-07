@@ -846,7 +846,7 @@ export default function StatsPage() {
                               {implants.length > 0 && (
                                 <>
                                   <p className="text-xs font-medium text-muted-foreground mb-1">Implants posés ({implants.length}):</p>
-                                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                                  <div className={`space-y-1 ${implants.length > 6 ? 'max-h-40 overflow-y-auto pr-1' : ''}`}>
                                     {implants.map((imp: {id: string; siteFdi: string; patientNom: string; patientPrenom: string; marque: string}) => (
                                       <div key={imp.id} className="text-xs p-1 rounded bg-muted/50">
                                         <span className="font-medium">{imp.patientPrenom} {imp.patientNom}</span>
