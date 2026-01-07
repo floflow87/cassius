@@ -5321,13 +5321,13 @@ export async function registerRoutes(
       if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
 
       const { category } = req.params;
-      const { frequency, inAppEnabled, emailEnabled, digestTime } = req.body;
+      const { frequency, inAppEnabled, emailEnabled, digestTime, disabledTypes } = req.body;
       
       const preference = await notificationService.updatePreference(
         userId,
         organisationId,
         category as any,
-        { frequency, inAppEnabled, emailEnabled, digestTime }
+        { frequency, inAppEnabled, emailEnabled, digestTime, disabledTypes }
       );
       
       res.json(preference);
