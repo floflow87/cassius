@@ -177,7 +177,14 @@ export default function NotificationsPage() {
   const kindFilter = activeTab === "all" ? undefined : activeTab.toUpperCase();
   
   const { data, isLoading } = useQuery<{ notifications: Notification[]; total: number }>({
-    queryKey: ['/api/notifications', { kind: kindFilter, pageSize: 50 }],
+    queryKey: ['/api/notifications', kindFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ pageSize: '50' });
+      if (kindFilter) params.set('kind', kindFilter);
+      const res = await fetch(`/api/notifications?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch notifications');
+      return res.json();
+    },
   });
   
   const { data: unreadData } = useQuery<{ count: number }>({
