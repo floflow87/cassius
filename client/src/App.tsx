@@ -283,7 +283,7 @@ function AuthenticatedApp() {
   };
 
   const style = {
-    "--sidebar-width": "16rem",
+    "--sidebar-width": "18rem",
     "--sidebar-width-icon": "4.5rem",
   };
 
