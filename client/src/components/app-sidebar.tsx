@@ -88,7 +88,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar px-0 py-0">
-        <SidebarMenu className="gap-1 px-2 pt-1">
+        <SidebarMenu className="gap-1 px-3 pt-1">
           {menuItems.map((item) => {
             const active = isActive(item.url);
             
@@ -142,7 +142,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="bg-sidebar px-2 py-2 pb-4 mt-auto rounded-b-[15px]">
+      <SidebarFooter className="bg-sidebar px-3 py-2 pb-4 mt-auto rounded-b-[15px]">
         <SidebarMenu className="gap-1">
           {/* Settings button with toggle */}
           <SidebarMenuItem className="px-0">
