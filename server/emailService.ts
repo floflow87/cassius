@@ -569,3 +569,396 @@ export async function sendNotificationEmail(
     return { success: false, error: err.message };
   }
 }
+
+export async function sendDocumentAddedEmail(
+  toEmail: string,
+  firstName: string,
+  docName: string,
+  mimeTypeLabel: string,
+  actorName: string,
+  contextLabel: string,
+  tagsLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Document ajouté',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Un document a été ajouté dans Cassius.</p>
+      `,
+      infoBox: {
+        title: 'Détail',
+        lines: [
+          `Nom : <b>${docName}</b>`,
+          `Type : ${mimeTypeLabel}`,
+          `Ajouté par : ${actorName}`,
+          `Rattaché à : ${contextLabel}`,
+          `<span style="margin-top:8px;color:#64748B;font-size:12px;">Tags : ${tagsLabel}</span>`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Ouvrir le document'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Document ajouté — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send document added email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending document added email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendRadiographAddedEmail(
+  toEmail: string,
+  firstName: string,
+  radioTypeLabel: string,
+  actorName: string,
+  contextLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Radiographie ajoutée',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Une nouvelle radiographie a été ajoutée.</p>
+      `,
+      infoBox: {
+        title: 'Détail',
+        lines: [
+          `Type : <b>${radioTypeLabel}</b>`,
+          `Ajouté par : ${actorName}`,
+          `Rattaché à : ${contextLabel}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Voir la radiographie'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Radiographie ajoutée — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send radiograph added email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending radiograph added email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendAppointmentCreatedEmail(
+  toEmail: string,
+  firstName: string,
+  appointmentTitle: string,
+  appointmentDateLabel: string,
+  appointmentTimeLabel: string,
+  actorName: string,
+  contextLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Nouveau rendez-vous planifié',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Un rendez-vous a été créé dans votre agenda Cassius.</p>
+      `,
+      infoBox: {
+        title: 'Résumé',
+        lines: [
+          `Intitulé : <b>${appointmentTitle}</b>`,
+          `Date : ${appointmentDateLabel}`,
+          `Heure : ${appointmentTimeLabel}`,
+          `Créé par : ${actorName}`,
+          `Contexte : ${contextLabel}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Voir le rendez-vous'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Nouveau rendez-vous planifié — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send appointment created email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending appointment created email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendPatientUpdatedEmail(
+  toEmail: string,
+  firstName: string,
+  actorName: string,
+  changeSummary: string,
+  changedAtLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Fiche patient mise à jour',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Une fiche patient a été modifiée dans Cassius.</p>
+      `,
+      infoBox: {
+        title: 'Résumé',
+        lines: [
+          `Modifié par : <b>${actorName}</b>`,
+          `Changement : ${changeSummary}`,
+          `Date : ${changedAtLabel}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Voir la fiche'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Fiche patient mise à jour — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send patient updated email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending patient updated email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendAppointmentReminderEmail(
+  toEmail: string,
+  firstName: string,
+  appointmentTitle: string,
+  appointmentDateLabel: string,
+  appointmentTimeLabel: string,
+  locationLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Rappel : rendez-vous à venir',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Ce message est un rappel pour un rendez-vous planifié dans Cassius.</p>
+      `,
+      infoBox: {
+        title: 'Rendez-vous',
+        lines: [
+          `Intitulé : <b>${appointmentTitle}</b>`,
+          `Date : ${appointmentDateLabel}`,
+          `Heure : ${appointmentTimeLabel}`,
+          `Lieu : ${locationLabel}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Ouvrir dans Cassius'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Rappel : rendez-vous à venir — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send appointment reminder email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending appointment reminder email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendSyncErrorEmail(
+  toEmail: string,
+  firstName: string,
+  errorCount: number,
+  lastErrorShort: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Synchronisation Google Calendar : action requise',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Cassius n'a pas pu synchroniser certains rendez-vous avec Google Calendar.</p>
+      `,
+      warningBox: {
+        title: 'Détail',
+        lines: [
+          `Nombre d'erreurs : <b>${errorCount}</b>`,
+          `Dernière erreur : ${lastErrorShort}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Ouvrir les intégrations'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Synchronisation Google Calendar : action requise — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send sync error email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending sync error email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendFollowupRequiredEmail(
+  toEmail: string,
+  firstName: string,
+  lastFollowupLabel: string,
+  thresholdLabel: string,
+  contextLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Suivi recommandé',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Un implant n'a pas eu de suivi depuis un certain temps, selon vos règles de notification.</p>
+      `,
+      infoBox: {
+        title: 'Résumé',
+        lines: [
+          `Dernier suivi : <b>${lastFollowupLabel}</b>`,
+          `Seuil : ${thresholdLabel}`,
+          `Contexte : ${contextLabel}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Ouvrir dans Cassius'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Suivi recommandé — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send followup required email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending followup required email:', err);
+    return { success: false, error: err.message };
+  }
+}

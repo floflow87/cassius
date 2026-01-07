@@ -12,7 +12,14 @@ import { sendEmail } from "../emails/send";
 import { 
   sendISQAlertEmail, 
   sendImportCompletedEmail,
-  sendNotificationEmail
+  sendNotificationEmail,
+  sendDocumentAddedEmail,
+  sendRadiographAddedEmail,
+  sendAppointmentCreatedEmail,
+  sendPatientUpdatedEmail,
+  sendAppointmentReminderEmail,
+  sendSyncErrorEmail,
+  sendFollowupRequiredEmail
 } from "../emailService";
 
 type NotificationKind = "ALERT" | "REMINDER" | "ACTIVITY" | "IMPORT" | "SYSTEM";
@@ -252,6 +259,87 @@ async function sendImmediateEmailNotification(notification: Notification, userId
           metadata.patientsCount || 0,
           metadata.implantsCount || 0,
           metadata.documentsCount || 0,
+          deepLink
+        );
+        break;
+      
+      case 'DOCUMENT_UPLOADED':
+        await sendDocumentAddedEmail(
+          user.username,
+          firstName,
+          metadata.docName || 'Document',
+          metadata.mimeTypeLabel || 'Fichier',
+          metadata.actorName || 'Un membre',
+          metadata.contextLabel || '',
+          metadata.tagsLabel || 'Aucun',
+          deepLink
+        );
+        break;
+      
+      case 'RADIO_ADDED':
+        await sendRadiographAddedEmail(
+          user.username,
+          firstName,
+          metadata.radioTypeLabel || 'Radiographie',
+          metadata.actorName || 'Un membre',
+          metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'APPOINTMENT_CREATED':
+        await sendAppointmentCreatedEmail(
+          user.username,
+          firstName,
+          metadata.appointmentTitle || 'Rendez-vous',
+          metadata.appointmentDateLabel || '',
+          metadata.appointmentTimeLabel || '',
+          metadata.actorName || 'Un membre',
+          metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'PATIENT_UPDATED':
+        await sendPatientUpdatedEmail(
+          user.username,
+          firstName,
+          metadata.actorName || 'Un membre',
+          metadata.changeSummary || 'Mise à jour',
+          metadata.changedAtLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'APPOINTMENT_REMINDER':
+        await sendAppointmentReminderEmail(
+          user.username,
+          firstName,
+          metadata.appointmentTitle || 'Rendez-vous',
+          metadata.appointmentDateLabel || '',
+          metadata.appointmentTimeLabel || '',
+          metadata.locationLabel || 'Non spécifié',
+          deepLink
+        );
+        break;
+      
+      case 'SYNC_ERROR':
+        await sendSyncErrorEmail(
+          user.username,
+          firstName,
+          metadata.errorCount || 1,
+          metadata.lastErrorShort || 'Erreur de synchronisation',
+          deepLink
+        );
+        break;
+      
+      case 'NO_POSTOP_FOLLOWUP':
+        await sendFollowupRequiredEmail(
+          user.username,
+          firstName,
+          metadata.lastFollowupLabel || 'Aucun',
+          metadata.thresholdLabel || '',
+          metadata.contextLabel || '',
           deepLink
         );
         break;
