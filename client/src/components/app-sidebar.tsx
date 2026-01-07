@@ -70,8 +70,8 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0 overflow-visible relative">
 
-      <SidebarHeader className="bg-sidebar h-24 pb-2 px-2">
-        <div className="flex items-end h-full pl-3">
+      <SidebarHeader className="bg-sidebar h-16 px-2">
+        <div className="flex items-center h-full pl-3">
           <a 
             href="/dashboard" 
             onClick={handleNavClick("/dashboard")}
@@ -79,7 +79,7 @@ export function AppSidebar() {
             data-testid="link-logo-home"
           >
             {isExpanded ? (
-              <img src={logoFull} alt="Cassius" className="h-7 w-auto" />
+              <img src={logoFull} alt="Cassius" className="h-9 w-auto" />
             ) : (
               <img src={logoIcon} alt="Cassius" className="h-8 w-8 shrink-0 brightness-0 invert" />
             )}
@@ -88,7 +88,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar px-0 py-0">
-        <SidebarMenu className="gap-1 px-2 pt-2">
+        <SidebarMenu className="gap-1 px-2 pt-1">
           {menuItems.map((item) => {
             const active = isActive(item.url);
             
