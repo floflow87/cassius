@@ -56,23 +56,87 @@ interface EmailResult {
   error?: string;
 }
 
-function createSimpleEmailHtml(content: string): string {
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.8; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    a { color: #1e40af; }
-    .signature { margin-top: 30px; color: #64748b; }
-  </style>
-</head>
-<body>
-${content}
-</body>
-</html>
-  `.trim();
+function createEmailTemplate(params: {
+  title: string;
+  content: string;
+  actionUrl?: string;
+  actionLabel?: string;
+  infoBox?: { title: string; lines: string[] };
+  warningBox?: { title: string; lines: string[] };
+  successBox?: { title: string; lines: string[] };
+}): string {
+  const { title, content, actionUrl, actionLabel, infoBox, warningBox, successBox } = params;
+
+  let boxHtml = '';
+  if (warningBox) {
+    boxHtml = `
+      <div style="margin:14px 0 18px 0;padding:12px;border-radius:10px;background:#FFF7ED;border:1px solid #FED7AA;color:#7C2D12;">
+        <div style="font-weight:700;margin-bottom:6px;">${warningBox.title}</div>
+        ${warningBox.lines.map(line => `<div>${line}</div>`).join('')}
+      </div>`;
+  } else if (successBox) {
+    boxHtml = `
+      <div style="margin:14px 0 18px 0;padding:12px;border-radius:10px;background:#F0FDF4;border:1px solid #BBF7D0;color:#14532D;">
+        <div style="font-weight:700;margin-bottom:6px;">${successBox.title}</div>
+        ${successBox.lines.map(line => `<div>${line}</div>`).join('')}
+      </div>`;
+  } else if (infoBox) {
+    boxHtml = `
+      <div style="margin-top:14px;padding:12px 12px;border-radius:10px;background:#F8FAFC;border:1px solid #E2E8F0;color:#334155;">
+        <div style="font-weight:600;margin-bottom:6px;">${infoBox.title}</div>
+        ${infoBox.lines.map(line => `<div>${line}</div>`).join('')}
+      </div>`;
+  }
+
+  const buttonHtml = actionUrl && actionLabel ? `
+      <div style="margin:18px 0 18px 0;">
+        <a href="${actionUrl}"
+           style="display:inline-block;background:#3C83F6;color:#FFFFFF;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600;font-size:14px;">
+          ${actionLabel}
+        </a>
+      </div>` : '';
+
+  const fallbackLinkHtml = actionUrl ? `
+      <p style="margin:18px 0 0 0;color:#64748B;font-size:12px;">
+        Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br />
+        <span style="word-break:break-all;color:#3C83F6;">${actionUrl}</span>
+      </p>` : '';
+
+  return `<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>${title}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#F6F8FB;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0F172A;">
+    <div style="max-width:640px;margin:0 auto;padding:28px 16px;">
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:14px;overflow:hidden;">
+        <div style="padding:22px 22px 8px 22px;">
+          <div style="font-size:14px;color:#475569;letter-spacing:0.2px;">Cassius</div>
+          <h1 style="margin:10px 0 0 0;font-size:20px;line-height:1.3;color:#0F172A;">
+            ${title}
+          </h1>
+        </div>
+
+        <div style="padding:16px 22px 22px 22px;font-size:14px;line-height:1.7;color:#0F172A;">
+          ${content}
+          ${boxHtml}
+          ${buttonHtml}
+          ${fallbackLinkHtml}
+        </div>
+
+        <div style="padding:16px 22px;background:#FBFCFE;border-top:1px solid #E5E7EB;">
+          <div style="color:#64748B;font-size:12px;line-height:1.6;">
+            —<br />
+            <b>Cassius</b> — Le compagnon des chirurgiens-dentistes<br />
+            Cet email a été envoyé automatiquement, merci de ne pas y répondre.
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
 }
 
 export async function sendPasswordResetEmail(
@@ -90,16 +154,28 @@ export async function sendPasswordResetEmail(
     }
     const { client, fromEmail } = clientData;
     const resetUrl = `${getBaseUrl()}/reset-password?token=${token}`;
-    const expiryMinutes = 60;
     
-    const htmlContent = createSimpleEmailHtml(`
-<p>Bonjour ${firstName || ''},</p>
-<p>Nous avons reçu une demande de réinitialisation du mot de passe de votre compte ${APP_NAME}.</p>
-<p>Pour réinitialiser votre mot de passe, cliquez sur ce lien : <a href="${resetUrl}">${resetUrl}</a></p>
-<p>Ce lien expire dans ${expiryMinutes} minutes.</p>
-<p>Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</p>
-<p class="signature">— L'équipe ${APP_NAME}</p>
-    `);
+    const htmlContent = createEmailTemplate({
+      title: 'Réinitialisation de votre mot de passe',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName || ''},</p>
+        <p style="margin:0 0 14px 0;">
+          Nous avons reçu une demande de réinitialisation du mot de passe associé à votre compte Cassius.
+        </p>
+        <p style="margin:0 0 18px 0;">
+          Pour définir un nouveau mot de passe et sécuriser l'accès à votre espace, cliquez sur le bouton ci-dessous.
+        </p>
+      `,
+      actionUrl: resetUrl,
+      actionLabel: 'Réinitialiser mon mot de passe',
+      infoBox: {
+        title: 'À savoir',
+        lines: [
+          'Ce lien est valable pendant <b>60 minutes</b>.',
+          "Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email."
+        ]
+      }
+    });
 
     const { data, error } = await client.emails.send({
       from: fromEmail,
@@ -137,18 +213,26 @@ export async function sendEmailVerificationEmail(
     const { client, fromEmail } = clientData;
     const verifyUrl = `${getBaseUrl()}/verify-email?token=${token}`;
     
-    const htmlContent = createSimpleEmailHtml(`
-<p>Bonjour ${firstName || ''},</p>
-<p>Pour finaliser l'activation de votre compte ${APP_NAME}, merci de confirmer votre adresse email.</p>
-<p>Confirmer mon email ici : <a href="${verifyUrl}">${verifyUrl}</a></p>
-<p>Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement ce message.</p>
-<p class="signature">— L'équipe ${APP_NAME}</p>
-    `);
+    const htmlContent = createEmailTemplate({
+      title: 'Confirmez votre adresse email',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName || ''},</p>
+        <p style="margin:0 0 14px 0;">
+          Bienvenue sur Cassius.
+        </p>
+        <p style="margin:0 0 18px 0;">
+          Afin de finaliser la création de votre compte et sécuriser l'accès à votre espace professionnel,
+          nous vous invitons à confirmer votre adresse email.
+        </p>
+      `,
+      actionUrl: verifyUrl,
+      actionLabel: 'Confirmer mon adresse email'
+    });
 
     const { data, error } = await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: `Confirmez votre adresse email pour votre inscription à ${APP_NAME}`,
+      subject: `Confirmez votre adresse email — ${APP_NAME}`,
       html: htmlContent,
     });
 
@@ -184,22 +268,29 @@ export async function sendCollaboratorInvitationEmail(
     const { client, fromEmail } = clientData;
     const inviteUrl = `${getBaseUrl()}/accept-invitation?token=${token}`;
     
-    const roleLabel = role === 'ADMIN' ? 'Administrateur' : role === 'CHIRURGIEN' ? 'Chirurgien' : 'Assistant';
-    const expiryDate = format(expiresAt, 'dd MMMM yyyy', { locale: fr });
-    
-    const htmlContent = createSimpleEmailHtml(`
-<p>Bonjour,</p>
-<p>${inviterName} vous a invité(e) à rejoindre ${organisationName} sur ${APP_NAME} en tant que ${roleLabel}.</p>
-<p>Rejoindre le cabinet maintenant : <a href="${inviteUrl}">${inviteUrl}</a></p>
-<p>Ce lien expire le ${expiryDate}.</p>
-<p>Si vous pensez qu'il s'agit d'une erreur, vous pouvez ignorer cet email.</p>
-<p class="signature">— ${APP_NAME}</p>
-    `);
+    const htmlContent = createEmailTemplate({
+      title: `Invitation à rejoindre ${organisationName}`,
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour,</p>
+        <p style="margin:0 0 14px 0;">
+          <b>${inviterName}</b> vous invite à rejoindre l'organisation <b>${organisationName}</b> sur Cassius.
+        </p>
+        <p style="margin:0 0 18px 0;">
+          Pour accepter l'invitation et accéder à l'espace, cliquez ci-dessous.
+        </p>
+      `,
+      actionUrl: inviteUrl,
+      actionLabel: "Accepter l'invitation",
+      infoBox: {
+        title: 'Sécurité',
+        lines: ['Cette invitation est personnelle et valable pour une durée limitée.']
+      }
+    });
 
     const { data, error } = await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: `Vous avez été invité(e) à rejoindre ${organisationName} sur ${APP_NAME}`,
+      subject: `Invitation à rejoindre ${organisationName} — ${APP_NAME}`,
       html: htmlContent,
     });
 
@@ -212,6 +303,121 @@ export async function sendCollaboratorInvitationEmail(
     return { success: true, messageId: data?.id };
   } catch (err: any) {
     console.error('[Email] Error sending invitation email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendISQAlertEmail(
+  toEmail: string,
+  firstName: string,
+  isqValue: number,
+  threshold: number,
+  contextLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Alerte clinique — stabilité implantaire faible',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">
+          Une mesure récente indique une <b>stabilité implantaire inférieure au seuil</b> défini.
+        </p>
+      `,
+      actionUrl,
+      actionLabel: "Consulter l'alerte",
+      warningBox: {
+        title: 'Détail',
+        lines: [
+          `ISQ mesuré : <b>${isqValue}</b> (seuil : ${threshold})`,
+          `Référence : ${contextLabel}`
+        ]
+      }
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Alerte ISQ faible — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send ISQ alert email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('[Email] ISQ alert email sent to:', toEmail, 'messageId:', data?.id);
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending ISQ alert email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendImportCompletedEmail(
+  toEmail: string,
+  firstName: string,
+  patientsCount: number,
+  implantsCount: number,
+  documentsCount: number,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Import terminé',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">
+          L'import de vos données dans Cassius est maintenant terminé.
+        </p>
+      `,
+      actionUrl,
+      actionLabel: 'Voir les données importées',
+      successBox: {
+        title: 'Récapitulatif',
+        lines: [
+          `Patients importés : <b>${patientsCount}</b>`,
+          `Implants importés : <b>${implantsCount}</b>`,
+          `Documents importés : <b>${documentsCount}</b>`
+        ]
+      }
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Import terminé — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send import completed email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('[Email] Import completed email sent to:', toEmail, 'messageId:', data?.id);
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending import completed email:', err);
     return { success: false, error: err.message };
   }
 }
@@ -231,13 +437,21 @@ export async function sendPaymentFailedEmail(
     const { client, fromEmail } = clientData;
     const billingUrl = `${getBaseUrl()}/settings?section=billing`;
     
-    const htmlContent = createSimpleEmailHtml(`
-<p>Bonjour ${firstName},</p>
-<p>Nous n'avons pas pu renouveler votre abonnement ${APP_NAME} (paiement refusé).</p>
-<p>Afin de conserver votre compte, mettez à jour votre moyen de paiement ici : <a href="${billingUrl}">${billingUrl}</a></p>
-<p>Vos données restent accessibles, mais certaines fonctionnalités pourront être limitées si la situation n'est pas régularisée.</p>
-<p class="signature">— ${APP_NAME}</p>
-    `);
+    const htmlContent = createEmailTemplate({
+      title: 'Problème de paiement',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">
+          Nous n'avons pas pu renouveler votre abonnement ${APP_NAME} (paiement refusé).
+        </p>
+        <p style="margin:0 0 18px 0;">
+          Afin de conserver votre compte, mettez à jour votre moyen de paiement.
+          Vos données restent accessibles, mais certaines fonctionnalités pourront être limitées si la situation n'est pas régularisée.
+        </p>
+      `,
+      actionUrl: billingUrl,
+      actionLabel: 'Mettre à jour mon paiement'
+    });
 
     const { data, error } = await client.emails.send({
       from: fromEmail,
@@ -275,13 +489,20 @@ export async function sendTrialEndingEmail(
     const billingUrl = `${getBaseUrl()}/settings?section=billing`;
     const formattedDate = format(trialEndDate, 'dd MMMM yyyy', { locale: fr });
     
-    const htmlContent = createSimpleEmailHtml(`
-<p>Bonjour ${firstName},</p>
-<p>Votre période d'essai se termine le ${formattedDate}.</p>
-<p>Pour conserver l'accès complet à ${APP_NAME}, vous pouvez activer votre abonnement à tout moment.</p>
-<p>Gérer mon abonnement maintenant : <a href="${billingUrl}">${billingUrl}</a></p>
-<p class="signature">— ${APP_NAME}</p>
-    `);
+    const htmlContent = createEmailTemplate({
+      title: "Votre essai se termine bientôt",
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">
+          Votre période d'essai se termine le ${formattedDate}.
+        </p>
+        <p style="margin:0 0 18px 0;">
+          Pour conserver l'accès complet à ${APP_NAME}, vous pouvez activer votre abonnement à tout moment.
+        </p>
+      `,
+      actionUrl: billingUrl,
+      actionLabel: 'Gérer mon abonnement'
+    });
 
     const { data, error } = await client.emails.send({
       from: fromEmail,
@@ -298,6 +519,53 @@ export async function sendTrialEndingEmail(
     return { success: true, messageId: data?.id };
   } catch (err: any) {
     console.error('[Email] Error sending trial ending email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendNotificationEmail(
+  toEmail: string,
+  firstName: string,
+  title: string,
+  body: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const htmlContent = createEmailTemplate({
+      title,
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 18px 0;">${body}</p>
+      `,
+      actionUrl,
+      actionLabel: 'Ouvrir dans Cassius'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `${title} — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send notification email:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('[Email] Notification email sent to:', toEmail, 'messageId:', data?.id);
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending notification email:', err);
     return { success: false, error: err.message };
   }
 }

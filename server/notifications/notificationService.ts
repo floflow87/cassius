@@ -9,6 +9,11 @@ import {
 } from "@shared/schema";
 import { eq, and, desc, isNull, sql, lt, gte } from "drizzle-orm";
 import { sendEmail } from "../emails/send";
+import { 
+  sendISQAlertEmail, 
+  sendImportCompletedEmail,
+  sendNotificationEmail
+} from "../emailService";
 
 type NotificationKind = "ALERT" | "REMINDER" | "ACTIVITY" | "IMPORT" | "SYSTEM";
 type NotificationSeverity = "INFO" | "WARNING" | "CRITICAL";
@@ -35,12 +40,16 @@ interface UserPreferences {
   frequency: NotificationFrequency;
   inAppEnabled: boolean;
   emailEnabled: boolean;
+  disabledTypes: string[];
+  disabledEmailTypes: string[];
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   frequency: "IMMEDIATE",
   inAppEnabled: true,
   emailEnabled: false,
+  disabledTypes: [],
+  disabledEmailTypes: [],
 };
 
 function kindToCategory(kind: NotificationKind): NotificationCategory {
@@ -78,7 +87,17 @@ async function getPreferences(userId: string, organisationId: string, category: 
     frequency: pref.frequency as NotificationFrequency,
     inAppEnabled: pref.inAppEnabled,
     emailEnabled: pref.emailEnabled,
+    disabledTypes: Array.isArray(pref.disabledTypes) ? pref.disabledTypes : [],
+    disabledEmailTypes: Array.isArray(pref.disabledEmailTypes) ? pref.disabledEmailTypes : [],
   };
+}
+
+function isTypeDisabledForInApp(prefs: UserPreferences, type: string): boolean {
+  return prefs.disabledTypes.includes(type);
+}
+
+function isTypeDisabledForEmail(prefs: UserPreferences, type: string): boolean {
+  return prefs.disabledEmailTypes.includes(type);
 }
 
 async function checkDedupe(dedupeKey: string, recipientUserId: string, cooldownMinutes: number = 30): Promise<boolean> {
@@ -118,8 +137,11 @@ export async function createNotification(params: CreateNotificationParams): Prom
   const category = kindToCategory(kind);
   const prefs = await getPreferences(recipientUserId, organisationId, category);
 
-  if (prefs.frequency === "NONE" || (!prefs.inAppEnabled && !prefs.emailEnabled)) {
-    console.log(`[Notification] Skipping notification for user ${recipientUserId} - disabled by preferences`);
+  const inAppEnabledForType = prefs.inAppEnabled && !isTypeDisabledForInApp(prefs, type);
+  const emailEnabledForType = prefs.emailEnabled && !isTypeDisabledForEmail(prefs, type);
+
+  if (prefs.frequency === "NONE" || (!inAppEnabledForType && !emailEnabledForType)) {
+    console.log(`[Notification] Skipping notification for user ${recipientUserId} - disabled by preferences (type: ${type})`);
     return null;
   }
 
@@ -129,6 +151,10 @@ export async function createNotification(params: CreateNotificationParams): Prom
       console.log(`[Notification] Skipping duplicate notification: ${dedupeKey}`);
       return null;
     }
+  }
+
+  if (!inAppEnabledForType) {
+    console.log(`[Notification] In-app disabled for type ${type}, only sending email`);
   }
 
   const [notification] = await db
@@ -151,7 +177,7 @@ export async function createNotification(params: CreateNotificationParams): Prom
 
   console.log(`[Notification] Created notification ${notification.id} for user ${recipientUserId}: ${title}`);
 
-  if (prefs.emailEnabled && prefs.frequency === "IMMEDIATE") {
+  if (emailEnabledForType && prefs.frequency === "IMMEDIATE") {
     await sendImmediateEmailNotification(notification, recipientUserId, organisationId);
   }
 
@@ -192,15 +218,56 @@ async function sendImmediateEmailNotification(notification: Notification, userId
       }
     }
 
-    await sendEmail(user.username, 'systemAlert', {
-      alertType: 'action_required',
-      message: `${notification.title}${notification.body ? '\n\n' + notification.body : ''}`,
-      actionLabel: 'Ouvrir dans Cassius',
-      actionUrl: deepLink,
-      firstName: user.prenom || user.nom || undefined,
-    });
+    const firstName = user.prenom || user.nom || '';
+    
+    let metadata: Record<string, any> = {};
+    try {
+      if (notification.metadata) {
+        metadata = typeof notification.metadata === 'string' 
+          ? JSON.parse(notification.metadata) 
+          : notification.metadata;
+      }
+    } catch (parseError) {
+      console.warn(`[Notification] Failed to parse metadata for notification ${notification.id}:`, parseError);
+    }
 
-    console.log(`[Notification] Sent immediate email to ${user.username}`);
+    switch (notification.type) {
+      case 'ISQ_LOW':
+      case 'ISQ_DECLINING':
+      case 'UNSTABLE_ISQ_HISTORY':
+        await sendISQAlertEmail(
+          user.username,
+          firstName,
+          metadata.isqValue || 0,
+          metadata.threshold || 60,
+          metadata.contextLabel || 'Implant',
+          deepLink
+        );
+        break;
+      
+      case 'IMPORT_COMPLETED':
+        await sendImportCompletedEmail(
+          user.username,
+          firstName,
+          metadata.patientsCount || 0,
+          metadata.implantsCount || 0,
+          metadata.documentsCount || 0,
+          deepLink
+        );
+        break;
+      
+      default:
+        await sendNotificationEmail(
+          user.username,
+          firstName,
+          notification.title,
+          notification.body || '',
+          deepLink
+        );
+        break;
+    }
+
+    console.log(`[Notification] Sent immediate email to ${user.username} (type: ${notification.type})`);
   } catch (error) {
     console.error(`[Notification] Failed to send immediate email:`, error);
   }
