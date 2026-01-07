@@ -4728,6 +4728,87 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/dev/test-notifications - Generate test notifications (DEV only)
+  app.post("/api/dev/test-notifications", requireJwtOrSession, async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: "Non disponible en production" });
+      }
+
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const testNotifications = [
+        {
+          organisationId,
+          recipientUserId: userId,
+          kind: "ALERT" as const,
+          type: "ISQ_LOW",
+          severity: "CRITICAL" as const,
+          title: "ISQ bas detecte",
+          body: "Un implant presente un ISQ de 45, en dessous du seuil recommande.",
+          entityType: "PATIENT" as const,
+        },
+        {
+          organisationId,
+          recipientUserId: userId,
+          kind: "REMINDER" as const,
+          type: "FOLLOWUP_TO_SCHEDULE",
+          severity: "WARNING" as const,
+          title: "Suivi a programmer",
+          body: "Patient Jean Dupont necessite un rendez-vous de controle.",
+          entityType: "PATIENT" as const,
+        },
+        {
+          organisationId,
+          recipientUserId: userId,
+          kind: "ACTIVITY" as const,
+          type: "DOCUMENT_ADDED",
+          severity: "INFO" as const,
+          title: "Document ajoute",
+          body: "Une nouvelle radiographie a ete ajoutee au dossier patient.",
+          entityType: "DOCUMENT" as const,
+        },
+        {
+          organisationId,
+          recipientUserId: userId,
+          kind: "IMPORT" as const,
+          type: "IMPORT_COMPLETED",
+          severity: "INFO" as const,
+          title: "Import termine",
+          body: "12 patients ont ete importes avec succes.",
+          entityType: "IMPORT" as const,
+        },
+        {
+          organisationId,
+          recipientUserId: userId,
+          kind: "SYSTEM" as const,
+          type: "SYSTEM_UPDATE",
+          severity: "INFO" as const,
+          title: "Mise a jour systeme",
+          body: "De nouvelles fonctionnalites sont disponibles.",
+        },
+      ];
+
+      const created = [];
+      for (const notif of testNotifications) {
+        const result = await notificationService.createNotification(notif);
+        if (result) created.push(result);
+      }
+
+      res.json({
+        success: true,
+        message: `${created.length} notifications de test creees`,
+        notifications: created,
+      });
+    } catch (error: any) {
+      console.error("[DEV] Error creating test notifications:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ==================== NOTIFICATION ROUTES ====================
 
   // Helper: Convert flags to notification-like objects
