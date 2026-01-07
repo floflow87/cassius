@@ -112,7 +112,8 @@ export function NotificationBell() {
   });
   
   const { data: notificationsData, isLoading } = useQuery<{ notifications: Notification[]; total: number }>({
-    queryKey: ['/api/notifications', { pageSize: 10 }],
+    queryKey: ['/api/notifications'],
+    queryFn: () => fetch('/api/notifications?pageSize=10').then(r => r.json()),
     enabled: open,
   });
   

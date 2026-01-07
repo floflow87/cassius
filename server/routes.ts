@@ -4901,7 +4901,7 @@ export async function registerRoutes(
       // Also get flags and upcoming appointments as virtual notifications
       const [flags, appointments] = await Promise.all([
         storage.getFlagsWithEntity(organisationId, false), // unresolved flags only
-        storage.getAppointments(organisationId),
+        storage.getAppointmentsForSync(organisationId),
       ]);
       
       const virtualFromFlags = flagsToNotifications(flags);
@@ -4944,7 +4944,7 @@ export async function registerRoutes(
       // Also count unresolved flags and upcoming appointments
       const [flags, appointments] = await Promise.all([
         storage.getFlagsWithEntity(organisationId, false),
-        storage.getAppointments(organisationId),
+        storage.getAppointmentsForSync(organisationId),
       ]);
       
       const now = new Date();
