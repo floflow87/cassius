@@ -68,9 +68,9 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0 overflow-visible relative">
+    <Sidebar collapsible="icon" variant="floating" className="border-r-0 overflow-visible relative">
 
-      <SidebarHeader className="bg-sidebar h-16 px-2">
+      <SidebarHeader className="bg-sidebar h-16 px-2 rounded-t-[15px]">
         <div className="flex items-center h-full pl-[11px]">
           <a 
             href="/dashboard" 
@@ -142,7 +142,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="bg-sidebar px-2 py-2 pb-4 mt-auto">
+      <SidebarFooter className="bg-sidebar px-2 py-2 pb-4 mt-auto rounded-b-[15px]">
         <SidebarMenu className="gap-1">
           {/* Settings button with toggle */}
           <SidebarMenuItem className="px-0">
