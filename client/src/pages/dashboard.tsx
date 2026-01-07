@@ -170,7 +170,7 @@ function AppointmentItem({ date, title, description, type, time }: AppointmentIt
         <span className="text-xs text-muted-foreground">{month}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium truncate">{title}</p>
+        <p className="text-sm font-medium truncate">{title}</p>
         <p className="text-sm text-muted-foreground truncate">{description}</p>
       </div>
       <Badge className={`${badgeVariant} no-default-hover-elevate no-default-active-elevate`}>
