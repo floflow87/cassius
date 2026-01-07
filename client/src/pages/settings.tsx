@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -135,6 +136,17 @@ function getRoleBadgeVariant(role: string): "default" | "secondary" | "outline" 
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const searchString = useSearch();
+  const urlParams = new URLSearchParams(searchString);
+  const tabFromUrl = urlParams.get("tab") || "security";
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
+  
+  useEffect(() => {
+    const newTab = urlParams.get("tab");
+    if (newTab && ["security", "notifications", "collaborators", "organization", "integrations"].includes(newTab)) {
+      setActiveTab(newTab);
+    }
+  }, [searchString]);
 
   const { data: profile, isLoading: profileLoading } = useQuery<UserProfile>({
     queryKey: ["/api/settings/profile"],
@@ -153,7 +165,7 @@ export default function SettingsPage() {
   return (
     <div className="h-full overflow-auto p-6" data-testid="settings-page">
       <div className="w-full">
-        <Tabs defaultValue="security" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="bg-transparent p-0 h-auto gap-6 border-b-0 mb-6">
             <TabsTrigger 
               value="security" 

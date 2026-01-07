@@ -159,9 +159,9 @@ function NotificationRow({
             {!notification.isVirtual && (
               isUnread ? (
                 <Button 
-                  variant="ghost" 
+                  variant="outline" 
                   size="icon"
-                  className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
+                  className="border-primary text-primary hover:bg-primary/10"
                   onClick={() => onMarkAsRead(notification.id)}
                   data-testid={`button-mark-read-${notification.id}`}
                   title="Marquer comme lu"
@@ -172,7 +172,7 @@ function NotificationRow({
                 <Button 
                   variant="ghost" 
                   size="icon"
-                  className="text-muted-foreground hover:text-foreground hover:bg-muted"
+                  className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
                   onClick={() => onMarkAsUnread(notification.id)}
                   data-testid={`button-mark-unread-${notification.id}`}
                   title="Marquer comme non lu"
