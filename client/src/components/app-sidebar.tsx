@@ -67,7 +67,8 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0 overflow-visible">
+    <Sidebar collapsible="icon" className="border-r-0 overflow-visible relative">
+
       <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center h-16 px-4 border-b">
         <a 
           href="/dashboard" 
@@ -111,7 +112,7 @@ export function AppSidebar() {
                   <item.lucideIcon className="h-5 w-5 text-white shrink-0" strokeWidth={2.5} />
                 )}
                 {isExpanded && (
-                  <span className="text-sm font-medium text-white truncate">
+                  <span className={`text-sm truncate ${active ? 'font-medium text-white' : 'font-light text-white/80'}`}>
                     {item.title}
                   </span>
                 )}
@@ -140,88 +141,73 @@ export function AppSidebar() {
 
       <SidebarFooter className="bg-primary px-2 py-2 pb-4 mt-auto">
         <SidebarMenu className="gap-1">
-          {/* Toggle button - first */}
+          {/* Settings button with toggle */}
           <SidebarMenuItem className="px-0">
-            {isExpanded ? (
+            <div className="flex items-center gap-1">
+              {isExpanded ? (
+                <a
+                  href="/settings"
+                  onClick={handleNavClick("/settings")}
+                  className={`flex-1 flex h-10 items-center justify-start px-3 gap-3 rounded-[5px] ${
+                    isActive("/settings") ? "bg-secondary" : "bg-transparent hover:bg-white/10"
+                  }`}
+                  data-testid="link-settings"
+                >
+                  <img 
+                    src={settingsIcon} 
+                    alt="Paramètres"
+                    className="h-5 w-auto brightness-0 invert shrink-0"
+                  />
+                  <span className={`text-sm truncate ${isActive("/settings") ? 'font-medium text-white' : 'font-light text-white/80'}`}>
+                    Paramètres
+                  </span>
+                </a>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      href="/settings"
+                      onClick={handleNavClick("/settings")}
+                      className="flex-1 flex h-10 items-center justify-center rounded-[5px] bg-transparent hover:bg-white/10"
+                      data-testid="link-settings"
+                    >
+                      <img 
+                        src={settingsIcon} 
+                        alt="Paramètres"
+                        className="h-5 w-auto brightness-0 invert"
+                      />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
+                    Paramètres
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              
+              {/* Toggle button */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={handleToggle}
-                    className="flex h-10 w-full items-center justify-end px-3 text-white hover:bg-white/10"
+                    className="shrink-0 hover:bg-white/10"
                     aria-expanded={isExpanded}
-                    aria-label="Réduire le menu"
+                    aria-label={isExpanded ? "Réduire le menu" : "Agrandir le menu"}
                     data-testid="button-toggle-sidebar"
                   >
-                    <ChevronLeft className="h-5 w-5" />
+                    {isExpanded ? (
+                      <ChevronLeft className="h-4 w-4 text-white" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-white" />
+                    )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
-                  Réduire le menu
+                  {isExpanded ? "Réduire le menu" : "Agrandir le menu"}
                 </TooltipContent>
               </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleToggle}
-                    className="flex h-10 w-full items-center justify-center text-white hover:bg-white/10"
-                    aria-expanded={isExpanded}
-                    aria-label="Agrandir le menu"
-                    data-testid="button-toggle-sidebar"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
-                  Agrandir le menu
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </SidebarMenuItem>
-
-          {/* Settings button - second */}
-          <SidebarMenuItem className="px-0">
-            {isExpanded ? (
-              <a
-                href="/settings"
-                onClick={handleNavClick("/settings")}
-                className="flex h-10 w-full items-center justify-start px-3 gap-3 rounded-[5px] bg-transparent hover:bg-white/10"
-                data-testid="link-settings"
-              >
-                <img 
-                  src={settingsIcon} 
-                  alt="Paramètres"
-                  className="h-5 w-auto brightness-0 invert shrink-0"
-                />
-                <span className="text-sm font-medium text-white truncate">
-                  Paramètres
-                </span>
-              </a>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <a
-                    href="/settings"
-                    onClick={handleNavClick("/settings")}
-                    className="flex h-10 w-full items-center justify-center rounded-[5px] bg-transparent hover:bg-white/10"
-                    data-testid="link-settings"
-                  >
-                    <img 
-                      src={settingsIcon} 
-                      alt="Paramètres"
-                      className="h-5 w-auto brightness-0 invert"
-                    />
-                  </a>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
-                  Paramètres
-                </TooltipContent>
-              </Tooltip>
-            )}
+            </div>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

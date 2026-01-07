@@ -276,7 +276,11 @@ export interface ClinicalStats {
   activityByPeriod: { period: string; count: number }[];
   implantsByPeriod: { period: string; count: number }[];
   totalImplantsInPeriod: number;
-  actsByType: { type: string; count: number }[];
+  actsByType: { 
+    type: string; 
+    count: number;
+    implants: { id: string; siteFdi: string; patientNom: string; patientPrenom: string; marque: string }[];
+  }[];
   successRate: number;
   complicationRate: number;
   failureRate: number;
@@ -292,6 +296,29 @@ export interface ClinicalStats {
     datePose: string;
     lastVisitDate: string | null;
     daysSinceVisit: number | null;
+    marque: string;
+    referenceFabricant: string | null;
+  }[];
+  availableImplantModels: { id: string; marque: string; referenceFabricant: string | null }[];
+}
+
+export interface PatientStats {
+  patientId: string;
+  nom: string;
+  prenom: string;
+  dateNaissance: string;
+  age: number;
+  totalImplants: number;
+  successRate: number;
+  complicationCount: number;
+  failureCount: number;
+  activeAlerts: number;
+  implants: {
+    id: string;
+    siteFdi: string;
+    marque: string;
+    statut: string;
+    isqPose: number | null;
   }[];
 }
 

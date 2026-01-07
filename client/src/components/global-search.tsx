@@ -75,13 +75,18 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsFocused(false);
-      }
+      // Use setTimeout to ensure the click is fully processed before checking
+      // This prevents premature closing when clicking on select elements etc.
+      setTimeout(() => {
+        if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+          setIsFocused(false);
+        }
+      }, 0);
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    // Use mousedown with capture to handle clicks before they bubble
+    document.addEventListener("mousedown", handleClickOutside, true);
+    return () => document.removeEventListener("mousedown", handleClickOutside, true);
   }, []);
 
   // Fetch search results
@@ -233,7 +238,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
           onFocus={() => setIsFocused(true)}
           onKeyDown={handleKeyDown}
           placeholder="Rechercher..."
-          className="pl-9 w-64"
+          className="pl-9 w-80"
           data-testid="input-global-search"
         />
       </div>

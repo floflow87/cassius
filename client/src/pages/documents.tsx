@@ -53,6 +53,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -61,7 +67,8 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { DocumentWithDetails } from "@shared/schema";
+import { DocumentUploadForm } from "@/components/document-upload-form";
+import type { DocumentWithDetails, Patient } from "@shared/schema";
 import type { DocumentTree, DocumentTreeNode, DocumentFilters, UnifiedFile, TypeRadio } from "@shared/types";
 
 type FolderPath = {
@@ -93,10 +100,12 @@ const RADIO_TYPE_LABELS: Record<TypeRadio, string> = {
 };
 
 const RADIO_TYPE_COLORS: Record<TypeRadio, string> = {
-  PANORAMIQUE: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
-  CBCT: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
-  RETROALVEOLAIRE: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
+  PANORAMIQUE: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
+  CBCT: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
+  RETROALVEOLAIRE: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
 };
+
+const RADIO_BADGE_COLOR = "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
 
 function getFileIcon(mimeType: string | null) {
   if (!mimeType) return <File className="h-5 w-5 text-muted-foreground" />;
@@ -152,7 +161,9 @@ function FolderTreeItem({
 }) {
   return (
     <button
-      onClick={() => {
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
         if (hasChildren && onToggle) onToggle();
         onSelect();
       }}
@@ -206,7 +217,7 @@ function FileRow({
   
   return (
     <div
-      className="flex items-center gap-3 px-4 py-2.5 border-b hover-elevate cursor-pointer"
+      className="flex items-center gap-3 px-4 py-2.5 border-b hover-elevate cursor-pointer bg-white dark:bg-card"
       onClick={onView}
       data-testid={`file-row-${file.sourceType}-${file.id}`}
     >
@@ -225,6 +236,11 @@ function FileRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm truncate">{file.title}</span>
+          {isRadio && (
+            <Badge variant="secondary" className={`text-xs ${RADIO_BADGE_COLOR}`}>
+              Radio
+            </Badge>
+          )}
           {isRadio && file.radioType && (
             <Badge variant="secondary" className={`text-xs ${RADIO_TYPE_COLORS[file.radioType] || ''}`}>
               {RADIO_TYPE_LABELS[file.radioType] || file.radioType}
@@ -235,11 +251,6 @@ function FileRow({
               {TAG_LABELS[tag] || tag}
             </Badge>
           ))}
-          {isRadio && (
-            <Badge variant="outline" className="text-xs">
-              Radio
-            </Badge>
-          )}
         </div>
         <div className="flex items-center gap-4 text-xs text-muted-foreground mt-0.5">
           {file.patient && (
@@ -338,11 +349,11 @@ function FileGridItem({
   
   return (
     <div
-      className={`relative flex flex-col items-center p-3 rounded-md hover-elevate cursor-pointer border ${isSelected ? 'bg-accent border-primary' : 'border-transparent'}`}
+      className={`relative flex flex-col items-center p-4 rounded-lg hover-elevate cursor-pointer border shadow-sm ${isSelected ? 'bg-accent border-primary' : 'bg-white dark:bg-zinc-900 border-border'}`}
       onClick={onView}
       data-testid={`file-grid-${file.sourceType}-${file.id}`}
     >
-      <div className="absolute top-2 left-2" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute top-3 left-3" onClick={(e) => e.stopPropagation()}>
         <Checkbox 
           checked={isSelected} 
           onCheckedChange={onToggleSelect}
@@ -350,11 +361,11 @@ function FileGridItem({
         />
       </div>
       
-      <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute top-3 right-3" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              <MoreHorizontal className="h-3 w-3" />
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -399,22 +410,22 @@ function FileGridItem({
         </DropdownMenu>
       </div>
       
-      <div className="w-20 h-20 flex items-center justify-center mb-2 bg-muted/50 rounded-md overflow-hidden">
+      <div className="w-24 h-24 flex items-center justify-center mb-3 bg-muted/30 rounded-lg overflow-hidden">
         {thumbnailUrl && isImage ? (
           <img src={thumbnailUrl} alt={file.title} className="w-full h-full object-cover" />
         ) : isPdf ? (
-          <FileText className="h-10 w-10 text-red-500" />
+          <FileText className="h-12 w-12 text-red-500" />
         ) : isImage ? (
-          <Image className="h-10 w-10 text-blue-500" />
+          <Image className="h-12 w-12 text-blue-500" />
         ) : (
-          <File className="h-10 w-10 text-muted-foreground" />
+          <File className="h-12 w-12 text-muted-foreground" />
         )}
       </div>
       
-      <span className="text-xs text-center truncate w-full max-w-[100px]" title={file.title}>
+      <span className="text-sm text-center truncate w-full max-w-[140px] font-medium" title={file.title}>
         {file.title}
       </span>
-      <span className="text-xs text-muted-foreground">
+      <span className="text-xs text-muted-foreground mt-1">
         {format(new Date(file.createdAt), "dd/MM/yy", { locale: fr })}
       </span>
     </div>
@@ -428,16 +439,30 @@ export default function DocumentsPage() {
   const [currentPath, setCurrentPath] = useState<FolderPath[]>([
     { type: 'root', name: 'Documents' }
   ]);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['patients', 'operations']));
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['patients']));
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'size'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('documents-view-mode');
+      return (saved === 'grid' || saved === 'list') ? saved : 'list';
+    }
+    return 'list';
+  });
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('documents-view-mode', viewMode);
+    }
+  }, [viewMode]);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [viewingFile, setViewingFile] = useState<{ file: UnifiedFile; url: string } | null>(null);
   const [editingDoc, setEditingDoc] = useState<UnifiedFile | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [deletingFile, setDeletingFile] = useState<UnifiedFile | null>(null);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
+  const [uploadPatientId, setUploadPatientId] = useState<string>("");
 
   const currentFolder = currentPath[currentPath.length - 1];
 
@@ -466,6 +491,16 @@ export default function DocumentsPage() {
 
   const { data: tree, isLoading: treeLoading } = useQuery<DocumentTree>({
     queryKey: ["/api/documents/tree"],
+  });
+
+  // Fetch patients for upload form
+  const { data: patientsData = [] } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
+    queryFn: async () => {
+      const res = await fetch("/api/patients", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch patients");
+      return res.json();
+    },
   });
 
   const { data: filesData, isLoading: filesLoading } = useQuery<{ files: UnifiedFile[]; totalCount: number }>({
@@ -717,33 +752,18 @@ export default function DocumentsPage() {
                   onToggle={() => toggleFolder('patients')}
                   onSelect={() => handleFolderSelect('patients')}
                 />
-                {expandedFolders.has('patients') && tree?.patients.map(p => (
-                  <div key={p.id} style={{ paddingLeft: '24px' }}>
-                    <FolderTreeItem
-                      node={{ name: p.name, count: p.count, type: 'patient', id: p.patientId }}
-                      isSelected={currentFolder.type === 'patient' && currentFolder.id === p.patientId}
-                      onSelect={() => handleFolderSelect('patient', p.patientId, p.name)}
-                    />
-                  </div>
-                ))}
-                
-                <FolderTreeItem
-                  node={{ name: 'Actes', count: tree?.operations.reduce((acc, o) => acc + o.count, 0) || 0, type: 'operations' }}
-                  isOpen={expandedFolders.has('operations')}
-                  isSelected={currentFolder.type === 'operations'}
-                  hasChildren={(tree?.operations.length || 0) > 0}
-                  onToggle={() => toggleFolder('operations')}
-                  onSelect={() => handleFolderSelect('operations')}
-                />
-                {expandedFolders.has('operations') && tree?.operations.map(o => (
-                  <div key={o.id} style={{ paddingLeft: '24px' }}>
-                    <FolderTreeItem
-                      node={{ name: o.name, count: o.count, type: 'operation', id: o.operationId }}
-                      isSelected={currentFolder.type === 'operation' && currentFolder.id === o.operationId}
-                      onSelect={() => handleFolderSelect('operation', o.operationId, o.name)}
-                    />
-                  </div>
-                ))}
+                {expandedFolders.has('patients') && tree?.patients.map(p => {
+                  const pid = p.patientId || p.id;
+                  return (
+                    <div key={p.id} style={{ paddingLeft: '24px' }}>
+                      <FolderTreeItem
+                        node={{ name: p.name, count: p.count, type: 'patient', id: pid }}
+                        isSelected={currentFolder.type === 'patient' && currentFolder.id === pid}
+                        onSelect={() => handleFolderSelect('patient', pid, p.name)}
+                      />
+                    </div>
+                  );
+                })}
                 
                 {(tree?.unclassifiedCount || 0) > 0 && (
                   <FolderTreeItem
@@ -840,6 +860,15 @@ export default function DocumentsPage() {
                 <Grid className="h-4 w-4" />
               </Button>
             </div>
+            
+            <Button
+              onClick={() => setUploadSheetOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="button-upload-document"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Ajouter un document
+            </Button>
           </div>
         </div>
         
@@ -891,7 +920,7 @@ export default function DocumentsPage() {
                 />
                 <span>{totalCount} fichier{totalCount > 1 ? 's' : ''}</span>
               </div>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
                 {files.map(file => (
                   <FileGridItem
                     key={`${file.sourceType}-${file.id}`}
@@ -918,9 +947,6 @@ export default function DocumentsPage() {
             <DialogTitle className="flex items-center gap-2 pr-8">
               {viewingFile && getFileIcon(viewingFile.file.mimeType)}
               <span className="truncate">{viewingFile?.file.title}</span>
-              {viewingFile?.file.sourceType === 'radio' && (
-                <Badge variant="outline" className="text-xs ml-2">Radio</Badge>
-              )}
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto min-h-0">
@@ -1047,6 +1073,42 @@ export default function DocumentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Sheet open={uploadSheetOpen} onOpenChange={setUploadSheetOpen}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Ajouter un document</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Patient</Label>
+              <Select value={uploadPatientId} onValueChange={setUploadPatientId}>
+                <SelectTrigger data-testid="select-upload-patient">
+                  <SelectValue placeholder="Sélectionner un patient" />
+                </SelectTrigger>
+                <SelectContent>
+                  {patientsData.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.prenom} {p.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {uploadPatientId && (
+              <DocumentUploadForm
+                patientId={uploadPatientId}
+                onSuccess={() => {
+                  setUploadSheetOpen(false);
+                  setUploadPatientId("");
+                  queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/documents/tree"] });
+                }}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

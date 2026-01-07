@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
 import logoBlue from "@assets/logo_Cassius_Plan_de_travail_1_copie_1765897934649.png";
 import logoWhite from "@assets/logo_Cassius_Plan_de_travail_1_copie_Plan_de_travail_1_copie_2_1765897934649.png";
@@ -35,6 +35,7 @@ interface LoginPageProps {
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const { toast } = useToast();
+  const [showPassword, setShowPassword] = useState(false);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -131,13 +132,30 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                     <FormItem>
                       <FormLabel className="text-sm text-muted-foreground">Mot de passe</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="password" 
-                          placeholder="••••••••" 
-                          className="h-11 border-gray-300 dark:border-gray-700"
-                          {...field} 
-                          data-testid="input-password" 
-                        />
+                        <div className="relative">
+                          <Input 
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••" 
+                            className="h-11 border-gray-300 dark:border-gray-700 pr-11"
+                            {...field} 
+                            data-testid="input-password" 
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 -translate-y-1/2"
+                            onClick={() => setShowPassword(!showPassword)}
+                            aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                            data-testid="button-toggle-password"
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
                       </FormControl>
                       <div className="flex justify-end">
                         <Link 

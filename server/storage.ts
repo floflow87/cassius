@@ -182,7 +182,8 @@ export interface IStorage {
   // Stats methods
   getStats(organisationId: string): Promise<DashboardStats>;
   getAdvancedStats(organisationId: string): Promise<AdvancedStats>;
-  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string): Promise<ClinicalStats>;
+  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[]): Promise<ClinicalStats>;
+  getPatientStats(organisationId: string): Promise<import("@shared/types").PatientStats[]>;
 
   // User methods (not tenant-filtered, users are global)
   getUserById(id: string): Promise<User | undefined>;
@@ -1767,33 +1768,84 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string): Promise<ClinicalStats> {
+  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[]): Promise<ClinicalStats> {
     const now = new Date();
     const defaultFrom = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().split('T')[0];
     const defaultTo = now.toISOString().split('T')[0];
     const fromDate = dateFrom || defaultFrom;
     const toDate = dateTo || defaultTo;
 
+    // Build base operation conditions
+    const opConditions = [
+      eq(operations.organisationId, organisationId),
+      gte(operations.dateOperation, fromDate),
+      lte(operations.dateOperation, toDate)
+    ];
+    
+    // Add patient filter if provided
+    if (patientIds && patientIds.length > 0) {
+      opConditions.push(inArray(operations.patientId, patientIds));
+    }
+    
+    // Add operation filter if provided
+    if (operationIds && operationIds.length > 0) {
+      opConditions.push(inArray(operations.id, operationIds));
+    }
+
     const allOperations = await db.select().from(operations)
-      .where(and(
-        eq(operations.organisationId, organisationId),
-        gte(operations.dateOperation, fromDate),
-        lte(operations.dateOperation, toDate)
-      ))
+      .where(and(...opConditions))
       .orderBy(operations.dateOperation);
 
-    const allSurgeryImplants = await db.select().from(surgeryImplants)
-      .where(and(
-        eq(surgeryImplants.organisationId, organisationId),
-        gte(surgeryImplants.datePose, fromDate),
-        lte(surgeryImplants.datePose, toDate)
-      ));
+    // Build surgery implant conditions
+    const siConditions: SQL[] = [
+      eq(surgeryImplants.organisationId, organisationId),
+      gte(surgeryImplants.datePose, fromDate),
+      lte(surgeryImplants.datePose, toDate)
+    ];
+    
+    // Filter by operation IDs if provided
+    if (operationIds && operationIds.length > 0) {
+      siConditions.push(inArray(surgeryImplants.surgeryId, operationIds));
+    }
+    
+    // Get operation IDs for patient filter
+    const operationIdsFromPatients = patientIds && patientIds.length > 0 
+      ? allOperations.map(op => op.id) 
+      : undefined;
+    
+    if (operationIdsFromPatients && operationIdsFromPatients.length > 0) {
+      siConditions.push(inArray(surgeryImplants.surgeryId, operationIdsFromPatients));
+    }
+
+    const allSurgeryImplantsWithDetails = await db.select({
+      id: surgeryImplants.id,
+      surgeryId: surgeryImplants.surgeryId,
+      implantId: surgeryImplants.implantId,
+      siteFdi: surgeryImplants.siteFdi,
+      isqPose: surgeryImplants.isqPose,
+      statut: surgeryImplants.statut,
+      datePose: surgeryImplants.datePose,
+      boneLossScore: surgeryImplants.boneLossScore,
+      marque: implants.marque,
+      referenceFabricant: implants.referenceFabricant,
+    }).from(surgeryImplants)
+      .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
+      .where(and(...siConditions));
+
+    const allSurgeryImplants = allSurgeryImplantsWithDetails;
 
     const allCompletedAppointments = await db.select().from(appointments)
       .where(and(
         eq(appointments.organisationId, organisationId),
         eq(appointments.status, 'COMPLETED')
       ));
+
+    // Build patients map early (needed for actsByType)
+    const patientsMap: Record<string, { nom: string; prenom: string }> = {};
+    const patientsList = await db.select({ id: patients.id, nom: patients.nom, prenom: patients.prenom })
+      .from(patients)
+      .where(eq(patients.organisationId, organisationId));
+    patientsList.forEach(p => { patientsMap[p.id] = { nom: p.nom, prenom: p.prenom }; });
 
     const activityByMonth: Record<string, number> = {};
     allOperations.forEach(op => {
@@ -1807,10 +1859,30 @@ export class DatabaseStorage implements IStorage {
       implantsByMonth[month] = (implantsByMonth[month] || 0) + 1;
     });
 
-    const actsByType: Record<string, number> = {};
+    // Build maps for implants per operation type
+    const surgeryImplantsByOp: Record<string, typeof allSurgeryImplants> = {};
+    allSurgeryImplants.forEach(si => {
+      if (!surgeryImplantsByOp[si.surgeryId]) surgeryImplantsByOp[si.surgeryId] = [];
+      surgeryImplantsByOp[si.surgeryId].push(si);
+    });
+
+    const actsByTypeMap: Record<string, { count: number; implants: { id: string; siteFdi: string; patientNom: string; patientPrenom: string; marque: string }[] }> = {};
     allOperations.forEach(op => {
       const type = op.typeIntervention || "AUTRE";
-      actsByType[type] = (actsByType[type] || 0) + 1;
+      if (!actsByTypeMap[type]) actsByTypeMap[type] = { count: 0, implants: [] };
+      actsByTypeMap[type].count++;
+      
+      const opImplants = surgeryImplantsByOp[op.id] || [];
+      const patient = patientsMap[op.patientId];
+      opImplants.forEach(si => {
+        actsByTypeMap[type].implants.push({
+          id: si.id,
+          siteFdi: si.siteFdi,
+          patientNom: patient?.nom || '',
+          patientPrenom: patient?.prenom || '',
+          marque: si.marque || '',
+        });
+      });
     });
 
     const statusCounts = { SUCCES: 0, COMPLICATION: 0, ECHEC: 0, EN_SUIVI: 0 };
@@ -1821,19 +1893,49 @@ export class DatabaseStorage implements IStorage {
       if (si.isqPose) isqValues.push(si.isqPose);
     });
 
+    // Helper: convert bone loss score (0-5) to success rate (100-0%)
+    const boneLossToSuccessRate = (score: number | null): number | null => {
+      if (score === null || score === undefined) return null;
+      const rates = [100, 80, 60, 40, 20, 0];
+      return rates[score] ?? null;
+    };
+
+    // Calculate success rate from boneLossScore (like individual implant stats)
+    const implantsWithBoneLoss = allSurgeryImplants.filter(si => 
+      si.boneLossScore !== null && si.boneLossScore !== undefined
+    );
+    
+    let successRate = 0;
+    if (implantsWithBoneLoss.length > 0) {
+      const totalSuccessRate = implantsWithBoneLoss.reduce((sum, si) => {
+        const rate = boneLossToSuccessRate(si.boneLossScore);
+        return sum + (rate ?? 0);
+      }, 0);
+      successRate = Math.round(totalSuccessRate / implantsWithBoneLoss.length);
+    }
+
     const total = allSurgeryImplants.length;
-    const successRate = total > 0 ? Math.round((statusCounts.SUCCES / total) * 100) : 0;
     const complicationRate = total > 0 ? Math.round((statusCounts.COMPLICATION / total) * 100) : 0;
     const failureRate = total > 0 ? Math.round((statusCounts.ECHEC / total) * 100) : 0;
 
+    // Filter surgery implants for ISQ data if implantModelId is provided
+    const isqFilteredImplants = implantModelId 
+      ? allSurgeryImplants.filter(si => si.implantId === implantModelId)
+      : allSurgeryImplants;
+
+    const filteredIsqValues: number[] = [];
+    isqFilteredImplants.forEach(si => {
+      if (si.isqPose) filteredIsqValues.push(si.isqPose);
+    });
+
     const isqDistribution = [
-      { category: "Faible (<55)", count: isqValues.filter(v => v < 55).length },
-      { category: "Modéré (55-70)", count: isqValues.filter(v => v >= 55 && v <= 70).length },
-      { category: "Élevé (>70)", count: isqValues.filter(v => v > 70).length },
+      { category: "Faible (<55)", count: filteredIsqValues.filter(v => v < 55).length },
+      { category: "Modéré (55-70)", count: filteredIsqValues.filter(v => v >= 55 && v <= 70).length },
+      { category: "Élevé (>70)", count: filteredIsqValues.filter(v => v > 70).length },
     ];
 
     const isqByMonth: Record<string, { sum: number; count: number }> = {};
-    allSurgeryImplants.forEach(si => {
+    isqFilteredImplants.forEach(si => {
       const month = si.datePose.substring(0, 7);
       if (si.isqPose) {
         if (!isqByMonth[month]) isqByMonth[month] = { sum: 0, count: 0 };
@@ -1867,22 +1969,24 @@ export class DatabaseStorage implements IStorage {
 
     const avgDelayToFirstVisit = delayCount > 0 ? Math.round(totalDelayDays / delayCount) : null;
 
-    const patientsMap: Record<string, { nom: string; prenom: string }> = {};
-    const patientsList = await db.select({ id: patients.id, nom: patients.nom, prenom: patients.prenom })
-      .from(patients)
-      .where(eq(patients.organisationId, organisationId));
-    patientsList.forEach(p => { patientsMap[p.id] = { nom: p.nom, prenom: p.prenom }; });
-
     const operationsMap: Record<string, string> = {};
     allOperations.forEach(op => { operationsMap[op.id] = op.patientId; });
 
     const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
     const implantsWithoutFollowup: ClinicalStats["implantsWithoutFollowup"] = [];
     
-    const allOrgSurgeryImplants = await db.select().from(surgeryImplants)
+    const allOrgSurgeryImplantsWithDetails = await db.select({
+      id: surgeryImplants.id,
+      surgeryId: surgeryImplants.surgeryId,
+      siteFdi: surgeryImplants.siteFdi,
+      datePose: surgeryImplants.datePose,
+      marque: implants.marque,
+      referenceFabricant: implants.referenceFabricant,
+    }).from(surgeryImplants)
+      .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
       .where(eq(surgeryImplants.organisationId, organisationId));
 
-    for (const si of allOrgSurgeryImplants) {
+    for (const si of allOrgSurgeryImplantsWithDetails) {
       const siVisites = visitesPerSurgeryImplant[si.id] || [];
       const lastVisit = siVisites.length > 0 
         ? siVisites.sort((a, b) => b.getTime() - a.getTime())[0] 
@@ -1905,10 +2009,21 @@ export class DatabaseStorage implements IStorage {
             datePose: si.datePose,
             lastVisitDate: lastVisit ? lastVisit.toISOString().split('T')[0] : null,
             daysSinceVisit: daysSince,
+            marque: si.marque || '',
+            referenceFabricant: si.referenceFabricant || null,
           });
         }
       }
     }
+
+    // Get available implant models for filter
+    const availableModels = await db.selectDistinct({
+      id: implants.id,
+      marque: implants.marque,
+      referenceFabricant: implants.referenceFabricant,
+    }).from(implants)
+      .where(eq(implants.organisationId, organisationId))
+      .orderBy(implants.marque);
 
     return {
       activityByPeriod: Object.entries(activityByMonth)
@@ -1918,8 +2033,8 @@ export class DatabaseStorage implements IStorage {
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([period, count]) => ({ period, count })),
       totalImplantsInPeriod: allSurgeryImplants.length,
-      actsByType: Object.entries(actsByType)
-        .map(([type, count]) => ({ type, count })),
+      actsByType: Object.entries(actsByTypeMap)
+        .map(([type, data]) => ({ type, count: data.count, implants: data.implants })),
       successRate,
       complicationRate,
       failureRate,
@@ -1929,7 +2044,111 @@ export class DatabaseStorage implements IStorage {
         .map(([period, data]) => ({ period, avgIsq: Math.round(data.sum / data.count) })),
       avgDelayToFirstVisit,
       implantsWithoutFollowup: implantsWithoutFollowup.slice(0, 20),
+      availableImplantModels: availableModels,
     };
+  }
+
+  async getPatientStats(organisationId: string): Promise<import("@shared/types").PatientStats[]> {
+    const allPatients = await db.select().from(patients)
+      .where(eq(patients.organisationId, organisationId));
+
+    const allOperations = await db.select().from(operations)
+      .where(eq(operations.organisationId, organisationId));
+
+    const allSurgeryImplants = await db.select({
+      id: surgeryImplants.id,
+      surgeryId: surgeryImplants.surgeryId,
+      siteFdi: surgeryImplants.siteFdi,
+      statut: surgeryImplants.statut,
+      isqPose: surgeryImplants.isqPose,
+      marque: implants.marque,
+    }).from(surgeryImplants)
+      .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
+      .where(eq(surgeryImplants.organisationId, organisationId));
+
+    const allFlags = await db.select().from(flags)
+      .where(and(
+        eq(flags.organisationId, organisationId),
+        isNull(flags.resolvedAt)
+      ));
+
+    const operationsByPatient: Record<string, string[]> = {};
+    allOperations.forEach(op => {
+      if (!operationsByPatient[op.patientId]) operationsByPatient[op.patientId] = [];
+      operationsByPatient[op.patientId].push(op.id);
+    });
+
+    const implantsBySurgery: Record<string, typeof allSurgeryImplants> = {};
+    allSurgeryImplants.forEach(si => {
+      if (!implantsBySurgery[si.surgeryId]) implantsBySurgery[si.surgeryId] = [];
+      implantsBySurgery[si.surgeryId].push(si);
+    });
+
+    const flagsByPatient: Record<string, number> = {};
+    allFlags.forEach(f => {
+      if (f.patientId) {
+        flagsByPatient[f.patientId] = (flagsByPatient[f.patientId] || 0) + 1;
+      }
+    });
+
+    const now = new Date();
+    const results: import("@shared/types").PatientStats[] = [];
+
+    for (const patient of allPatients) {
+      const patientOpIds = operationsByPatient[patient.id] || [];
+      const patientImplants: typeof allSurgeryImplants = [];
+      patientOpIds.forEach(opId => {
+        const opImplants = implantsBySurgery[opId] || [];
+        patientImplants.push(...opImplants);
+      });
+
+      const total = patientImplants.length;
+      let successCount = 0;
+      let complicationCount = 0;
+      let failureCount = 0;
+
+      patientImplants.forEach(si => {
+        const status = si.statut || "EN_SUIVI";
+        // Count SUCCES and EN_SUIVI as successful outcomes
+        // EN_SUIVI = implant in post-operative surveillance (default healthy state)
+        if (status === "SUCCES" || status === "EN_SUIVI") successCount++;
+        if (status === "COMPLICATION") complicationCount++;
+        if (status === "ECHEC") failureCount++;
+      });
+
+      const successRate = total > 0 ? Math.round((successCount / total) * 100) : 0;
+
+      let age = 0;
+      if (patient.dateNaissance) {
+        const birthDate = new Date(patient.dateNaissance);
+        if (!isNaN(birthDate.getTime())) {
+          age = Math.floor((now.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+          if (age < 0) age = 0;
+        }
+      }
+
+      results.push({
+        patientId: patient.id,
+        nom: patient.nom,
+        prenom: patient.prenom,
+        dateNaissance: patient.dateNaissance,
+        age,
+        totalImplants: total,
+        successRate,
+        complicationCount,
+        failureCount,
+        activeAlerts: flagsByPatient[patient.id] || 0,
+        implants: patientImplants.map(si => ({
+          id: si.id,
+          siteFdi: si.siteFdi,
+          marque: si.marque || '',
+          statut: si.statut || 'EN_SUIVI',
+          isqPose: si.isqPose,
+        })),
+      });
+    }
+
+    return results.sort((a, b) => b.activeAlerts - a.activeAlerts || b.totalImplants - a.totalImplants);
   }
 
   // ========== USERS (not tenant-filtered) ==========
@@ -2468,7 +2687,7 @@ export class DatabaseStorage implements IStorage {
       )
       SELECT 
         (SELECT json_agg(json_build_object('id', patient_id, 'name', nom || ' ' || prenom, 'type', 'patient', 'count', count, 'patientId', patient_id)) FROM patient_counts) as patients,
-        (SELECT json_agg(json_build_object('id', operation_id, 'name', type_intervention || ' - ' || date_operation || ' - ' || patient_nom || ' ' || patient_prenom, 'type', 'operation', 'count', count, 'operationId', operation_id, 'patientId', patient_id)) FROM operation_counts) as operations,
+        (SELECT json_agg(json_build_object('id', operation_id, 'name', patient_nom || ' ' || patient_prenom || ' - ' || TO_CHAR(date_operation, 'DD/MM/YYYY') || ' - ' || CASE type_intervention WHEN 'POSE_IMPLANT' THEN 'Pose' WHEN 'GREFFE_OSSEUSE' THEN 'Greffe' WHEN 'SINUS_LIFT' THEN 'Sinus Lift' WHEN 'EXTRACTION_IMPLANT_IMMEDIATE' THEN 'Extraction' WHEN 'REPRISE_IMPLANT' THEN 'Reprise' WHEN 'CHIRURGIE_GUIDEE' THEN 'Guidée' ELSE type_intervention END, 'type', 'operation', 'count', count, 'operationId', operation_id, 'patientId', patient_id)) FROM operation_counts) as operations,
         (SELECT count FROM unclassified_count) as unclassified_count,
         (SELECT count FROM total_count) as total_count
     `, [organisationId]);

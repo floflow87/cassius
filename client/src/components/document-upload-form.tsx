@@ -3,9 +3,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-import { Upload, FileText, X, Loader2 } from "lucide-react";
+import { Upload, FileText, X, Loader2, Image, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Form,
   FormControl,
@@ -14,12 +15,26 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const ACCEPTED_TYPES = ["application/pdf"];
+const ACCEPTED_DOC_TYPES = ["application/pdf"];
+const ACCEPTED_RADIO_TYPES = ["image/jpeg", "image/png", "image/dicom", "application/dicom", "application/pdf"];
 
 const TAG_OPTIONS = [
   { value: "DEVIS", label: "Devis" },
@@ -29,7 +44,15 @@ const TAG_OPTIONS = [
   { value: "AUTRE", label: "Autre" },
 ];
 
-const formSchema = z.object({
+const RADIO_TYPE_OPTIONS = [
+  { value: "PANORAMIQUE", label: "Panoramique" },
+  { value: "CBCT", label: "CBCT" },
+  { value: "RETROALVEOLAIRE", label: "Rétroalvéolaire" },
+];
+
+type FileUploadType = "document" | "radio";
+
+const documentFormSchema = z.object({
   title: z.string().min(1, "Le titre est requis"),
   tags: z.array(z.string()).default([]),
   filePath: z.string().min(1, "Veuillez telecharger un fichier PDF"),
@@ -38,7 +61,17 @@ const formSchema = z.object({
   sizeBytes: z.number().optional(),
 });
 
-type FormData = z.infer<typeof formSchema>;
+const radioFormSchema = z.object({
+  typeRadio: z.enum(["PANORAMIQUE", "CBCT", "RETROALVEOLAIRE"], { required_error: "Veuillez sélectionner un type de radio" }),
+  dateRadio: z.date({ required_error: "Veuillez sélectionner une date" }),
+  filePath: z.string().min(1, "Veuillez telecharger un fichier"),
+  fileName: z.string().optional(),
+  mimeType: z.string().optional(),
+  sizeBytes: z.number().optional(),
+});
+
+type DocumentFormData = z.infer<typeof documentFormSchema>;
+type RadioFormData = z.infer<typeof radioFormSchema>;
 
 interface DocumentUploadFormProps {
   patientId: string;
@@ -50,13 +83,15 @@ export function DocumentUploadForm({
   onSuccess,
 }: DocumentUploadFormProps) {
   const { toast } = useToast();
+  const [fileType, setFileType] = useState<FileUploadType | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; path: string } | null>(null);
   const [uploadError, setUploadError] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+  const documentForm = useForm<DocumentFormData>({
+    resolver: zodResolver(documentFormSchema),
     defaultValues: {
       title: "",
       tags: [],
@@ -67,8 +102,20 @@ export function DocumentUploadForm({
     },
   });
 
-  const mutation = useMutation({
-    mutationFn: async (data: FormData) => {
+  const radioForm = useForm<RadioFormData>({
+    resolver: zodResolver(radioFormSchema),
+    defaultValues: {
+      typeRadio: undefined,
+      dateRadio: undefined,
+      filePath: "",
+      fileName: "",
+      mimeType: "",
+      sizeBytes: 0,
+    },
+  });
+
+  const documentMutation = useMutation({
+    mutationFn: async (data: DocumentFormData) => {
       const res = await apiRequest("POST", "/api/documents", {
         ...data,
         patientId,
@@ -77,13 +124,13 @@ export function DocumentUploadForm({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents/tree"] });
       toast({
-        title: "Document ajoute",
-        description: "Le document a ete enregistre.",
+        title: "Document ajouté",
+        description: "Le document a été enregistré.",
         variant: "success",
       });
-      form.reset();
-      setUploadedFile(null);
+      resetAll();
       onSuccess?.();
     },
     onError: (error) => {
@@ -94,6 +141,48 @@ export function DocumentUploadForm({
       });
     },
   });
+
+  const radioMutation = useMutation({
+    mutationFn: async (data: RadioFormData) => {
+      const res = await apiRequest("POST", `/api/radios`, {
+        patientId,
+        type: data.typeRadio,
+        title: data.fileName || `Radio ${data.typeRadio}`,
+        date: format(data.dateRadio, "yyyy-MM-dd"),
+        filePath: data.filePath,
+        fileName: data.fileName,
+        mimeType: data.mimeType,
+        sizeBytes: data.sizeBytes,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "radios"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents/tree"] });
+      toast({
+        title: "Radio ajoutée",
+        description: "La radiographie a été enregistrée.",
+        variant: "success",
+      });
+      resetAll();
+      onSuccess?.();
+    },
+    onError: (error) => {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetAll = () => {
+    setFileType(null);
+    setUploadedFile(null);
+    setUploadError("");
+    documentForm.reset();
+    radioForm.reset();
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -107,30 +196,40 @@ export function DocumentUploadForm({
 
   const handleRemoveFile = () => {
     setUploadedFile(null);
-    form.setValue("filePath", "");
-    form.setValue("fileName", "");
-    form.setValue("mimeType", "");
-    form.setValue("sizeBytes", 0);
+    if (fileType === "document") {
+      documentForm.setValue("filePath", "");
+      documentForm.setValue("fileName", "");
+      documentForm.setValue("mimeType", "");
+      documentForm.setValue("sizeBytes", 0);
+    } else {
+      radioForm.setValue("filePath", "");
+      radioForm.setValue("fileName", "");
+      radioForm.setValue("mimeType", "");
+      radioForm.setValue("sizeBytes", 0);
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
   const toggleTag = (tag: string) => {
-    const currentTags = form.getValues("tags");
+    const currentTags = documentForm.getValues("tags");
     if (currentTags.includes(tag)) {
-      form.setValue("tags", currentTags.filter(t => t !== tag));
+      documentForm.setValue("tags", currentTags.filter(t => t !== tag));
     } else {
-      form.setValue("tags", [...currentTags, tag]);
+      documentForm.setValue("tags", [...currentTags, tag]);
     }
   };
 
-  const onSubmit = (data: FormData) => {
-    mutation.mutate(data);
+  const onSubmitDocument = (data: DocumentFormData) => {
+    documentMutation.mutate(data);
   };
 
-  const selectedTags = form.watch("tags");
-  const [isDragging, setIsDragging] = useState(false);
+  const onSubmitRadio = (data: RadioFormData) => {
+    radioMutation.mutate(data);
+  };
+
+  const selectedTags = documentForm.watch("tags");
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -162,8 +261,14 @@ export function DocumentUploadForm({
   };
 
   const processFile = async (file: File) => {
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setUploadError("Type de fichier non supporte. Utilisez uniquement des fichiers PDF.");
+    const acceptedTypes = fileType === "radio" ? ACCEPTED_RADIO_TYPES : ACCEPTED_DOC_TYPES;
+    
+    if (!acceptedTypes.includes(file.type)) {
+      if (fileType === "radio") {
+        setUploadError("Type de fichier non supporté. Utilisez des images (JPEG, PNG) ou PDF.");
+      } else {
+        setUploadError("Type de fichier non supporté. Utilisez uniquement des fichiers PDF.");
+      }
       return;
     }
 
@@ -176,7 +281,11 @@ export function DocumentUploadForm({
     setIsUploading(true);
 
     try {
-      const urlRes = await apiRequest("POST", "/api/documents/upload-url", {
+      const uploadEndpoint = fileType === "radio" 
+        ? "/api/radios/upload-url" 
+        : "/api/documents/upload-url";
+      
+      const urlRes = await apiRequest("POST", uploadEndpoint, {
         patientId,
         fileName: file.name,
         mimeType: file.type,
@@ -203,26 +312,34 @@ export function DocumentUploadForm({
       }
 
       setUploadedFile({ name: file.name, path: urlData.filePath });
-      form.setValue("filePath", urlData.filePath);
-      form.setValue("fileName", file.name);
-      form.setValue("mimeType", file.type);
-      form.setValue("sizeBytes", file.size);
+      
+      if (fileType === "document") {
+        documentForm.setValue("filePath", urlData.filePath);
+        documentForm.setValue("fileName", file.name);
+        documentForm.setValue("mimeType", file.type);
+        documentForm.setValue("sizeBytes", file.size);
 
-      if (!form.getValues("title")) {
-        form.setValue("title", file.name.replace(/\.[^/.]+$/, ""));
+        if (!documentForm.getValues("title")) {
+          documentForm.setValue("title", file.name.replace(/\.[^/.]+$/, ""));
+        }
+      } else {
+        radioForm.setValue("filePath", urlData.filePath);
+        radioForm.setValue("fileName", file.name);
+        radioForm.setValue("mimeType", file.type);
+        radioForm.setValue("sizeBytes", file.size);
       }
 
       toast({
-        title: "Fichier televerse",
-        description: "Le fichier a ete televerse avec succes.",
+        title: "Fichier téléversé",
+        description: "Le fichier a été téléversé avec succès.",
         variant: "success",
       });
     } catch (error) {
       console.error("Upload error:", error);
-      setUploadError("Impossible de televerser le fichier. Veuillez reessayer.");
+      setUploadError("Impossible de téléverser le fichier. Veuillez réessayer.");
       toast({
         title: "Erreur",
-        description: "Impossible de televerser le fichier.",
+        description: "Impossible de téléverser le fichier.",
         variant: "destructive",
       });
     } finally {
@@ -234,18 +351,256 @@ export function DocumentUploadForm({
     fileInputRef.current?.click();
   };
 
+  const getAcceptedTypes = () => {
+    if (fileType === "radio") {
+      return ".jpg,.jpeg,.png,.pdf,.dcm,image/jpeg,image/png,application/pdf,application/dicom";
+    }
+    return ".pdf,application/pdf";
+  };
+
+  // Step 1: Choose file type
+  if (!fileType) {
+    return (
+      <div className="space-y-4">
+        <Label className="font-light text-muted-foreground">Quel type de fichier souhaitez-vous ajouter ?</Label>
+        <div className="grid grid-cols-2 gap-4">
+          <button
+            type="button"
+            onClick={() => setFileType("radio")}
+            className="flex flex-col items-center gap-3 p-6 border-2 border-dashed rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors cursor-pointer"
+            data-testid="button-type-radio"
+          >
+            <Image className="h-10 w-10 text-blue-500" />
+            <span className="font-medium">Radiographie</span>
+            <span className="text-xs text-muted-foreground text-center">
+              Panoramique, CBCT, Rétroalvéolaire
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFileType("document")}
+            className="flex flex-col items-center gap-3 p-6 border-2 border-dashed rounded-lg hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
+            data-testid="button-type-document"
+          >
+            <File className="h-10 w-10 text-muted-foreground" />
+            <span className="font-medium">Document</span>
+            <span className="text-xs text-muted-foreground text-center">
+              Devis, Consentement, Compte-rendu
+            </span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: Radio form
+  if (fileType === "radio") {
+    return (
+      <Form {...radioForm}>
+        <form onSubmit={radioForm.handleSubmit(onSubmitRadio)} className="space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={resetAll}
+              data-testid="button-back-type"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Retour
+            </Button>
+            <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              Radiographie
+            </Badge>
+          </div>
+
+          <FormField
+            control={radioForm.control}
+            name="typeRadio"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-light">Type de radio</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-radio-type">
+                      <SelectValue placeholder="Sélectionner un type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {RADIO_TYPE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={radioForm.control}
+            name="dateRadio"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel className="font-light">Date de la radio</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                        data-testid="button-radio-date"
+                      >
+                        {field.value ? (
+                          format(field.value, "PPP", { locale: fr })
+                        ) : (
+                          <span>Sélectionner une date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      disabled={(date) => date > new Date()}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={radioForm.control}
+            name="filePath"
+            render={() => (
+              <FormItem>
+                <FormLabel className="font-light">Fichier image</FormLabel>
+                <FormControl>
+                  <div>
+                    {uploadedFile ? (
+                      <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50">
+                        <Image className="h-5 w-5 text-blue-500" />
+                        <span className="flex-1 truncate text-sm">{uploadedFile.name}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleRemoveFile}
+                          data-testid="button-remove-file"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept={getAcceptedTypes()}
+                          onChange={handleFileSelect}
+                          className="hidden"
+                          disabled={isUploading}
+                          data-testid="input-radio-file"
+                        />
+                        <div 
+                          onClick={handleFileClick}
+                          onDragOver={handleDragOver}
+                          onDragEnter={handleDragEnter}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop}
+                          className={`flex items-center justify-center gap-2 p-6 border-2 border-dashed rounded-md cursor-pointer transition-colors ${
+                            isDragging 
+                              ? "border-blue-500 bg-blue-50 dark:bg-blue-950" 
+                              : "border-muted-foreground/25 hover:border-blue-500/50 hover:bg-muted/50"
+                          }`}
+                          data-testid="dropzone-radio"
+                        >
+                          {isUploading ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <span className="text-sm">Téléversement...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-5 w-5 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">
+                                Cliquez ou déposez une image (JPEG, PNG) ou PDF
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {uploadError && (
+                      <p className="text-sm text-destructive mt-2">{uploadError}</p>
+                    )}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <Button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700"
+            disabled={radioMutation.isPending || isUploading || !uploadedFile}
+            data-testid="button-submit-radio"
+          >
+            {radioMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Enregistrement...
+              </>
+            ) : (
+              "Enregistrer la radiographie"
+            )}
+          </Button>
+        </form>
+      </Form>
+    );
+  }
+
+  // Step 2: Document form
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <Form {...documentForm}>
+      <form onSubmit={documentForm.handleSubmit(onSubmitDocument)} className="space-y-4">
+        <div className="flex items-center gap-2 mb-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={resetAll}
+            data-testid="button-back-type"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Retour
+          </Button>
+          <Badge variant="outline">
+            Document
+          </Badge>
+        </div>
+
         <FormField
-          control={form.control}
+          control={documentForm.control}
           name="title"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nom du document</FormLabel>
+              <FormLabel className="font-light">Nom du document</FormLabel>
               <FormControl>
                 <Input 
-                  placeholder="Ex: Devis prothese" 
+                  placeholder="Ex: Devis prothèse" 
                   {...field} 
                   data-testid="input-document-title" 
                 />
@@ -256,11 +611,11 @@ export function DocumentUploadForm({
         />
 
         <FormField
-          control={form.control}
+          control={documentForm.control}
           name="tags"
           render={() => (
             <FormItem>
-              <FormLabel>Tags</FormLabel>
+              <FormLabel className="font-light">Tags</FormLabel>
               <div className="flex flex-wrap gap-2">
                 {TAG_OPTIONS.map((tag) => (
                   <Badge
@@ -280,11 +635,11 @@ export function DocumentUploadForm({
         />
 
         <FormField
-          control={form.control}
+          control={documentForm.control}
           name="filePath"
           render={() => (
             <FormItem>
-              <FormLabel>Fichier PDF</FormLabel>
+              <FormLabel className="font-light">Fichier PDF</FormLabel>
               <FormControl>
                 <div>
                   {uploadedFile ? (
@@ -306,7 +661,7 @@ export function DocumentUploadForm({
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept=".pdf,application/pdf"
+                        accept={getAcceptedTypes()}
                         onChange={handleFileSelect}
                         className="hidden"
                         disabled={isUploading}
@@ -328,13 +683,13 @@ export function DocumentUploadForm({
                         {isUploading ? (
                           <>
                             <Loader2 className="h-5 w-5 animate-spin" />
-                            <span className="text-sm">Televersement...</span>
+                            <span className="text-sm">Téléversement...</span>
                           </>
                         ) : (
                           <>
                             <Upload className="h-5 w-5 text-muted-foreground" />
                             <span className="text-sm text-muted-foreground">
-                              Cliquez ou deposez un fichier PDF
+                              Cliquez ou déposez un fichier PDF
                             </span>
                           </>
                         )}
@@ -354,10 +709,10 @@ export function DocumentUploadForm({
         <Button
           type="submit"
           className="w-full"
-          disabled={mutation.isPending || isUploading || !uploadedFile}
+          disabled={documentMutation.isPending || isUploading || !uploadedFile}
           data-testid="button-submit-document"
         >
-          {mutation.isPending ? (
+          {documentMutation.isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Enregistrement...
