@@ -72,6 +72,12 @@ const TYPE_LABELS: Record<string, string> = {
 
 // Design System Color Tokens - using CSS variables
 const STATS_COLORS = {
+  // Chart colors palette
+  chart1: "hsl(var(--stats-chart-1))",
+  chart2: "hsl(var(--stats-chart-2))",
+  chart3: "hsl(var(--stats-chart-3))",
+  chart4: "hsl(var(--stats-chart-4))",
+  // Legacy aliases
   primary: "hsl(var(--stats-primary))",
   primarySoft: "hsl(var(--stats-primary-soft))",
   success: "hsl(var(--stats-success))",
@@ -83,7 +89,7 @@ const STATS_COLORS = {
   grayMuted: "hsl(var(--stats-gray-muted))",
   border: "hsl(var(--stats-border))",
   textSecondary: "hsl(var(--stats-text-secondary))",
-  // Desaturated ISQ colors
+  // ISQ colors
   isqHigh: "hsl(var(--stats-isq-high))",
   isqMedium: "hsl(var(--stats-isq-medium))",
   isqLow: "hsl(var(--stats-isq-low))",

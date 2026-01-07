@@ -58,9 +58,14 @@
   --border-gray: 220 13% 91%;
   
   /* Stats Design System - Premium Palette */
-  /* Primary #2563EB */
-  --stats-primary: 217 91% 53%;
-  --stats-primary-soft: 217 91% 65%;
+  /* Graph Colors */
+  --stats-chart-1: 217 91% 60%;    /* #3c83f6 */
+  --stats-chart-2: 215 93% 80%;    /* #9dc1fb */
+  --stats-chart-3: 277 100% 80%;   /* #d399ff */
+  --stats-chart-4: 232 24% 52%;    /* #676da2 */
+  /* Legacy aliases */
+  --stats-primary: 217 91% 60%;
+  --stats-primary-soft: 215 93% 80%;
   /* Success #16A34A (bg #DCFCE7) */
   --stats-success: 142 76% 36%;
   --stats-success-bg: 142 77% 93%;
@@ -76,11 +81,18 @@
   --stats-border: 214 32% 91%;
   --stats-page-bg: 210 40% 98%;
   --stats-card-bg: 0 0% 100%;
-  /* Desaturated chart colors */
+  /* ISQ chart colors */
   --stats-isq-high: 142 50% 45%;
   --stats-isq-medium: 38 70% 55%;
   --stats-isq-low: 0 60% 60%;
-  --stats-gray-muted: 220 13% 85%;
+  --stats-gray-muted: 232 24% 52%;
+  
+  /* Badge Colors */
+  --badge-blue: 217 91% 60%;       /* #3c83f6 */
+  --badge-cyan: 196 93% 60%;       /* #3abff8 */
+  --badge-orange: 27 88% 59%;      /* #f28f3b */
+  --badge-pink: 335 94% 57%;       /* #f92a82 */
+  --badge-dark: 240 7% 20%;        /* #303036 */
   
   --radius: 0.8rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
@@ -157,8 +169,14 @@
   --border-gray: 220 13% 25%;
   
   /* Stats Design System - Dark Mode */
+  /* Graph Colors */
+  --stats-chart-1: 217 91% 60%;    /* #3c83f6 */
+  --stats-chart-2: 215 93% 75%;    /* lighter in dark */
+  --stats-chart-3: 277 100% 75%;   /* #d399ff adapted */
+  --stats-chart-4: 232 24% 60%;    /* #676da2 lighter */
+  /* Legacy aliases */
   --stats-primary: 217 91% 60%;
-  --stats-primary-soft: 217 70% 50%;
+  --stats-primary-soft: 215 93% 75%;
   --stats-success: 142 70% 45%;
   --stats-success-bg: 142 50% 15%;
   --stats-warning: 38 85% 55%;
@@ -173,7 +191,14 @@
   --stats-isq-high: 142 45% 50%;
   --stats-isq-medium: 38 60% 55%;
   --stats-isq-low: 0 55% 55%;
-  --stats-gray-muted: 220 10% 40%;
+  --stats-gray-muted: 232 24% 60%;
+  
+  /* Badge Colors - Dark Mode */
+  --badge-blue: 217 91% 65%;
+  --badge-cyan: 196 93% 65%;
+  --badge-orange: 27 88% 65%;
+  --badge-pink: 335 94% 62%;
+  --badge-dark: 240 7% 35%;
   
   --accent: 25 45% 20%;
   --accent-foreground: 45 25% 85%;

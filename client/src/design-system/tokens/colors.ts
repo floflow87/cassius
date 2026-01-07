@@ -122,6 +122,52 @@ export const implantStatusColors = {
 } as const;
 
 // ============================================================================
+// COULEURS GRAPHIQUES STATS
+// ============================================================================
+
+export const statsChartColors = {
+  chart1: "#3c83f6",  // Bleu principal
+  chart2: "#9dc1fb",  // Bleu clair
+  chart3: "#d399ff",  // Violet clair
+  chart4: "#676da2",  // Gris violet
+} as const;
+
+export const statsChartColorsHSL = {
+  chart1: "217 91% 60%",
+  chart2: "215 93% 80%",
+  chart3: "277 100% 80%",
+  chart4: "232 24% 52%",
+} as const;
+
+// ============================================================================
+// COULEURS BADGES
+// ============================================================================
+
+export const badgeColors = {
+  blue: "#3c83f6",    // Bleu
+  cyan: "#3abff8",    // Cyan
+  orange: "#f28f3b",  // Orange
+  pink: "#f92a82",    // Rose
+  dark: "#303036",    // Gris foncé
+} as const;
+
+export const badgeColorsHSL = {
+  blue: "217 91% 60%",
+  cyan: "196 93% 60%",
+  orange: "27 88% 59%",
+  pink: "335 94% 57%",
+  dark: "240 7% 20%",
+} as const;
+
+export const badgeColorClasses = {
+  blue: "bg-[hsl(217,91%,60%)] text-white dark:bg-[hsl(217,91%,65%)]",
+  cyan: "bg-[hsl(196,93%,60%)] text-white dark:bg-[hsl(196,93%,65%)]",
+  orange: "bg-[hsl(27,88%,59%)] text-white dark:bg-[hsl(27,88%,65%)]",
+  pink: "bg-[hsl(335,94%,57%)] text-white dark:bg-[hsl(335,94%,62%)]",
+  dark: "bg-[hsl(240,7%,20%)] text-white dark:bg-[hsl(240,7%,35%)]",
+} as const;
+
+// ============================================================================
 // EXPORT CONSOLIDÉ
 // ============================================================================
 
@@ -131,6 +177,11 @@ export const colors = {
   neutrals,
   semantic: semanticColors,
   implantStatus: implantStatusColors,
+  statsChart: statsChartColors,
+  statsChartHSL: statsChartColorsHSL,
+  badge: badgeColors,
+  badgeHSL: badgeColorsHSL,
+  badgeClasses: badgeColorClasses,
 } as const;
 
 export default colors;
