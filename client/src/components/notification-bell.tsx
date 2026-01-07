@@ -212,7 +212,7 @@ export function NotificationBell() {
                   {generateTestNotificationsMutation.isPending ? (
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                   ) : null}
-                  Generer des notifications de test
+                  Générer des notifications de test
                 </Button>
               )}
             </div>

@@ -4951,8 +4951,8 @@ export async function registerRoutes(
           kind: "SYSTEM" as const,
           type: "SYSTEM_UPDATE",
           severity: "INFO" as const,
-          title: "Mise a jour systeme",
-          body: "De nouvelles fonctionnalites sont disponibles.",
+          title: "Mise à jour système",
+          body: "De nouvelles fonctionnalités sont disponibles.",
         },
       ];
 
