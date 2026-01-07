@@ -447,6 +447,11 @@
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
   overflow: hidden;
+  background: white;
+}
+
+.dark .fc-theme-standard .fc-scrollgrid {
+  background: hsl(var(--card));
 }
 
 .fc .fc-now-indicator-line {

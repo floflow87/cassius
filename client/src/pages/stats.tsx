@@ -586,24 +586,24 @@ export default function StatsPage() {
 
       {/* Tabs for different stat views */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-transparent p-0 h-auto gap-6 border-b-0">
+        <TabsList className="bg-transparent p-0 h-auto gap-1 border-b-0">
           <TabsTrigger 
             value="patient" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-patient"
           >
             Patients
           </TabsTrigger>
           <TabsTrigger 
             value="implant" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-implant"
           >
             Implants
           </TabsTrigger>
           <TabsTrigger 
             value="activite" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-activite"
           >
             Activités

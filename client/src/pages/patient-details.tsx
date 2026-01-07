@@ -1396,52 +1396,52 @@ export default function PatientDetailsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-transparent p-0 h-auto gap-6 border-b-0">
+        <TabsList className="bg-transparent p-0 h-auto gap-1 border-b-0">
           <TabsTrigger 
             value="overview" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-overview"
           >
             Vue d'ensemble
           </TabsTrigger>
           <TabsTrigger 
             value="implants" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-implants"
           >
             Implants <span className="text-xs italic ml-1">({implantCount})</span>
           </TabsTrigger>
           <TabsTrigger 
             value="operations" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-operations"
           >
             Actes chirurgicaux
           </TabsTrigger>
           <TabsTrigger 
             value="radios" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-radios"
           >
             Radiographies
           </TabsTrigger>
           <TabsTrigger 
             value="documents" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-documents"
           >
             Documents
           </TabsTrigger>
           <TabsTrigger 
             value="visits" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-visits"
           >
             Suivi & Visites
           </TabsTrigger>
           <TabsTrigger 
             value="notes" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-[#11172B] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-notes"
           >
             Notes
