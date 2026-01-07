@@ -234,6 +234,7 @@ export function NotificationBell() {
             variant="ghost" 
             className="w-full text-xs h-8"
             asChild
+            onClick={() => setOpen(false)}
             data-testid="link-view-all-notifications"
           >
             <Link href="/notifications">Voir toutes les notifications</Link>

@@ -152,15 +152,20 @@ function NotificationRow({
                 <Link href={link}>Voir</Link>
               </Button>
             )}
-            {isUnread && (
+            {isUnread ? (
               <Button 
                 variant="ghost" 
                 size="icon"
+                className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
                 onClick={() => onMarkAsRead(notification.id)}
                 data-testid={`button-mark-read-${notification.id}`}
               >
                 <Check className="h-4 w-4" />
               </Button>
+            ) : (
+              <div className="h-9 w-9 flex items-center justify-center rounded-md bg-green-100 dark:bg-green-900/30">
+                <Check className="h-4 w-4 text-green-600" />
+              </div>
             )}
           </div>
         </div>
