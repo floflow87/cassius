@@ -157,8 +157,7 @@ export function NotificationBell() {
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge 
-              variant="destructive" 
-              className="absolute -top-1 -right-1 h-5 min-w-[1.25rem] px-1 text-[10px] font-bold"
+              className="absolute -top-1 -right-1 h-5 min-w-[1.25rem] px-1 text-[10px] font-bold bg-primary text-primary-foreground"
               data-testid="badge-notification-count"
             >
               {unreadCount > 99 ? "99+" : unreadCount}

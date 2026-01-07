@@ -2262,17 +2262,31 @@ export async function registerRoutes(
       const appointmentData = insertAppointmentSchema.parse({ ...req.body, patientId });
       const appointment = await storage.createAppointment(organisationId, appointmentData);
       
-      // Send notification about new appointment
       const userId = req.jwtUser?.userId;
+      
+      // If it's a future appointment, resolve the "NO_RECENT_APPOINTMENT" flag for this patient
+      if (appointment.dateStart >= new Date() && userId) {
+        const resolvedCount = await storage.resolveFlagByTypeAndPatient(
+          organisationId, 
+          "NO_RECENT_APPOINTMENT", 
+          patientId, 
+          userId
+        );
+        if (resolvedCount > 0) {
+          console.log(`[APPOINTMENT] Resolved ${resolvedCount} NO_RECENT_APPOINTMENT flag(s) for patient ${patientId}`);
+        }
+      }
+      
+      // Send notification about new appointment
       if (userId) {
-        await notificationService.notificationEvents.onAppointmentCreated({
+        notificationService.notificationEvents.onAppointmentCreated({
           organisationId,
           recipientUserId: userId,
           actorUserId: userId,
           appointmentId: appointment.id,
           appointmentDate: appointment.dateStart.toISOString(),
           patientId,
-        });
+        }).catch(err => console.error("[Notification] Appointment created notification failed:", err));
       }
       
       res.status(201).json(appointment);
