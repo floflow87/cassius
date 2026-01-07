@@ -71,7 +71,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r-0 overflow-visible relative">
 
       <SidebarHeader className="bg-sidebar h-16 px-2">
-        <div className="flex items-center h-full pl-3">
+        <div className="flex items-center h-full pl-[11px]">
           <a 
             href="/dashboard" 
             onClick={handleNavClick("/dashboard")}
