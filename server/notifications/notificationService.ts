@@ -570,6 +570,256 @@ export const notificationEvents = {
       metadata: { appointmentDate: params.appointmentDate, patientId: params.patientId },
     });
   },
+
+  // Clinical: ISQ declining (drop of 10+ points)
+  async onIsqDeclining(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    patientName: string;
+    implantSite: string;
+    previousIsq: number;
+    currentIsq: number;
+    drop: number;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ALERT",
+      type: "ISQ_DECLINING",
+      severity: "WARNING",
+      title: `Baisse significative de stabilite implantaire`,
+      body: `L'implant site ${params.implantSite} (${params.patientName}) a perdu ${params.drop} points ISQ (${params.previousIsq} -> ${params.currentIsq}).`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      metadata: { implantSite: params.implantSite, previousIsq: params.previousIsq, currentIsq: params.currentIsq, drop: params.drop },
+      dedupeKey: `isq_declining_${params.patientId}_${params.implantSite}`,
+    });
+  },
+
+  // Clinical: No post-op follow-up
+  async onNoPostOpFollowup(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    patientName: string;
+    operationId: string;
+    operationDate: string;
+    daysSinceOp: number;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "REMINDER",
+      type: "NO_POSTOP_FOLLOWUP",
+      severity: "WARNING",
+      title: `Suivi post-operatoire manquant`,
+      body: `${params.patientName}: intervention du ${params.operationDate} sans controle ISQ a J+${params.daysSinceOp}.`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      metadata: { operationId: params.operationId, operationDate: params.operationDate, daysSinceOp: params.daysSinceOp },
+      dedupeKey: `no_postop_${params.operationId}`,
+    });
+  },
+
+  // Clinical: Implant without visit for X months
+  async onNoRecentVisit(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    patientName: string;
+    implantSite: string;
+    monthsSinceVisit: number;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "REMINDER",
+      type: "NO_RECENT_VISIT",
+      severity: "INFO",
+      title: `Implant sans visite recente`,
+      body: `${params.patientName}, site ${params.implantSite}: aucune visite depuis ${params.monthsSinceVisit} mois.`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      metadata: { implantSite: params.implantSite, monthsSinceVisit: params.monthsSinceVisit },
+      dedupeKey: `no_recent_visit_${params.patientId}_${params.implantSite}`,
+    });
+  },
+
+  // Clinical: Unstable ISQ history (multiple low consecutive)
+  async onUnstableIsqHistory(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    patientName: string;
+    implantSite: string;
+    lowIsqCount: number;
+    recentIsqValues: number[];
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ALERT",
+      type: "UNSTABLE_ISQ_HISTORY",
+      severity: "CRITICAL",
+      title: `Historique ISQ instable`,
+      body: `${params.patientName}, site ${params.implantSite}: ${params.lowIsqCount} mesures ISQ faibles consecutives (${params.recentIsqValues.join(', ')}).`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      metadata: { implantSite: params.implantSite, lowIsqCount: params.lowIsqCount, recentIsqValues: params.recentIsqValues },
+      dedupeKey: `unstable_isq_${params.patientId}_${params.implantSite}`,
+    });
+  },
+
+  // Clinical: Surgery without planned follow-up
+  async onSurgeryNoFollowupPlanned(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    patientName: string;
+    operationId: string;
+    operationDate: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "REMINDER",
+      type: "SURGERY_NO_FOLLOWUP_PLANNED",
+      severity: "WARNING",
+      title: `Acte chirurgical sans suivi planifie`,
+      body: `${params.patientName}: operation du ${params.operationDate} sans RDV de suivi programme.`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      metadata: { operationId: params.operationId, operationDate: params.operationDate },
+      dedupeKey: `surgery_no_followup_${params.operationId}`,
+    });
+  },
+
+  // Activity: Radio added
+  async onRadioAdded(params: {
+    organisationId: string;
+    recipientUserId: string;
+    actorUserId: string;
+    patientId: string;
+    patientName: string;
+    radioType: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ACTIVITY",
+      type: "RADIO_ADDED",
+      severity: "INFO",
+      title: `Radiographie ajoutee`,
+      body: `${params.radioType} ajoutee pour ${params.patientName}.`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      actorUserId: params.actorUserId,
+      metadata: { radioType: params.radioType },
+    });
+  },
+
+  // Collaboration: Invitation sent
+  async onInvitationSent(params: {
+    organisationId: string;
+    recipientUserId: string;
+    inviteeEmail: string;
+    role: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ACTIVITY",
+      type: "INVITATION_SENT",
+      severity: "INFO",
+      title: `Invitation envoyee`,
+      body: `Une invitation a ete envoyee a ${params.inviteeEmail} en tant que ${params.role}.`,
+      metadata: { inviteeEmail: params.inviteeEmail, role: params.role },
+    });
+  },
+
+  // Collaboration: New member joined
+  async onNewMemberJoined(params: {
+    organisationId: string;
+    recipientUserId: string;
+    newMemberName: string;
+    newMemberEmail: string;
+    role: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ACTIVITY",
+      type: "NEW_MEMBER_JOINED",
+      severity: "INFO",
+      title: `Nouveau membre`,
+      body: `${params.newMemberName} (${params.newMemberEmail}) a rejoint l'equipe en tant que ${params.role}.`,
+      metadata: { newMemberName: params.newMemberName, newMemberEmail: params.newMemberEmail, role: params.role },
+    });
+  },
+
+  // Collaboration: Role changed
+  async onRoleChanged(params: {
+    organisationId: string;
+    recipientUserId: string;
+    affectedUserName: string;
+    previousRole: string;
+    newRole: string;
+    actorUserId: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ACTIVITY",
+      type: "ROLE_CHANGED",
+      severity: "INFO",
+      title: `Role modifie`,
+      body: `Le role de ${params.affectedUserName} a ete modifie: ${params.previousRole} -> ${params.newRole}.`,
+      actorUserId: params.actorUserId,
+      metadata: { affectedUserName: params.affectedUserName, previousRole: params.previousRole, newRole: params.newRole },
+    });
+  },
+
+  // Technical: Email sending error
+  async onEmailError(params: {
+    organisationId: string;
+    recipientUserId: string;
+    emailType: string;
+    targetEmail: string;
+    errorMessage: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "SYSTEM",
+      type: "EMAIL_ERROR",
+      severity: "WARNING",
+      title: `Erreur d'envoi d'email`,
+      body: `L'email ${params.emailType} vers ${params.targetEmail} n'a pas pu etre envoye.`,
+      metadata: { emailType: params.emailType, targetEmail: params.targetEmail, errorMessage: params.errorMessage },
+      dedupeKey: `email_error_${params.targetEmail}_${params.emailType}`,
+    });
+  },
+
+  // System: Maintenance notification
+  async onSystemMaintenance(params: {
+    organisationId: string;
+    recipientUserId: string;
+    maintenanceType: string;
+    scheduledAt?: string;
+    description: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "SYSTEM",
+      type: "SYSTEM_MAINTENANCE",
+      severity: "INFO",
+      title: `Maintenance systeme`,
+      body: params.description,
+      metadata: { maintenanceType: params.maintenanceType, scheduledAt: params.scheduledAt },
+    });
+  },
 };
 
 export default {
