@@ -16,13 +16,14 @@
   --card: 0deg 0% 100%;
   --card-foreground: 0 0% 0%;
   --card-border: 0 0% 97%;
-  /* Sidebar with Cassius mainBlue #2563EB */
-  --sidebar: 217 91% 60%;
+  /* Sidebar with dark navy #11172B */
+  --sidebar: 222 56% 12%;
   --sidebar-foreground: 0 0% 100%;
-  --sidebar-border: 217 91% 55%;
+  --sidebar-border: 222 56% 10%;
   --sidebar-primary: 0 0% 100%;
-  --sidebar-primary-foreground: 217 91% 60%;
-  --sidebar-accent: 217 91% 70%;
+  --sidebar-primary-foreground: 222 56% 12%;
+  /* Active tab uses primary color #2563EB */
+  --sidebar-accent: 217 91% 53%;
   --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-ring: 0 0% 100%;
   --popover: 0 0% 100%;
@@ -147,13 +148,14 @@
   --card: 20 14% 8%;
   --card-foreground: 45 25% 85%;
   --card-border: 20 14% 15%;
-  /* Sidebar with Cassius mainBlue #2563EB - same in dark mode */
-  --sidebar: 217 91% 50%;
+  /* Sidebar with dark navy #11172B - same in dark mode */
+  --sidebar: 222 56% 12%;
   --sidebar-foreground: 0 0% 100%;
-  --sidebar-border: 217 91% 45%;
+  --sidebar-border: 222 56% 10%;
   --sidebar-primary: 0 0% 100%;
-  --sidebar-primary-foreground: 217 91% 50%;
-  --sidebar-accent: 217 91% 60%;
+  --sidebar-primary-foreground: 222 56% 12%;
+  /* Active tab uses primary color #2563EB */
+  --sidebar-accent: 217 91% 53%;
   --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-ring: 0 0% 100%;
   --popover: 20 14% 4%;
