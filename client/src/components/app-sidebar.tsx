@@ -85,7 +85,7 @@ export function AppSidebar() {
         </a>
       </SidebarHeader>
 
-      <SidebarContent className="bg-primary px-0 py-0">
+      <SidebarContent className="bg-sidebar px-0 py-0">
         <SidebarMenu className="gap-1 px-2 pt-2">
           {menuItems.map((item) => {
             const active = isActive(item.url);
@@ -94,12 +94,12 @@ export function AppSidebar() {
               <a
                 href={item.url}
                 onClick={handleNavClick(item.url)}
-                className={`flex h-10 items-center rounded-[5px] ${
+                className={`flex h-10 items-center transition-all ${
                   isExpanded ? 'justify-start px-3 gap-3' : 'justify-center w-full'
                 } ${
                   active 
-                    ? "bg-secondary" 
-                    : "bg-transparent hover:bg-white/10"
+                    ? "bg-sidebar-accent rounded-[50px]" 
+                    : "bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] rounded-md"
                 }`}
                 data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
               >
@@ -140,7 +140,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="bg-primary px-2 py-2 pb-4 mt-auto">
+      <SidebarFooter className="bg-sidebar px-2 py-2 pb-4 mt-auto">
         <SidebarMenu className="gap-1">
           {/* Settings button with toggle */}
           <SidebarMenuItem className="px-0">
@@ -149,8 +149,8 @@ export function AppSidebar() {
                 <a
                   href="/settings"
                   onClick={handleNavClick("/settings")}
-                  className={`flex-1 flex h-10 items-center justify-start px-3 gap-3 rounded-[5px] ${
-                    isActive("/settings") ? "bg-secondary" : "bg-transparent hover:bg-white/10"
+                  className={`flex-1 flex h-10 items-center justify-start px-3 gap-3 transition-all ${
+                    isActive("/settings") ? "bg-sidebar-accent rounded-[50px]" : "bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] rounded-md"
                   }`}
                   data-testid="link-settings"
                 >
@@ -169,7 +169,7 @@ export function AppSidebar() {
                     <a
                       href="/settings"
                       onClick={handleNavClick("/settings")}
-                      className="flex-1 flex h-10 items-center justify-center rounded-[5px] bg-transparent hover:bg-white/10"
+                      className="flex-1 flex h-10 items-center justify-center rounded-md bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] transition-all"
                       data-testid="link-settings"
                     >
                       <img 
