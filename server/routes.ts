@@ -5250,6 +5250,33 @@ export async function registerRoutes(
     }
   });
 
+  // Delete a notification
+  app.delete("/api/notifications/:id", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const { id } = req.params;
+      
+      // Delete from database
+      const result = await db
+        .delete(notifications)
+        .where(and(
+          eq(notifications.id, id),
+          eq(notifications.recipientUserId, userId)
+        ));
+      
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: "Notification non trouvee" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Notifications] Error deleting notification:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get user notification preferences
   app.get("/api/notifications/preferences", requireJwtOrSession, async (req, res) => {
     try {

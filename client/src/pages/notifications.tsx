@@ -15,7 +15,8 @@ import {
   Loader2,
   Settings,
   Filter,
-  MailOpen
+  MailOpen,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -235,6 +236,23 @@ export default function NotificationsPage() {
     },
   });
   
+  const deleteNotificationMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/notifications/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+    },
+  });
+  
+  const resolveFlagMutation = useMutation({
+    mutationFn: (flagId: string) => apiRequest("PATCH", `/api/flags/${flagId}/resolve`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/flags'] });
+    },
+  });
+  
   const notifications = data?.notifications || [];
   const unreadCount = unreadData?.count || 0;
   
@@ -354,7 +372,7 @@ export default function NotificationsPage() {
                   onClick={() => {
                     selectedIds.forEach(id => {
                       const n = notifications.find(n => n.id === id);
-                      if (n && !n.readAt) {
+                      if (n && !n.readAt && !n.isVirtual) {
                         markAsReadMutation.mutate(id);
                       }
                     });
@@ -363,6 +381,31 @@ export default function NotificationsPage() {
                   data-testid="button-mark-selected-read"
                 >
                   Marquer comme lu
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => {
+                    selectedIds.forEach(id => {
+                      const n = notifications.find(n => n.id === id);
+                      if (n) {
+                        if (n.isVirtual && id.startsWith('flag-')) {
+                          // Resolve the flag
+                          const flagId = id.replace('flag-', '');
+                          resolveFlagMutation.mutate(flagId);
+                        } else if (!n.isVirtual) {
+                          // Delete the notification
+                          deleteNotificationMutation.mutate(id);
+                        }
+                      }
+                    });
+                    setSelectedIds(new Set());
+                  }}
+                  data-testid="button-delete-selected"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Supprimer
                 </Button>
               </div>
             )}
