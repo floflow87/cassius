@@ -844,105 +844,6 @@ function CollaboratorsSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end gap-4 flex-wrap">
-        <Sheet open={showInviteSheet} onOpenChange={setShowInviteSheet}>
-          <SheetTrigger asChild>
-            <Button data-testid="button-invite-collaborator">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Ajouter
-            </Button>
-          </SheetTrigger>
-          <SheetContent>
-            <SheetHeader>
-              <SheetTitle>Ajouter un collaborateur</SheetTitle>
-              <SheetDescription>
-                Invitez un nouveau membre à rejoindre votre organisation.
-              </SheetDescription>
-            </SheetHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit((data) => inviteMutation.mutate(data))} className="space-y-4 mt-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="prenom"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Prénom</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-invite-prenom" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="nom"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nom</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-invite-nom" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email (identifiant)</FormLabel>
-                      <FormControl>
-                        <Input type="email" {...field} data-testid="input-invite-email" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Rôle</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-invite-role">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="ADMIN">Administrateur</SelectItem>
-                          <SelectItem value="CHIRURGIEN">Collaborateur</SelectItem>
-                          <SelectItem value="ASSISTANT">Assistant</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="w-4 h-4" />
-                        Un email sera envoyé au collaborateur afin de l'inviter à se connecter à Cassius.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <SheetFooter className="mt-6">
-                  <Button type="button" variant="outline" onClick={() => setShowInviteSheet(false)}>
-                    Annuler
-                  </Button>
-                  <Button type="submit" disabled={inviteMutation.isPending} data-testid="button-submit-invite">
-                    {inviteMutation.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
-                    Inviter
-                  </Button>
-                </SheetFooter>
-              </form>
-            </Form>
-          </SheetContent>
-        </Sheet>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Permissions par rôle</CardTitle>
@@ -973,8 +874,108 @@ function CollaboratorsSection() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Membres de l'organisation</CardTitle>
-          <CardDescription>{collaborators.length} collaborateur(s)</CardDescription>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <CardTitle>Membres de l'organisation</CardTitle>
+              <CardDescription>{collaborators.length} collaborateur(s)</CardDescription>
+            </div>
+            <Sheet open={showInviteSheet} onOpenChange={setShowInviteSheet}>
+              <SheetTrigger asChild>
+                <Button data-testid="button-invite-collaborator">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Ajouter
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Ajouter un collaborateur</SheetTitle>
+                  <SheetDescription>
+                    Invitez un nouveau membre à rejoindre votre organisation.
+                  </SheetDescription>
+                </SheetHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit((data) => inviteMutation.mutate(data))} className="space-y-4 mt-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="prenom"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Prénom</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="input-invite-prenom" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="nom"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nom</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="input-invite-nom" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email (identifiant)</FormLabel>
+                          <FormControl>
+                            <Input type="email" {...field} data-testid="input-invite-email" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rôle</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-invite-role">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="ADMIN">Administrateur</SelectItem>
+                              <SelectItem value="CHIRURGIEN">Collaborateur</SelectItem>
+                              <SelectItem value="ASSISTANT">Assistant</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription className="flex items-center gap-2 text-muted-foreground">
+                            <Mail className="w-4 h-4" />
+                            Un email sera envoyé au collaborateur afin de l'inviter à se connecter à Cassius.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <SheetFooter className="mt-6">
+                      <Button type="button" variant="outline" onClick={() => setShowInviteSheet(false)}>
+                        Annuler
+                      </Button>
+                      <Button type="submit" disabled={inviteMutation.isPending} data-testid="button-submit-invite">
+                        {inviteMutation.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
+                        Inviter
+                      </Button>
+                    </SheetFooter>
+                  </form>
+                </Form>
+              </SheetContent>
+            </Sheet>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -1432,54 +1433,21 @@ function NotificationsSection() {
 
   const categories = ["ALERTS_REMINDERS", "TEAM_ACTIVITY", "IMPORTS", "SYSTEM"] as const;
 
-  const [digestFrequency, setDigestFrequency] = useState<"none" | "daily" | "weekly">("none");
-  const [digestEnabled, setDigestEnabled] = useState(false);
+  const [digestPrefs, setDigestPrefs] = useState<Record<string, "none" | "daily" | "weekly">>({});
 
-  const handleDigestChange = (value: string) => {
-    setDigestFrequency(value as "none" | "daily" | "weekly");
-    setDigestEnabled(value !== "none");
+  const getDigestPref = (type: string): "none" | "daily" | "weekly" => {
+    return digestPrefs[type] || "none";
+  };
+
+  const handleDigestChange = (type: string, value: string) => {
+    setDigestPrefs(prev => ({
+      ...prev,
+      [type]: value as "none" | "daily" | "weekly"
+    }));
   };
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-muted">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Notifications par email</CardTitle>
-                <CardDescription className="text-xs">
-                  Les notifications par email sont envoyées immédiatement pour les alertes critiques.
-                </CardDescription>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4 p-4 border rounded-md">
-              <div>
-                <p className="text-sm font-medium">Résumé par email</p>
-                <p className="text-xs text-muted-foreground">Recevez un récapitulatif de vos notifications non lues</p>
-              </div>
-              <Select value={digestFrequency} onValueChange={handleDigestChange}>
-                <SelectTrigger className="w-[200px]" data-testid="select-digest-frequency">
-                  <SelectValue placeholder="Fréquence" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Désactivé</SelectItem>
-                  <SelectItem value="daily">Tous les soirs, 19h</SelectItem>
-                  <SelectItem value="weekly">Tous les vendredis, 19h</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -1524,28 +1492,46 @@ function NotificationsSection() {
                 <CardContent className="pt-0">
                   <div className="border rounded-md divide-y">
                     <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-muted/50 text-xs font-medium text-muted-foreground">
-                      <div className="col-span-4">Type</div>
-                      <div className="col-span-4">Description</div>
-                      <div className="col-span-2 text-center">In-App</div>
+                      <div className="col-span-3">Type</div>
+                      <div className="col-span-3">Description</div>
+                      <div className="col-span-3 text-center">Résumé</div>
+                      <div className="col-span-1 text-center">In-App</div>
                       <div className="col-span-2 text-center">Email</div>
                     </div>
                     {typesInCategory.map((notifType) => {
                       const typePrefs = getTypePrefs(category, notifType.type);
                       const isDisabled = !typePrefs.inApp && !typePrefs.email;
+                      const digestValue = getDigestPref(notifType.type);
                       return (
                         <div 
                           key={notifType.type} 
                           className={`grid grid-cols-12 gap-2 px-4 py-3 items-center ${isDisabled ? "opacity-50" : ""}`}
                         >
-                          <div className="col-span-4">
+                          <div className="col-span-3">
                             <span className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : ""}`}>
                               {notifType.label}
                             </span>
                           </div>
-                          <div className="col-span-4">
+                          <div className="col-span-3">
                             <span className="text-xs text-muted-foreground">{notifType.description}</span>
                           </div>
-                          <div className="col-span-2 flex justify-center">
+                          <div className="col-span-3 flex justify-center">
+                            <Select 
+                              value={digestValue} 
+                              onValueChange={(v) => handleDigestChange(notifType.type, v)}
+                              disabled={!typePrefs.email}
+                            >
+                              <SelectTrigger className="h-8 text-xs w-[140px]" data-testid={`select-digest-${notifType.type}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Immédiat</SelectItem>
+                                <SelectItem value="daily">Soir, 19h</SelectItem>
+                                <SelectItem value="weekly">Vendredi, 19h</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-1 flex justify-center">
                             <Switch
                               checked={typePrefs.inApp}
                               onCheckedChange={(v) => handleToggleInApp(category, notifType.type, v)}
