@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Plus,
@@ -2277,58 +2278,58 @@ export default function PatientDetailsPage() {
             <>
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center bg-white dark:bg-zinc-900 rounded-full p-1 gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`rounded-full ${implantTypeFilter === "all" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                      onClick={() => setImplantTypeFilter("all")}
-                      data-testid="button-filter-all"
-                    >
-                      Tous
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`rounded-full ${implantTypeFilter === "IMPLANT" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                      onClick={() => setImplantTypeFilter("IMPLANT")}
-                      data-testid="button-filter-implants"
-                    >
-                      Implants
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`rounded-full ${implantTypeFilter === "MINI_IMPLANT" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                      onClick={() => setImplantTypeFilter("MINI_IMPLANT")}
-                      data-testid="button-filter-mini-implants"
-                    >
-                      Mini-implants
-                    </Button>
+                  <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-full">
+                    {[
+                      { value: "all" as const, label: "Tous" },
+                      { value: "IMPLANT" as const, label: "Implants" },
+                      { value: "MINI_IMPLANT" as const, label: "Mini-implants" },
+                    ].map((filter) => (
+                      <button
+                        key={filter.value}
+                        onClick={() => setImplantTypeFilter(filter.value)}
+                        className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                          implantTypeFilter === filter.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        data-testid={`button-filter-${filter.value.toLowerCase()}`}
+                      >
+                        {implantTypeFilter === filter.value && (
+                          <motion.div
+                            layoutId="implant-type-filter-indicator"
+                            className="absolute inset-0 bg-primary rounded-full"
+                            transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                          />
+                        )}
+                        <span className="relative z-10">{filter.label}</span>
+                      </button>
+                    ))}
                   </div>
                   <span className="text-sm text-muted-foreground">
                     {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
                   </span>
                 </div>
-                <div className="flex items-center bg-white dark:bg-zinc-900 rounded-full p-1 gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`rounded-full ${implantViewMode === "table" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                    onClick={() => setImplantViewMode("table")}
-                    data-testid="button-view-table"
-                  >
-                    <LayoutList className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`rounded-full ${implantViewMode === "cards" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                    onClick={() => setImplantViewMode("cards")}
-                    data-testid="button-view-cards"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
+                <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-full">
+                  {[
+                    { value: "table" as const, icon: LayoutList },
+                    { value: "cards" as const, icon: LayoutGrid },
+                  ].map((mode) => (
+                    <button
+                      key={mode.value}
+                      onClick={() => setImplantViewMode(mode.value)}
+                      className={`relative p-2 rounded-full transition-colors duration-200 ${
+                        implantViewMode === mode.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      data-testid={`button-view-${mode.value}`}
+                    >
+                      {implantViewMode === mode.value && (
+                        <motion.div
+                          layoutId="implant-view-mode-indicator"
+                          className="absolute inset-0 bg-primary rounded-full"
+                          transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                        />
+                      )}
+                      <mode.icon className="h-4 w-4 relative z-10" />
+                    </button>
+                  ))}
                 </div>
               </div>
 

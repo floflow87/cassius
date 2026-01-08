@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, differenceInYears } from "date-fns";
 import { fr } from "date-fns/locale";
+import { motion } from "framer-motion";
 import {
   BarChart3,
   TrendingUp,
@@ -588,29 +589,31 @@ export default function StatsPage() {
 
       {/* Tabs for different stat views */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-white dark:bg-zinc-900 p-1 h-auto gap-1 border-b-0 rounded-full">
-          <TabsTrigger 
-            value="patient" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-patient"
-          >
-            Patients
-          </TabsTrigger>
-          <TabsTrigger 
-            value="implant" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-implant"
-          >
-            Implants
-          </TabsTrigger>
-          <TabsTrigger 
-            value="activite" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-activite"
-          >
-            Activités
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-full w-fit">
+          {[
+            { value: "patient", label: "Patients" },
+            { value: "implant", label: "Implants" },
+            { value: "activite", label: "Activités" },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value)}
+              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid={`tab-${tab.value}`}
+            >
+              {activeTab === tab.value && (
+                <motion.div
+                  layoutId="stats-tab-indicator"
+                  className="absolute inset-0 bg-primary rounded-full"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                />
+              )}
+              <span className="relative z-10">{tab.label}</span>
+            </button>
+          ))}
+        </div>
 
         {/* Search and Period selector - below tabs */}
         <div className="flex flex-wrap items-center gap-2 mt-4">
