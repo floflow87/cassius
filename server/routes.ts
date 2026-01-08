@@ -34,7 +34,12 @@ import {
   users,
   notifications,
   flags,
+  patientShareLinks,
+  surgeryImplants,
+  implants,
+  operations,
 } from "@shared/schema";
+import type { PublicPatientShareData, PatientShareLinkWithDetails } from "@shared/schema";
 import type {
   Patient,
   PatientDetail,
@@ -650,6 +655,222 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting patient:", error);
       res.status(500).json({ error: "Failed to delete patient" });
+    }
+  });
+
+  // ========== PATIENT SHARE LINKS ==========
+
+  // Create a share link for a patient's implants
+  app.post("/api/patients/:patientId/share-links", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.jwtUser?.userId;
+    if (!userId) return res.status(401).json({ error: "User not authenticated" });
+
+    const { patientId } = req.params;
+    const { expiresInDays } = req.body as { expiresInDays?: number };
+
+    try {
+      // Verify patient exists and belongs to this org
+      const patient = await storage.getPatient(organisationId, patientId);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Generate a secure random token
+      const token = randomBytes(32).toString("hex");
+      const tokenHash = scryptSync(token, "salt_share_link", 64).toString("hex");
+
+      // Calculate expiration (default: no expiration)
+      const expiresAt = expiresInDays 
+        ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) 
+        : null;
+
+      // Insert the share link
+      const [shareLink] = await db.insert(patientShareLinks).values({
+        organisationId,
+        patientId,
+        sharedByUserId: userId,
+        tokenHash,
+        expiresAt,
+      }).returning();
+
+      // Return the token (only time it's visible - we store only the hash)
+      res.json({
+        id: shareLink.id,
+        token,
+        shareUrl: `${getBaseUrl()}/public/share/${token}`,
+        expiresAt: shareLink.expiresAt,
+        createdAt: shareLink.createdAt,
+      });
+    } catch (error) {
+      console.error("Error creating share link:", error);
+      res.status(500).json({ error: "Failed to create share link" });
+    }
+  });
+
+  // Get existing share links for a patient
+  app.get("/api/patients/:patientId/share-links", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    const { patientId } = req.params;
+
+    try {
+      // Verify patient exists
+      const patient = await storage.getPatient(organisationId, patientId);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Get all active share links for this patient
+      const links = await db.select({
+        id: patientShareLinks.id,
+        expiresAt: patientShareLinks.expiresAt,
+        revokedAt: patientShareLinks.revokedAt,
+        lastAccessedAt: patientShareLinks.lastAccessedAt,
+        accessCount: patientShareLinks.accessCount,
+        createdAt: patientShareLinks.createdAt,
+        sharedByUserName: sql<string>`(SELECT COALESCE(prenom || ' ' || nom, email) FROM users WHERE id = ${patientShareLinks.sharedByUserId})`,
+      }).from(patientShareLinks).where(
+        and(
+          eq(patientShareLinks.organisationId, organisationId),
+          eq(patientShareLinks.patientId, patientId)
+        )
+      ).orderBy(desc(patientShareLinks.createdAt));
+
+      res.json(links);
+    } catch (error) {
+      console.error("Error fetching share links:", error);
+      res.status(500).json({ error: "Failed to fetch share links" });
+    }
+  });
+
+  // Revoke a share link
+  app.delete("/api/patients/:patientId/share-links/:linkId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    const { patientId, linkId } = req.params;
+
+    try {
+      // Verify patient exists and belongs to this org
+      const patient = await storage.getPatient(organisationId, patientId);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Revoke the link by setting revokedAt
+      const result = await db.update(patientShareLinks)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(patientShareLinks.id, linkId),
+            eq(patientShareLinks.organisationId, organisationId),
+            eq(patientShareLinks.patientId, patientId)
+          )
+        )
+        .returning();
+
+      if (result.length === 0) {
+        return res.status(404).json({ error: "Share link not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error revoking share link:", error);
+      res.status(500).json({ error: "Failed to revoke share link" });
+    }
+  });
+
+  // Public endpoint to view shared patient data (NO AUTH REQUIRED)
+  app.get("/api/public/share/:token", async (req, res) => {
+    const { token } = req.params;
+
+    try {
+      // Hash the provided token to match against stored hash
+      const tokenHash = scryptSync(token, "salt_share_link", 64).toString("hex");
+
+      // Find the share link
+      const [link] = await db.select().from(patientShareLinks)
+        .where(eq(patientShareLinks.tokenHash, tokenHash))
+        .limit(1);
+
+      if (!link) {
+        return res.status(404).json({ error: "Lien de partage invalide ou expiré" });
+      }
+
+      // Check if revoked
+      if (link.revokedAt) {
+        return res.status(410).json({ error: "Ce lien de partage a été révoqué" });
+      }
+
+      // Check if expired
+      if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+        return res.status(410).json({ error: "Ce lien de partage a expiré" });
+      }
+
+      // Update access count and last accessed
+      await db.update(patientShareLinks)
+        .set({ 
+          accessCount: sql`${patientShareLinks.accessCount} + 1`,
+          lastAccessedAt: new Date(),
+        })
+        .where(eq(patientShareLinks.id, link.id));
+
+      // Get patient basic info
+      const [patient] = await db.select({
+        prenom: patients.prenom,
+        nom: patients.nom,
+        dateNaissance: patients.dateNaissance,
+      }).from(patients).where(eq(patients.id, link.patientId)).limit(1);
+
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Get implants for this patient (through operations)
+      const implantData = await db.select({
+        id: surgeryImplants.id,
+        siteFdi: surgeryImplants.siteFdi,
+        marque: implants.marque,
+        reference: implants.referenceFabricant,
+        diametre: implants.diametre,
+        longueur: implants.longueur,
+        position: surgeryImplants.positionImplant,
+        statut: surgeryImplants.statut,
+        datePose: surgeryImplants.datePose,
+        isqPose: surgeryImplants.isqPose,
+        isq2m: surgeryImplants.isq2m,
+        isq3m: surgeryImplants.isq3m,
+        isq6m: surgeryImplants.isq6m,
+      })
+        .from(surgeryImplants)
+        .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+        .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
+        .where(eq(operations.patientId, link.patientId))
+        .orderBy(desc(surgeryImplants.datePose));
+
+      // Get sharer name
+      const [sharer] = await db.select({
+        name: sql<string>`COALESCE(prenom || ' ' || nom, email)`,
+      }).from(users).where(eq(users.id, link.sharedByUserId)).limit(1);
+
+      const responseData: PublicPatientShareData = {
+        patient: {
+          prenom: patient.prenom,
+          nom: patient.nom,
+          dateNaissance: patient.dateNaissance,
+        },
+        implants: implantData,
+        sharedByUserName: sharer?.name || "Utilisateur inconnu",
+        createdAt: link.createdAt.toISOString(),
+      };
+
+      res.json(responseData);
+    } catch (error) {
+      console.error("Error fetching shared patient data:", error);
+      res.status(500).json({ error: "Failed to fetch shared data" });
     }
   });
 

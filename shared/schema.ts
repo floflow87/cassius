@@ -1367,17 +1367,18 @@ export interface PublicPatientShareData {
   };
   implants: Array<{
     id: string;
-    siteFdi?: number | null;
+    siteFdi: string;
     marque?: string | null;
     reference?: string | null;
     diametre?: number | null;
     longueur?: number | null;
     position?: string | null;
     statut?: string | null;
-    datePose?: string | null;
-    isqPrimaire?: number | null;
-    isqSecondaire?: number | null;
-    isqTertiaire?: number | null;
+    datePose: string;
+    isqPose?: number | null;
+    isq2m?: number | null;
+    isq3m?: number | null;
+    isq6m?: number | null;
   }>;
   sharedByUserName: string;
   createdAt: string;
