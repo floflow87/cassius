@@ -1619,10 +1619,34 @@ export default function CalendarPage() {
       durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
     }
     
-    // Show time for events >= 45 minutes in time-based views
-    const showTime = durationMinutes >= 45 && eventInfo.view.type !== "dayGridMonth" && eventInfo.view.type !== "listWeek";
-    
     const isGoogle = source === "google";
+    const isMonthView = eventInfo.view.type === "dayGridMonth";
+    const isListView = eventInfo.view.type === "listWeek";
+    
+    // Show time in time-based views for events >= 45min, or always in month view
+    const showTime = isMonthView || (durationMinutes >= 45 && !isListView);
+    
+    // For month view: compact format with time + patient name
+    if (isMonthView) {
+      return (
+        <div className="px-1 py-0.5 text-xs overflow-hidden relative flex items-center gap-1" data-testid={`calendar-event-${eventInfo.event.id}`}>
+          {start && (
+            <span className="text-white/90 font-medium shrink-0">
+              {format(start, "HH:mm")}
+            </span>
+          )}
+          <span className="text-white truncate">
+            {isGoogle ? eventInfo.event.title : (patientPrenom && patientNom ? `${patientPrenom} ${patientNom}` : eventInfo.event.title)}
+          </span>
+          {isGoogle && (
+            <SiGoogle className="h-2.5 w-2.5 text-white/70 shrink-0" />
+          )}
+          {(hasConflict || hasCriticalFlag) && (
+            <AlertTriangle className="h-2.5 w-2.5 text-yellow-300 shrink-0" />
+          )}
+        </div>
+      );
+    }
     
     return (
       <div className="p-1 text-xs overflow-hidden relative" data-testid={`calendar-event-${eventInfo.event.id}`}>
@@ -1652,7 +1676,7 @@ export default function CalendarPage() {
         <div className="font-medium truncate text-white pr-6">
           {eventInfo.event.title}
         </div>
-        {eventInfo.view.type !== "dayGridMonth" && durationMinutes >= 30 && (
+        {durationMinutes >= 30 && (
           <div className="text-white/80 truncate">
             {isGoogle ? (
               location ? location : ""
