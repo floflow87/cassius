@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Link } from "wouter";
+import { motion } from "framer-motion";
 import { 
   Bell, 
   AlertCircle, 
@@ -315,62 +316,42 @@ export default function NotificationsPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <CardHeader className="pb-0">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setActiveTab("all")}
-                  className={`rounded-full ${activeTab === "all" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                  data-testid="tab-all"
-                >
-                  Toutes
-                  {unreadCount > 0 && (
-                    <Badge variant="default" className="ml-2 text-xs rounded-full">
-                      {unreadCount}
-                    </Badge>
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setActiveTab("alert")}
-                  className={`rounded-full ${activeTab === "alert" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                  data-testid="tab-alert"
-                >
-                  Alertes
-                  {countByKind("ALERT") > 0 && (
-                    <Badge variant="default" className="ml-2 text-xs rounded-full">
-                      {countByKind("ALERT")}
-                    </Badge>
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setActiveTab("activity")}
-                  className={`rounded-full ${activeTab === "activity" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                  data-testid="tab-activity"
-                >
-                  Activité
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setActiveTab("import")}
-                  className={`rounded-full ${activeTab === "import" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                  data-testid="tab-import"
-                >
-                  Imports
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setActiveTab("system")}
-                  className={`rounded-full ${activeTab === "system" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                  data-testid="tab-system"
-                >
-                  Système
-                </Button>
+              <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-full">
+                {[
+                  { value: "all", label: "Toutes", count: unreadCount },
+                  { value: "alert", label: "Alertes", count: countByKind("ALERT") },
+                  { value: "activity", label: "Activité", count: 0 },
+                  { value: "import", label: "Imports", count: 0 },
+                  { value: "system", label: "Système", count: 0 },
+                ].map((tab) => (
+                  <button
+                    key={tab.value}
+                    onClick={() => setActiveTab(tab.value)}
+                    className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                      activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    data-testid={`tab-${tab.value}`}
+                  >
+                    {activeTab === tab.value && (
+                      <motion.div
+                        layoutId="notification-filter-indicator"
+                        className="absolute inset-0 bg-primary rounded-full"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                      />
+                    )}
+                    <span className="relative z-10 flex items-center gap-2">
+                      {tab.label}
+                      {tab.count > 0 && (
+                        <Badge 
+                          variant={activeTab === tab.value ? "secondary" : "default"} 
+                          className="text-xs rounded-full"
+                        >
+                          {tab.count}
+                        </Badge>
+                      )}
+                    </span>
+                  </button>
+                ))}
               </div>
               
               <div className="flex items-center gap-2">
