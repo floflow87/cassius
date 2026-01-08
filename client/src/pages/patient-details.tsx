@@ -30,6 +30,10 @@ import {
   GripVertical,
   LayoutGrid,
   LayoutList,
+  Share2,
+  Copy,
+  ExternalLink,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -316,6 +320,68 @@ export default function PatientDetailsPage() {
     } catch {}
     return "all";
   });
+
+  // Share dialog state
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareExpiryDays, setShareExpiryDays] = useState<number | null>(null);
+  const [newShareLink, setNewShareLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // Share links query
+  interface ShareLinkData {
+    id: string;
+    expiresAt: string | null;
+    revokedAt: string | null;
+    createdAt: string;
+    accessCount: number;
+    sharedByUserName?: string;
+  }
+  const { data: shareLinks = [], isLoading: shareLinksLoading } = useQuery<ShareLinkData[]>({
+    queryKey: ["/api/patients", patientId, "share-links"],
+    enabled: !!patientId && shareDialogOpen,
+  });
+
+  // Create share link mutation
+  const createShareLinkMutation = useMutation({
+    mutationFn: async (expiresInDays: number | null) => {
+      const res = await apiRequest("POST", `/api/patients/${patientId}/share-links`, { 
+        expiresInDays 
+      });
+      return res.json();
+    },
+    onSuccess: (data: { token: string }) => {
+      const link = `${window.location.origin}/share/${data.token}`;
+      setNewShareLink(link);
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "share-links"] });
+      toast({ title: "Lien créé", description: "Le lien de partage a été généré avec succès." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de créer le lien de partage.", variant: "destructive" });
+    },
+  });
+
+  // Revoke share link mutation
+  const revokeShareLinkMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      await apiRequest("DELETE", `/api/patients/${patientId}/share-links/${linkId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "share-links"] });
+      toast({ title: "Lien révoqué", description: "Le lien de partage a été désactivé." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de révoquer le lien.", variant: "destructive" });
+    },
+  });
+
+  const handleCopyLink = () => {
+    if (newShareLink) {
+      navigator.clipboard.writeText(newShareLink);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+      toast({ title: "Copié", description: "Le lien a été copié dans le presse-papiers." });
+    }
+  };
 
   // Persist implant view preferences
   useEffect(() => {
@@ -1995,6 +2061,130 @@ export default function PatientDetailsPage() {
                       >
                         Voir détails
                       </Button>
+                      <Dialog open={shareDialogOpen} onOpenChange={(open) => {
+                        setShareDialogOpen(open);
+                        if (!open) {
+                          setNewShareLink(null);
+                          setShareExpiryDays(null);
+                        }
+                      }}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setShareDialogOpen(true)}
+                          data-testid="button-share-patient"
+                        >
+                          <Share2 className="h-4 w-4 mr-1" />
+                          Partager
+                        </Button>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Partager les données implants</DialogTitle>
+                            <DialogDescription>
+                              Créez un lien sécurisé pour partager les informations d'implants de ce patient.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            {newShareLink ? (
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Input 
+                                    value={newShareLink} 
+                                    readOnly 
+                                    className="font-mono text-sm bg-muted"
+                                    data-testid="input-share-link"
+                                  />
+                                  <Button 
+                                    size="icon" 
+                                    variant="outline" 
+                                    onClick={handleCopyLink}
+                                    data-testid="button-copy-link"
+                                  >
+                                    {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </Button>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  Ce lien permet à quiconque d'accéder aux données d'implants du patient sans connexion.
+                                </p>
+                                <Button 
+                                  variant="outline" 
+                                  className="w-full"
+                                  onClick={() => setNewShareLink(null)}
+                                >
+                                  Créer un autre lien
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                <div>
+                                  <Label>Expiration du lien</Label>
+                                  <Select 
+                                    value={shareExpiryDays?.toString() || "never"} 
+                                    onValueChange={(v) => setShareExpiryDays(v === "never" ? null : parseInt(v))}
+                                  >
+                                    <SelectTrigger className="w-full mt-1" data-testid="select-expiry">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="never">Sans expiration</SelectItem>
+                                      <SelectItem value="1">1 jour</SelectItem>
+                                      <SelectItem value="7">7 jours</SelectItem>
+                                      <SelectItem value="30">30 jours</SelectItem>
+                                      <SelectItem value="90">90 jours</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <Button 
+                                  className="w-full" 
+                                  onClick={() => createShareLinkMutation.mutate(shareExpiryDays)}
+                                  disabled={createShareLinkMutation.isPending}
+                                  data-testid="button-create-share-link"
+                                >
+                                  {createShareLinkMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                  <Link2 className="h-4 w-4 mr-2" />
+                                  Générer un lien de partage
+                                </Button>
+                              </div>
+                            )}
+
+                            {shareLinks.length > 0 && (
+                              <div className="border-t pt-4">
+                                <h4 className="text-sm font-medium mb-3">Liens actifs</h4>
+                                <div className="space-y-2">
+                                  {shareLinks
+                                    .filter(l => !l.revokedAt)
+                                    .map((link) => (
+                                      <div 
+                                        key={link.id} 
+                                        className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                                      >
+                                        <div className="text-sm">
+                                          <p className="text-muted-foreground">
+                                            Créé le {new Date(link.createdAt).toLocaleDateString("fr-FR")}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {link.accessCount} accès
+                                            {link.expiresAt && ` · Expire le ${new Date(link.expiresAt).toLocaleDateString("fr-FR")}`}
+                                          </p>
+                                        </div>
+                                        <Button 
+                                          size="sm" 
+                                          variant="ghost" 
+                                          className="text-destructive"
+                                          onClick={() => revokeShareLinkMutation.mutate(link.id)}
+                                          disabled={revokeShareLinkMutation.isPending}
+                                          data-testid={`button-revoke-link-${link.id}`}
+                                        >
+                                          Révoquer
+                                        </Button>
+                                      </div>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                       <Sheet open={operationDialogOpen} onOpenChange={setOperationDialogOpen}>
                         <SheetTrigger asChild>
                           <Button size="sm" data-testid="button-new-act">
