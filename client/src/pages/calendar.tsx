@@ -1012,7 +1012,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
                   <div>
                     <Link 
                       href={`/patients/${appointment.patient.id}`}
-                      className="font-medium text-primary hover:underline flex items-center gap-1"
+                      className="font-medium text-primary underline flex items-center gap-1"
                       data-testid="link-patient-profile"
                     >
                       {appointment.patient.prenom} {appointment.patient.nom}
@@ -1162,6 +1162,22 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
       description: "",
     },
   });
+  
+  // Reset form when defaultDate changes (clicking on calendar or opening with "Nouveau")
+  useEffect(() => {
+    if (open && defaultDate) {
+      form.reset({
+        patientId: "",
+        title: "",
+        type: "CONSULTATION",
+        color: null,
+        dateStart: format(defaultDate, "yyyy-MM-dd"),
+        timeStart: format(defaultDate, "HH:mm"),
+        description: "",
+      });
+      setPatientSearch("");
+    }
+  }, [open, defaultDate, form]);
   
   const watchedPatientId = form.watch("patientId");
   const selectedPatient = useMemo(() => {
@@ -1644,8 +1660,17 @@ export default function CalendarPage() {
     }
   }, []);
   
-  const handleDateClick = useCallback((info: { date: Date; dateStr: string }) => {
-    setQuickCreateDate(info.date);
+  const handleDateClick = useCallback((info: { date: Date; dateStr: string; view: { type: string } }) => {
+    // In month view, don't have a specific time, so use current time
+    if (info.view.type === "dayGridMonth") {
+      const now = new Date();
+      const dateWithTime = new Date(info.date);
+      dateWithTime.setHours(now.getHours(), now.getMinutes(), 0, 0);
+      setQuickCreateDate(dateWithTime);
+    } else {
+      // In day/week views, use the exact clicked time
+      setQuickCreateDate(info.date);
+    }
     setQuickCreateOpen(true);
   }, []);
   
