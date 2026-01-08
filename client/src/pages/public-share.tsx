@@ -83,9 +83,9 @@ export default function PublicSharePage() {
             </CardContent>
           </Card>
         </div>
-        <div className="mt-8 text-center">
-          <img src="/assets/logos/logo-cassius.png" alt="Cassius" className="h-6 mx-auto mb-2" />
-          <p className="text-[11px] text-muted-foreground italic">
+        <div className="mt-4 text-center">
+          <img src="/assets/logos/logo-cassius-blue.png" alt="Cassius" className="h-5 mx-auto mb-1" />
+          <p className="text-[10px] text-muted-foreground italic">
             Propulsé par <a href="https://cassiuspro.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Cassius</a>
           </p>
         </div>
@@ -211,9 +211,9 @@ export default function PublicSharePage() {
         </div>
       </div>
 
-      <div className="mt-8 text-center">
-        <img src="/assets/logos/logo-cassius.png" alt="Cassius" className="h-6 mx-auto mb-2" />
-        <p className="text-[11px] text-muted-foreground italic">
+      <div className="mt-4 text-center">
+        <img src="/assets/logos/logo-cassius-blue.png" alt="Cassius" className="h-5 mx-auto mb-1" />
+        <p className="text-[10px] text-muted-foreground italic">
           Propulsé par <a href="https://cassiuspro.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Cassius</a>
         </p>
       </div>
