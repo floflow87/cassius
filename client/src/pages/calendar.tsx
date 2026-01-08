@@ -623,7 +623,12 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
   const [isEditing, setIsEditing] = useState(false);
   
   const { data: appointment, isLoading } = useQuery<AppointmentWithDetails>({
-    queryKey: ["/api/appointments", appointmentId],
+    queryKey: ["/api/appointments", appointmentId, "details"],
+    queryFn: async () => {
+      const res = await fetch(`/api/appointments/${appointmentId}?details=true`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch appointment");
+      return res.json();
+    },
     enabled: !!appointmentId && open,
   });
   
@@ -1585,6 +1590,7 @@ export default function CalendarPage() {
             isq: apt.isq,
             hasCriticalFlag: apt.hasCriticalFlag,
             customColor: apt.color,
+            description: apt.description,
           },
           backgroundColor: bgColor,
           borderColor: "transparent",
@@ -1726,7 +1732,7 @@ export default function CalendarPage() {
   };
   
   const renderEventContent = (eventInfo: EventContentArg) => {
-    const { source, type, patientNom, patientPrenom, isq, hasCriticalFlag, hasConflict, location } = eventInfo.event.extendedProps;
+    const { source, type, patientNom, patientPrenom, isq, hasCriticalFlag, hasConflict, location, description } = eventInfo.event.extendedProps;
     const start = eventInfo.event.start;
     const end = eventInfo.event.end;
     
@@ -1738,10 +1744,34 @@ export default function CalendarPage() {
     
     const isGoogle = source === "google";
     const isMonthView = eventInfo.view.type === "dayGridMonth";
-    const isListView = eventInfo.view.type === "listWeek";
+    const isListView = eventInfo.view.type.startsWith("list");
     
     // Show time in time-based views for events >= 45min, or always in month view
     const showTime = isMonthView || (durationMinutes >= 45 && !isListView);
+    
+    // For list/agenda view: show title, patient, and notes
+    if (isListView) {
+      return (
+        <div className="p-1 overflow-hidden" data-testid={`calendar-event-${eventInfo.event.id}`}>
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-foreground">{eventInfo.event.title}</span>
+            {isGoogle && <SiGoogle className="h-3 w-3 text-muted-foreground shrink-0" />}
+            {(hasConflict || hasCriticalFlag) && <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />}
+          </div>
+          {!isGoogle && patientPrenom && patientNom && (
+            <div className="text-sm text-muted-foreground">
+              {patientPrenom} {patientNom}
+              {isq !== null && isq !== undefined && ` • ISQ ${isq}`}
+            </div>
+          )}
+          {description && (
+            <div className="text-sm text-muted-foreground/80 italic mt-0.5 truncate">
+              {description}
+            </div>
+          )}
+        </div>
+      );
+    }
     
     // For month view: compact format with time + patient name
     if (isMonthView) {

@@ -492,10 +492,10 @@
 
 /* Horizontal gap between overlapping/adjacent events */
 .fc-timegrid-event-harness {
-  margin-right: 2px !important;
+  padding-right: 3px !important;
 }
 
-.fc-timegrid-event-harness:last-child {
+.fc-timegrid-event-harness > .fc-timegrid-event {
   margin-right: 0 !important;
 }
 
