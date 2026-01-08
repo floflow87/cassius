@@ -163,7 +163,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-auto px-6 pb-6" data-testid="settings-page">
+    <div className="flex flex-col h-full overflow-auto pb-6" data-testid="settings-page">
       <div className="w-full">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="bg-white dark:bg-zinc-900 p-1 h-auto gap-1 border-b-0 rounded-full mb-6">
