@@ -1915,27 +1915,30 @@ export default function CalendarPage() {
               }}
             />
             
-            <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-full gap-1">
+            <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-full gap-1 border border-border/50">
               {[
                 { key: "timeGridDay", label: "Jour" },
                 { key: "timeGridWeek", label: "Semaine" },
                 { key: "dayGridMonth", label: "Mois" },
                 { key: "listWeek", label: "Agenda" },
               ].map(v => (
-                <Button
+                <button
                   key={v.key}
-                  variant="ghost"
-                  size="sm"
-                  className={`rounded-full transition-all duration-200 ${
-                    currentView === v.key 
-                      ? "bg-primary text-white shadow-none" 
-                      : "bg-transparent text-muted-foreground"
-                  }`}
+                  className="relative px-3 py-1.5 text-sm font-medium rounded-full transition-colors"
                   onClick={() => changeView(v.key as typeof currentView)}
                   data-testid={`button-view-${v.key}`}
                 >
-                  {v.label}
-                </Button>
+                  {currentView === v.key && (
+                    <motion.div
+                      layoutId="calendar-view-indicator"
+                      className="absolute inset-0 bg-primary rounded-full"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                    />
+                  )}
+                  <span className={`relative z-10 ${currentView === v.key ? "text-white" : "text-muted-foreground"}`}>
+                    {v.label}
+                  </span>
+                </button>
               ))}
             </div>
             

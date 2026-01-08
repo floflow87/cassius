@@ -731,7 +731,7 @@ export async function registerRoutes(
         lastAccessedAt: patientShareLinks.lastAccessedAt,
         accessCount: patientShareLinks.accessCount,
         createdAt: patientShareLinks.createdAt,
-        sharedByUserName: sql<string>`(SELECT COALESCE(prenom || ' ' || nom, email) FROM users WHERE id = ${patientShareLinks.sharedByUserId})`,
+        sharedByUserName: sql<string>`(SELECT COALESCE(prenom || ' ' || nom, username) FROM users WHERE id = ${patientShareLinks.sharedByUserId})`,
       }).from(patientShareLinks).where(
         and(
           eq(patientShareLinks.organisationId, organisationId),
@@ -853,7 +853,7 @@ export async function registerRoutes(
 
       // Get sharer name
       const [sharer] = await db.select({
-        name: sql<string>`COALESCE(prenom || ' ' || nom, email)`,
+        name: sql<string>`COALESCE(${users.prenom} || ' ' || ${users.nom}, ${users.username})`,
       }).from(users).where(eq(users.id, link.sharedByUserId)).limit(1);
 
       const responseData: PublicPatientShareData = {
