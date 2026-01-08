@@ -9,7 +9,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay, parse } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay, parse, isPast } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Filter, User, Plus, Check, Pencil, X, Search, Copy, AlertTriangle, ExternalLink, RotateCcw, Settings } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
@@ -36,12 +36,24 @@ import type { EventClickArg, EventDropArg, EventContentArg } from "@fullcalendar
 import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 
 const appointmentTypes = [
-  { value: "CONSULTATION", label: "Consultation", color: "bg-blue-500" },
-  { value: "SUIVI", label: "Suivi", color: "bg-green-500" },
-  { value: "CHIRURGIE", label: "Chirurgie", color: "bg-red-500" },
-  { value: "CONTROLE", label: "Contrôle", color: "bg-yellow-500" },
-  { value: "URGENCE", label: "Urgence", color: "bg-orange-500" },
-  { value: "AUTRE", label: "Autre", color: "bg-gray-500" },
+  { value: "CONSULTATION", label: "Consultation", color: "bg-blue-500", hex: "#3b82f6" },
+  { value: "SUIVI", label: "Suivi", color: "bg-green-500", hex: "#22c55e" },
+  { value: "CHIRURGIE", label: "Chirurgie", color: "bg-red-500", hex: "#ef4444" },
+  { value: "CONTROLE", label: "Contrôle", color: "bg-yellow-500", hex: "#eab308" },
+  { value: "URGENCE", label: "Urgence", color: "bg-orange-500", hex: "#f97316" },
+  { value: "AUTRE", label: "Autre", color: "bg-gray-500", hex: "#6b7280" },
+];
+
+const appointmentColors = [
+  { value: "#3b82f6", label: "Bleu", class: "bg-blue-500" },
+  { value: "#22c55e", label: "Vert", class: "bg-green-500" },
+  { value: "#ef4444", label: "Rouge", class: "bg-red-500" },
+  { value: "#eab308", label: "Jaune", class: "bg-yellow-500" },
+  { value: "#f97316", label: "Orange", class: "bg-orange-500" },
+  { value: "#6b7280", label: "Gris", class: "bg-gray-500" },
+  { value: "#8b5cf6", label: "Violet", class: "bg-violet-500" },
+  { value: "#ec4899", label: "Rose", class: "bg-pink-500" },
+  { value: "#14b8a6", label: "Turquoise", class: "bg-teal-500" },
 ];
 
 const appointmentStatuses = [
@@ -589,6 +601,7 @@ const editFormSchema = z.object({
   title: z.string().min(1, "Titre requis"),
   type: z.enum(["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"]),
   status: z.enum(["UPCOMING", "COMPLETED", "CANCELLED"]),
+  color: z.string().nullable().optional(),
   dateStart: z.string(),
   timeStart: z.string(),
   timeEnd: z.string().optional(),
@@ -620,6 +633,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
       title: "",
       type: "CONSULTATION",
       status: "UPCOMING",
+      color: null,
       dateStart: "",
       timeStart: "09:00",
       timeEnd: "",
@@ -636,6 +650,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
         title: appointment.title || "",
         type: appointment.type as EditFormData["type"],
         status: appointment.status as EditFormData["status"],
+        color: (appointment as { color?: string | null }).color || null,
         dateStart: format(dateStart, "yyyy-MM-dd"),
         timeStart: format(dateStart, "HH:mm"),
         timeEnd: appointment.dateEnd ? format(new Date(appointment.dateEnd), "HH:mm") : "",
@@ -655,6 +670,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
         title: appointment.title || "",
         type: appointment.type as EditFormData["type"],
         status: appointment.status as EditFormData["status"],
+        color: (appointment as { color?: string | null }).color || null,
         dateStart: format(dateStart, "yyyy-MM-dd"),
         timeStart: format(dateStart, "HH:mm"),
         timeEnd: appointment.dateEnd ? format(new Date(appointment.dateEnd), "HH:mm") : "",
@@ -728,6 +744,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
       title: data.title,
       type: data.type,
       status: data.status,
+      color: data.color || null,
       dateStart,
       dateEnd,
       description: data.description || null,
@@ -761,9 +778,18 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
               <Skeleton className="h-4 w-32" />
             ) : appointment && !isEditing ? (
               <span className="flex items-center gap-2">
-                <Badge className={getStatusBadge(appointment.status)} variant="secondary">
-                  {appointmentStatuses.find(s => s.value === appointment.status)?.label}
-                </Badge>
+                {/* Only show UPCOMING badge if appointment is not in the past */}
+                {!(appointment.status === "UPCOMING" && isPast(new Date(appointment.dateStart))) && (
+                  <Badge className={getStatusBadge(appointment.status)} variant="secondary">
+                    {appointmentStatuses.find(s => s.value === appointment.status)?.label}
+                  </Badge>
+                )}
+                {/* Show "Passé" badge for past UPCOMING appointments */}
+                {appointment.status === "UPCOMING" && isPast(new Date(appointment.dateStart)) && (
+                  <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200" variant="secondary">
+                    Passé
+                  </Badge>
+                )}
                 <Badge className={`${getAppointmentColor(appointment.type)} text-white`}>
                   {appointmentTypes.find(t => t.value === appointment.type)?.label}
                 </Badge>
@@ -843,6 +869,34 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
                   )}
                 />
               </div>
+              
+              <FormField
+                control={form.control}
+                name="color"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Couleur</FormLabel>
+                    <div className="flex flex-wrap gap-2">
+                      {appointmentColors.map(c => (
+                        <button
+                          key={c.value}
+                          type="button"
+                          className={`w-7 h-7 rounded-md border-2 transition-all ${c.class} ${
+                            field.value === c.value 
+                              ? "border-foreground ring-2 ring-primary ring-offset-2" 
+                              : "border-transparent hover:border-muted-foreground/50"
+                          }`}
+                          onClick={() => field.onChange(field.value === c.value ? null : c.value)}
+                          title={c.label}
+                          data-testid={`edit-color-${c.value}`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Optionnel - sinon, couleur basée sur le type</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
               <FormField
                 control={form.control}
@@ -987,7 +1041,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
             </div>
             
             <div className="flex flex-col gap-3 pt-4 border-t">
-              {appointment.status === "UPCOMING" && (
+              {appointment.status === "UPCOMING" && !isPast(new Date(appointment.dateStart)) && (
                 <div className="flex gap-2">
                   <Button 
                     variant="default" 
@@ -1060,6 +1114,7 @@ const quickCreateFormSchema = z.object({
   patientId: z.string().min(1, "Patient requis"),
   title: z.string().min(1, "Titre requis"),
   type: z.enum(["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"]),
+  color: z.string().nullable().optional(),
   dateStart: z.string(),
   timeStart: z.string(),
   description: z.string().optional(),
@@ -1101,6 +1156,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
       patientId: "",
       title: "",
       type: "CONSULTATION",
+      color: null,
       dateStart: defaultDate ? format(defaultDate, "yyyy-MM-dd") : "",
       timeStart: defaultDate ? format(defaultDate, "HH:mm") : "09:00",
       description: "",
@@ -1121,6 +1177,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
         status: "UPCOMING",
         dateStart,
         description: data.description || null,
+        color: data.color || null,
       });
     },
     onSuccess: () => {
@@ -1186,7 +1243,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
                               setPatientSearch(e.target.value);
                               setPatientDropdownOpen(true);
                             }}
-                            onFocus={() => setPatientDropdownOpen(true)}
+                            onFocus={() => {}}
                             onBlur={() => setTimeout(() => setPatientDropdownOpen(false), 200)}
                             className="pl-9"
                             data-testid="input-patient-search"
@@ -1261,6 +1318,34 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Couleur</FormLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {appointmentColors.map(c => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        className={`w-7 h-7 rounded-md border-2 transition-all ${c.class} ${
+                          field.value === c.value 
+                            ? "border-foreground ring-2 ring-primary ring-offset-2" 
+                            : "border-transparent hover:border-muted-foreground/50"
+                        }`}
+                        onClick={() => field.onChange(field.value === c.value ? null : c.value)}
+                        title={c.label}
+                        data-testid={`color-${c.value}`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Optionnel - sinon, couleur basée sur le type</p>
                   <FormMessage />
                 </FormItem>
               )}
@@ -1464,6 +1549,12 @@ export default function CalendarPage() {
       }
       
       for (const apt of filteredAppointments) {
+        // Use custom color if set, otherwise fall back to type-based color
+        const bgColor = apt.color || appointmentTypes.find(t => t.value === apt.type)?.hex || "#6b7280";
+        const bgClass = apt.color 
+          ? appointmentColors.find(c => c.value === apt.color)?.class || "bg-gray-500"
+          : getAppointmentColor(apt.type);
+        
         result.push({
           id: apt.id,
           title: apt.title || (apt.patientPrenom && apt.patientNom ? `${apt.patientPrenom} ${apt.patientNom}` : "Nouveau rdv"),
@@ -1477,10 +1568,11 @@ export default function CalendarPage() {
             patientPrenom: apt.patientPrenom,
             isq: apt.isq,
             hasCriticalFlag: apt.hasCriticalFlag,
+            customColor: apt.color,
           },
-          backgroundColor: getAppointmentColor(apt.type).replace("bg-", ""),
+          backgroundColor: bgColor,
           borderColor: "transparent",
-          classNames: [getAppointmentColor(apt.type)],
+          classNames: [bgClass],
         });
       }
     }

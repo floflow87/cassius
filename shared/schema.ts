@@ -424,6 +424,8 @@ export const appointments = pgTable("appointments", {
   dateEnd: timestamp("date_end"),
   isq: real("isq"),
   radioId: varchar("radio_id").references(() => radios.id, { onDelete: "set null" }),
+  // Custom color override (nullable - when null, uses type-based color)
+  color: text("color"),
   // Status timestamps
   completedAt: timestamp("completed_at"),
   cancelledAt: timestamp("cancelled_at"),
@@ -903,6 +905,7 @@ export const updateAppointmentSchema = z.object({
   dateStart: z.coerce.date().optional(),
   dateEnd: z.coerce.date().nullable().optional(),
   isq: z.number().nullable().optional(),
+  color: z.string().nullable().optional(),
   operationId: z.string().nullable().optional(),
   surgeryImplantId: z.string().nullable().optional(),
   radioId: z.string().nullable().optional(),

@@ -715,6 +715,7 @@ export interface CalendarAppointment {
   dateStart: Date;
   dateEnd: Date | null;
   isq: number | null;
+  color: string | null;
   patientNom: string;
   patientPrenom: string;
   hasCriticalFlag?: boolean;

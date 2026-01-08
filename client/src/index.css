@@ -470,6 +470,26 @@
   background: hsl(var(--muted));
 }
 
+/* List view (agenda) - white time text */
+.fc .fc-list-event-time {
+  color: white !important;
+}
+
+.fc .fc-list-event-dot {
+  display: none;
+}
+
+/* Event separation in week/day views */
+.fc-timegrid-event {
+  margin-bottom: 2px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.fc-timegrid-event + .fc-timegrid-event {
+  margin-top: 2px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
 .fc .fc-scrollgrid {
   border: none;
 }
