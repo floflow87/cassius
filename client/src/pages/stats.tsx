@@ -33,6 +33,8 @@ import {
   Bar,
   LineChart,
   Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -72,6 +74,12 @@ const TYPE_LABELS: Record<string, string> = {
 
 // Design System Color Tokens - using CSS variables
 const STATS_COLORS = {
+  // Chart colors palette
+  chart1: "hsl(var(--stats-chart-1))",
+  chart2: "hsl(var(--stats-chart-2))",
+  chart3: "hsl(var(--stats-chart-3))",
+  chart4: "hsl(var(--stats-chart-4))",
+  // Legacy aliases
   primary: "hsl(var(--stats-primary))",
   primarySoft: "hsl(var(--stats-primary-soft))",
   success: "hsl(var(--stats-success))",
@@ -83,7 +91,7 @@ const STATS_COLORS = {
   grayMuted: "hsl(var(--stats-gray-muted))",
   border: "hsl(var(--stats-border))",
   textSecondary: "hsl(var(--stats-text-secondary))",
-  // Desaturated ISQ colors
+  // ISQ colors
   isqHigh: "hsl(var(--stats-isq-high))",
   isqMedium: "hsl(var(--stats-isq-medium))",
   isqLow: "hsl(var(--stats-isq-low))",
@@ -467,7 +475,7 @@ export default function StatsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="flex flex-col h-full overflow-auto px-6 pb-6 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i} className="animate-pulse">
@@ -510,7 +518,7 @@ export default function StatsPage() {
   })) || [];
 
   return (
-    <div className="p-6 space-y-6 overflow-auto h-full">
+    <div className="flex flex-col h-full overflow-auto px-6 pb-6 space-y-6">
       {/* Summary stat cards - always visible */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card data-testid="stat-card-activity">
@@ -580,24 +588,24 @@ export default function StatsPage() {
 
       {/* Tabs for different stat views */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-transparent p-0 h-auto gap-6 border-b-0">
+        <TabsList className="bg-white dark:bg-zinc-900 p-1 h-auto gap-1 border-b-0 rounded-full">
           <TabsTrigger 
             value="patient" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-patient"
           >
             Patients
           </TabsTrigger>
           <TabsTrigger 
             value="implant" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-implant"
           >
             Implants
           </TabsTrigger>
           <TabsTrigger 
             value="activite" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-activite"
           >
             Activités
@@ -797,60 +805,73 @@ export default function StatsPage() {
 
           {/* Half-width row: Types d'interventions + Implants par mois */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Types d'interventions */}
+            {/* Types d'interventions - Horizontal Bar Chart */}
             <Card>
               <CardHeader>
-                <CardTitle>Types d'interventions</CardTitle>
-                <CardDescription>Répartition par type</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Types d'interventions
+                </CardTitle>
+                <CardDescription>Répartition par type avec détails au survol</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {typeData.map((item, index) => (
-                    <div key={item.type} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: index === 0 ? STATS_COLORS.primary : index === 1 ? STATS_COLORS.success : index === 2 ? STATS_COLORS.warning : STATS_COLORS.grayMuted }}
-                        />
-                        <span className="text-sm">{item.type}</span>
-                      </div>
-                      {item.implants && item.implants.length > 0 ? (
-                        <HoverCard>
-                          <HoverCardTrigger asChild>
-                            <Badge variant="secondary" className="cursor-pointer" data-testid={`badge-type-count-${index}`}>
-                              {item.count}
-                            </Badge>
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-80" align="end">
-                            <div className="space-y-2">
-                              <h4 className="font-semibold text-sm">Implants posés ({item.implants.length})</h4>
-                              <ScrollArea className="h-48">
-                                <div className="space-y-2">
-                                  {item.implants.map((imp) => (
-                                    <Link
-                                      key={imp.id}
-                                      href={`/implants/${imp.id}`}
-                                      className="flex items-center justify-between p-2 rounded hover-elevate bg-muted/50 text-sm"
-                                      data-testid={`link-implant-${imp.id}`}
-                                    >
-                                      <div>
+                {typeData.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Package className="h-12 w-12 mx-auto mb-2" />
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={Math.max(200, typeData.length * 50)}>
+                    <BarChart data={typeData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
+                      <XAxis type="number" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} allowDecimals={false} />
+                      <YAxis type="category" dataKey="type" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 14 }} axisLine={false} tickLine={false} width={160} />
+                      <Tooltip
+                        position={{ x: 200, y: 0 }}
+                        wrapperStyle={{ zIndex: 100 }}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: `1px solid ${STATS_COLORS.border}`,
+                          borderRadius: "6px",
+                          maxWidth: "320px",
+                        }}
+                        labelStyle={{ color: "hsl(var(--foreground))" }}
+                        content={({ active, payload }) => {
+                          if (!active || !payload || payload.length === 0) return null;
+                          const data = payload[0]?.payload;
+                          const implants = data.implants || [];
+                          const uniquePatients = Array.from(new Map(implants.map((i: {patientNom: string; patientPrenom: string}) => [`${i.patientNom}-${i.patientPrenom}`, i])).values());
+                          return (
+                            <div className="p-3 bg-card border rounded-md shadow-lg max-w-xs">
+                              <p className="font-semibold text-sm mb-2">{data.type}</p>
+                              <p className="text-sm text-muted-foreground mb-2">{data.count} intervention{data.count > 1 ? "s" : ""}</p>
+                              {implants.length > 0 && (
+                                <>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Implants posés ({implants.length}):</p>
+                                  <div className={`space-y-1 ${implants.length > 6 ? 'max-h-40 overflow-y-auto pr-1' : ''}`}>
+                                    {implants.map((imp: {id: string; siteFdi: string; patientNom: string; patientPrenom: string; marque: string}) => (
+                                      <div key={imp.id} className="text-xs p-1 rounded bg-muted/50">
                                         <span className="font-medium">{imp.patientPrenom} {imp.patientNom}</span>
-                                        <p className="text-xs text-muted-foreground">Site {imp.siteFdi} - {imp.marque}</p>
+                                        <span className="text-muted-foreground"> - Site {imp.siteFdi}</span>
                                       </div>
-                                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                    </Link>
-                                  ))}
-                                </div>
-                              </ScrollArea>
+                                    ))}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2">{uniquePatients.length} patient{uniquePatients.length > 1 ? "s" : ""} concerné{uniquePatients.length > 1 ? "s" : ""}</p>
+                                </>
+                              )}
                             </div>
-                          </HoverCardContent>
-                        </HoverCard>
-                      ) : (
-                        <Badge variant="secondary">{item.count}</Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                          );
+                        }}
+                      />
+                      <Bar dataKey="count" name="Interventions" radius={[0, 4, 4, 0]}>
+                        {typeData.map((_, index) => {
+                          const barColors = ["#d399ff", "#676da2", "#3c83f6", "#9dc1fb", "#3abff8"];
+                          return <Cell key={`cell-${index}`} fill={barColors[index % barColors.length]} />;
+                        })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -865,7 +886,13 @@ export default function StatsPage() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={implantData}>
+                  <AreaChart data={implantData}>
+                    <defs>
+                      <linearGradient id="implantGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
                     <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
                     <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
@@ -877,15 +904,16 @@ export default function StatsPage() {
                       }}
                       labelStyle={{ color: "hsl(var(--foreground))" }}
                     />
-                    <Line
+                    <Area
                       type="monotone"
                       dataKey="count"
                       name="Implants"
-                      stroke={STATS_COLORS.primary}
+                      stroke="hsl(var(--primary))"
                       strokeWidth={2}
-                      dot={{ fill: STATS_COLORS.primary, strokeWidth: 0, r: 4 }}
+                      fill="url(#implantGradient)"
+                      dot={{ fill: "hsl(var(--primary))", strokeWidth: 0, r: 4 }}
                     />
-                  </LineChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
@@ -1075,7 +1103,13 @@ export default function StatsPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={isqEvolutionChartData}>
+              <AreaChart data={isqEvolutionChartData}>
+                <defs>
+                  <linearGradient id="isqGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
                 <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
                 <YAxis domain={[40, 90]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} />
@@ -1089,15 +1123,16 @@ export default function StatsPage() {
                   }}
                   labelStyle={{ color: "hsl(var(--foreground))" }}
                 />
-                <Line
+                <Area
                   type="monotone"
                   dataKey="avgIsq"
                   name="ISQ moyen"
-                  stroke={STATS_COLORS.primary}
+                  stroke="hsl(var(--primary))"
                   strokeWidth={2}
-                  dot={{ fill: STATS_COLORS.primary, strokeWidth: 0, r: 4 }}
+                  fill="url(#isqGradient)"
+                  dot={{ fill: "hsl(var(--primary))", strokeWidth: 0, r: 4 }}
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -1300,7 +1335,7 @@ export default function StatsPage() {
                           <TableCell className="text-center">
                             <Badge
                               variant={p.successRate >= 80 ? "default" : p.successRate >= 50 ? "outline" : "destructive"}
-                              className={p.successRate >= 80 ? "bg-green-600" : ""}
+                              className={p.successRate >= 80 ? "bg-[#ECFDF5] text-[#16A34A] hover:bg-[#ECFDF5]" : ""}
                             >
                               {p.successRate}%
                             </Badge>

@@ -311,26 +311,32 @@ export function RadioUploadForm({
           <FormField
             control={form.control}
             name="implantId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Lier à un implant (optionnel)</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ""}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un implant" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {surgeryImplants.map((surgeryImp) => (
-                      <SelectItem key={surgeryImp.id} value={surgeryImp.id}>
-                        Site {surgeryImp.siteFdi} - {surgeryImp.implant.marque} ({surgeryImp.implant.diametre}x{surgeryImp.implant.longueur}mm)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
+            render={({ field }) => {
+              // Filter to only show surgery implants that have a valid implant reference
+              const validSurgeryImplants = surgeryImplants.filter(si => si.implantId && si.implant);
+              if (validSurgeryImplants.length === 0) return <></>;
+              
+              return (
+                <FormItem>
+                  <FormLabel>Lier à un implant (optionnel)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un implant" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {validSurgeryImplants.map((surgeryImp) => (
+                        <SelectItem key={surgeryImp.id} value={surgeryImp.implantId}>
+                          Site {surgeryImp.siteFdi} - {surgeryImp.implant.marque} ({surgeryImp.implant.diametre}x{surgeryImp.implant.longueur}mm)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
           />
         )}
 

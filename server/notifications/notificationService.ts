@@ -2,12 +2,35 @@ import { db } from "../db";
 import { 
   notifications, 
   notificationPreferences, 
+  users,
   InsertNotification,
   Notification,
   NotificationPreference
 } from "@shared/schema";
 import { eq, and, desc, isNull, sql, lt, gte } from "drizzle-orm";
 import { sendEmail } from "../emails/send";
+import { 
+  sendISQAlertEmail, 
+  sendImportCompletedEmail,
+  sendNotificationEmail,
+  sendDocumentAddedEmail,
+  sendRadiographAddedEmail,
+  sendAppointmentCreatedEmail,
+  sendPatientUpdatedEmail,
+  sendAppointmentReminderEmail,
+  sendSyncErrorEmail,
+  sendFollowupRequiredEmail,
+  sendNoRecentVisitEmail,
+  sendFollowupNotPlannedEmail,
+  sendNewMemberJoinedEmail,
+  sendRoleChangedEmail,
+  sendInvitationSentEmail,
+  sendImportStartedEmail,
+  sendImportPartialEmail,
+  sendImportFailedEmail,
+  sendEmailErrorEmail,
+  sendSystemMaintenanceEmail
+} from "../emailService";
 
 type NotificationKind = "ALERT" | "REMINDER" | "ACTIVITY" | "IMPORT" | "SYSTEM";
 type NotificationSeverity = "INFO" | "WARNING" | "CRITICAL";
@@ -34,12 +57,16 @@ interface UserPreferences {
   frequency: NotificationFrequency;
   inAppEnabled: boolean;
   emailEnabled: boolean;
+  disabledTypes: string[];
+  disabledEmailTypes: string[];
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   frequency: "IMMEDIATE",
   inAppEnabled: true,
   emailEnabled: false,
+  disabledTypes: [],
+  disabledEmailTypes: [],
 };
 
 function kindToCategory(kind: NotificationKind): NotificationCategory {
@@ -77,7 +104,17 @@ async function getPreferences(userId: string, organisationId: string, category: 
     frequency: pref.frequency as NotificationFrequency,
     inAppEnabled: pref.inAppEnabled,
     emailEnabled: pref.emailEnabled,
+    disabledTypes: Array.isArray(pref.disabledTypes) ? pref.disabledTypes : [],
+    disabledEmailTypes: Array.isArray(pref.disabledEmailTypes) ? pref.disabledEmailTypes : [],
   };
+}
+
+function isTypeDisabledForInApp(prefs: UserPreferences, type: string): boolean {
+  return prefs.disabledTypes.includes(type);
+}
+
+function isTypeDisabledForEmail(prefs: UserPreferences, type: string): boolean {
+  return prefs.disabledEmailTypes.includes(type);
 }
 
 async function checkDedupe(dedupeKey: string, recipientUserId: string, cooldownMinutes: number = 30): Promise<boolean> {
@@ -117,8 +154,11 @@ export async function createNotification(params: CreateNotificationParams): Prom
   const category = kindToCategory(kind);
   const prefs = await getPreferences(recipientUserId, organisationId, category);
 
-  if (prefs.frequency === "NONE" || (!prefs.inAppEnabled && !prefs.emailEnabled)) {
-    console.log(`[Notification] Skipping notification for user ${recipientUserId} - disabled by preferences`);
+  const inAppEnabledForType = prefs.inAppEnabled && !isTypeDisabledForInApp(prefs, type);
+  const emailEnabledForType = prefs.emailEnabled && !isTypeDisabledForEmail(prefs, type);
+
+  if (prefs.frequency === "NONE" || (!inAppEnabledForType && !emailEnabledForType)) {
+    console.log(`[Notification] Skipping notification for user ${recipientUserId} - disabled by preferences (type: ${type})`);
     return null;
   }
 
@@ -128,6 +168,10 @@ export async function createNotification(params: CreateNotificationParams): Prom
       console.log(`[Notification] Skipping duplicate notification: ${dedupeKey}`);
       return null;
     }
+  }
+
+  if (!inAppEnabledForType) {
+    console.log(`[Notification] In-app disabled for type ${type}, only sending email`);
   }
 
   const [notification] = await db
@@ -150,7 +194,7 @@ export async function createNotification(params: CreateNotificationParams): Prom
 
   console.log(`[Notification] Created notification ${notification.id} for user ${recipientUserId}: ${title}`);
 
-  if (prefs.emailEnabled && prefs.frequency === "IMMEDIATE") {
+  if (emailEnabledForType && prefs.frequency === "IMMEDIATE") {
     await sendImmediateEmailNotification(notification, recipientUserId, organisationId);
   }
 
@@ -161,8 +205,8 @@ async function sendImmediateEmailNotification(notification: Notification, userId
   try {
     const [user] = await db
       .select()
-      .from(require("@shared/schema").users)
-      .where(eq(require("@shared/schema").users.id, userId))
+      .from(users)
+      .where(eq(users.id, userId))
       .limit(1);
 
     if (!user || !user.username) {
@@ -191,15 +235,248 @@ async function sendImmediateEmailNotification(notification: Notification, userId
       }
     }
 
-    await sendEmail(user.username, 'systemAlert', {
-      alertType: 'action_required',
-      message: `${notification.title}${notification.body ? '\n\n' + notification.body : ''}`,
-      actionLabel: 'Ouvrir dans Cassius',
-      actionUrl: deepLink,
-      firstName: user.prenom || user.nom || undefined,
-    });
+    const firstName = user.prenom || user.nom || '';
+    
+    let metadata: Record<string, any> = {};
+    try {
+      if (notification.metadata) {
+        metadata = typeof notification.metadata === 'string' 
+          ? JSON.parse(notification.metadata) 
+          : notification.metadata;
+      }
+    } catch (parseError) {
+      console.warn(`[Notification] Failed to parse metadata for notification ${notification.id}:`, parseError);
+    }
 
-    console.log(`[Notification] Sent immediate email to ${user.username}`);
+    switch (notification.type) {
+      case 'ISQ_LOW':
+      case 'ISQ_DECLINING':
+      case 'UNSTABLE_ISQ_HISTORY':
+        await sendISQAlertEmail(
+          user.username,
+          firstName,
+          metadata.isqValue || 0,
+          metadata.threshold || 60,
+          metadata.contextLabel || 'Implant',
+          deepLink
+        );
+        break;
+      
+      case 'IMPORT_COMPLETED':
+        await sendImportCompletedEmail(
+          user.username,
+          firstName,
+          metadata.patientsCount || 0,
+          metadata.implantsCount || 0,
+          metadata.documentsCount || 0,
+          deepLink
+        );
+        break;
+      
+      case 'DOCUMENT_UPLOADED':
+      case 'DOCUMENT_ADDED':
+        await sendDocumentAddedEmail(
+          user.username,
+          firstName,
+          metadata.docName || 'Document',
+          metadata.mimeTypeLabel || 'Fichier',
+          metadata.actorName || 'Un membre',
+          metadata.contextLabel || '',
+          metadata.tagsLabel || 'Aucun',
+          deepLink
+        );
+        break;
+      
+      case 'RADIO_ADDED':
+        await sendRadiographAddedEmail(
+          user.username,
+          firstName,
+          metadata.radioTypeLabel || 'Radiographie',
+          metadata.actorName || 'Un membre',
+          metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'APPOINTMENT_CREATED':
+        await sendAppointmentCreatedEmail(
+          user.username,
+          firstName,
+          metadata.appointmentTitle || 'Rendez-vous',
+          metadata.appointmentDateLabel || '',
+          metadata.appointmentTimeLabel || '',
+          metadata.actorName || 'Un membre',
+          metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'PATIENT_UPDATED':
+        await sendPatientUpdatedEmail(
+          user.username,
+          firstName,
+          metadata.actorName || 'Un membre',
+          metadata.changeSummary || 'Mise à jour',
+          metadata.changedAtLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'APPOINTMENT_REMINDER':
+        await sendAppointmentReminderEmail(
+          user.username,
+          firstName,
+          metadata.appointmentTitle || 'Rendez-vous',
+          metadata.appointmentDateLabel || '',
+          metadata.appointmentTimeLabel || '',
+          metadata.locationLabel || 'Non spécifié',
+          deepLink
+        );
+        break;
+      
+      case 'SYNC_ERROR':
+        await sendSyncErrorEmail(
+          user.username,
+          firstName,
+          metadata.errorCount || 1,
+          metadata.lastErrorShort || 'Erreur de synchronisation',
+          deepLink
+        );
+        break;
+      
+      case 'NO_POSTOP_FOLLOWUP':
+        await sendFollowupRequiredEmail(
+          user.username,
+          firstName,
+          metadata.lastFollowupLabel || 'Aucun',
+          metadata.thresholdLabel || '',
+          metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'NO_RECENT_VISIT':
+        await sendNoRecentVisitEmail(
+          user.username,
+          firstName,
+          metadata.lastVisitLabel || 'Aucune',
+          metadata.thresholdLabel || '',
+          metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'SURGERY_NO_FOLLOWUP_PLANNED':
+      case 'FOLLOWUP_TO_SCHEDULE':
+        await sendFollowupNotPlannedEmail(
+          user.username,
+          firstName,
+          metadata.surgeryDateLabel || '',
+          metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'NEW_MEMBER_JOINED':
+        await sendNewMemberJoinedEmail(
+          user.username,
+          firstName,
+          metadata.memberName || 'Nouveau membre',
+          metadata.memberRole || '',
+          metadata.joinedAtLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'ROLE_CHANGED':
+        await sendRoleChangedEmail(
+          user.username,
+          firstName,
+          metadata.memberName || '',
+          metadata.oldRole || '',
+          metadata.newRole || '',
+          metadata.changedByName || '',
+          deepLink
+        );
+        break;
+      
+      case 'INVITATION_SENT':
+        await sendInvitationSentEmail(
+          user.username,
+          firstName,
+          metadata.inviteeEmail || '',
+          metadata.inviteeRole || '',
+          metadata.sentByName || '',
+          deepLink
+        );
+        break;
+      
+      case 'IMPORT_STARTED':
+        await sendImportStartedEmail(
+          user.username,
+          firstName,
+          metadata.importType || 'Données',
+          metadata.fileName || '',
+          metadata.startedAtLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'IMPORT_PARTIAL':
+        await sendImportPartialEmail(
+          user.username,
+          firstName,
+          metadata.importType || 'Données',
+          metadata.successCount || 0,
+          metadata.errorCount || 0,
+          deepLink
+        );
+        break;
+      
+      case 'IMPORT_FAILED':
+        await sendImportFailedEmail(
+          user.username,
+          firstName,
+          metadata.importType || 'Données',
+          metadata.errorMessage || 'Erreur inconnue',
+          deepLink
+        );
+        break;
+      
+      case 'EMAIL_ERROR':
+        await sendEmailErrorEmail(
+          user.username,
+          firstName,
+          metadata.originalEmailType || '',
+          metadata.errorMessage || 'Erreur inconnue',
+          deepLink
+        );
+        break;
+      
+      case 'SYSTEM_MAINTENANCE':
+        await sendSystemMaintenanceEmail(
+          user.username,
+          firstName,
+          metadata.maintenanceTitle || 'Maintenance',
+          metadata.scheduledDateLabel || '',
+          metadata.durationLabel || '',
+          metadata.description || '',
+          deepLink
+        );
+        break;
+      
+      default:
+        await sendNotificationEmail(
+          user.username,
+          firstName,
+          notification.title,
+          notification.body || '',
+          deepLink
+        );
+        break;
+    }
+
+    console.log(`[Notification] Sent immediate email to ${user.username} (type: ${notification.type})`);
   } catch (error) {
     console.error(`[Notification] Failed to send immediate email:`, error);
   }
@@ -280,6 +557,21 @@ export async function markAsRead(notificationId: string, userId: string): Promis
   return !!updated;
 }
 
+export async function markAsUnread(notificationId: string, userId: string): Promise<boolean> {
+  const [updated] = await db
+    .update(notifications)
+    .set({ readAt: null })
+    .where(
+      and(
+        eq(notifications.id, notificationId),
+        eq(notifications.recipientUserId, userId)
+      )
+    )
+    .returning();
+
+  return !!updated;
+}
+
 export async function markAllAsRead(userId: string, organisationId: string): Promise<number> {
   const result = await db
     .update(notifications)
@@ -335,6 +627,8 @@ export async function updatePreference(
     inAppEnabled?: boolean;
     emailEnabled?: boolean;
     digestTime?: string;
+    disabledTypes?: string[];
+    disabledEmailTypes?: string[];
   }
 ): Promise<NotificationPreference> {
   const existing = await db
@@ -370,6 +664,8 @@ export async function updatePreference(
         inAppEnabled: updates.inAppEnabled ?? true,
         emailEnabled: updates.emailEnabled ?? false,
         digestTime: updates.digestTime || "08:30",
+        disabledTypes: updates.disabledTypes || [],
+        disabledEmailTypes: updates.disabledEmailTypes || [],
       })
       .returning();
     return created;
@@ -390,8 +686,8 @@ export const notificationEvents = {
       kind: "ALERT",
       type: "ISQ_LOW",
       severity: "CRITICAL",
-      title: "ISQ bas detecte",
-      body: `Un implant presente un ISQ faible (${params.isqValue}). Action requise.`,
+      title: "ISQ bas détecté",
+      body: `Un implant présente un ISQ faible (${params.isqValue}). Action requise.`,
       entityType: "PATIENT",
       entityId: params.patientId,
       metadata: { implantRef: params.implantRef, isqValue: params.isqValue },
@@ -433,8 +729,8 @@ export const notificationEvents = {
       kind: "ACTIVITY",
       type: "DOCUMENT_ADDED",
       severity: "INFO",
-      title: "Document ajoute",
-      body: `Un document a ete ajoute.`,
+      title: "Document ajouté",
+      body: `Un document a été ajouté.`,
       entityType: "DOCUMENT",
       entityId: params.documentId,
       actorUserId: params.actorUserId,
@@ -454,7 +750,7 @@ export const notificationEvents = {
       kind: "IMPORT",
       type: "IMPORT_STARTED",
       severity: "INFO",
-      title: "Import demarre",
+      title: "Import démarré",
       body: `L'import est en cours.`,
       entityType: "IMPORT",
       entityId: params.importId,
@@ -478,8 +774,8 @@ export const notificationEvents = {
       kind: "IMPORT",
       type,
       severity,
-      title: params.failureCount > 0 ? "Import termine avec erreurs" : "Import termine",
-      body: `${params.successCount} elements importes` + (params.failureCount > 0 ? `, ${params.failureCount} erreurs` : ""),
+      title: params.failureCount > 0 ? "Import terminé avec erreurs" : "Import terminé",
+      body: `${params.successCount} éléments importés` + (params.failureCount > 0 ? `, ${params.failureCount} erreurs` : ""),
       entityType: "IMPORT",
       entityId: params.importId,
       metadata: { successCount: params.successCount, failureCount: params.failureCount },
@@ -498,8 +794,8 @@ export const notificationEvents = {
       kind: "IMPORT",
       type: "IMPORT_FAILED",
       severity: "CRITICAL",
-      title: "Echec de l'import",
-      body: `L'import a echoue.`,
+      title: "Échec de l'import",
+      body: `L'import a échoué.`,
       entityType: "IMPORT",
       entityId: params.importId,
       metadata: { errorMessage: params.errorMessage },
@@ -519,7 +815,7 @@ export const notificationEvents = {
       type: "SYNC_ERROR",
       severity: "WARNING",
       title: "Erreur de synchronisation",
-      body: `La synchronisation ${params.integrationName} a rencontre une erreur.`,
+      body: `La synchronisation ${params.integrationName} a rencontré une erreur.`,
       entityType: "INTEGRATION",
       metadata: { integrationName: params.integrationName, errorMessage: params.errorMessage },
       dedupeKey: `sync_error_${params.integrationName}`,
@@ -539,8 +835,8 @@ export const notificationEvents = {
       kind: "ACTIVITY",
       type: "PATIENT_UPDATED",
       severity: "INFO",
-      title: "Fiche patient modifiee",
-      body: `Des modifications ont ete apportees a une fiche patient.`,
+      title: "Fiche patient modifiée",
+      body: `Des modifications ont été apportées à une fiche patient.`,
       entityType: "PATIENT",
       entityId: params.patientId,
       actorUserId: params.actorUserId,
@@ -563,11 +859,261 @@ export const notificationEvents = {
       type: "APPOINTMENT_CREATED",
       severity: "INFO",
       title: "Nouveau rendez-vous",
-      body: `Un rendez-vous a ete programme.`,
+      body: `Un rendez-vous a été programmé.`,
       entityType: "APPOINTMENT",
       entityId: params.appointmentId,
       actorUserId: params.actorUserId,
       metadata: { appointmentDate: params.appointmentDate, patientId: params.patientId },
+    });
+  },
+
+  // Clinical: ISQ declining (drop of 10+ points)
+  async onIsqDeclining(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    patientName: string;
+    implantSite: string;
+    previousIsq: number;
+    currentIsq: number;
+    drop: number;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ALERT",
+      type: "ISQ_DECLINING",
+      severity: "WARNING",
+      title: `Baisse significative de stabilité implantaire`,
+      body: `L'implant site ${params.implantSite} (${params.patientName}) a perdu ${params.drop} points ISQ (${params.previousIsq} -> ${params.currentIsq}).`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      metadata: { implantSite: params.implantSite, previousIsq: params.previousIsq, currentIsq: params.currentIsq, drop: params.drop },
+      dedupeKey: `isq_declining_${params.patientId}_${params.implantSite}`,
+    });
+  },
+
+  // Clinical: No post-op follow-up
+  async onNoPostOpFollowup(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    patientName: string;
+    operationId: string;
+    operationDate: string;
+    daysSinceOp: number;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "REMINDER",
+      type: "NO_POSTOP_FOLLOWUP",
+      severity: "WARNING",
+      title: `Suivi post-opératoire manquant`,
+      body: `${params.patientName}: intervention du ${params.operationDate} sans contrôle ISQ à J+${params.daysSinceOp}.`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      metadata: { operationId: params.operationId, operationDate: params.operationDate, daysSinceOp: params.daysSinceOp },
+      dedupeKey: `no_postop_${params.operationId}`,
+    });
+  },
+
+  // Clinical: Implant without visit for X months
+  async onNoRecentVisit(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    patientName: string;
+    implantSite: string;
+    monthsSinceVisit: number;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "REMINDER",
+      type: "NO_RECENT_VISIT",
+      severity: "INFO",
+      title: `Implant sans visite récente`,
+      body: `${params.patientName}, site ${params.implantSite}: aucune visite depuis ${params.monthsSinceVisit} mois.`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      metadata: { implantSite: params.implantSite, monthsSinceVisit: params.monthsSinceVisit },
+      dedupeKey: `no_recent_visit_${params.patientId}_${params.implantSite}`,
+    });
+  },
+
+  // Clinical: Unstable ISQ history (multiple low consecutive)
+  async onUnstableIsqHistory(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    patientName: string;
+    implantSite: string;
+    lowIsqCount: number;
+    recentIsqValues: number[];
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ALERT",
+      type: "UNSTABLE_ISQ_HISTORY",
+      severity: "CRITICAL",
+      title: `Historique ISQ instable`,
+      body: `${params.patientName}, site ${params.implantSite}: ${params.lowIsqCount} mesures ISQ faibles consécutives (${params.recentIsqValues.join(', ')}).`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      metadata: { implantSite: params.implantSite, lowIsqCount: params.lowIsqCount, recentIsqValues: params.recentIsqValues },
+      dedupeKey: `unstable_isq_${params.patientId}_${params.implantSite}`,
+    });
+  },
+
+  // Clinical: Surgery without planned follow-up
+  async onSurgeryNoFollowupPlanned(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    patientName: string;
+    operationId: string;
+    operationDate: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "REMINDER",
+      type: "SURGERY_NO_FOLLOWUP_PLANNED",
+      severity: "WARNING",
+      title: `Acte chirurgical sans suivi planifié`,
+      body: `${params.patientName}: opération du ${params.operationDate} sans RDV de suivi programmé.`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      metadata: { operationId: params.operationId, operationDate: params.operationDate },
+      dedupeKey: `surgery_no_followup_${params.operationId}`,
+    });
+  },
+
+  // Activity: Radio added
+  async onRadioAdded(params: {
+    organisationId: string;
+    recipientUserId: string;
+    actorUserId: string;
+    patientId: string;
+    patientName: string;
+    radioType: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ACTIVITY",
+      type: "RADIO_ADDED",
+      severity: "INFO",
+      title: `Radiographie ajoutée`,
+      body: `${params.radioType} ajoutée pour ${params.patientName}.`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      actorUserId: params.actorUserId,
+      metadata: { radioType: params.radioType },
+    });
+  },
+
+  // Collaboration: Invitation sent
+  async onInvitationSent(params: {
+    organisationId: string;
+    recipientUserId: string;
+    inviteeEmail: string;
+    role: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ACTIVITY",
+      type: "INVITATION_SENT",
+      severity: "INFO",
+      title: `Invitation envoyée`,
+      body: `Une invitation a été envoyée à ${params.inviteeEmail} en tant que ${params.role}.`,
+      metadata: { inviteeEmail: params.inviteeEmail, role: params.role },
+    });
+  },
+
+  // Collaboration: New member joined
+  async onNewMemberJoined(params: {
+    organisationId: string;
+    recipientUserId: string;
+    newMemberName: string;
+    newMemberEmail: string;
+    role: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ACTIVITY",
+      type: "NEW_MEMBER_JOINED",
+      severity: "INFO",
+      title: `Nouveau membre`,
+      body: `${params.newMemberName} (${params.newMemberEmail}) a rejoint l'équipe en tant que ${params.role}.`,
+      metadata: { newMemberName: params.newMemberName, newMemberEmail: params.newMemberEmail, role: params.role },
+    });
+  },
+
+  // Collaboration: Role changed
+  async onRoleChanged(params: {
+    organisationId: string;
+    recipientUserId: string;
+    affectedUserName: string;
+    previousRole: string;
+    newRole: string;
+    actorUserId: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ACTIVITY",
+      type: "ROLE_CHANGED",
+      severity: "INFO",
+      title: `Rôle modifié`,
+      body: `Le rôle de ${params.affectedUserName} a été modifié: ${params.previousRole} -> ${params.newRole}.`,
+      actorUserId: params.actorUserId,
+      metadata: { affectedUserName: params.affectedUserName, previousRole: params.previousRole, newRole: params.newRole },
+    });
+  },
+
+  // Technical: Email sending error
+  async onEmailError(params: {
+    organisationId: string;
+    recipientUserId: string;
+    emailType: string;
+    targetEmail: string;
+    errorMessage: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "SYSTEM",
+      type: "EMAIL_ERROR",
+      severity: "WARNING",
+      title: `Erreur d'envoi d'email`,
+      body: `L'email ${params.emailType} vers ${params.targetEmail} n'a pas pu être envoyé.`,
+      metadata: { emailType: params.emailType, targetEmail: params.targetEmail, errorMessage: params.errorMessage },
+      dedupeKey: `email_error_${params.targetEmail}_${params.emailType}`,
+    });
+  },
+
+  // System: Maintenance notification
+  async onSystemMaintenance(params: {
+    organisationId: string;
+    recipientUserId: string;
+    maintenanceType: string;
+    scheduledAt?: string;
+    description: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "SYSTEM",
+      type: "SYSTEM_MAINTENANCE",
+      severity: "INFO",
+      title: `Maintenance système`,
+      body: params.description,
+      metadata: { maintenanceType: params.maintenanceType, scheduledAt: params.scheduledAt },
     });
   },
 };
@@ -577,6 +1123,7 @@ export default {
   getNotifications,
   getUnreadCount,
   markAsRead,
+  markAsUnread,
   markAllAsRead,
   archiveNotification,
   getUserPreferences,

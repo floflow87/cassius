@@ -14,10 +14,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, FolderClosed, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { FaFolder, FaCalendarAlt } from "react-icons/fa";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
-import logoFull from "@assets/logo_Cassius_Plan_de_travail_1_copie_1765897934649.png";
+import logoFull from "@assets/logo_Cassius_Plan_de_travail_1_copie_Plan_de_travail_1_copie_2_1767822114601.png";
 import homeIcon from "/assets/icons/home.png";
 import patientIcon from "/assets/icons/patient.png";
 import implantsIcon from "/assets/icons/implants.png";
@@ -29,7 +30,7 @@ type MenuItem = {
   title: string;
   url: string;
   icon?: string;
-  lucideIcon?: typeof FolderClosed;
+  reactIcon?: typeof FaFolder;
 };
 
 const menuItems: MenuItem[] = [
@@ -37,8 +38,8 @@ const menuItems: MenuItem[] = [
   { title: "Patients", url: "/patients", icon: patientIcon },
   { title: "Implants", url: "/implants", icon: implantsIcon },
   { title: "Actes", url: "/actes", icon: actesIcon },
-  { title: "Documents", url: "/documents", lucideIcon: FolderClosed },
-  { title: "Calendrier", url: "/calendar", lucideIcon: Calendar },
+  { title: "Documents", url: "/documents", reactIcon: FaFolder },
+  { title: "Calendrier", url: "/calendar", reactIcon: FaCalendarAlt },
   { title: "Statistiques", url: "/stats", icon: statsIcon },
 ];
 
@@ -67,25 +68,31 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0 overflow-visible relative">
+    <Sidebar collapsible="icon" variant="floating" className="border-r-0 overflow-visible relative">
 
-      <SidebarHeader className="bg-white dark:bg-gray-950 flex items-center justify-center h-16 px-4 border-b">
-        <a 
-          href="/dashboard" 
-          onClick={handleNavClick("/dashboard")}
-          className="flex items-center justify-center w-full cursor-pointer"
-          data-testid="link-logo-home"
-        >
-          {isExpanded ? (
-            <img src={logoFull} alt="Cassius" className="h-8 w-auto" />
-          ) : (
-            <img src={logoIcon} alt="Cassius" className="h-8 w-8 shrink-0" />
-          )}
-        </a>
+      <SidebarHeader className="bg-sidebar h-16 px-2 rounded-t-[15px]">
+        <div className="flex items-center h-full pl-[11px]">
+          <a 
+            href="/dashboard" 
+            onClick={handleNavClick("/dashboard")}
+            className="cursor-pointer"
+            data-testid="link-logo-home"
+          >
+            {isExpanded ? (
+              <img src={logoFull} alt="Cassius" className="h-11 w-auto" />
+            ) : (
+              <img src={logoIcon} alt="Cassius" className="h-9 w-9 shrink-0 brightness-0 invert" />
+            )}
+          </a>
+        </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-primary px-0 py-0">
-        <SidebarMenu className="gap-1 px-2 pt-2">
+      <SidebarContent className="bg-sidebar px-0 py-0">
+        {/* HR separator between logo and menu */}
+        <div className="px-3 pt-2 pb-3">
+          <hr className="border-t border-white/20" />
+        </div>
+        <SidebarMenu className="gap-1 px-3 pt-2">
           {menuItems.map((item) => {
             const active = isActive(item.url);
             
@@ -93,12 +100,12 @@ export function AppSidebar() {
               <a
                 href={item.url}
                 onClick={handleNavClick(item.url)}
-                className={`flex h-10 items-center rounded-[5px] ${
+                className={`flex h-10 items-center transition-all ${
                   isExpanded ? 'justify-start px-3 gap-3' : 'justify-center w-full'
                 } ${
                   active 
-                    ? "bg-secondary" 
-                    : "bg-transparent hover:bg-white/10"
+                    ? "bg-sidebar-accent rounded-[50px]" 
+                    : "bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] rounded-md"
                 }`}
                 data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
               >
@@ -106,13 +113,13 @@ export function AppSidebar() {
                   <img 
                     src={item.icon} 
                     alt={item.title}
-                    className="h-5 w-auto brightness-0 invert shrink-0"
+                    className="h-[18px] w-auto brightness-0 invert shrink-0"
                   />
-                ) : item.lucideIcon && (
-                  <item.lucideIcon className="h-5 w-5 text-white shrink-0" strokeWidth={2.5} />
+                ) : item.reactIcon && (
+                  <item.reactIcon className="h-[16px] w-[16px] text-white shrink-0" />
                 )}
                 {isExpanded && (
-                  <span className={`text-sm truncate ${active ? 'font-medium text-white' : 'font-light text-white/80'}`}>
+                  <span className={`text-xs truncate ${active ? 'font-medium text-white' : 'font-light text-white/80'}`}>
                     {item.title}
                   </span>
                 )}
@@ -139,7 +146,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="bg-primary px-2 py-2 pb-4 mt-auto">
+      <SidebarFooter className="bg-sidebar px-3 py-2 pb-4 mt-auto rounded-b-[15px]">
         <SidebarMenu className="gap-1">
           {/* Settings button with toggle */}
           <SidebarMenuItem className="px-0">
@@ -148,17 +155,17 @@ export function AppSidebar() {
                 <a
                   href="/settings"
                   onClick={handleNavClick("/settings")}
-                  className={`flex-1 flex h-10 items-center justify-start px-3 gap-3 rounded-[5px] ${
-                    isActive("/settings") ? "bg-secondary" : "bg-transparent hover:bg-white/10"
+                  className={`flex-1 flex h-10 items-center justify-start px-3 gap-3 transition-all ${
+                    isActive("/settings") ? "bg-sidebar-accent rounded-[50px]" : "bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] rounded-md"
                   }`}
                   data-testid="link-settings"
                 >
                   <img 
                     src={settingsIcon} 
                     alt="Paramètres"
-                    className="h-5 w-auto brightness-0 invert shrink-0"
+                    className="h-[18px] w-auto brightness-0 invert shrink-0"
                   />
-                  <span className={`text-sm truncate ${isActive("/settings") ? 'font-medium text-white' : 'font-light text-white/80'}`}>
+                  <span className={`text-xs truncate ${isActive("/settings") ? 'font-medium text-white' : 'font-light text-white/80'}`}>
                     Paramètres
                   </span>
                 </a>
@@ -168,13 +175,13 @@ export function AppSidebar() {
                     <a
                       href="/settings"
                       onClick={handleNavClick("/settings")}
-                      className="flex-1 flex h-10 items-center justify-center rounded-[5px] bg-transparent hover:bg-white/10"
+                      className="flex-1 flex h-10 items-center justify-center rounded-md bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] transition-all"
                       data-testid="link-settings"
                     >
                       <img 
                         src={settingsIcon} 
                         alt="Paramètres"
-                        className="h-5 w-auto brightness-0 invert"
+                        className="h-[18px] w-auto brightness-0 invert"
                       />
                     </a>
                   </TooltipTrigger>

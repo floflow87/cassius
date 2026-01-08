@@ -407,7 +407,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
   }
 
   return (
-    <div className="p-6">
+    <div className="flex flex-col h-full overflow-auto px-6 pb-6">
       <div className="flex items-center gap-4 mb-5">
         <CassiusSearchInput
           placeholder="Rechercher par marque ou reference..."

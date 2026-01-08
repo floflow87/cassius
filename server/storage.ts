@@ -52,6 +52,7 @@ import {
   type Flag,
   type InsertFlag,
   type FlagWithEntity,
+  type FlagType,
   type AppointmentWithPatient,
   type DocumentWithDetails,
   calendarIntegrations,
@@ -250,6 +251,7 @@ export interface IStorage {
   getEntityFlags(organisationId: string, entityType: string, entityId: string): Promise<Flag[]>;
   createFlag(organisationId: string, flag: InsertFlag): Promise<Flag>;
   resolveFlag(organisationId: string, id: string, userId: string): Promise<Flag | undefined>;
+  resolveFlagByTypeAndPatient(organisationId: string, type: FlagType, patientId: string, userId: string): Promise<number>;
   deleteFlag(organisationId: string, id: string): Promise<boolean>;
   upsertFlag(organisationId: string, flag: InsertFlag): Promise<Flag>;
   
@@ -2451,6 +2453,7 @@ export class DatabaseStorage implements IStorage {
         dateStart: appointments.dateStart,
         dateEnd: appointments.dateEnd,
         isq: appointments.isq,
+        color: appointments.color,
         patientNom: patients.nom,
         patientPrenom: patients.prenom,
       })
@@ -3419,6 +3422,24 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return updated;
+  }
+
+  async resolveFlagByTypeAndPatient(organisationId: string, type: FlagType, patientId: string, userId: string): Promise<number> {
+    const result = await db
+      .update(flags)
+      .set({
+        resolvedAt: new Date(),
+        resolvedBy: userId,
+      })
+      .where(and(
+        eq(flags.organisationId, organisationId),
+        eq(flags.type, type),
+        eq(flags.entityType, "PATIENT"),
+        eq(flags.entityId, patientId),
+        sql`${flags.resolvedAt} IS NULL`
+      ))
+      .returning({ id: flags.id });
+    return result.length;
   }
 
   async deleteFlag(organisationId: string, id: string): Promise<boolean> {

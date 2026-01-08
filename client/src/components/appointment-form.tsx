@@ -257,28 +257,6 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
 
         <FormField
           control={form.control}
-          name="isq"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Valeur ISQ (optionnel)</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  placeholder="Ex: 75"
-                  value={field.value ?? ""}
-                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                  data-testid="input-appointment-isq"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
           name="description"
           render={({ field }) => (
             <FormItem>

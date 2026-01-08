@@ -32,6 +32,8 @@ import {
   patients,
   importJobs,
   users,
+  notifications,
+  flags,
 } from "@shared/schema";
 import type {
   Patient,
@@ -52,7 +54,7 @@ import type {
 } from "@shared/types";
 import { z } from "zod";
 import { db, pool, testConnection, getDbEnv, getDbConnectionInfo } from "./db";
-import { eq, sql, and, inArray, desc } from "drizzle-orm";
+import { eq, sql, and, inArray, notInArray, desc } from "drizzle-orm";
 
 function getOrganisationId(req: Request, res: Response): string | null {
   const organisationId = req.jwtUser?.organisationId;
@@ -598,6 +600,7 @@ export async function registerRoutes(
   app.patch("/api/patients/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    const userId = req.jwtUser?.userId;
 
     try {
       const data = insertPatientSchema.partial().parse(req.body);
@@ -605,6 +608,25 @@ export async function registerRoutes(
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
+      
+      // Notify other team members about patient modification
+      if (userId) {
+        const orgUsers = await storage.getUsersByOrganisation(organisationId);
+        const changedFields = Object.keys(data);
+        
+        for (const user of orgUsers) {
+          if (user.id !== userId) {
+            notificationService.notificationEvents.onPatientUpdated({
+              organisationId,
+              recipientUserId: user.id,
+              actorUserId: userId,
+              patientId: patient.id,
+              changes: changedFields,
+            }).catch(err => console.error("[Notification] Patient updated notification failed:", err));
+          }
+        }
+      }
+      
       res.json(patient);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1375,6 +1397,28 @@ export async function registerRoutes(
         createdBy: userId || null,
       };
       const radio = await storage.createRadio(organisationId, radioData);
+      
+      // Send notification about new radio to other team members
+      if (userId && data.patientId) {
+        const patient = await storage.getPatient(organisationId, data.patientId);
+        const patientName = patient ? `${patient.prenom} ${patient.nom}` : "Patient";
+        const orgUsers = await storage.getUsersByOrganisation(organisationId);
+        
+        // Notify all other users in the organization
+        for (const user of orgUsers) {
+          if (user.id !== userId) {
+            notificationService.notificationEvents.onRadioAdded({
+              organisationId,
+              recipientUserId: user.id,
+              actorUserId: userId,
+              patientId: data.patientId,
+              patientName,
+              radioType: data.type,
+            }).catch(err => console.error("[Notification] Radio added notification failed:", err));
+          }
+        }
+      }
+      
       res.status(201).json(radio);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1676,16 +1720,22 @@ export async function registerRoutes(
       const userId = req.jwtUser?.userId || null;
       const doc = await storage.createDocument(organisationId, { ...data, createdBy: userId });
       
-      // Send notification about new document
+      // Send notification about new document to other team members
       if (userId) {
-        await notificationService.notificationEvents.onDocumentUploaded({
-          organisationId,
-          recipientUserId: userId,
-          actorUserId: userId,
-          documentId: doc.id,
-          documentName: doc.title || doc.fileName,
-          patientId: doc.patientId || undefined,
-        });
+        const orgUsers = await storage.getUsersByOrganisation(organisationId);
+        
+        for (const user of orgUsers) {
+          if (user.id !== userId) {
+            notificationService.notificationEvents.onDocumentUploaded({
+              organisationId,
+              recipientUserId: user.id,
+              actorUserId: userId,
+              documentId: doc.id,
+              documentName: doc.title || doc.fileName,
+              patientId: doc.patientId || undefined,
+            }).catch(err => console.error("[Notification] Document uploaded notification failed:", err));
+          }
+        }
       }
       
       res.status(201).json(doc);
@@ -1785,6 +1835,13 @@ export async function registerRoutes(
         );
         
         if (surgeryImplantId) {
+          // Get previous ISQ before syncing
+          const previousVisites = await storage.getImplantVisites(organisationId, data.implantId);
+          const sortedVisites = previousVisites
+            .filter(v => v.isq !== null && v.id !== visite.id)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          const previousIsq = sortedVisites.length > 0 ? sortedVisites[0].isq : null;
+          
           await storage.syncVisiteIsqToSurgeryImplant(
             organisationId, 
             surgeryImplantId, 
@@ -1798,22 +1855,65 @@ export async function registerRoutes(
           );
           console.log(`[VISITE-ISQ] Synced ISQ=${data.isq} to surgery_implant=${surgeryImplantId}`);
           
+          const userId = req.jwtUser?.userId;
+          
           // Send notification for low ISQ (< 60)
-          if (data.isq < 60) {
-            const userId = req.jwtUser?.userId;
-            if (userId) {
-              notificationService.createNotification({
+          if (data.isq < 60 && userId) {
+            notificationService.createNotification({
+              organisationId,
+              recipientUserId: userId,
+              kind: "ALERT",
+              type: "ISQ_LOW",
+              severity: data.isq < 50 ? "CRITICAL" : "WARNING",
+              title: `ISQ faible detecte: ${data.isq}`,
+              body: `L'implant sur le site a un ISQ de ${data.isq}, ce qui est en dessous du seuil recommande.`,
+              entityType: "IMPLANT",
+              entityId: surgeryImplantId,
+              dedupeKey: `isq_low_${surgeryImplantId}_${data.isq}`,
+            }).catch(err => console.error("[Notification] ISQ_LOW notification failed:", err));
+          }
+          
+          // Check for significant ISQ drop (10+ points)
+          if (previousIsq !== null && userId) {
+            const isqDrop = previousIsq - data.isq;
+            if (isqDrop >= 10) {
+              const patient = await storage.getPatient(organisationId, data.patientId);
+              const patientName = patient ? `${patient.prenom} ${patient.nom}` : "Patient";
+              const surgeryImplant = await storage.getSurgeryImplant(organisationId, surgeryImplantId);
+              const implantSite = surgeryImplant?.siteFdi || "inconnu";
+              
+              notificationService.notificationEvents.onIsqDeclining({
                 organisationId,
                 recipientUserId: userId,
-                kind: "ALERT",
-                type: "ISQ_LOW",
-                severity: data.isq < 50 ? "CRITICAL" : "WARNING",
-                title: `ISQ faible detecte: ${data.isq}`,
-                body: `L'implant sur le site a un ISQ de ${data.isq}, ce qui est en dessous du seuil recommande.`,
-                entityType: "IMPLANT",
-                entityId: surgeryImplantId,
-                dedupeKey: `isq_low_${surgeryImplantId}_${data.isq}`,
-              }).catch(err => console.error("[Notification] ISQ_LOW notification failed:", err));
+                patientId: data.patientId,
+                patientName,
+                implantSite,
+                previousIsq,
+                currentIsq: data.isq,
+                drop: isqDrop,
+              }).catch(err => console.error("[Notification] ISQ_DECLINING notification failed:", err));
+            }
+            
+            // Check for unstable ISQ history (3+ consecutive low ISQs)
+            const recentIsqValues = sortedVisites.slice(0, 3).map(v => v.isq as number);
+            recentIsqValues.unshift(data.isq);
+            const lowIsqCount = recentIsqValues.filter(v => v < 60).length;
+            
+            if (lowIsqCount >= 3) {
+              const patient = await storage.getPatient(organisationId, data.patientId);
+              const patientName = patient ? `${patient.prenom} ${patient.nom}` : "Patient";
+              const surgeryImplant = await storage.getSurgeryImplant(organisationId, surgeryImplantId);
+              const implantSite = surgeryImplant?.siteFdi || "inconnu";
+              
+              notificationService.notificationEvents.onUnstableIsqHistory({
+                organisationId,
+                recipientUserId: userId,
+                patientId: data.patientId,
+                patientName,
+                implantSite,
+                lowIsqCount,
+                recentIsqValues: recentIsqValues.slice(0, lowIsqCount),
+              }).catch(err => console.error("[Notification] UNSTABLE_ISQ notification failed:", err));
             }
           }
         }
@@ -2164,17 +2264,31 @@ export async function registerRoutes(
       const appointmentData = insertAppointmentSchema.parse({ ...req.body, patientId });
       const appointment = await storage.createAppointment(organisationId, appointmentData);
       
-      // Send notification about new appointment
       const userId = req.jwtUser?.userId;
+      
+      // If it's a future appointment, resolve the "NO_RECENT_APPOINTMENT" flag for this patient
+      if (appointment.dateStart >= new Date() && userId) {
+        const resolvedCount = await storage.resolveFlagByTypeAndPatient(
+          organisationId, 
+          "NO_RECENT_APPOINTMENT", 
+          patientId, 
+          userId
+        );
+        if (resolvedCount > 0) {
+          console.log(`[APPOINTMENT] Resolved ${resolvedCount} NO_RECENT_APPOINTMENT flag(s) for patient ${patientId}`);
+        }
+      }
+      
+      // Send notification about new appointment
       if (userId) {
-        await notificationService.notificationEvents.onAppointmentCreated({
+        notificationService.notificationEvents.onAppointmentCreated({
           organisationId,
           recipientUserId: userId,
           actorUserId: userId,
           appointmentId: appointment.id,
           appointmentDate: appointment.dateStart.toISOString(),
           patientId,
-        });
+        }).catch(err => console.error("[Notification] Appointment created notification failed:", err));
       }
       
       res.status(201).json(appointment);
@@ -2927,6 +3041,17 @@ export async function registerRoutes(
           message = "Permissions insuffisantes. Veuillez reconnecter Google Calendar avec les bons scopes.";
           step = "google_auth";
         }
+      }
+      
+      // Send sync error notification
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        notificationService.notificationEvents.onSyncError({
+          organisationId,
+          recipientUserId: userId,
+          integrationName: "Google Calendar",
+          errorMessage: message,
+        }).catch(err => console.error("[Notification] Sync error notification failed:", err));
       }
       
       res.status(500).json({ 
@@ -4106,6 +4231,16 @@ export async function registerRoutes(
       
       console.log(`[SETTINGS] Invitation created for: ${normalizedEmail}, email sent: ${result.success}`);
       
+      // Send notification to the inviting user about invitation sent
+      if (inviterId) {
+        notificationService.notificationEvents.onInvitationSent({
+          organisationId,
+          recipientUserId: inviterId,
+          inviteeEmail: normalizedEmail,
+          role,
+        }).catch(err => console.error("[Notification] Invitation sent notification failed:", err));
+      }
+      
       res.status(201).json({
         id: invitation.id,
         email: invitation.email,
@@ -4152,7 +4287,24 @@ export async function registerRoutes(
         }
       }
       
+      const previousRole = user.role;
       await storage.updateUser(id, { role: role as "ADMIN" | "CHIRURGIEN" | "ASSISTANT" });
+      
+      // Notify all admins about role change
+      const actorUserId = req.jwtUser?.userId || "";
+      const orgUsers = await storage.getUsersByOrganisation(organisationId);
+      const userName = `${user.prenom || ""} ${user.nom || ""}`.trim() || user.username;
+      
+      for (const admin of orgUsers.filter(u => u.role === "ADMIN")) {
+        notificationService.notificationEvents.onRoleChanged({
+          organisationId,
+          recipientUserId: admin.id,
+          affectedUserName: userName,
+          previousRole,
+          newRole: role,
+          actorUserId,
+        }).catch(err => console.error("[Notification] Role changed notification failed:", err));
+      }
       
       res.json({ success: true });
     } catch (error: any) {
@@ -4363,6 +4515,20 @@ export async function registerRoutes(
       
       // Mark invitation as accepted
       await storage.acceptInvitation(invitation.id);
+      
+      // Notify all admins about new member joining
+      const orgUsers = await storage.getUsersByOrganisation(invitation.organisationId);
+      const newMemberName = `${prenom || invitation.prenom || ""} ${nom || invitation.nom || ""}`.trim() || invitation.email;
+      
+      for (const admin of orgUsers.filter(u => u.role === "ADMIN" && u.id !== newUser.id)) {
+        notificationService.notificationEvents.onNewMemberJoined({
+          organisationId: invitation.organisationId,
+          recipientUserId: admin.id,
+          newMemberName,
+          newMemberEmail: invitation.email,
+          role: invitation.role,
+        }).catch(err => console.error("[Notification] New member notification failed:", err));
+      }
       
       console.log("[AUTH] Invitation accepted, user created:", newUser.id);
       res.json({
@@ -4728,9 +4894,220 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/dev/test-notifications - Generate test notifications (DEV only)
+  app.post("/api/dev/test-notifications", requireJwtOrSession, async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: "Non disponible en production" });
+      }
+
+      const organisationId = getOrganisationId(req, res);
+      if (!organisationId) return;
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const testNotifications = [
+        {
+          organisationId,
+          recipientUserId: userId,
+          kind: "ALERT" as const,
+          type: "ISQ_LOW",
+          severity: "CRITICAL" as const,
+          title: "ISQ bas detecte",
+          body: "Un implant presente un ISQ de 45, en dessous du seuil recommande.",
+          entityType: "PATIENT" as const,
+        },
+        {
+          organisationId,
+          recipientUserId: userId,
+          kind: "REMINDER" as const,
+          type: "FOLLOWUP_TO_SCHEDULE",
+          severity: "WARNING" as const,
+          title: "Suivi a programmer",
+          body: "Patient Jean Dupont necessite un rendez-vous de controle.",
+          entityType: "PATIENT" as const,
+        },
+        {
+          organisationId,
+          recipientUserId: userId,
+          kind: "ACTIVITY" as const,
+          type: "DOCUMENT_ADDED",
+          severity: "INFO" as const,
+          title: "Document ajoute",
+          body: "Une nouvelle radiographie a ete ajoutee au dossier patient.",
+          entityType: "DOCUMENT" as const,
+        },
+        {
+          organisationId,
+          recipientUserId: userId,
+          kind: "IMPORT" as const,
+          type: "IMPORT_COMPLETED",
+          severity: "INFO" as const,
+          title: "Import termine",
+          body: "12 patients ont ete importes avec succes.",
+          entityType: "IMPORT" as const,
+        },
+        {
+          organisationId,
+          recipientUserId: userId,
+          kind: "SYSTEM" as const,
+          type: "SYSTEM_UPDATE",
+          severity: "INFO" as const,
+          title: "Mise à jour système",
+          body: "De nouvelles fonctionnalités sont disponibles.",
+        },
+      ];
+
+      const created = [];
+      for (const notif of testNotifications) {
+        const result = await notificationService.createNotification(notif);
+        if (result) created.push(result);
+      }
+
+      res.json({
+        success: true,
+        message: `${created.length} notifications de test creees`,
+        notifications: created,
+      });
+    } catch (error: any) {
+      console.error("[DEV] Error creating test notifications:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/dev/clear-notifications - Clear all notifications except last N (DEV only)
+  app.delete("/api/dev/clear-notifications", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: "Non disponible en production" });
+      }
+
+      // In dev mode, clear all notifications for all users
+      const keepLast = parseInt(req.query.keep as string) || 0;
+      
+      // Get IDs to keep (most recent N globally)
+      const toKeep = await db
+        .select({ id: notifications.id })
+        .from(notifications)
+        .orderBy(desc(notifications.createdAt))
+        .limit(keepLast);
+      
+      const keepIds = toKeep.map(n => n.id);
+      
+      // Delete all except those
+      let deletedCount = 0;
+      if (keepIds.length > 0) {
+        const result = await db
+          .delete(notifications)
+          .where(notInArray(notifications.id, keepIds));
+        deletedCount = result.rowCount || 0;
+      } else {
+        const result = await db
+          .delete(notifications);
+        deletedCount = result.rowCount || 0;
+      }
+
+      res.json({
+        success: true,
+        message: `${deletedCount} notifications supprimees, ${keepIds.length} conservees`,
+        kept: keepIds,
+      });
+    } catch (error: any) {
+      console.error("[DEV] Error clearing notifications:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/dev/clear-flags - Clear all flags (DEV only)
+  app.delete("/api/dev/clear-flags", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: "Non disponible en production" });
+      }
+
+      const result = await db.delete(flags);
+      res.json({
+        success: true,
+        message: `${result.rowCount || 0} flags supprimés`,
+      });
+    } catch (error: any) {
+      console.error("[DEV] Error clearing flags:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ==================== NOTIFICATION ROUTES ====================
 
-  // Get notifications list
+  // Helper: Convert flags to notification-like objects
+  function flagsToNotifications(flags: any[]): any[] {
+    const severityMap: Record<string, string> = {
+      CRITICAL: "CRITICAL",
+      WARNING: "WARNING",
+      INFO: "INFO",
+    };
+    
+    const titleMap: Record<string, string> = {
+      ISQ_LOW: "ISQ bas detecte",
+      ISQ_CRITICAL: "ISQ critique",
+      NO_POSTOP_FOLLOWUP: "Suivi post-operatoire manquant",
+      INCOMPLETE_DATA: "Donnees incompletes",
+      OVERDUE_APPOINTMENT: "Rendez-vous en retard",
+      MISSING_XRAY: "Radiographie manquante",
+    };
+    
+    return flags.map((flag) => ({
+      id: `flag-${flag.id}`,
+      kind: "ALERT",
+      type: flag.type,
+      severity: severityMap[flag.severity] || "INFO",
+      title: titleMap[flag.type] || flag.type,
+      body: flag.message || `Alerte pour le patient ${flag.patient?.prenom || ""} ${flag.patient?.nom || ""}`.trim(),
+      entityType: "PATIENT",
+      entityId: flag.patientId,
+      createdAt: flag.createdAt || new Date().toISOString(),
+      readAt: flag.resolvedAt || null,
+      isVirtual: true,
+      patientName: flag.patient ? `${flag.patient.prenom || ""} ${flag.patient.nom || ""}`.trim() : null,
+    }));
+  }
+
+  // Helper: Convert upcoming appointments to notification-like objects
+  function appointmentsToNotifications(appointments: any[]): any[] {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date(tomorrow);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+
+    return appointments
+      .filter((apt) => {
+        const aptDate = new Date(apt.dateHeure);
+        return aptDate >= today && aptDate < dayAfter;
+      })
+      .map((apt) => {
+        const aptDate = new Date(apt.dateHeure);
+        const isToday = aptDate >= today && aptDate < tomorrow;
+        const timeStr = aptDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+        
+        return {
+          id: `apt-${apt.id}`,
+          kind: "REMINDER",
+          type: "UPCOMING_APPOINTMENT",
+          severity: isToday ? "WARNING" : "INFO",
+          title: isToday ? `RDV aujourd'hui a ${timeStr}` : `RDV demain a ${timeStr}`,
+          body: apt.patient ? `${apt.patient.prenom || ""} ${apt.patient.nom || ""} - ${apt.type}`.trim() : apt.type,
+          entityType: "APPOINTMENT",
+          entityId: apt.id,
+          createdAt: apt.createdAt || new Date().toISOString(),
+          readAt: null,
+          isVirtual: true,
+          patientName: apt.patient ? `${apt.patient.prenom || ""} ${apt.patient.nom || ""}`.trim() : null,
+        };
+      });
+  }
+
+  // Get notifications list (including flags and upcoming appointments)
   app.get("/api/notifications", requireJwtOrSession, async (req, res) => {
     try {
       const organisationId = getOrganisationId(req, res);
@@ -4740,6 +5117,7 @@ export async function registerRoutes(
 
       const { kind, unreadOnly, page, pageSize } = req.query;
       
+      // Get stored notifications
       const result = await notificationService.getNotifications(userId, organisationId, {
         kind: kind as any,
         unreadOnly: unreadOnly === 'true',
@@ -4747,14 +5125,39 @@ export async function registerRoutes(
         pageSize: pageSize ? parseInt(pageSize as string) : 20,
       });
       
-      res.json(result);
+      // Also get flags and upcoming appointments as virtual notifications
+      const [flags, appointments] = await Promise.all([
+        storage.getFlagsWithEntity(organisationId, false), // unresolved flags only
+        storage.getAppointmentsForSync(organisationId),
+      ]);
+      
+      const virtualFromFlags = flagsToNotifications(flags);
+      const virtualFromAppointments = appointmentsToNotifications(appointments);
+      
+      // Merge and sort by date (newest first)
+      const allNotifications = [
+        ...result.notifications,
+        ...virtualFromFlags,
+        ...virtualFromAppointments,
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      // Paginate the merged results
+      const pageNum = page ? parseInt(page as string) : 1;
+      const pageSizeNum = pageSize ? parseInt(pageSize as string) : 20;
+      const startIdx = (pageNum - 1) * pageSizeNum;
+      const paginatedNotifications = allNotifications.slice(startIdx, startIdx + pageSizeNum);
+      
+      res.json({
+        notifications: paginatedNotifications,
+        total: allNotifications.length,
+      });
     } catch (error: any) {
       console.error("[Notifications] Error fetching notifications:", error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Get unread count
+  // Get unread count (including flags and upcoming appointments)
   app.get("/api/notifications/unread-count", requireJwtOrSession, async (req, res) => {
     try {
       const organisationId = getOrganisationId(req, res);
@@ -4762,8 +5165,28 @@ export async function registerRoutes(
       const userId = req.jwtUser?.userId;
       if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
 
-      const count = await notificationService.getUnreadCount(userId, organisationId);
-      res.json({ count });
+      // Get stored notification count
+      const storedCount = await notificationService.getUnreadCount(userId, organisationId);
+      
+      // Also count unresolved flags and upcoming appointments
+      const [flags, appointments] = await Promise.all([
+        storage.getFlagsWithEntity(organisationId, false),
+        storage.getAppointmentsForSync(organisationId),
+      ]);
+      
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dayAfterTomorrow = new Date(today);
+      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+      
+      const upcomingAppointmentsCount = appointments.filter((apt: any) => {
+        const aptDate = new Date(apt.dateHeure);
+        return aptDate >= today && aptDate < dayAfterTomorrow;
+      }).length;
+      
+      const totalCount = storedCount + flags.length + upcomingAppointmentsCount;
+      
+      res.json({ count: totalCount });
     } catch (error: any) {
       console.error("[Notifications] Error fetching unread count:", error);
       res.status(500).json({ error: error.message });
@@ -4786,6 +5209,26 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error: any) {
       console.error("[Notifications] Error marking notification as read:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Mark notification as unread
+  app.patch("/api/notifications/:id/unread", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifié" });
+
+      const { id } = req.params;
+      const success = await notificationService.markAsUnread(id, userId);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Notification non trouvée" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Notifications] Error marking notification as unread:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -4826,6 +5269,33 @@ export async function registerRoutes(
     }
   });
 
+  // Delete a notification
+  app.delete("/api/notifications/:id", requireJwtOrSession, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+
+      const { id } = req.params;
+      
+      // Delete from database
+      const result = await db
+        .delete(notifications)
+        .where(and(
+          eq(notifications.id, id),
+          eq(notifications.recipientUserId, userId)
+        ));
+      
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: "Notification non trouvee" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Notifications] Error deleting notification:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get user notification preferences
   app.get("/api/notifications/preferences", requireJwtOrSession, async (req, res) => {
     try {
@@ -4851,13 +5321,13 @@ export async function registerRoutes(
       if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
 
       const { category } = req.params;
-      const { frequency, inAppEnabled, emailEnabled, digestTime } = req.body;
+      const { frequency, inAppEnabled, emailEnabled, digestTime, disabledTypes, disabledEmailTypes } = req.body;
       
       const preference = await notificationService.updatePreference(
         userId,
         organisationId,
         category as any,
-        { frequency, inAppEnabled, emailEnabled, digestTime }
+        { frequency, inAppEnabled, emailEnabled, digestTime, disabledTypes, disabledEmailTypes }
       );
       
       res.json(preference);

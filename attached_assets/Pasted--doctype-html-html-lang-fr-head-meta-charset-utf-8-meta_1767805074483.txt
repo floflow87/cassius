@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Réinitialisation de mot de passe</title>
+  </head>
+  <body style="margin:0;padding:0;background:#F6F8FB;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0F172A;">
+    <div style="max-width:640px;margin:0 auto;padding:28px 16px;">
+      <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:14px;overflow:hidden;">
+        <div style="padding:22px 22px 8px 22px;">
+          <div style="font-size:14px;color:#475569;letter-spacing:0.2px;">Cassius</div>
+          <h1 style="margin:10px 0 0 0;font-size:20px;line-height:1.3;color:#0F172A;">
+            Réinitialisation de votre mot de passe
+          </h1>
+        </div>
+
+        <div style="padding:16px 22px 22px 22px;font-size:14px;line-height:1.7;color:#0F172A;">
+          <p style="margin:0 0 14px 0;">Bonjour {{firstName}},</p>
+          <p style="margin:0 0 14px 0;">
+            Nous avons reçu une demande de réinitialisation du mot de passe associé à votre compte Cassius.
+          </p>
+          <p style="margin:0 0 18px 0;">
+            Pour définir un nouveau mot de passe et sécuriser l’accès à votre espace, cliquez sur le bouton ci-dessous.
+          </p>
+
+          <div style="margin:18px 0 18px 0;">
+            <a href="{{actionUrl}}"
+               style="display:inline-block;background:#3C83F6;color:#FFFFFF;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600;font-size:14px;">
+              Réinitialiser mon mot de passe
+            </a>
+          </div>
+
+          <div style="margin-top:14px;padding:12px 12px;border-radius:10px;background:#F8FAFC;border:1px solid #E2E8F0;color:#334155;">
+            <div style="font-weight:600;margin-bottom:6px;">À savoir</div>
+            <div>Ce lien est valable pendant <b>60 minutes</b>.</div>
+            <div>Si vous n’êtes pas à l’origine de cette demande, vous pouvez ignorer cet email.</div>
+          </div>
+
+          <p style="margin:18px 0 0 0;color:#64748B;font-size:12px;">
+            Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br />
+            <span style="word-break:break-all;color:#3C83F6;">{{actionUrl}}</span>
+          </p>
+        </div>
+
+        <div style="padding:16px 22px;background:#FBFCFE;border-top:1px solid #E5E7EB;">
+          <div style="color:#64748B;font-size:12px;line-height:1.6;">
+            —<br />
+            <b>Cassius</b> — Le compagnon des chirurgiens-dentistes<br />
+            Cet email a été envoyé automatiquement, merci de ne pas y répondre.
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

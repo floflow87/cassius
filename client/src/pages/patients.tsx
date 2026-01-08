@@ -697,14 +697,14 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
 
   if (isLoading) {
     return (
-      <div className="p-6">
+      <div className="flex flex-col h-full overflow-auto px-6 pb-6">
         <PatientsListSkeleton />
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="flex flex-col h-full overflow-auto px-6 pb-6">
       <div className="flex items-center gap-4 mb-5">
         <CassiusSearchInput
           placeholder="Rechercher un patient..."
@@ -724,22 +724,30 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           activeFilterCount={activeFilterCount}
         />
 
-        <div className="flex items-center border rounded-md bg-white dark:bg-zinc-900">
+        <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-full gap-1">
           <Button
-            variant={viewMode === "table" ? "secondary" : "ghost"}
+            variant="ghost"
             size="icon"
             onClick={() => handleViewModeChange("table")}
             data-testid="button-view-table"
-            className="rounded-r-none"
+            className={`rounded-full transition-all duration-200 ${
+              viewMode === "table" 
+                ? "bg-primary text-white" 
+                : "bg-transparent text-muted-foreground"
+            }`}
           >
             <LayoutList className="h-4 w-4" />
           </Button>
           <Button
-            variant={viewMode === "cards" ? "secondary" : "ghost"}
+            variant="ghost"
             size="icon"
             onClick={() => handleViewModeChange("cards")}
             data-testid="button-view-cards"
-            className="rounded-l-none"
+            className={`rounded-full transition-all duration-200 ${
+              viewMode === "cards" 
+                ? "bg-primary text-white" 
+                : "bg-transparent text-muted-foreground"
+            }`}
           >
             <LayoutGrid className="h-4 w-4" />
           </Button>

@@ -14,7 +14,9 @@ import {
   CheckCheck, 
   Loader2,
   Settings,
-  Filter
+  Filter,
+  MailOpen,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +43,7 @@ interface Notification {
   entityId?: string;
   createdAt: string;
   readAt?: string;
+  isVirtual?: boolean;
 }
 
 const KIND_ICONS: Record<string, typeof AlertCircle> = {
@@ -75,12 +78,14 @@ function NotificationRow({
   notification, 
   selected,
   onSelect,
-  onMarkAsRead 
+  onMarkAsRead,
+  onMarkAsUnread
 }: { 
   notification: Notification;
   selected: boolean;
   onSelect: (id: string) => void;
   onMarkAsRead: (id: string) => void;
+  onMarkAsUnread: (id: string) => void;
 }) {
   const Icon = KIND_ICONS[notification.kind] || Bell;
   const severityColor = SEVERITY_COLORS[notification.severity] || "text-muted-foreground";
@@ -152,15 +157,30 @@ function NotificationRow({
                 <Link href={link}>Voir</Link>
               </Button>
             )}
-            {isUnread && (
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={() => onMarkAsRead(notification.id)}
-                data-testid={`button-mark-read-${notification.id}`}
-              >
-                <Check className="h-4 w-4" />
-              </Button>
+            {!notification.isVirtual && (
+              isUnread ? (
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  className="border-primary text-primary hover:bg-primary/10"
+                  onClick={() => onMarkAsRead(notification.id)}
+                  data-testid={`button-mark-read-${notification.id}`}
+                  title="Marquer comme lu"
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
+                  onClick={() => onMarkAsUnread(notification.id)}
+                  data-testid={`button-mark-unread-${notification.id}`}
+                  title="Marquer comme non lu"
+                >
+                  <MailOpen className="h-4 w-4" />
+                </Button>
+              )
             )}
           </div>
         </div>
@@ -177,7 +197,14 @@ export default function NotificationsPage() {
   const kindFilter = activeTab === "all" ? undefined : activeTab.toUpperCase();
   
   const { data, isLoading } = useQuery<{ notifications: Notification[]; total: number }>({
-    queryKey: ['/api/notifications', { kind: kindFilter, pageSize: 50 }],
+    queryKey: ['/api/notifications', kindFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ pageSize: '50' });
+      if (kindFilter) params.set('kind', kindFilter);
+      const res = await fetch(`/api/notifications?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch notifications');
+      return res.json();
+    },
   });
   
   const { data: unreadData } = useQuery<{ count: number }>({
@@ -198,6 +225,31 @@ export default function NotificationsPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
       setSelectedIds(new Set());
+    },
+  });
+  
+  const markAsUnreadMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("PATCH", `/api/notifications/${id}/unread`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+    },
+  });
+  
+  const deleteNotificationMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/notifications/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+    },
+  });
+  
+  const resolveFlagMutation = useMutation({
+    mutationFn: (flagId: string) => apiRequest("PATCH", `/api/flags/${flagId}/resolve`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/flags'] });
     },
   });
   
@@ -233,7 +285,7 @@ export default function NotificationsPage() {
   };
   
   return (
-    <div className="p-6 w-full" data-testid="page-notifications">
+    <div className="px-6 pb-6 w-full" data-testid="page-notifications">
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Notifications</h1>
@@ -320,7 +372,7 @@ export default function NotificationsPage() {
                   onClick={() => {
                     selectedIds.forEach(id => {
                       const n = notifications.find(n => n.id === id);
-                      if (n && !n.readAt) {
+                      if (n && !n.readAt && !n.isVirtual) {
                         markAsReadMutation.mutate(id);
                       }
                     });
@@ -329,6 +381,31 @@ export default function NotificationsPage() {
                   data-testid="button-mark-selected-read"
                 >
                   Marquer comme lu
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => {
+                    selectedIds.forEach(id => {
+                      const n = notifications.find(n => n.id === id);
+                      if (n) {
+                        if (n.isVirtual && id.startsWith('flag-')) {
+                          // Resolve the flag
+                          const flagId = id.replace('flag-', '');
+                          resolveFlagMutation.mutate(flagId);
+                        } else if (!n.isVirtual) {
+                          // Delete the notification
+                          deleteNotificationMutation.mutate(id);
+                        }
+                      }
+                    });
+                    setSelectedIds(new Set());
+                  }}
+                  data-testid="button-delete-selected"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Supprimer
                 </Button>
               </div>
             )}
@@ -378,6 +455,7 @@ export default function NotificationsPage() {
                     selected={selectedIds.has(notification.id)}
                     onSelect={toggleSelect}
                     onMarkAsRead={(id) => markAsReadMutation.mutate(id)}
+                    onMarkAsUnread={(id) => markAsUnreadMutation.mutate(id)}
                   />
                 ))}
               </div>

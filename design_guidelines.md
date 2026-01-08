@@ -97,6 +97,30 @@
 
 ---
 
+## Color Palettes
+
+### Stats Graph Colors
+Used for charts, graphs, and data visualizations:
+- Chart 1: `#3c83f6` (Primary blue) - `--stats-chart-1`
+- Chart 2: `#9dc1fb` (Light blue) - `--stats-chart-2`
+- Chart 3: `#d399ff` (Light violet) - `--stats-chart-3`
+- Chart 4: `#676da2` (Gray violet) - `--stats-chart-4`
+
+### Badge Colors
+Used for status badges, tags, and labels:
+- Blue: `#3c83f6` - `--badge-blue`
+- Cyan: `#3abff8` - `--badge-cyan`
+- Orange: `#f28f3b` - `--badge-orange`
+- Pink: `#f92a82` - `--badge-pink`
+- Dark: `#303036` - `--badge-dark`
+
+### Usage
+- Import from `@/design-system/tokens/colors` for TypeScript access
+- Use CSS variables `hsl(var(--stats-chart-1))` etc. for dynamic theming
+- Badge classes available via `badgeColorClasses` export
+
+---
+
 ## Images
 
 **X-ray Viewer**: Full-width modal with zoom controls, measurement tools, DICOM metadata display - triggered from timeline or implant details

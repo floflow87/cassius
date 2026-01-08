@@ -9,7 +9,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay, parse } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay, parse, isPast } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Filter, User, Plus, Check, Pencil, X, Search, Copy, AlertTriangle, ExternalLink, RotateCcw, Settings } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
@@ -36,12 +36,24 @@ import type { EventClickArg, EventDropArg, EventContentArg } from "@fullcalendar
 import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 
 const appointmentTypes = [
-  { value: "CONSULTATION", label: "Consultation", color: "bg-blue-500" },
-  { value: "SUIVI", label: "Suivi", color: "bg-green-500" },
-  { value: "CHIRURGIE", label: "Chirurgie", color: "bg-red-500" },
-  { value: "CONTROLE", label: "Contrôle", color: "bg-yellow-500" },
-  { value: "URGENCE", label: "Urgence", color: "bg-orange-500" },
-  { value: "AUTRE", label: "Autre", color: "bg-gray-500" },
+  { value: "CONSULTATION", label: "Consultation", color: "bg-blue-500", hex: "#3b82f6" },
+  { value: "SUIVI", label: "Suivi", color: "bg-green-500", hex: "#22c55e" },
+  { value: "CHIRURGIE", label: "Chirurgie", color: "bg-red-500", hex: "#ef4444" },
+  { value: "CONTROLE", label: "Contrôle", color: "bg-yellow-500", hex: "#eab308" },
+  { value: "URGENCE", label: "Urgence", color: "bg-orange-500", hex: "#f97316" },
+  { value: "AUTRE", label: "Autre", color: "bg-gray-500", hex: "#6b7280" },
+];
+
+const appointmentColors = [
+  { value: "#93c5fd", label: "Bleu", class: "bg-blue-300" },
+  { value: "#86efac", label: "Vert", class: "bg-green-300" },
+  { value: "#fca5a5", label: "Rouge", class: "bg-red-300" },
+  { value: "#fde047", label: "Jaune", class: "bg-yellow-300" },
+  { value: "#fdba74", label: "Orange", class: "bg-orange-300" },
+  { value: "#d1d5db", label: "Gris", class: "bg-gray-300" },
+  { value: "#c4b5fd", label: "Violet", class: "bg-violet-300" },
+  { value: "#f9a8d4", label: "Rose", class: "bg-pink-300" },
+  { value: "#5eead4", label: "Turquoise", class: "bg-teal-300" },
 ];
 
 const appointmentStatuses = [
@@ -508,7 +520,7 @@ function CalendarSearch({ appointments, onSelectAppointment, onSelectDate, onSel
           }}
           onFocus={() => setIsOpen(true)}
           onBlur={() => setTimeout(() => setIsOpen(false), 200)}
-          className="pl-9 w-64"
+          className="pl-9 w-64 bg-white dark:bg-zinc-900"
           data-testid="input-calendar-search"
         />
       </div>
@@ -589,6 +601,7 @@ const editFormSchema = z.object({
   title: z.string().min(1, "Titre requis"),
   type: z.enum(["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"]),
   status: z.enum(["UPCOMING", "COMPLETED", "CANCELLED"]),
+  color: z.string().nullable().optional(),
   dateStart: z.string(),
   timeStart: z.string(),
   timeEnd: z.string().optional(),
@@ -610,7 +623,12 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
   const [isEditing, setIsEditing] = useState(false);
   
   const { data: appointment, isLoading } = useQuery<AppointmentWithDetails>({
-    queryKey: ["/api/appointments", appointmentId],
+    queryKey: ["/api/appointments", appointmentId, "details"],
+    queryFn: async () => {
+      const res = await fetch(`/api/appointments/${appointmentId}?details=true`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch appointment");
+      return res.json();
+    },
     enabled: !!appointmentId && open,
   });
   
@@ -620,6 +638,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
       title: "",
       type: "CONSULTATION",
       status: "UPCOMING",
+      color: null,
       dateStart: "",
       timeStart: "09:00",
       timeEnd: "",
@@ -636,6 +655,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
         title: appointment.title || "",
         type: appointment.type as EditFormData["type"],
         status: appointment.status as EditFormData["status"],
+        color: (appointment as { color?: string | null }).color || null,
         dateStart: format(dateStart, "yyyy-MM-dd"),
         timeStart: format(dateStart, "HH:mm"),
         timeEnd: appointment.dateEnd ? format(new Date(appointment.dateEnd), "HH:mm") : "",
@@ -655,6 +675,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
         title: appointment.title || "",
         type: appointment.type as EditFormData["type"],
         status: appointment.status as EditFormData["status"],
+        color: (appointment as { color?: string | null }).color || null,
         dateStart: format(dateStart, "yyyy-MM-dd"),
         timeStart: format(dateStart, "HH:mm"),
         timeEnd: appointment.dateEnd ? format(new Date(appointment.dateEnd), "HH:mm") : "",
@@ -728,6 +749,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
       title: data.title,
       type: data.type,
       status: data.status,
+      color: data.color || null,
       dateStart,
       dateEnd,
       description: data.description || null,
@@ -761,9 +783,18 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
               <Skeleton className="h-4 w-32" />
             ) : appointment && !isEditing ? (
               <span className="flex items-center gap-2">
-                <Badge className={getStatusBadge(appointment.status)} variant="secondary">
-                  {appointmentStatuses.find(s => s.value === appointment.status)?.label}
-                </Badge>
+                {/* Only show UPCOMING badge if appointment is not in the past */}
+                {!(appointment.status === "UPCOMING" && isPast(new Date(appointment.dateStart))) && (
+                  <Badge className={getStatusBadge(appointment.status)} variant="secondary">
+                    {appointmentStatuses.find(s => s.value === appointment.status)?.label}
+                  </Badge>
+                )}
+                {/* Show "Passé" badge for past UPCOMING appointments */}
+                {appointment.status === "UPCOMING" && isPast(new Date(appointment.dateStart)) && (
+                  <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200" variant="secondary">
+                    Passé
+                  </Badge>
+                )}
                 <Badge className={`${getAppointmentColor(appointment.type)} text-white`}>
                   {appointmentTypes.find(t => t.value === appointment.type)?.label}
                 </Badge>
@@ -916,6 +947,34 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
                 )}
               />
               
+              <FormField
+                control={form.control}
+                name="color"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Couleur</FormLabel>
+                    <div className="flex flex-wrap gap-2">
+                      {appointmentColors.map(c => (
+                        <button
+                          key={c.value}
+                          type="button"
+                          className={`w-7 h-7 rounded-md border-2 transition-all ${c.class} ${
+                            field.value === c.value 
+                              ? "border-foreground ring-2 ring-primary ring-offset-2" 
+                              : "border-transparent hover:border-muted-foreground/50"
+                          }`}
+                          onClick={() => field.onChange(field.value === c.value ? null : c.value)}
+                          title={c.label}
+                          data-testid={`edit-color-${c.value}`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Optionnel - sinon, couleur basée sur le type</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
               <div className="flex gap-2 pt-4">
                 <Button 
                   type="submit" 
@@ -956,14 +1015,14 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
                 <div className="flex items-start gap-3">
                   <User className="h-5 w-5 text-muted-foreground mt-0.5" />
                   <div>
-                    <a 
+                    <Link 
                       href={`/patients/${appointment.patient.id}`}
-                      className="font-medium hover:underline flex items-center gap-1"
+                      className="font-medium text-primary underline flex items-center gap-1"
                       data-testid="link-patient-profile"
                     >
                       {appointment.patient.prenom} {appointment.patient.nom}
                       <ExternalLink className="h-3 w-3" />
-                    </a>
+                    </Link>
                     {appointment.patient.telephone && (
                       <div className="text-sm text-muted-foreground">{appointment.patient.telephone}</div>
                     )}
@@ -987,7 +1046,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
             </div>
             
             <div className="flex flex-col gap-3 pt-4 border-t">
-              {appointment.status === "UPCOMING" && (
+              {appointment.status === "UPCOMING" && !isPast(new Date(appointment.dateStart)) && (
                 <div className="flex gap-2">
                   <Button 
                     variant="default" 
@@ -1060,6 +1119,7 @@ const quickCreateFormSchema = z.object({
   patientId: z.string().min(1, "Patient requis"),
   title: z.string().min(1, "Titre requis"),
   type: z.enum(["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"]),
+  color: z.string().nullable().optional(),
   dateStart: z.string(),
   timeStart: z.string(),
   description: z.string().optional(),
@@ -1101,11 +1161,28 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
       patientId: "",
       title: "",
       type: "CONSULTATION",
+      color: null,
       dateStart: defaultDate ? format(defaultDate, "yyyy-MM-dd") : "",
       timeStart: defaultDate ? format(defaultDate, "HH:mm") : "09:00",
       description: "",
     },
   });
+  
+  // Reset form when defaultDate changes (clicking on calendar or opening with "Nouveau")
+  useEffect(() => {
+    if (open && defaultDate) {
+      form.reset({
+        patientId: "",
+        title: "",
+        type: "CONSULTATION",
+        color: null,
+        dateStart: format(defaultDate, "yyyy-MM-dd"),
+        timeStart: format(defaultDate, "HH:mm"),
+        description: "",
+      });
+      setPatientSearch("");
+    }
+  }, [open, defaultDate, form]);
   
   const watchedPatientId = form.watch("patientId");
   const selectedPatient = useMemo(() => {
@@ -1121,6 +1198,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
         status: "UPCOMING",
         dateStart,
         description: data.description || null,
+        color: data.color || null,
       });
     },
     onSuccess: () => {
@@ -1186,7 +1264,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
                               setPatientSearch(e.target.value);
                               setPatientDropdownOpen(true);
                             }}
-                            onFocus={() => setPatientDropdownOpen(true)}
+                            onFocus={() => {}}
                             onBlur={() => setTimeout(() => setPatientDropdownOpen(false), 200)}
                             className="pl-9"
                             data-testid="input-patient-search"
@@ -1305,6 +1383,34 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
                   <FormControl>
                     <Textarea placeholder="Notes optionnelles..." {...field} data-testid="input-description" />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Couleur</FormLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {appointmentColors.map(c => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        className={`w-7 h-7 rounded-md border-2 transition-all ${c.class} ${
+                          field.value === c.value 
+                            ? "border-foreground ring-2 ring-primary ring-offset-2" 
+                            : "border-transparent hover:border-muted-foreground/50"
+                        }`}
+                        onClick={() => field.onChange(field.value === c.value ? null : c.value)}
+                        title={c.label}
+                        data-testid={`color-${c.value}`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Optionnel - sinon, couleur basée sur le type</p>
                   <FormMessage />
                 </FormItem>
               )}
@@ -1464,6 +1570,12 @@ export default function CalendarPage() {
       }
       
       for (const apt of filteredAppointments) {
+        // Use custom color if set, otherwise fall back to type-based color
+        const bgColor = apt.color || appointmentTypes.find(t => t.value === apt.type)?.hex || "#6b7280";
+        const bgClass = apt.color 
+          ? appointmentColors.find(c => c.value === apt.color)?.class || "bg-gray-500"
+          : getAppointmentColor(apt.type);
+        
         result.push({
           id: apt.id,
           title: apt.title || (apt.patientPrenom && apt.patientNom ? `${apt.patientPrenom} ${apt.patientNom}` : "Nouveau rdv"),
@@ -1477,10 +1589,12 @@ export default function CalendarPage() {
             patientPrenom: apt.patientPrenom,
             isq: apt.isq,
             hasCriticalFlag: apt.hasCriticalFlag,
+            customColor: apt.color,
+            description: apt.description,
           },
-          backgroundColor: getAppointmentColor(apt.type).replace("bg-", ""),
+          backgroundColor: bgColor,
           borderColor: "transparent",
-          classNames: [getAppointmentColor(apt.type)],
+          classNames: [bgClass],
         });
       }
     }
@@ -1552,8 +1666,17 @@ export default function CalendarPage() {
     }
   }, []);
   
-  const handleDateClick = useCallback((info: { date: Date; dateStr: string }) => {
-    setQuickCreateDate(info.date);
+  const handleDateClick = useCallback((info: { date: Date; dateStr: string; view: { type: string } }) => {
+    // In month view, don't have a specific time, so use current time
+    if (info.view.type === "dayGridMonth") {
+      const now = new Date();
+      const dateWithTime = new Date(info.date);
+      dateWithTime.setHours(now.getHours(), now.getMinutes(), 0, 0);
+      setQuickCreateDate(dateWithTime);
+    } else {
+      // In day/week views, use the exact clicked time
+      setQuickCreateDate(info.date);
+    }
     setQuickCreateOpen(true);
   }, []);
   
@@ -1609,7 +1732,7 @@ export default function CalendarPage() {
   };
   
   const renderEventContent = (eventInfo: EventContentArg) => {
-    const { source, type, patientNom, patientPrenom, isq, hasCriticalFlag, hasConflict, location } = eventInfo.event.extendedProps;
+    const { source, type, patientNom, patientPrenom, isq, hasCriticalFlag, hasConflict, location, description } = eventInfo.event.extendedProps;
     const start = eventInfo.event.start;
     const end = eventInfo.event.end;
     
@@ -1619,10 +1742,58 @@ export default function CalendarPage() {
       durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
     }
     
-    // Show time for events >= 45 minutes in time-based views
-    const showTime = durationMinutes >= 45 && eventInfo.view.type !== "dayGridMonth" && eventInfo.view.type !== "listWeek";
-    
     const isGoogle = source === "google";
+    const isMonthView = eventInfo.view.type === "dayGridMonth";
+    const isListView = eventInfo.view.type.startsWith("list");
+    
+    // Show time in time-based views for events >= 45min, or always in month view
+    const showTime = isMonthView || (durationMinutes >= 45 && !isListView);
+    
+    // For list/agenda view: show title, patient, and notes
+    if (isListView) {
+      return (
+        <div className="p-1 overflow-hidden" data-testid={`calendar-event-${eventInfo.event.id}`}>
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-white">{eventInfo.event.title}</span>
+            {isGoogle && <SiGoogle className="h-3 w-3 text-white/70 shrink-0" />}
+            {(hasConflict || hasCriticalFlag) && <AlertTriangle className="h-3 w-3 text-yellow-300 shrink-0" />}
+          </div>
+          {!isGoogle && patientPrenom && patientNom && (
+            <div className="text-sm text-white/90">
+              {patientPrenom} {patientNom}
+              {isq !== null && isq !== undefined && ` • ISQ ${isq}`}
+            </div>
+          )}
+          {description && (
+            <div className="text-sm text-white/80 italic mt-0.5 truncate">
+              {description}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // For month view: compact format with time + patient name
+    if (isMonthView) {
+      return (
+        <div className="px-1 py-0.5 text-xs overflow-hidden relative flex items-center gap-1" data-testid={`calendar-event-${eventInfo.event.id}`}>
+          {start && (
+            <span className="text-white/90 font-medium shrink-0">
+              {format(start, "HH:mm")}
+            </span>
+          )}
+          <span className="text-white truncate">
+            {isGoogle ? eventInfo.event.title : (patientPrenom && patientNom ? `${patientPrenom} ${patientNom}` : eventInfo.event.title)}
+          </span>
+          {isGoogle && (
+            <SiGoogle className="h-2.5 w-2.5 text-white/70 shrink-0" />
+          )}
+          {(hasConflict || hasCriticalFlag) && (
+            <AlertTriangle className="h-2.5 w-2.5 text-yellow-300 shrink-0" />
+          )}
+        </div>
+      );
+    }
     
     return (
       <div className="p-1 text-xs overflow-hidden relative" data-testid={`calendar-event-${eventInfo.event.id}`}>
@@ -1652,7 +1823,7 @@ export default function CalendarPage() {
         <div className="font-medium truncate text-white pr-6">
           {eventInfo.event.title}
         </div>
-        {eventInfo.view.type !== "dayGridMonth" && durationMinutes >= 30 && (
+        {durationMinutes >= 30 && (
           <div className="text-white/80 truncate">
             {isGoogle ? (
               location ? location : ""
@@ -1687,7 +1858,7 @@ export default function CalendarPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between gap-4 p-4 border-b bg-background shrink-0">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={goToToday} data-testid="button-today">
+            <Button variant="outline" size="sm" className="bg-white dark:bg-zinc-900" onClick={goToToday} data-testid="button-today">
               Aujourd&apos;hui
             </Button>
             <Button
@@ -1724,7 +1895,7 @@ export default function CalendarPage() {
               }}
             />
             
-            <div className="flex border rounded-md">
+            <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-full gap-1">
               {[
                 { key: "timeGridDay", label: "Jour" },
                 { key: "timeGridWeek", label: "Semaine" },
@@ -1733,9 +1904,13 @@ export default function CalendarPage() {
               ].map(v => (
                 <Button
                   key={v.key}
-                  variant={currentView === v.key ? "secondary" : "ghost"}
+                  variant="ghost"
                   size="sm"
-                  className="rounded-none first:rounded-l-md last:rounded-r-md"
+                  className={`rounded-full transition-all duration-200 ${
+                    currentView === v.key 
+                      ? "bg-primary text-white shadow-none" 
+                      : "bg-transparent text-muted-foreground"
+                  }`}
                   onClick={() => changeView(v.key as typeof currentView)}
                   data-testid={`button-view-${v.key}`}
                 >

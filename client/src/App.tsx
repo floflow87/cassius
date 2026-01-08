@@ -111,7 +111,7 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
   };
 
   return (
-    <header className="flex items-center justify-between gap-4 px-6 h-16 bg-white dark:bg-gray-950 sticky top-0 z-50 border-b shrink-0">
+    <header className="flex items-center justify-between gap-4 px-6 h-[59px] bg-white dark:bg-gray-950 sticky top-2 z-50 shrink-0 mx-6 rounded-[15px]">
       <div className="flex items-center gap-2">
         <h1 className="text-base font-semibold text-foreground" data-testid="text-page-title">
           {title}
@@ -123,12 +123,12 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
       
       <GlobalSearch className="flex-1 max-w-md" />
       
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <NotificationBell />
         <Button 
           variant="ghost" 
           size="icon" 
-          className="text-muted-foreground" 
+          className="text-primary bg-primary/10 hover:bg-primary/20 rounded-full" 
           data-testid="button-calendar"
           onClick={() => setLocation("/calendar")}
         >
@@ -283,8 +283,8 @@ function AuthenticatedApp() {
   };
 
   const style = {
-    "--sidebar-width": "14rem",
-    "--sidebar-width-icon": "4rem",
+    "--sidebar-width": "18rem",
+    "--sidebar-width-icon": "4.5rem",
   };
 
   return (
@@ -295,9 +295,9 @@ function AuthenticatedApp() {
     >
       <div className="flex h-screen w-full">
         <AppSidebar />
-        <div className="flex flex-col flex-1 min-w-0 bg-muted/30">
+        <div className="flex flex-col flex-1 min-w-0 bg-muted/30 pt-2">
           <PageHeader user={user} onLogout={handleLogout} patientCount={patients?.length} />
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto pt-4">
             <Router searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
           </main>
         </div>

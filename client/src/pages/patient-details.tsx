@@ -1396,52 +1396,52 @@ export default function PatientDetailsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-transparent p-0 h-auto gap-6 border-b-0">
+        <TabsList className="bg-white dark:bg-zinc-900 p-1 h-auto gap-1 border-b-0 rounded-full">
           <TabsTrigger 
             value="overview" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-overview"
           >
             Vue d'ensemble
           </TabsTrigger>
           <TabsTrigger 
             value="implants" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-implants"
           >
             Implants <span className="text-xs italic ml-1">({implantCount})</span>
           </TabsTrigger>
           <TabsTrigger 
             value="operations" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-operations"
           >
             Actes chirurgicaux
           </TabsTrigger>
           <TabsTrigger 
             value="radios" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-radios"
           >
             Radiographies
           </TabsTrigger>
           <TabsTrigger 
             value="documents" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-documents"
           >
             Documents
           </TabsTrigger>
           <TabsTrigger 
             value="visits" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-visits"
           >
             Suivi & Visites
           </TabsTrigger>
           <TabsTrigger 
             value="notes" 
-            className="text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none px-1 pb-2" 
+            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
             data-testid="tab-notes"
           >
             Notes
@@ -2087,26 +2087,29 @@ export default function PatientDetailsPage() {
             <>
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center border rounded-md p-0.5">
+                  <div className="flex items-center bg-white dark:bg-zinc-900 rounded-full p-1 gap-1">
                     <Button
-                      variant={implantTypeFilter === "all" ? "secondary" : "ghost"}
+                      variant="ghost"
                       size="sm"
+                      className={`rounded-full ${implantTypeFilter === "all" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
                       onClick={() => setImplantTypeFilter("all")}
                       data-testid="button-filter-all"
                     >
                       Tous
                     </Button>
                     <Button
-                      variant={implantTypeFilter === "IMPLANT" ? "secondary" : "ghost"}
+                      variant="ghost"
                       size="sm"
+                      className={`rounded-full ${implantTypeFilter === "IMPLANT" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
                       onClick={() => setImplantTypeFilter("IMPLANT")}
                       data-testid="button-filter-implants"
                     >
                       Implants
                     </Button>
                     <Button
-                      variant={implantTypeFilter === "MINI_IMPLANT" ? "secondary" : "ghost"}
+                      variant="ghost"
                       size="sm"
+                      className={`rounded-full ${implantTypeFilter === "MINI_IMPLANT" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
                       onClick={() => setImplantTypeFilter("MINI_IMPLANT")}
                       data-testid="button-filter-mini-implants"
                     >
@@ -2117,18 +2120,20 @@ export default function PatientDetailsPage() {
                     {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
                   </span>
                 </div>
-                <div className="flex items-center gap-1 border rounded-md p-0.5">
+                <div className="flex items-center bg-white dark:bg-zinc-900 rounded-full p-1 gap-1">
                   <Button
-                    variant={implantViewMode === "table" ? "secondary" : "ghost"}
+                    variant="ghost"
                     size="sm"
+                    className={`rounded-full ${implantViewMode === "table" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
                     onClick={() => setImplantViewMode("table")}
                     data-testid="button-view-table"
                   >
                     <LayoutList className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={implantViewMode === "cards" ? "secondary" : "ghost"}
+                    variant="ghost"
                     size="sm"
+                    className={`rounded-full ${implantViewMode === "cards" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
                     onClick={() => setImplantViewMode("cards")}
                     data-testid="button-view-cards"
                   >

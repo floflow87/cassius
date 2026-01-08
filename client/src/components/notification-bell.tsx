@@ -112,7 +112,8 @@ export function NotificationBell() {
   });
   
   const { data: notificationsData, isLoading } = useQuery<{ notifications: Notification[]; total: number }>({
-    queryKey: ['/api/notifications', { pageSize: 10 }],
+    queryKey: ['/api/notifications'],
+    queryFn: () => fetch('/api/notifications?pageSize=10').then(r => r.json()),
     enabled: open,
   });
   
@@ -141,14 +142,13 @@ export function NotificationBell() {
         <Button 
           variant="ghost" 
           size="icon" 
-          className="relative text-muted-foreground" 
+          className="relative text-primary bg-primary/10 hover:bg-primary/20 rounded-full" 
           data-testid="button-notifications"
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge 
-              variant="destructive" 
-              className="absolute -top-1 -right-1 h-5 min-w-[1.25rem] px-1 text-[10px] font-bold"
+              className="absolute -top-1 -right-1 h-5 min-w-[1.25rem] px-1 text-[10px] font-bold bg-primary text-primary-foreground"
               data-testid="badge-notification-count"
             >
               {unreadCount > 99 ? "99+" : unreadCount}
@@ -210,6 +210,7 @@ export function NotificationBell() {
             variant="ghost" 
             className="w-full text-xs h-8"
             asChild
+            onClick={() => setOpen(false)}
             data-testid="link-view-all-notifications"
           >
             <Link href="/notifications">Voir toutes les notifications</Link>

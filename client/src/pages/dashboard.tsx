@@ -170,7 +170,7 @@ function AppointmentItem({ date, title, description, type, time }: AppointmentIt
         <span className="text-xs text-muted-foreground">{month}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium truncate">{title}</p>
+        <p className="text-sm font-medium truncate">{title}</p>
         <p className="text-sm text-muted-foreground truncate">{description}</p>
       </div>
       <Badge className={`${badgeVariant} no-default-hover-elevate no-default-active-elevate`}>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex flex-col h-full overflow-auto px-6 pb-6 space-y-6">
       <h1 className="text-lg font-medium" data-testid="text-welcome-title">
         Bienvenue {getUserFirstName()}
       </h1>

@@ -16,13 +16,14 @@
   --card: 0deg 0% 100%;
   --card-foreground: 0 0% 0%;
   --card-border: 0 0% 97%;
-  /* Sidebar with Cassius mainBlue #2563EB */
-  --sidebar: 217 91% 60%;
+  /* Sidebar with dark navy #11172B */
+  --sidebar: 222 56% 12%;
   --sidebar-foreground: 0 0% 100%;
-  --sidebar-border: 217 91% 55%;
+  --sidebar-border: 222 56% 10%;
   --sidebar-primary: 0 0% 100%;
-  --sidebar-primary-foreground: 217 91% 60%;
-  --sidebar-accent: 217 91% 70%;
+  --sidebar-primary-foreground: 222 56% 12%;
+  /* Active tab uses primary color #2563EB */
+  --sidebar-accent: 217 91% 53%;
   --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-ring: 0 0% 100%;
   --popover: 0 0% 100%;
@@ -58,12 +59,17 @@
   --border-gray: 220 13% 91%;
   
   /* Stats Design System - Premium Palette */
-  /* Primary #2563EB */
-  --stats-primary: 217 91% 53%;
-  --stats-primary-soft: 217 91% 65%;
-  /* Success #16A34A (bg #DCFCE7) */
-  --stats-success: 142 76% 36%;
-  --stats-success-bg: 142 77% 93%;
+  /* Graph Colors */
+  --stats-chart-1: 217 91% 60%;    /* #3c83f6 */
+  --stats-chart-2: 215 93% 80%;    /* #9dc1fb */
+  --stats-chart-3: 277 100% 80%;   /* #d399ff */
+  --stats-chart-4: 232 24% 52%;    /* #676da2 */
+  /* Legacy aliases */
+  --stats-primary: 217 91% 60%;
+  --stats-primary-soft: 215 93% 80%;
+  /* Success - using violet #d399ff for stats */
+  --stats-success: 277 100% 80%;
+  --stats-success-bg: 277 100% 95%;
   /* Warning #F59E0B (bg #FEF3C7) */
   --stats-warning: 38 92% 50%;
   --stats-warning-bg: 48 96% 89%;
@@ -76,11 +82,18 @@
   --stats-border: 214 32% 91%;
   --stats-page-bg: 210 40% 98%;
   --stats-card-bg: 0 0% 100%;
-  /* Desaturated chart colors */
+  /* ISQ chart colors */
   --stats-isq-high: 142 50% 45%;
   --stats-isq-medium: 38 70% 55%;
   --stats-isq-low: 0 60% 60%;
-  --stats-gray-muted: 220 13% 85%;
+  --stats-gray-muted: 232 24% 52%;
+  
+  /* Badge Colors */
+  --badge-blue: 217 91% 60%;       /* #3c83f6 */
+  --badge-cyan: 196 93% 60%;       /* #3abff8 */
+  --badge-orange: 27 88% 59%;      /* #f28f3b */
+  --badge-pink: 335 94% 57%;       /* #f92a82 */
+  --badge-dark: 240 7% 20%;        /* #303036 */
   
   --radius: 0.8rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
@@ -135,13 +148,14 @@
   --card: 20 14% 8%;
   --card-foreground: 45 25% 85%;
   --card-border: 20 14% 15%;
-  /* Sidebar with Cassius mainBlue #2563EB - same in dark mode */
-  --sidebar: 217 91% 50%;
+  /* Sidebar with dark navy #11172B - same in dark mode */
+  --sidebar: 222 56% 12%;
   --sidebar-foreground: 0 0% 100%;
-  --sidebar-border: 217 91% 45%;
+  --sidebar-border: 222 56% 10%;
   --sidebar-primary: 0 0% 100%;
-  --sidebar-primary-foreground: 217 91% 50%;
-  --sidebar-accent: 217 91% 60%;
+  --sidebar-primary-foreground: 222 56% 12%;
+  /* Active tab uses primary color #2563EB */
+  --sidebar-accent: 217 91% 53%;
   --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-ring: 0 0% 100%;
   --popover: 20 14% 4%;
@@ -157,10 +171,16 @@
   --border-gray: 220 13% 25%;
   
   /* Stats Design System - Dark Mode */
+  /* Graph Colors */
+  --stats-chart-1: 217 91% 60%;    /* #3c83f6 */
+  --stats-chart-2: 215 93% 75%;    /* lighter in dark */
+  --stats-chart-3: 277 100% 75%;   /* #d399ff adapted */
+  --stats-chart-4: 232 24% 60%;    /* #676da2 lighter */
+  /* Legacy aliases */
   --stats-primary: 217 91% 60%;
-  --stats-primary-soft: 217 70% 50%;
-  --stats-success: 142 70% 45%;
-  --stats-success-bg: 142 50% 15%;
+  --stats-primary-soft: 215 93% 75%;
+  --stats-success: 277 100% 75%;
+  --stats-success-bg: 277 50% 20%;
   --stats-warning: 38 85% 55%;
   --stats-warning-bg: 38 50% 15%;
   --stats-danger: 0 75% 55%;
@@ -173,7 +193,14 @@
   --stats-isq-high: 142 45% 50%;
   --stats-isq-medium: 38 60% 55%;
   --stats-isq-low: 0 55% 55%;
-  --stats-gray-muted: 220 10% 40%;
+  --stats-gray-muted: 232 24% 60%;
+  
+  /* Badge Colors - Dark Mode */
+  --badge-blue: 217 91% 65%;
+  --badge-cyan: 196 93% 65%;
+  --badge-orange: 27 88% 65%;
+  --badge-pink: 335 94% 62%;
+  --badge-dark: 240 7% 35%;
   
   --accent: 25 45% 20%;
   --accent-foreground: 45 25% 85%;
@@ -346,6 +373,42 @@
   }
 }
 
+/* Tab slide animation */
+[role="tab"] {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+[data-state="active"][role="tab"] {
+  animation: tab-button-slide 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes tab-button-slide {
+  0% {
+    transform: translateX(-8px);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+[role="tabpanel"] {
+  animation: tab-content-slide 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes tab-content-slide {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* FullCalendar custom styling */
 .fc {
   --fc-border-color: hsl(var(--border));
@@ -407,6 +470,35 @@
   background: hsl(var(--muted));
 }
 
+/* List view (agenda) - white time text */
+.fc .fc-list-event-time {
+  color: white !important;
+}
+
+.fc .fc-list-event-dot {
+  display: none;
+}
+
+/* Event separation in week/day views */
+.fc-timegrid-event {
+  margin-bottom: 2px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.fc-timegrid-event + .fc-timegrid-event {
+  margin-top: 2px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Horizontal gap between overlapping/adjacent events */
+.fc-timegrid-event-harness {
+  padding-right: 3px !important;
+}
+
+.fc-timegrid-event-harness > .fc-timegrid-event {
+  margin-right: 0 !important;
+}
+
 .fc .fc-scrollgrid {
   border: none;
 }
@@ -420,6 +512,11 @@
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
   overflow: hidden;
+  background: white;
+}
+
+.dark .fc-theme-standard .fc-scrollgrid {
+  background: hsl(var(--card));
 }
 
 .fc .fc-now-indicator-line {
