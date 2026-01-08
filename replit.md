@@ -49,6 +49,14 @@ Cassius utilizes a modern full-stack architecture built for scalability and resp
     - **Idempotent upserts:** Creates new patients or updates existing with conflict handling.
     - **Error export:** Download CSV of failed rows for correction.
     - **Migration required:** Tables import_jobs, import_job_rows (migration 20241230_008).
+- **Patient Share Links:**
+    - **Secure sharing:** Generate time-limited links to share patient implant data externally.
+    - **Token security:** Tokens hashed with scrypt and unique salt before storage.
+    - **Expiration options:** Links can expire after 1, 7, 30, 90 days, or never.
+    - **Revocation:** Active links can be revoked at any time.
+    - **Access tracking:** Access count and last accessed timestamp tracked.
+    - **Public page:** Unauthenticated access to shared data at /share/:token.
+    - **API Endpoints:** POST /api/patients/:id/share-links, GET /api/patients/:id/share-links, DELETE /api/patients/:id/share-links/:linkId, GET /api/public/share/:token.
 
 ## External Dependencies
 - **Supabase PostgreSQL:** Database hosting and management.
