@@ -956,14 +956,14 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
                 <div className="flex items-start gap-3">
                   <User className="h-5 w-5 text-muted-foreground mt-0.5" />
                   <div>
-                    <a 
+                    <Link 
                       href={`/patients/${appointment.patient.id}`}
-                      className="font-medium hover:underline flex items-center gap-1"
+                      className="font-medium text-primary hover:underline flex items-center gap-1"
                       data-testid="link-patient-profile"
                     >
                       {appointment.patient.prenom} {appointment.patient.nom}
                       <ExternalLink className="h-3 w-3" />
-                    </a>
+                    </Link>
                     {appointment.patient.telephone && (
                       <div className="text-sm text-muted-foreground">{appointment.patient.telephone}</div>
                     )}
