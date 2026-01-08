@@ -315,27 +315,63 @@ export default function NotificationsPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <CardHeader className="pb-0">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <TabsList>
-                <TabsTrigger value="all" data-testid="tab-all">
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveTab("all")}
+                  className={`rounded-full ${activeTab === "all" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
+                  data-testid="tab-all"
+                >
                   Toutes
                   {unreadCount > 0 && (
                     <Badge variant="default" className="ml-2 text-xs rounded-full">
                       {unreadCount}
                     </Badge>
                   )}
-                </TabsTrigger>
-                <TabsTrigger value="alert" data-testid="tab-alert">
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveTab("alert")}
+                  className={`rounded-full ${activeTab === "alert" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
+                  data-testid="tab-alert"
+                >
                   Alertes
                   {countByKind("ALERT") > 0 && (
                     <Badge variant="default" className="ml-2 text-xs rounded-full">
                       {countByKind("ALERT")}
                     </Badge>
                   )}
-                </TabsTrigger>
-                <TabsTrigger value="activity" data-testid="tab-activity">Activité</TabsTrigger>
-                <TabsTrigger value="import" data-testid="tab-import">Imports</TabsTrigger>
-                <TabsTrigger value="system" data-testid="tab-system">Système</TabsTrigger>
-              </TabsList>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveTab("activity")}
+                  className={`rounded-full ${activeTab === "activity" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
+                  data-testid="tab-activity"
+                >
+                  Activité
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveTab("import")}
+                  className={`rounded-full ${activeTab === "import" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
+                  data-testid="tab-import"
+                >
+                  Imports
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveTab("system")}
+                  className={`rounded-full ${activeTab === "system" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
+                  data-testid="tab-system"
+                >
+                  Système
+                </Button>
+              </div>
               
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
