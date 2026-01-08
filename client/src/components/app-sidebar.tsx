@@ -115,7 +115,7 @@ export function AppSidebar() {
                   <item.reactIcon className="h-[16px] w-[16px] text-white shrink-0" />
                 )}
                 {isExpanded && (
-                  <span className={`text-sm truncate ${active ? 'font-medium text-white' : 'font-light text-white/80'}`}>
+                  <span className={`text-xs truncate ${active ? 'font-medium text-white' : 'font-light text-white/80'}`}>
                     {item.title}
                   </span>
                 )}
@@ -161,7 +161,7 @@ export function AppSidebar() {
                     alt="Paramètres"
                     className="h-[18px] w-auto brightness-0 invert shrink-0"
                   />
-                  <span className={`text-sm truncate ${isActive("/settings") ? 'font-medium text-white' : 'font-light text-white/80'}`}>
+                  <span className={`text-xs truncate ${isActive("/settings") ? 'font-medium text-white' : 'font-light text-white/80'}`}>
                     Paramètres
                   </span>
                 </a>
