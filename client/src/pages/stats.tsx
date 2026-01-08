@@ -33,6 +33,8 @@ import {
   Bar,
   LineChart,
   Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -884,7 +886,13 @@ export default function StatsPage() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={implantData}>
+                  <AreaChart data={implantData}>
+                    <defs>
+                      <linearGradient id="implantGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
                     <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
                     <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
@@ -896,15 +904,16 @@ export default function StatsPage() {
                       }}
                       labelStyle={{ color: "hsl(var(--foreground))" }}
                     />
-                    <Line
+                    <Area
                       type="monotone"
                       dataKey="count"
                       name="Implants"
-                      stroke={STATS_COLORS.primary}
+                      stroke="hsl(var(--primary))"
                       strokeWidth={2}
-                      dot={{ fill: STATS_COLORS.primary, strokeWidth: 0, r: 4 }}
+                      fill="url(#implantGradient)"
+                      dot={{ fill: "hsl(var(--primary))", strokeWidth: 0, r: 4 }}
                     />
-                  </LineChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
@@ -1094,7 +1103,13 @@ export default function StatsPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={isqEvolutionChartData}>
+              <AreaChart data={isqEvolutionChartData}>
+                <defs>
+                  <linearGradient id="isqGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
                 <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
                 <YAxis domain={[40, 90]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} />
@@ -1108,15 +1123,16 @@ export default function StatsPage() {
                   }}
                   labelStyle={{ color: "hsl(var(--foreground))" }}
                 />
-                <Line
+                <Area
                   type="monotone"
                   dataKey="avgIsq"
                   name="ISQ moyen"
-                  stroke={STATS_COLORS.primary}
+                  stroke="hsl(var(--primary))"
                   strokeWidth={2}
-                  dot={{ fill: STATS_COLORS.primary, strokeWidth: 0, r: 4 }}
+                  fill="url(#isqGradient)"
+                  dot={{ fill: "hsl(var(--primary))", strokeWidth: 0, r: 4 }}
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
