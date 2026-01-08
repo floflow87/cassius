@@ -840,20 +840,28 @@ export default function DocumentsPage() {
               {sortDir === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
             </Button>
             
-            <div className="flex border rounded-md">
+            <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-full gap-1">
               <Button
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                variant="ghost"
                 size="icon"
-                className="rounded-r-none"
+                className={`rounded-full transition-all duration-200 ${
+                  viewMode === 'list' 
+                    ? "bg-primary text-white" 
+                    : "bg-transparent text-muted-foreground"
+                }`}
                 onClick={() => setViewMode('list')}
                 data-testid="button-view-list"
               >
                 <List className="h-4 w-4" />
               </Button>
               <Button
-                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                variant="ghost"
                 size="icon"
-                className="rounded-l-none"
+                className={`rounded-full transition-all duration-200 ${
+                  viewMode === 'grid' 
+                    ? "bg-primary text-white" 
+                    : "bg-transparent text-muted-foreground"
+                }`}
                 onClick={() => setViewMode('grid')}
                 data-testid="button-view-grid"
               >

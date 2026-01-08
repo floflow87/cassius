@@ -1748,7 +1748,7 @@ export default function CalendarPage() {
               }}
             />
             
-            <div className="flex border rounded-md">
+            <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-full gap-1">
               {[
                 { key: "timeGridDay", label: "Jour" },
                 { key: "timeGridWeek", label: "Semaine" },
@@ -1757,9 +1757,13 @@ export default function CalendarPage() {
               ].map(v => (
                 <Button
                   key={v.key}
-                  variant={currentView === v.key ? "secondary" : "ghost"}
+                  variant="ghost"
                   size="sm"
-                  className="rounded-none first:rounded-l-md last:rounded-r-md"
+                  className={`rounded-full transition-all duration-200 ${
+                    currentView === v.key 
+                      ? "bg-primary text-white shadow-none" 
+                      : "bg-transparent text-muted-foreground"
+                  }`}
                   onClick={() => changeView(v.key as typeof currentView)}
                   data-testid={`button-view-${v.key}`}
                 >
