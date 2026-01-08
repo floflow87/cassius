@@ -1305,7 +1305,7 @@ export default function StatsPage() {
                           <TableCell className="text-center">
                             <HoverCard>
                               <HoverCardTrigger asChild>
-                                <Badge variant="secondary" className="cursor-pointer">
+                                <Badge variant="default" className="cursor-pointer rounded-full">
                                   {p.totalImplants}
                                 </Badge>
                               </HoverCardTrigger>

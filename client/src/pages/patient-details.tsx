@@ -599,7 +599,7 @@ export default function PatientDetailsPage() {
           <Tooltip>
             <TooltipTrigger asChild>
               <span>
-                <Badge variant="secondary" className="font-mono cursor-help">
+                <Badge variant="default" className="rounded-full cursor-help">
                   {operation.surgeryImplants?.length || 0}
                 </Badge>
               </span>

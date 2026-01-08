@@ -286,14 +286,7 @@ export default function NotificationsPage() {
   
   return (
     <div className="px-6 pb-6 w-full" data-testid="page-notifications">
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold">Notifications</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : "Toutes lues"}
-          </p>
-        </div>
-        
+      <div className="flex items-center justify-end gap-4 mb-6 flex-wrap">
         <div className="flex items-center gap-2">
           <Button 
             variant="outline" 
@@ -326,7 +319,7 @@ export default function NotificationsPage() {
                 <TabsTrigger value="all" data-testid="tab-all">
                   Toutes
                   {unreadCount > 0 && (
-                    <Badge variant="secondary" className="ml-2 text-xs">
+                    <Badge variant="default" className="ml-2 text-xs rounded-full">
                       {unreadCount}
                     </Badge>
                   )}
@@ -334,7 +327,7 @@ export default function NotificationsPage() {
                 <TabsTrigger value="alert" data-testid="tab-alert">
                   Alertes
                   {countByKind("ALERT") > 0 && (
-                    <Badge variant="destructive" className="ml-2 text-xs">
+                    <Badge variant="default" className="ml-2 text-xs rounded-full">
                       {countByKind("ALERT")}
                     </Badge>
                   )}
