@@ -1463,57 +1463,35 @@ export default function PatientDetailsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-white dark:bg-zinc-900 p-1 h-auto gap-1 border-b-0 rounded-full">
-          <TabsTrigger 
-            value="overview" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-overview"
-          >
-            Vue d'ensemble
-          </TabsTrigger>
-          <TabsTrigger 
-            value="implants" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-implants"
-          >
-            Implants <span className="text-xs italic ml-1">({implantCount})</span>
-          </TabsTrigger>
-          <TabsTrigger 
-            value="operations" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-operations"
-          >
-            Actes chirurgicaux
-          </TabsTrigger>
-          <TabsTrigger 
-            value="radios" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-radios"
-          >
-            Radiographies
-          </TabsTrigger>
-          <TabsTrigger 
-            value="documents" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-documents"
-          >
-            Documents
-          </TabsTrigger>
-          <TabsTrigger 
-            value="visits" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-visits"
-          >
-            Suivi & Visites
-          </TabsTrigger>
-          <TabsTrigger 
-            value="notes" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-notes"
-          >
-            Notes
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit">
+          {[
+            { value: "overview", label: "Vue d'ensemble" },
+            { value: "implants", label: `Implants (${implantCount})` },
+            { value: "operations", label: "Actes chirurgicaux" },
+            { value: "radios", label: "Radiographies" },
+            { value: "documents", label: "Documents" },
+            { value: "visits", label: "Suivi & Visites" },
+            { value: "notes", label: "Notes" },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value)}
+              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid={`tab-${tab.value}`}
+            >
+              {activeTab === tab.value && (
+                <motion.div
+                  layoutId="patient-tab-indicator"
+                  className="absolute inset-0 bg-primary rounded-full"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                />
+              )}
+              <span className="relative z-10">{tab.label}</span>
+            </button>
+          ))}
+        </div>
 
         <TabsContent value="overview" className="mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -2072,6 +2050,7 @@ export default function PatientDetailsPage() {
                         <Button 
                           variant="outline" 
                           size="sm" 
+                          className="bg-white dark:bg-zinc-900"
                           onClick={() => setShareDialogOpen(true)}
                           data-testid="button-share-patient"
                         >
@@ -2278,7 +2257,7 @@ export default function PatientDetailsPage() {
             <>
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-full">
+                  <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full">
                     {[
                       { value: "all" as const, label: "Tous" },
                       { value: "IMPLANT" as const, label: "Implants" },
@@ -2307,7 +2286,7 @@ export default function PatientDetailsPage() {
                     {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
                   </span>
                 </div>
-                <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-full">
+                <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full">
                   {[
                     { value: "table" as const, icon: LayoutList },
                     { value: "cards" as const, icon: LayoutGrid },

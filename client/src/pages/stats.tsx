@@ -589,7 +589,7 @@ export default function StatsPage() {
 
       {/* Tabs for different stat views */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-full w-fit">
+        <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit">
           {[
             { value: "patient", label: "Patients" },
             { value: "implant", label: "Implants" },
