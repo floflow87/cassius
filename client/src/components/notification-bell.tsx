@@ -142,7 +142,7 @@ export function NotificationBell() {
         <Button 
           variant="ghost" 
           size="icon" 
-          className="relative text-primary bg-primary/10 hover:bg-primary/20" 
+          className="relative text-primary bg-primary/10 hover:bg-primary/20 rounded-full" 
           data-testid="button-notifications"
         >
           <Bell className="h-5 w-5" />
