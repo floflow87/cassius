@@ -1181,6 +1181,35 @@ export const digestRunsRelations = relations(digestRuns, ({ one }) => ({
   }),
 }));
 
+// Patient share links for public sharing
+export const patientShareLinks = pgTable("patient_share_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  sharedByUserId: varchar("shared_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at"),
+  revokedAt: timestamp("revoked_at"),
+  lastAccessedAt: timestamp("last_accessed_at"),
+  accessCount: integer("access_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const patientShareLinksRelations = relations(patientShareLinks, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [patientShareLinks.organisationId],
+    references: [organisations.id],
+  }),
+  patient: one(patients, {
+    fields: [patientShareLinks.patientId],
+    references: [patients.id],
+  }),
+  sharedByUser: one(users, {
+    fields: [patientShareLinks.sharedByUserId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas for new tables
 export const insertEmailTokenSchema = createInsertSchema(emailTokens).omit({
   id: true,
@@ -1211,6 +1240,12 @@ export const insertNotificationPreferenceSchema = createInsertSchema(notificatio
 export const insertDigestRunSchema = createInsertSchema(digestRuns).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertPatientShareLinkSchema = createInsertSchema(patientShareLinks).omit({
+  id: true,
+  createdAt: true,
+  accessCount: true,
 });
 
 export type InsertOrganisation = z.infer<typeof insertOrganisationSchema>;
@@ -1282,6 +1317,9 @@ export type NotificationPreference = typeof notificationPreferences.$inferSelect
 export type InsertDigestRun = z.infer<typeof insertDigestRunSchema>;
 export type DigestRun = typeof digestRuns.$inferSelect;
 
+export type InsertPatientShareLink = z.infer<typeof insertPatientShareLinkSchema>;
+export type PatientShareLink = typeof patientShareLinks.$inferSelect;
+
 // Extended types for API responses
 export interface SurgeryImplantWithDetails extends SurgeryImplant {
   implant: Implant;
@@ -1315,4 +1353,32 @@ export interface AppointmentWithPatient extends Appointment {
 export interface DocumentWithDetails extends Document {
   patient?: Patient;
   operation?: Operation;
+}
+
+export interface PatientShareLinkWithDetails extends PatientShareLink {
+  sharedByUserName?: string;
+}
+
+export interface PublicPatientShareData {
+  patient: {
+    prenom: string;
+    nom: string;
+    dateNaissance?: string | null;
+  };
+  implants: Array<{
+    id: string;
+    siteFdi?: number | null;
+    marque?: string | null;
+    reference?: string | null;
+    diametre?: number | null;
+    longueur?: number | null;
+    position?: string | null;
+    statut?: string | null;
+    datePose?: string | null;
+    isqPrimaire?: number | null;
+    isqSecondaire?: number | null;
+    isqTertiaire?: number | null;
+  }>;
+  sharedByUserName: string;
+  createdAt: string;
 }
