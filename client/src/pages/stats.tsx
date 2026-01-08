@@ -1312,7 +1312,7 @@ export default function StatsPage() {
                                   {p.totalImplants}
                                 </Badge>
                               </HoverCardTrigger>
-                              <HoverCardContent className="w-72 z-50" align="center">
+                              <HoverCardContent className="w-72 z-[100]" align="center" side="top" sideOffset={5}>
                                 <div className="space-y-2">
                                   <h4 className="font-semibold text-sm">Implants ({p.totalImplants})</h4>
                                   <ScrollArea className="h-32">

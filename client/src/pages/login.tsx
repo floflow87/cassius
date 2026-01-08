@@ -51,6 +51,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       const response = await apiRequest("POST", "/api/auth/login", {
         username: data.email,
         password: data.password,
+        rememberMe: data.rememberMe,
       });
       return response.json();
     },

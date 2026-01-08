@@ -118,8 +118,8 @@ export function setupAuth(app: Express): void {
   });
 
   app.post("/api/auth/login", (req, res, next) => {
-    const { username } = req.body;
-    authLog("/api/auth/login", "START", { username });
+    const { username, rememberMe } = req.body;
+    authLog("/api/auth/login", "START", { username, rememberMe });
     
     passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
       if (err) {
@@ -136,6 +136,13 @@ export function setupAuth(app: Express): void {
           return next(err);
         }
 
+        // Extend session to 7 days if rememberMe is checked
+        if (rememberMe && req.session) {
+          req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+        }
+
+        // Generate JWT with extended expiry if rememberMe
+        const tokenExpirySeconds = rememberMe ? 7 * 24 * 60 * 60 : 14400; // 7 days or 4 hours
         let token: string | null = null;
         try {
           token = generateToken({
@@ -143,12 +150,12 @@ export function setupAuth(app: Express): void {
             username: user.username,
             role: user.role,
             organisationId: user.organisationId,
-          });
+          }, tokenExpirySeconds);
         } catch (e) {
           console.warn("JWT_SECRET non configuré, token JWT non généré");
         }
 
-        authLog("/api/auth/login", "SUCCESS", { userId: user.id, organisationId: user.organisationId });
+        authLog("/api/auth/login", "SUCCESS", { userId: user.id, organisationId: user.organisationId, rememberMe });
         return res.json({
           token,
           user: {

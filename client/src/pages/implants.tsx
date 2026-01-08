@@ -17,6 +17,7 @@ import { ImplantsAdvancedFilterDrawer, ImplantFilterChips, type ImplantFilterGro
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CatalogImplantsListSkeleton } from "@/components/page-skeletons";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -376,16 +377,19 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
         );
       case "poseCount":
         return (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-foreground">
-              {implant.poseCount}
-            </span>
-            {implant.lastPoseDate && (
-              <span className="text-xs text-muted-foreground">
-                {new Date(implant.lastPoseDate).toLocaleDateString('fr-FR')}
-              </span>
-            )}
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="default" className="cursor-pointer">
+                {implant.poseCount}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              {implant.lastPoseDate 
+                ? `Dernière pose: ${new Date(implant.lastPoseDate).toLocaleDateString('fr-FR')}`
+                : "Aucune pose enregistrée"
+              }
+            </TooltipContent>
+          </Tooltip>
         );
       case "successRate":
         if (implant.successRate === null) {
