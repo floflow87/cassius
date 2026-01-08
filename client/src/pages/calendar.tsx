@@ -520,7 +520,7 @@ function CalendarSearch({ appointments, onSelectAppointment, onSelectDate, onSel
           }}
           onFocus={() => setIsOpen(true)}
           onBlur={() => setTimeout(() => setIsOpen(false), 200)}
-          className="pl-9 w-64"
+          className="pl-9 w-64 bg-white dark:bg-zinc-900"
           data-testid="input-calendar-search"
         />
       </div>
@@ -1803,7 +1803,7 @@ export default function CalendarPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between gap-4 p-4 border-b bg-background shrink-0">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={goToToday} data-testid="button-today">
+            <Button variant="outline" size="sm" className="bg-white dark:bg-zinc-900" onClick={goToToday} data-testid="button-today">
               Aujourd&apos;hui
             </Button>
             <Button
