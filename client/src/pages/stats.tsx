@@ -1335,7 +1335,7 @@ export default function StatsPage() {
                           <TableCell className="text-center">
                             <Badge
                               variant={p.successRate >= 80 ? "default" : p.successRate >= 50 ? "outline" : "destructive"}
-                              className={p.successRate >= 80 ? "bg-green-600" : ""}
+                              className={p.successRate >= 80 ? "bg-[#ECFDF5] text-[#16A34A] hover:bg-[#ECFDF5]" : ""}
                             >
                               {p.successRate}%
                             </Badge>
