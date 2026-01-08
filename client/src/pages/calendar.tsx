@@ -1754,18 +1754,18 @@ export default function CalendarPage() {
       return (
         <div className="p-1 overflow-hidden" data-testid={`calendar-event-${eventInfo.event.id}`}>
           <div className="flex items-center gap-2">
-            <span className="font-medium text-foreground">{eventInfo.event.title}</span>
-            {isGoogle && <SiGoogle className="h-3 w-3 text-muted-foreground shrink-0" />}
-            {(hasConflict || hasCriticalFlag) && <AlertTriangle className="h-3 w-3 text-yellow-500 shrink-0" />}
+            <span className="font-medium text-white">{eventInfo.event.title}</span>
+            {isGoogle && <SiGoogle className="h-3 w-3 text-white/70 shrink-0" />}
+            {(hasConflict || hasCriticalFlag) && <AlertTriangle className="h-3 w-3 text-yellow-300 shrink-0" />}
           </div>
           {!isGoogle && patientPrenom && patientNom && (
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-white/90">
               {patientPrenom} {patientNom}
               {isq !== null && isq !== undefined && ` • ISQ ${isq}`}
             </div>
           )}
           {description && (
-            <div className="text-sm text-muted-foreground/80 italic mt-0.5 truncate">
+            <div className="text-sm text-white/80 italic mt-0.5 truncate">
               {description}
             </div>
           )}
