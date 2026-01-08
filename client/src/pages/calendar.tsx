@@ -45,15 +45,15 @@ const appointmentTypes = [
 ];
 
 const appointmentColors = [
-  { value: "#3b82f6", label: "Bleu", class: "bg-blue-500" },
-  { value: "#22c55e", label: "Vert", class: "bg-green-500" },
-  { value: "#ef4444", label: "Rouge", class: "bg-red-500" },
-  { value: "#eab308", label: "Jaune", class: "bg-yellow-500" },
-  { value: "#f97316", label: "Orange", class: "bg-orange-500" },
-  { value: "#6b7280", label: "Gris", class: "bg-gray-500" },
-  { value: "#8b5cf6", label: "Violet", class: "bg-violet-500" },
-  { value: "#ec4899", label: "Rose", class: "bg-pink-500" },
-  { value: "#14b8a6", label: "Turquoise", class: "bg-teal-500" },
+  { value: "#93c5fd", label: "Bleu", class: "bg-blue-300" },
+  { value: "#86efac", label: "Vert", class: "bg-green-300" },
+  { value: "#fca5a5", label: "Rouge", class: "bg-red-300" },
+  { value: "#fde047", label: "Jaune", class: "bg-yellow-300" },
+  { value: "#fdba74", label: "Orange", class: "bg-orange-300" },
+  { value: "#d1d5db", label: "Gris", class: "bg-gray-300" },
+  { value: "#c4b5fd", label: "Violet", class: "bg-violet-300" },
+  { value: "#f9a8d4", label: "Rose", class: "bg-pink-300" },
+  { value: "#5eead4", label: "Turquoise", class: "bg-teal-300" },
 ];
 
 const appointmentStatuses = [
@@ -872,34 +872,6 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
               
               <FormField
                 control={form.control}
-                name="color"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Couleur</FormLabel>
-                    <div className="flex flex-wrap gap-2">
-                      {appointmentColors.map(c => (
-                        <button
-                          key={c.value}
-                          type="button"
-                          className={`w-7 h-7 rounded-md border-2 transition-all ${c.class} ${
-                            field.value === c.value 
-                              ? "border-foreground ring-2 ring-primary ring-offset-2" 
-                              : "border-transparent hover:border-muted-foreground/50"
-                          }`}
-                          onClick={() => field.onChange(field.value === c.value ? null : c.value)}
-                          title={c.label}
-                          data-testid={`edit-color-${c.value}`}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Optionnel - sinon, couleur basée sur le type</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
                 name="dateStart"
                 render={({ field }) => (
                   <FormItem>
@@ -965,6 +937,34 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
                     <FormControl>
                       <Textarea {...field} placeholder="Notes (optionnel)" rows={3} data-testid="input-edit-description" />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="color"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Couleur</FormLabel>
+                    <div className="flex flex-wrap gap-2">
+                      {appointmentColors.map(c => (
+                        <button
+                          key={c.value}
+                          type="button"
+                          className={`w-7 h-7 rounded-md border-2 transition-all ${c.class} ${
+                            field.value === c.value 
+                              ? "border-foreground ring-2 ring-primary ring-offset-2" 
+                              : "border-transparent hover:border-muted-foreground/50"
+                          }`}
+                          onClick={() => field.onChange(field.value === c.value ? null : c.value)}
+                          title={c.label}
+                          data-testid={`edit-color-${c.value}`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Optionnel - sinon, couleur basée sur le type</p>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -1323,34 +1323,6 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
               )}
             />
             
-            <FormField
-              control={form.control}
-              name="color"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Couleur</FormLabel>
-                  <div className="flex flex-wrap gap-2">
-                    {appointmentColors.map(c => (
-                      <button
-                        key={c.value}
-                        type="button"
-                        className={`w-7 h-7 rounded-md border-2 transition-all ${c.class} ${
-                          field.value === c.value 
-                            ? "border-foreground ring-2 ring-primary ring-offset-2" 
-                            : "border-transparent hover:border-muted-foreground/50"
-                        }`}
-                        onClick={() => field.onChange(field.value === c.value ? null : c.value)}
-                        title={c.label}
-                        data-testid={`color-${c.value}`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Optionnel - sinon, couleur basée sur le type</p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -1390,6 +1362,34 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
                   <FormControl>
                     <Textarea placeholder="Notes optionnelles..." {...field} data-testid="input-description" />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Couleur</FormLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {appointmentColors.map(c => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        className={`w-7 h-7 rounded-md border-2 transition-all ${c.class} ${
+                          field.value === c.value 
+                            ? "border-foreground ring-2 ring-primary ring-offset-2" 
+                            : "border-transparent hover:border-muted-foreground/50"
+                        }`}
+                        onClick={() => field.onChange(field.value === c.value ? null : c.value)}
+                        title={c.label}
+                        data-testid={`color-${c.value}`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Optionnel - sinon, couleur basée sur le type</p>
                   <FormMessage />
                 </FormItem>
               )}

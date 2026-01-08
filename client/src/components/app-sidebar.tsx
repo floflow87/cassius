@@ -88,7 +88,11 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar px-0 py-0">
-        <SidebarMenu className="gap-1 px-3 pt-1">
+        {/* HR separator between logo and menu */}
+        <div className="px-3 pt-2 pb-3">
+          <hr className="border-t border-white/20" />
+        </div>
+        <SidebarMenu className="gap-1 px-3 pt-2">
           {menuItems.map((item) => {
             const active = isActive(item.url);
             

@@ -123,7 +123,7 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
       
       <GlobalSearch className="flex-1 max-w-md" />
       
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <NotificationBell />
         <Button 
           variant="ghost" 
