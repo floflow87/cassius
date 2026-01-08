@@ -43,6 +43,14 @@ async function getUncachableResendClient() {
 const APP_NAME = 'Cassius';
 
 function getBaseUrl(): string {
+  // Support custom domain for production
+  if (process.env.CUSTOM_DOMAIN) {
+    return `https://${process.env.CUSTOM_DOMAIN}`;
+  }
+  // Production deployment URL (app.cassiuspro.com)
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://app.cassiuspro.com';
+  }
   return process.env.REPLIT_DEV_DOMAIN 
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : process.env.REPLIT_DEPLOYMENT_URL 
