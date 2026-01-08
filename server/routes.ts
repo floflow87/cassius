@@ -39,7 +39,8 @@ import {
   implants,
   operations,
 } from "@shared/schema";
-import type { PublicPatientShareData, PatientShareLinkWithDetails } from "@shared/schema";
+import type { PublicPatientShareData, PatientShareLinkWithDetails, OnboardingData, OnboardingState } from "@shared/schema";
+import { onboardingState } from "@shared/schema";
 import type {
   Patient,
   PatientDetail,
@@ -5695,6 +5696,200 @@ export async function registerRoutes(
       }
     } catch (error: any) {
       console.error("[Notifications] Test notification error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== ONBOARDING ROUTES ====================
+
+  // GET /api/onboarding - Get onboarding state for organisation
+  app.get("/api/onboarding", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      // Try to get existing state
+      let state = await db
+        .select()
+        .from(onboardingState)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .then(rows => rows[0]);
+
+      // If no state exists, create one
+      if (!state) {
+        const [newState] = await db
+          .insert(onboardingState)
+          .values({
+            organisationId,
+            currentStep: 0,
+            completedSteps: "{}",
+            skippedSteps: "{}",
+            data: "{}",
+            status: "IN_PROGRESS",
+          })
+          .returning();
+        state = newState;
+      }
+
+      // Parse JSON fields
+      const response = {
+        ...state,
+        completedSteps: JSON.parse(state.completedSteps || "{}"),
+        skippedSteps: JSON.parse(state.skippedSteps || "{}"),
+        data: JSON.parse(state.data || "{}") as OnboardingData,
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      console.error("[Onboarding] Error getting state:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/onboarding - Update onboarding state
+  app.patch("/api/onboarding", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { currentStep, markCompleteStep, markSkipStep, dataPatch } = req.body as {
+        currentStep?: number;
+        markCompleteStep?: number;
+        markSkipStep?: number;
+        dataPatch?: Partial<OnboardingData>;
+      };
+
+      // Required steps that cannot be skipped
+      const requiredSteps = [0, 1, 3, 4];
+
+      // Prevent skipping required steps
+      if (markSkipStep !== undefined && requiredSteps.includes(markSkipStep)) {
+        return res.status(400).json({ 
+          error: "Cette etape est obligatoire et ne peut pas etre passee",
+          requiredStep: markSkipStep 
+        });
+      }
+
+      // Get existing state
+      let state = await db
+        .select()
+        .from(onboardingState)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .then(rows => rows[0]);
+
+      if (!state) {
+        return res.status(404).json({ error: "Onboarding state not found" });
+      }
+
+      // Parse existing JSON fields
+      let completedSteps = JSON.parse(state.completedSteps || "{}") as Record<string, boolean>;
+      let skippedSteps = JSON.parse(state.skippedSteps || "{}") as Record<string, boolean>;
+      let data = JSON.parse(state.data || "{}") as OnboardingData;
+
+      // Apply updates
+      if (markCompleteStep !== undefined) {
+        completedSteps[String(markCompleteStep)] = true;
+        // Remove from skipped if was skipped
+        delete skippedSteps[String(markCompleteStep)];
+      }
+
+      if (markSkipStep !== undefined) {
+        skippedSteps[String(markSkipStep)] = true;
+        // Also mark as completed for progress tracking
+        completedSteps[String(markSkipStep)] = true;
+      }
+
+      if (dataPatch) {
+        data = { ...data, ...dataPatch };
+      }
+
+      // Update the state
+      const updateData: any = {
+        updatedAt: new Date(),
+        completedSteps: JSON.stringify(completedSteps),
+        skippedSteps: JSON.stringify(skippedSteps),
+        data: JSON.stringify(data),
+      };
+
+      if (currentStep !== undefined) {
+        updateData.currentStep = currentStep;
+      }
+
+      const [updatedState] = await db
+        .update(onboardingState)
+        .set(updateData)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .returning();
+
+      // Parse and return response
+      const response = {
+        ...updatedState,
+        completedSteps: JSON.parse(updatedState.completedSteps || "{}"),
+        skippedSteps: JSON.parse(updatedState.skippedSteps || "{}"),
+        data: JSON.parse(updatedState.data || "{}") as OnboardingData,
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      console.error("[Onboarding] Error updating state:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/onboarding/complete - Mark onboarding as completed
+  app.post("/api/onboarding/complete", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      // Get existing state
+      const state = await db
+        .select()
+        .from(onboardingState)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .then(rows => rows[0]);
+
+      if (!state) {
+        return res.status(404).json({ error: "Onboarding state not found" });
+      }
+
+      const completedSteps = JSON.parse(state.completedSteps || "{}") as Record<string, boolean>;
+      const skippedSteps = JSON.parse(state.skippedSteps || "{}") as Record<string, boolean>;
+
+      // Check required steps (0, 1, 3, 4 are required)
+      const requiredSteps = [0, 1, 3, 4];
+      const missingSteps = requiredSteps.filter(step => !completedSteps[String(step)]);
+
+      if (missingSteps.length > 0) {
+        return res.status(400).json({
+          error: "Required steps not completed",
+          missingSteps,
+        });
+      }
+
+      // Mark as completed
+      const [updatedState] = await db
+        .update(onboardingState)
+        .set({
+          status: "COMPLETED",
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(onboardingState.organisationId, organisationId))
+        .returning();
+
+      res.json({
+        success: true,
+        redirectTo: "/dashboard",
+        state: {
+          ...updatedState,
+          completedSteps: JSON.parse(updatedState.completedSteps || "{}"),
+          skippedSteps: JSON.parse(updatedState.skippedSteps || "{}"),
+          data: JSON.parse(updatedState.data || "{}"),
+        },
+      });
+    } catch (error: any) {
+      console.error("[Onboarding] Error completing:", error);
       res.status(500).json({ error: error.message });
     }
   });

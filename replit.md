@@ -130,6 +130,36 @@ The application includes a comprehensive in-app notification system with user pr
 - GET /api/notifications/preferences - Get user preferences
 - PUT /api/notifications/preferences - Update user preferences
 
+## Onboarding Wizard
+The application includes a comprehensive onboarding wizard for new organizations:
+
+**Wizard Steps (8 steps, 0-7):**
+- **Step 0 - Welcome:** Practice type (SOLO/CABINET), timezone, language
+- **Step 1 - Clinic & Security (required):** Clinic name, phone, address
+- **Step 2 - Team & Roles (optional):** Invite collaborators
+- **Step 3 - Data (required):** CSV import, demo mode, or manual entry
+- **Step 4 - First Clinical Case (required):** Create first operation with implant
+- **Step 5 - Calendar (optional):** Google Calendar integration
+- **Step 6 - Notifications (optional):** Configure notification preferences
+- **Step 7 - Documents (optional):** Upload first document
+
+**Features:**
+- Persistent state stored in `onboarding_state` table per organization
+- Auto-save with debounce on each action
+- Step completion tracking with required/optional distinction
+- Skip functionality for optional steps
+- Resume from any step via checklist on dashboard
+- Progress bar showing overall completion percentage
+
+**API Endpoints:**
+- GET /api/onboarding - Get/create onboarding state
+- PATCH /api/onboarding - Update step progress and data
+- POST /api/onboarding/complete - Mark onboarding as completed
+
+**Frontend:**
+- `/onboarding` - Full-screen wizard page
+- `<OnboardingChecklist />` - Dashboard component for incomplete onboarding
+
 ## Database Configuration
 **Important:** The application uses `SUPABASE_DB_URL_DEV` (Supabase PostgreSQL) for development, NOT `DATABASE_URL` (Replit PostgreSQL). 
 - `drizzle.config.ts` uses `DATABASE_URL` for migrations

@@ -94,6 +94,10 @@ export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"
 
 export const savedFilterPageTypeEnum = pgEnum("saved_filter_page_type", ["patients", "implants", "actes"]);
 
+// Onboarding enums
+export const onboardingStatusEnum = pgEnum("onboarding_status", ["IN_PROGRESS", "COMPLETED"]);
+export const practiceTypeEnum = pgEnum("practice_type", ["SOLO", "CABINET"]);
+
 // Flag system enums
 export const flagLevelEnum = pgEnum("flag_level", ["CRITICAL", "WARNING", "INFO"]);
 export const flagEntityTypeEnum = pgEnum("flag_entity_type", ["PATIENT", "OPERATION", "IMPLANT"]);
@@ -1210,6 +1214,27 @@ export const patientShareLinksRelations = relations(patientShareLinks, ({ one })
   }),
 }));
 
+// Onboarding state for wizard
+export const onboardingState = pgTable("onboarding_state", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }).unique(),
+  currentStep: integer("current_step").default(0).notNull(),
+  completedSteps: text("completed_steps").default("{}").notNull(),
+  skippedSteps: text("skipped_steps").default("{}").notNull(),
+  data: text("data").default("{}").notNull(),
+  status: onboardingStatusEnum("status").default("IN_PROGRESS").notNull(),
+  completedAt: timestamp("completed_at"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const onboardingStateRelations = relations(onboardingState, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [onboardingState.organisationId],
+    references: [organisations.id],
+  }),
+}));
+
 // Insert schemas for new tables
 export const insertEmailTokenSchema = createInsertSchema(emailTokens).omit({
   id: true,
@@ -1246,6 +1271,12 @@ export const insertPatientShareLinkSchema = createInsertSchema(patientShareLinks
   id: true,
   createdAt: true,
   accessCount: true,
+});
+
+export const insertOnboardingStateSchema = createInsertSchema(onboardingState).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertOrganisation = z.infer<typeof insertOrganisationSchema>;
@@ -1319,6 +1350,27 @@ export type DigestRun = typeof digestRuns.$inferSelect;
 
 export type InsertPatientShareLink = z.infer<typeof insertPatientShareLinkSchema>;
 export type PatientShareLink = typeof patientShareLinks.$inferSelect;
+
+export type InsertOnboardingState = z.infer<typeof insertOnboardingStateSchema>;
+export type OnboardingState = typeof onboardingState.$inferSelect;
+
+// Onboarding data interface
+export interface OnboardingData {
+  practiceType?: "SOLO" | "CABINET";
+  timezone?: string;
+  language?: string;
+  clinicName?: string;
+  phone?: string;
+  address?: string;
+  sessionTimeoutMinutes?: number;
+  emailVerified?: boolean;
+  demoModeEnabled?: boolean;
+  importCompleted?: boolean;
+  firstCaseCreated?: boolean;
+  googleConnected?: boolean;
+  notificationsConfigured?: boolean;
+  documentUploaded?: boolean;
+}
 
 // Extended types for API responses
 export interface SurgeryImplantWithDetails extends SurgeryImplant {

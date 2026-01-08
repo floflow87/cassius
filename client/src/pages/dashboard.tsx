@@ -36,6 +36,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import type { Operation, Appointment, User, Patient, SurgeryImplantWithDetails, FlagWithEntity, AppointmentWithPatient } from "@shared/schema";
 import { FlagBadge } from "@/components/flag-badge";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import { Link } from "wouter";
 
 interface BasicStats {
@@ -293,6 +294,8 @@ export default function DashboardPage() {
       <h1 className="text-lg font-medium" data-testid="text-welcome-title">
         Bienvenue {getUserFirstName()}
       </h1>
+
+      <OnboardingChecklist />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
