@@ -22,7 +22,10 @@ interface ChecklistData {
 
 export function SetupChecklist() {
   const [, setLocation] = useLocation();
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(() => {
+    const saved = localStorage.getItem("cassius_checklist_open");
+    return saved !== null ? saved === "true" : true;
+  });
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
@@ -31,6 +34,10 @@ export function SetupChecklist() {
       setIsDismissed(true);
     }
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("cassius_checklist_open", String(isOpen));
+  }, [isOpen]);
 
   const { data: checklist, isLoading } = useQuery<ChecklistData>({
     queryKey: ["/api/onboarding/checklist"],

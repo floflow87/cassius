@@ -547,15 +547,23 @@ function OnboardingSettingsSection() {
   const { toast } = useToast();
   const { 
     state, 
-    isLoading, 
+    isLoading: onboardingLoading, 
     isCompleted, 
     isDismissed,
-    getProgress, 
-    isStepCompleted, 
-    isStepSkipped,
     showOnboarding,
     isPending
   } = useOnboarding();
+
+  const { data: checklist, isLoading: checklistLoading } = useQuery<{
+    completedCount: number;
+    totalCount: number;
+    items: Array<{ id: string; label: string; completed: boolean; actionUrl: string }>;
+  }>({
+    queryKey: ["/api/onboarding/checklist"],
+    refetchInterval: 30000,
+  });
+
+  const isLoading = onboardingLoading || checklistLoading;
 
   if (isLoading) {
     return (
@@ -575,19 +583,16 @@ function OnboardingSettingsSection() {
     );
   }
 
-  const progress = getProgress();
-  const statusBadge = isCompleted ? (
+  const progress = checklist ? Math.round((checklist.completedCount / checklist.totalCount) * 100) : 0;
+  const allCompleted = checklist?.completedCount === checklist?.totalCount;
+  const statusBadge = allCompleted ? (
     <Badge variant="default" className="bg-green-500 hover:bg-green-600">Terminé</Badge>
   ) : (
     <Badge variant="secondary">En cours</Badge>
   );
 
-  const handleResumeOnboarding = (step?: number) => {
-    if (step !== undefined) {
-      setLocation(`/onboarding?step=${step}`);
-    } else {
-      setLocation("/onboarding");
-    }
+  const handleNavigate = (url: string) => {
+    setLocation(url);
   };
 
   const handleShowOnboarding = async () => {
@@ -626,8 +631,8 @@ function OnboardingSettingsSection() {
             </CollapsibleTrigger>
             <div className="flex items-center gap-2">
               {statusBadge}
-              {!isCompleted && (
-                <Button size="sm" onClick={() => handleResumeOnboarding()} data-testid="button-resume-onboarding-settings">
+              {!allCompleted && (
+                <Button size="sm" onClick={() => handleNavigate("/onboarding")} data-testid="button-resume-onboarding-settings">
                   Reprendre
                 </Button>
               )}
@@ -642,47 +647,37 @@ function OnboardingSettingsSection() {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Progression globale</span>
-                <span className="font-medium">{progress}%</span>
+                <span className="font-medium">{checklist?.completedCount || 0}/{checklist?.totalCount || 0}</span>
               </div>
               <Progress value={progress} className="h-2" />
             </div>
             
             <div className="space-y-1">
-              {ONBOARDING_STEPS.map((step) => {
-                const completed = isStepCompleted(step.id);
-                const skipped = isStepSkipped(step.id);
-                
-                return (
-                  <div 
-                    key={step.id}
-                    className="flex items-center justify-between gap-2 text-sm py-2 px-2 -mx-2 rounded cursor-pointer hover-elevate"
-                    onClick={() => handleResumeOnboarding(step.id)}
-                    data-testid={`settings-onboarding-step-${step.id}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {completed ? (
-                        <Check className="w-4 h-4 text-green-500" />
-                      ) : skipped ? (
-                        <SkipForward className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <Circle className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <span className={completed ? "text-muted-foreground" : skipped ? "text-muted-foreground" : ""}>
-                        {step.title}
-                      </span>
-                      {!step.required && (
-                        <span className="text-xs text-muted-foreground">(optionnel)</span>
-                      )}
-                    </div>
-                    <Badge variant={completed ? "default" : skipped ? "secondary" : "outline"} className={completed ? "bg-green-500 hover:bg-green-600" : ""}>
-                      {completed ? "Validé" : skipped ? "Passé" : "À faire"}
-                    </Badge>
+              {checklist?.items.map((item) => (
+                <div 
+                  key={item.id}
+                  className="flex items-center justify-between gap-2 text-sm py-2 px-2 -mx-2 rounded cursor-pointer hover-elevate"
+                  onClick={() => handleNavigate(item.actionUrl)}
+                  data-testid={`settings-onboarding-step-${item.id}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {item.completed ? (
+                      <Check className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <Circle className="w-4 h-4 text-muted-foreground" />
+                    )}
+                    <span className={item.completed ? "text-muted-foreground" : ""}>
+                      {item.label}
+                    </span>
                   </div>
-                );
-              })}
+                  <Badge variant={item.completed ? "default" : "outline"} className={item.completed ? "bg-green-500 hover:bg-green-600" : ""}>
+                    {item.completed ? "Validé" : "À faire"}
+                  </Badge>
+                </div>
+              ))}
             </div>
 
-            {isDismissed && !isCompleted && (
+            {isDismissed && !allCompleted && (
               <div className="pt-2 border-t">
                 <Button 
                   variant="outline" 
