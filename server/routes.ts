@@ -6110,5 +6110,139 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/onboarding/demo - Generate demo data for the organization (atomic transaction)
+  app.post("/api/onboarding/demo", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      // Use transaction for atomicity - all or nothing
+      const result = await db.transaction(async (tx) => {
+        // Check if demo data already exists (inside transaction for isolation)
+        const existingPatients = await tx
+          .select({ count: sql<number>`count(*)` })
+          .from(patients)
+          .where(eq(patients.organisationId, organisationId));
+        
+        if (Number(existingPatients[0]?.count || 0) > 0) {
+          throw new Error("EXISTING_DATA");
+        }
+
+        // Demo patients data
+        const demoPatients = [
+          { nom: "Dupont", prenom: "Marie", dateNaissance: "1985-03-15", sexe: "F" as const, telephone: "0612345678", email: "marie.dupont@email.fr" },
+          { nom: "Martin", prenom: "Jean", dateNaissance: "1972-08-22", sexe: "M" as const, telephone: "0698765432", email: "jean.martin@email.fr" },
+          { nom: "Bernard", prenom: "Sophie", dateNaissance: "1990-11-30", sexe: "F" as const, telephone: "0645678901", email: "sophie.bernard@email.fr" },
+          { nom: "Petit", prenom: "Pierre", dateNaissance: "1968-05-10", sexe: "M" as const, telephone: "0654321098", email: "pierre.petit@email.fr" },
+          { nom: "Robert", prenom: "Isabelle", dateNaissance: "1978-02-28", sexe: "F" as const, telephone: "0687654321", email: "isabelle.robert@email.fr" },
+        ];
+
+        // Create patients
+        const createdPatients = await tx.insert(patients).values(
+          demoPatients.map(p => ({
+            organisationId,
+            nom: p.nom,
+            prenom: p.prenom,
+            dateNaissance: p.dateNaissance,
+            sexe: p.sexe,
+            telephone: p.telephone,
+            email: p.email,
+            statut: "ACTIF" as const,
+          }))
+        ).returning();
+
+        // Create demo implants catalog
+        const demoImplants = [
+          { marque: "Nobel Biocare", referenceFabricant: "NB-Replace CC", diametre: 4.3, longueur: 11.5 },
+          { marque: "Straumann", referenceFabricant: "BL Roxolid", diametre: 4.1, longueur: 10.0 },
+          { marque: "Zimmer Biomet", referenceFabricant: "TSV", diametre: 4.0, longueur: 13.0 },
+        ];
+
+        const createdImplants = await tx.insert(implants).values(
+          demoImplants.map(i => ({
+            organisationId,
+            typeImplant: "IMPLANT" as const,
+            marque: i.marque,
+            referenceFabricant: i.referenceFabricant,
+            diametre: i.diametre,
+            longueur: i.longueur,
+          }))
+        ).returning();
+
+        // Create demo operations with implants
+        const today = new Date();
+        const demoOperations = [
+          { patientIdx: 0, implantIdx: 0, daysAgo: 90, siteFdi: "36", typeIntervention: "POSE" as const, isqPose: 72 },
+          { patientIdx: 1, implantIdx: 1, daysAgo: 60, siteFdi: "46", typeIntervention: "POSE" as const, isqPose: 68 },
+          { patientIdx: 2, implantIdx: 2, daysAgo: 30, siteFdi: "24", typeIntervention: "POSE" as const, isqPose: 75 },
+          { patientIdx: 3, implantIdx: 0, daysAgo: 120, siteFdi: "11", typeIntervention: "POSE" as const, isqPose: 70 },
+          { patientIdx: 4, implantIdx: 1, daysAgo: 45, siteFdi: "21", typeIntervention: "POSE" as const, isqPose: 65 },
+        ];
+
+        for (const op of demoOperations) {
+          const opDate = new Date(today);
+          opDate.setDate(opDate.getDate() - op.daysAgo);
+          const dateStr = opDate.toISOString().split("T")[0];
+
+          const [createdOp] = await tx.insert(operations).values({
+            organisationId,
+            patientId: createdPatients[op.patientIdx].id,
+            dateOperation: dateStr,
+            typeIntervention: op.typeIntervention,
+          }).returning();
+
+          await tx.insert(surgeryImplants).values({
+            organisationId,
+            surgeryId: createdOp.id,
+            implantId: createdImplants[op.implantIdx].id,
+            siteFdi: op.siteFdi,
+            datePose: dateStr,
+            isqPose: op.isqPose,
+            statut: "EN_SUIVI" as const,
+          });
+        }
+
+        // Create demo appointments
+        const futureAppointments = [
+          { patientIdx: 0, daysFromNow: 7, type: "SUIVI" as const },
+          { patientIdx: 1, daysFromNow: 14, type: "CONTROLE" as const },
+          { patientIdx: 2, daysFromNow: 3, type: "CONSULTATION" as const },
+        ];
+
+        for (const apt of futureAppointments) {
+          const aptDate = new Date(today);
+          aptDate.setDate(aptDate.getDate() + apt.daysFromNow);
+          aptDate.setHours(10, 0, 0, 0);
+
+          const typeLabel = apt.type === "SUIVI" ? "Suivi" : apt.type === "CONTROLE" ? "Contrôle" : "Consultation";
+          await tx.insert(appointments).values({
+            organisationId,
+            patientId: createdPatients[apt.patientIdx].id,
+            titre: `${typeLabel} - ${createdPatients[apt.patientIdx].prenom} ${createdPatients[apt.patientIdx].nom}`,
+            dateDebut: aptDate,
+            dateFin: new Date(aptDate.getTime() + 30 * 60000),
+            typeRdv: apt.type,
+            statut: "PLANIFIE",
+          });
+        }
+
+        return {
+          patients: createdPatients.length,
+          implants: createdImplants.length,
+          operations: demoOperations.length,
+          appointments: futureAppointments.length,
+        };
+      });
+
+      res.json({ success: true, created: result });
+    } catch (error: any) {
+      if (error.message === "EXISTING_DATA") {
+        return res.status(400).json({ error: "Des données existent déjà dans cette organisation" });
+      }
+      console.error("[Onboarding] Error generating demo data:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return httpServer;
 }

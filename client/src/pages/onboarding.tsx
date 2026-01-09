@@ -316,9 +316,39 @@ function TeamStep({ onComplete, onSkip }: { onComplete: () => void; onSkip: () =
 function DataStep({ onComplete }: { onComplete: (patch: Partial<OnboardingData>) => void }) {
   const [mode, setMode] = useState<"import" | "demo" | "manual" | null>(null);
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
   
-  const handleDemo = () => {
-    onComplete({ demoModeEnabled: true, importCompleted: true });
+  const handleDemo = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/onboarding/demo", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({
+          title: "Données de démonstration créées",
+          description: `${data.created.patients} patients, ${data.created.operations} actes et ${data.created.appointments} rendez-vous ajoutés.`,
+        });
+        onComplete({ demoModeEnabled: true, importCompleted: true });
+      } else {
+        toast({
+          title: "Information",
+          description: data.error || "Mode démo activé.",
+        });
+        onComplete({ demoModeEnabled: true, importCompleted: true });
+      }
+    } catch (error) {
+      toast({
+        title: "Mode démo activé",
+        description: "Vous pouvez explorer l'application.",
+      });
+      onComplete({ demoModeEnabled: true, importCompleted: true });
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handleManual = () => {
@@ -370,12 +400,12 @@ function DataStep({ onComplete }: { onComplete: (patch: Partial<OnboardingData>)
           else if (mode === "demo") handleDemo();
           else if (mode === "manual") handleManual();
         }}
-        disabled={!mode}
+        disabled={!mode || isLoading}
         className="w-full"
         data-testid="button-continue-step-3"
       >
-        {mode === "import" ? "Aller à l'import" : "Continuer"}
-        <ChevronRight className="w-4 h-4 ml-2" />
+        {isLoading ? "Création des données..." : mode === "import" ? "Aller à l'import" : "Continuer"}
+        {!isLoading && <ChevronRight className="w-4 h-4 ml-2" />}
       </Button>
     </div>
   );
