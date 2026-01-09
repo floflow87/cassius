@@ -557,7 +557,7 @@ function OnboardingSettingsSection() {
   const { data: checklist, isLoading: checklistLoading } = useQuery<{
     completedCount: number;
     totalCount: number;
-    items: Array<{ id: string; label: string; completed: boolean; actionUrl: string }>;
+    items: Array<{ id: string; label: string; completed: boolean; actionUrl: string; wizardStep: number | null }>;
   }>({
     queryKey: ["/api/onboarding/checklist"],
     refetchInterval: 30000,
@@ -596,9 +596,16 @@ function OnboardingSettingsSection() {
   };
 
   const handleResumeFirstIncomplete = () => {
-    const firstIncomplete = checklist?.items.find(item => !item.completed);
-    if (firstIncomplete) {
-      setLocation(firstIncomplete.actionUrl);
+    // Find first incomplete item with a wizard step
+    const firstIncomplete = checklist?.items.find((item: any) => !item.completed && item.wizardStep !== null);
+    if (firstIncomplete && firstIncomplete.wizardStep !== null) {
+      setLocation(`/onboarding?step=${firstIncomplete.wizardStep}`);
+    } else {
+      // Fallback to first incomplete item's actionUrl
+      const anyIncomplete = checklist?.items.find((item: any) => !item.completed);
+      if (anyIncomplete) {
+        setLocation(anyIncomplete.actionUrl);
+      }
     }
   };
 

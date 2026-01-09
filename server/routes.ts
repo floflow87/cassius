@@ -5746,7 +5746,8 @@ export async function registerRoutes(
         .where(eq(onboardingState.organisationId, organisationId))
         .then(rows => rows[0]);
 
-      const onboardingData = state ? JSON.parse(state.data || "{}") as OnboardingData : {};
+      const onboardingData = state ? JSON.parse(state.data || "{}") as OnboardingData & { manuallyCompleted?: Record<string, boolean> } : {};
+      const manuallyCompleted = onboardingData.manuallyCompleted || {};
 
       // Run all count queries in parallel for performance
       const [
@@ -5771,67 +5772,77 @@ export async function registerRoutes(
         db.select({ count: sql<number>`count(*)` }).from(notificationPreferences).where(and(eq(notificationPreferences.organisationId, organisationId), eq(notificationPreferences.inAppEnabled, true))).then(r => Number(r[0]?.count || 0))
       ]);
 
-      // Build checklist items
+      // Build checklist items (real data OR manually marked as complete)
       const items = [
         {
           id: "clinic",
           label: "Renseigner les infos du cabinet",
-          completed: !!(onboardingData.clinicName && onboardingData.clinicName.trim().length > 0),
-          actionUrl: "/settings?tab=organisation"
+          completed: manuallyCompleted["clinic"] || !!(onboardingData.clinicName && onboardingData.clinicName.trim().length > 0),
+          actionUrl: "/settings?tab=organisation",
+          wizardStep: 1
         },
         {
           id: "team",
           label: "Ajouter un collaborateur",
-          completed: userCount >= 2,
-          actionUrl: "/settings?tab=collaborators"
+          completed: manuallyCompleted["team"] || userCount >= 2,
+          actionUrl: "/settings?tab=collaborators",
+          wizardStep: 2
         },
         {
           id: "patient",
           label: "Ajouter des patients",
-          completed: patientCount >= 1,
-          actionUrl: "/patients"
+          completed: manuallyCompleted["patient"] || patientCount >= 1,
+          actionUrl: "/patients",
+          wizardStep: 3
         },
         {
           id: "act",
           label: "Créer un acte",
-          completed: operationCount >= 1,
-          actionUrl: "/actes"
+          completed: manuallyCompleted["act"] || operationCount >= 1,
+          actionUrl: "/actes",
+          wizardStep: 4
         },
         {
           id: "implant",
           label: "Poser un implant",
-          completed: surgeryImplantCount >= 1,
-          actionUrl: "/actes"
+          completed: manuallyCompleted["implant"] || surgeryImplantCount >= 1,
+          actionUrl: "/actes",
+          wizardStep: 4
         },
         {
           id: "isq",
           label: "Renseigner un ISQ",
-          completed: isqCount >= 1,
-          actionUrl: "/patients"
+          completed: manuallyCompleted["isq"] || isqCount >= 1,
+          actionUrl: "/patients",
+          wizardStep: null
         },
         {
           id: "calendar",
           label: "Créer un rendez-vous",
-          completed: appointmentCount >= 1,
-          actionUrl: "/calendar"
+          completed: manuallyCompleted["calendar"] || appointmentCount >= 1,
+          actionUrl: "/calendar",
+          wizardStep: 5
         },
         {
           id: "google",
           label: "Connecter Google Calendar",
-          completed: !!(calendarIntegration?.accessToken),
-          actionUrl: "/settings?tab=integrations"
+          completed: manuallyCompleted["google"] || !!(calendarIntegration?.accessToken),
+          actionUrl: "/settings?tab=integrations",
+          wizardStep: 5
         },
         {
           id: "notifications",
           label: "Activer les notifications",
-          completed: notificationEnabledCount >= 1,
-          actionUrl: "/settings?tab=notifications"
+          completed: manuallyCompleted["notifications"] || notificationEnabledCount >= 1,
+          actionUrl: "/settings?tab=notifications",
+          wizardStep: 6
         },
         {
           id: "documents",
           label: "Ajouter un document",
-          completed: documentCount >= 1,
-          actionUrl: "/documents"
+          completed: manuallyCompleted["documents"] || documentCount >= 1,
+          actionUrl: "/documents",
+          wizardStep: 7
         }
       ];
 
@@ -6106,6 +6117,119 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("[Onboarding] Error showing:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/onboarding/checklist/:itemId/mark-done - Mark a checklist item as done manually
+  app.post("/api/onboarding/checklist/:itemId/mark-done", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = getUserId(req, res);
+    if (!userId) return;
+
+    const { itemId } = req.params;
+
+    // Valid checklist item IDs
+    const validItems = ["clinic", "team", "patient", "act", "implant", "isq", "calendar", "google", "notifications", "documents"];
+    if (!validItems.includes(itemId)) {
+      return res.status(400).json({ error: "Invalid checklist item ID" });
+    }
+
+    try {
+      // Get existing state
+      let state = await db
+        .select()
+        .from(onboardingState)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .then(rows => rows[0]);
+
+      if (!state) {
+        return res.status(404).json({ error: "Onboarding state not found" });
+      }
+
+      // Store manual completion overrides in onboardingState.data.manuallyCompleted
+      const onboardingData = JSON.parse(state.data || "{}") as OnboardingData & { manuallyCompleted?: Record<string, boolean> };
+      const manuallyCompleted = onboardingData.manuallyCompleted || {};
+      manuallyCompleted[itemId] = true;
+      onboardingData.manuallyCompleted = manuallyCompleted;
+
+      await db
+        .update(onboardingState)
+        .set({
+          data: JSON.stringify(onboardingData),
+          updatedAt: new Date(),
+        })
+        .where(eq(onboardingState.organisationId, organisationId));
+
+      // Re-fetch checklist to check if all items are now complete
+      const [
+        userCount,
+        patientCount,
+        operationCount,
+        surgeryImplantCount,
+        isqCount,
+        appointmentCount,
+        documentCount,
+        calendarIntegration,
+        notificationEnabledCount
+      ] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(operations).where(eq(operations.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(surgeryImplants).where(eq(surgeryImplants.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(visites).where(and(eq(visites.organisationId, organisationId), sql`${visites.isq} IS NOT NULL`)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(appointments).where(eq(appointments.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(documents).where(eq(documents.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select().from(calendarIntegrations).where(eq(calendarIntegrations.organisationId, organisationId)).then(rows => rows[0]),
+        db.select({ count: sql<number>`count(*)` }).from(notificationPreferences).where(and(eq(notificationPreferences.organisationId, organisationId), eq(notificationPreferences.inAppEnabled, true))).then(r => Number(r[0]?.count || 0))
+      ]);
+
+      // Calculate completion with manual overrides
+      const mc = onboardingData.manuallyCompleted || {};
+      const items = [
+        { id: "clinic", completed: mc["clinic"] || !!(onboardingData.clinicName && onboardingData.clinicName.trim().length > 0) },
+        { id: "team", completed: mc["team"] || userCount >= 2 },
+        { id: "patient", completed: mc["patient"] || patientCount >= 1 },
+        { id: "act", completed: mc["act"] || operationCount >= 1 },
+        { id: "implant", completed: mc["implant"] || surgeryImplantCount >= 1 },
+        { id: "isq", completed: mc["isq"] || isqCount >= 1 },
+        { id: "calendar", completed: mc["calendar"] || appointmentCount >= 1 },
+        { id: "google", completed: mc["google"] || !!(calendarIntegration?.accessToken) },
+        { id: "notifications", completed: mc["notifications"] || notificationEnabledCount >= 1 },
+        { id: "documents", completed: mc["documents"] || documentCount >= 1 },
+      ];
+
+      const allCompleted = items.every(i => i.completed);
+
+      if (allCompleted) {
+        // Check if we already created the completion notification
+        const existingNotif = await db
+          .select()
+          .from(notifications)
+          .where(and(
+            eq(notifications.organisationId, organisationId),
+            eq(notifications.type, "ONBOARDING_COMPLETED")
+          ))
+          .then(rows => rows[0]);
+
+        if (!existingNotif) {
+          // Create onboarding completed notification
+          await db.insert(notifications).values({
+            organisationId,
+            recipientUserId: userId,
+            kind: "SYSTEM",
+            type: "ONBOARDING_COMPLETED",
+            severity: "INFO",
+            title: "Onboarding terminé",
+            message: "Félicitations ! Vous avez terminé la configuration de Cassius.",
+          });
+        }
+      }
+
+      res.json({ success: true, itemId, allCompleted });
+    } catch (error: any) {
+      console.error("[Onboarding] Error marking item done:", error);
       res.status(500).json({ error: error.message });
     }
   });

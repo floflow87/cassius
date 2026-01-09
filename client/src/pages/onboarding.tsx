@@ -591,7 +591,7 @@ function DocumentsStep({ onComplete, onSkip }: { onComplete: (patch: Partial<Onb
 }
 
 export default function OnboardingPage() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { 
     state, 
@@ -606,6 +606,20 @@ export default function OnboardingPage() {
     isPending,
     isCompleted 
   } = useOnboarding();
+  
+  // Handle URL step parameter to navigate directly to a specific step
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stepParam = urlParams.get('step');
+    if (stepParam && state && !isLoading) {
+      const targetStep = parseInt(stepParam, 10);
+      if (!isNaN(targetStep) && targetStep >= 0 && targetStep <= 7 && targetStep !== state.currentStep) {
+        goToStep(targetStep);
+        // Clear the step parameter from URL after navigating
+        window.history.replaceState({}, '', '/onboarding');
+      }
+    }
+  }, [state, isLoading, goToStep]);
   
   useEffect(() => {
     if (isCompleted) {
