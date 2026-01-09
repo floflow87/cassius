@@ -1223,6 +1223,8 @@ export const onboardingState = pgTable("onboarding_state", {
   skippedSteps: text("skipped_steps").default("{}").notNull(),
   data: text("data").default("{}").notNull(),
   status: onboardingStatusEnum("status").default("IN_PROGRESS").notNull(),
+  dismissed: boolean("dismissed").default(false).notNull(),
+  dismissedAt: timestamp("dismissed_at"),
   completedAt: timestamp("completed_at"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

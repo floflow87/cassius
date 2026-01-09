@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearch } from "wouter";
+import { useSearch, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useOnboarding, ONBOARDING_STEPS } from "@/hooks/use-onboarding";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,7 +41,12 @@ import {
   AlertCircle,
   Bell,
   Loader2,
-  Pencil
+  Pencil,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  SkipForward,
+  Sparkles
 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -215,7 +223,10 @@ export default function SettingsPage() {
 
           <TabsContent value="security">
             {profile ? (
-              <SecuritySection profile={profile} onProfileUpdate={() => queryClient.invalidateQueries({ queryKey: ["/api/settings/profile"] })} />
+              <div className="space-y-6">
+                <SecuritySection profile={profile} onProfileUpdate={() => queryClient.invalidateQueries({ queryKey: ["/api/settings/profile"] })} />
+                <OnboardingSettingsSection />
+              </div>
             ) : (
               <div className="flex items-center justify-center py-12 text-muted-foreground">
                 <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
@@ -527,6 +538,167 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function OnboardingSettingsSection() {
+  const [, setLocation] = useLocation();
+  const [isOpen, setIsOpen] = useState(true);
+  const { toast } = useToast();
+  const { 
+    state, 
+    isLoading, 
+    isCompleted, 
+    isDismissed,
+    getProgress, 
+    isStepCompleted, 
+    isStepSkipped,
+    showOnboarding,
+    isPending
+  } = useOnboarding();
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5" />
+            <CardTitle className="font-semibold">Configuration initiale</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const progress = getProgress();
+  const statusBadge = isCompleted ? (
+    <Badge variant="default" className="bg-green-500 hover:bg-green-600">Terminé</Badge>
+  ) : (
+    <Badge variant="secondary">En cours</Badge>
+  );
+
+  const handleResumeOnboarding = (step?: number) => {
+    if (step !== undefined) {
+      setLocation(`/onboarding?step=${step}`);
+    } else {
+      setLocation("/onboarding");
+    }
+  };
+
+  const handleShowOnboarding = async () => {
+    try {
+      await showOnboarding();
+      toast({
+        title: "Configuration réactivée",
+        description: "La progression s'affiche à nouveau sur le tableau de bord.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de réactiver la configuration",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <Card>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-2 hover-elevate rounded p-1 -m-1" data-testid="button-toggle-onboarding-settings">
+                {isOpen ? (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                )}
+                <CardTitle className="flex items-center gap-2 font-semibold">
+                  <Sparkles className="w-5 h-5" />
+                  Configuration initiale
+                </CardTitle>
+              </button>
+            </CollapsibleTrigger>
+            <div className="flex items-center gap-2">
+              {statusBadge}
+              {!isCompleted && (
+                <Button size="sm" onClick={() => handleResumeOnboarding()} data-testid="button-resume-onboarding-settings">
+                  Reprendre
+                </Button>
+              )}
+            </div>
+          </div>
+          <CardDescription className="font-light">
+            Suivez les étapes pour configurer complètement votre espace Cassius.
+          </CardDescription>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="space-y-4 pt-0">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Progression globale</span>
+                <span className="font-medium">{progress}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
+            
+            <div className="space-y-1">
+              {ONBOARDING_STEPS.map((step) => {
+                const completed = isStepCompleted(step.id);
+                const skipped = isStepSkipped(step.id);
+                
+                return (
+                  <div 
+                    key={step.id}
+                    className="flex items-center justify-between gap-2 text-sm py-2 px-2 -mx-2 rounded cursor-pointer hover-elevate"
+                    onClick={() => handleResumeOnboarding(step.id)}
+                    data-testid={`settings-onboarding-step-${step.id}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {completed ? (
+                        <Check className="w-4 h-4 text-green-500" />
+                      ) : skipped ? (
+                        <SkipForward className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <Circle className="w-4 h-4 text-muted-foreground" />
+                      )}
+                      <span className={completed ? "text-muted-foreground" : skipped ? "text-muted-foreground" : ""}>
+                        {step.title}
+                      </span>
+                      {!step.required && (
+                        <span className="text-xs text-muted-foreground">(optionnel)</span>
+                      )}
+                    </div>
+                    <Badge variant={completed ? "default" : skipped ? "secondary" : "outline"} className={completed ? "bg-green-500 hover:bg-green-600" : ""}>
+                      {completed ? "Validé" : skipped ? "Passé" : "À faire"}
+                    </Badge>
+                  </div>
+                );
+              })}
+            </div>
+
+            {isDismissed && !isCompleted && (
+              <div className="pt-2 border-t">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleShowOnboarding}
+                  disabled={isPending}
+                  data-testid="button-show-onboarding"
+                >
+                  Afficher sur le tableau de bord
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
   );
 }
 

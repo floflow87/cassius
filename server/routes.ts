@@ -1046,6 +1046,37 @@ export async function registerRoutes(
         implantData
       );
 
+      // Auto-complete onboarding step 4 (first case) when operation is created
+      try {
+        const onboardingStateRow = await db
+          .select()
+          .from(onboardingState)
+          .where(eq(onboardingState.organisationId, organisationId))
+          .then(rows => rows[0]);
+        
+        if (onboardingStateRow && onboardingStateRow.status === "IN_PROGRESS") {
+          const completedSteps = JSON.parse(onboardingStateRow.completedSteps || "{}");
+          if (!completedSteps["4"]) {
+            completedSteps["4"] = true;
+            const data = JSON.parse(onboardingStateRow.data || "{}");
+            data.firstCaseCreated = true;
+            
+            await db
+              .update(onboardingState)
+              .set({
+                completedSteps: JSON.stringify(completedSteps),
+                data: JSON.stringify(data),
+                updatedAt: new Date(),
+              })
+              .where(eq(onboardingState.organisationId, organisationId));
+            
+            console.log("[Onboarding] Auto-completed step 4 after operation creation");
+          }
+        }
+      } catch (onboardingError) {
+        console.error("[Onboarding] Error auto-completing step 4:", onboardingError);
+      }
+
       res.status(201).json({ ...operation, surgeryImplants: createdSurgeryImplants });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -5890,6 +5921,76 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("[Onboarding] Error completing:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/onboarding/dismiss - Hide onboarding widget
+  app.post("/api/onboarding/dismiss", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const [updatedState] = await db
+        .update(onboardingState)
+        .set({
+          dismissed: true,
+          dismissedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(onboardingState.organisationId, organisationId))
+        .returning();
+
+      if (!updatedState) {
+        return res.status(404).json({ error: "Onboarding state not found" });
+      }
+
+      res.json({
+        success: true,
+        state: {
+          ...updatedState,
+          completedSteps: JSON.parse(updatedState.completedSteps || "{}"),
+          skippedSteps: JSON.parse(updatedState.skippedSteps || "{}"),
+          data: JSON.parse(updatedState.data || "{}"),
+        },
+      });
+    } catch (error: any) {
+      console.error("[Onboarding] Error dismissing:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/onboarding/show - Show onboarding widget again
+  app.post("/api/onboarding/show", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const [updatedState] = await db
+        .update(onboardingState)
+        .set({
+          dismissed: false,
+          dismissedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(onboardingState.organisationId, organisationId))
+        .returning();
+
+      if (!updatedState) {
+        return res.status(404).json({ error: "Onboarding state not found" });
+      }
+
+      res.json({
+        success: true,
+        state: {
+          ...updatedState,
+          completedSteps: JSON.parse(updatedState.completedSteps || "{}"),
+          skippedSteps: JSON.parse(updatedState.skippedSteps || "{}"),
+          data: JSON.parse(updatedState.data || "{}"),
+        },
+      });
+    } catch (error: any) {
+      console.error("[Onboarding] Error showing:", error);
       res.status(500).json({ error: error.message });
     }
   });

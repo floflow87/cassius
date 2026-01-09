@@ -10,6 +10,8 @@ interface OnboardingStateResponse {
   skippedSteps: Record<string, boolean>;
   data: OnboardingData;
   status: "IN_PROGRESS" | "COMPLETED";
+  dismissed: boolean;
+  dismissedAt: string | null;
   completedAt: string | null;
   updatedAt: string;
   createdAt: string;
@@ -60,6 +62,26 @@ export function useOnboarding() {
     },
   });
 
+  const dismissMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/onboarding/dismiss");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/onboarding"] });
+    },
+  });
+
+  const showMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/onboarding/show");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/onboarding"] });
+    },
+  });
+
   const goToStep = async (step: number) => {
     await patchMutation.mutateAsync({ currentStep: step });
   };
@@ -86,6 +108,14 @@ export function useOnboarding() {
   const finishOnboarding = async () => {
     const result = await completeMutation.mutateAsync();
     return result;
+  };
+
+  const dismissOnboarding = async () => {
+    await dismissMutation.mutateAsync();
+  };
+
+  const showOnboarding = async () => {
+    await showMutation.mutateAsync();
   };
 
   const isStepCompleted = (step: number) => {
@@ -118,11 +148,14 @@ export function useOnboarding() {
     skipStep,
     updateData,
     finishOnboarding,
+    dismissOnboarding,
+    showOnboarding,
     isStepCompleted,
     isStepSkipped,
     getProgress,
     canComplete,
-    isPending: patchMutation.isPending || completeMutation.isPending,
+    isPending: patchMutation.isPending || completeMutation.isPending || dismissMutation.isPending || showMutation.isPending,
     isCompleted: state?.status === "COMPLETED",
+    isDismissed: state?.dismissed === true,
   };
 }

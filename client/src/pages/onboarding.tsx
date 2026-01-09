@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOnboarding, ONBOARDING_STEPS } from "@/hooks/use-onboarding";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Check, ChevronLeft, ChevronRight, Building2, Users, Database, Stethoscope, Calendar, Bell, FileText, Sparkles, SkipForward } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Building2, Users, Database, Stethoscope, Calendar, Bell, FileText, Sparkles, SkipForward, Mail, ExternalLink } from "lucide-react";
 import type { OnboardingData } from "@shared/schema";
 
 const stepIcons = [Sparkles, Building2, Users, Database, Stethoscope, Calendar, Bell, FileText];
@@ -176,6 +179,48 @@ function ClinicStep({ data, onComplete }: { data: OnboardingData; onComplete: (p
 }
 
 function TeamStep({ onComplete, onSkip }: { onComplete: () => void; onSkip: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [email, setEmail] = useState("");
+  const [nom, setNom] = useState("");
+  const [prenom, setPrenom] = useState("");
+  const [role, setRole] = useState<"CHIRURGIEN" | "ASSISTANT" | "ADMIN">("ASSISTANT");
+  const [invitedCount, setInvitedCount] = useState(0);
+
+  const inviteMutation = useMutation({
+    mutationFn: async (data: { email: string; nom: string; prenom: string; role: string }) => {
+      const response = await apiRequest("POST", "/api/settings/collaborators", data);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erreur lors de l'envoi de l'invitation");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Invitation envoyée",
+        description: `Une invitation a été envoyée à ${email}`,
+      });
+      setInvitedCount(prev => prev + 1);
+      setEmail("");
+      setNom("");
+      setPrenom("");
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/collaborators"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleInvite = () => {
+    if (!email) return;
+    inviteMutation.mutate({ email, nom, prenom, role });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -185,14 +230,72 @@ function TeamStep({ onComplete, onSkip }: { onComplete: () => void; onSkip: () =
         </p>
       </div>
       
-      <Card className="bg-muted/50">
-        <CardContent className="pt-6">
-          <div className="text-center space-y-3">
-            <Users className="w-12 h-12 mx-auto text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Vous pourrez inviter des collaborateurs plus tard depuis les paramètres.
-            </p>
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="invite-prenom">Prénom</Label>
+              <Input 
+                id="invite-prenom"
+                value={prenom}
+                onChange={(e) => setPrenom(e.target.value)}
+                placeholder="Jean"
+                data-testid="input-invite-prenom"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-nom">Nom</Label>
+              <Input 
+                id="invite-nom"
+                value={nom}
+                onChange={(e) => setNom(e.target.value)}
+                placeholder="Dupont"
+                data-testid="input-invite-nom"
+              />
+            </div>
           </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="invite-email">Email</Label>
+            <Input 
+              id="invite-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="jean.dupont@cabinet.fr"
+              data-testid="input-invite-email"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="invite-role">Rôle</Label>
+            <Select value={role} onValueChange={(v) => setRole(v as typeof role)}>
+              <SelectTrigger id="invite-role" data-testid="select-invite-role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ASSISTANT">Assistant</SelectItem>
+                <SelectItem value="CHIRURGIEN">Chirurgien</SelectItem>
+                <SelectItem value="ADMIN">Administrateur</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <Button 
+            onClick={handleInvite} 
+            disabled={!email || inviteMutation.isPending}
+            className="w-full"
+            data-testid="button-send-invite"
+          >
+            <Mail className="w-4 h-4 mr-2" />
+            {inviteMutation.isPending ? "Envoi..." : "Envoyer l'invitation"}
+          </Button>
+          
+          {invitedCount > 0 && (
+            <p className="text-sm text-center text-green-600">
+              {invitedCount} invitation{invitedCount > 1 ? "s" : ""} envoyée{invitedCount > 1 ? "s" : ""}
+            </p>
+          )}
         </CardContent>
       </Card>
       
@@ -325,8 +428,8 @@ function FirstCaseStep({ onComplete }: { onComplete: (patch: Partial<OnboardingD
 function CalendarStep({ onComplete, onSkip }: { onComplete: (patch: Partial<OnboardingData>) => void; onSkip: () => void }) {
   const [, setLocation] = useLocation();
   
-  const handleGoToCalendar = () => {
-    setLocation("/calendar");
+  const handleGoToSettings = () => {
+    setLocation("/settings/calendar");
   };
   
   return (
@@ -345,6 +448,10 @@ function CalendarStep({ onComplete, onSkip }: { onComplete: (patch: Partial<Onbo
             <p className="text-sm text-muted-foreground">
               Gérez vos rendez-vous et synchronisez avec Google Calendar.
             </p>
+            <Button variant="outline" size="sm" onClick={handleGoToSettings} data-testid="button-go-calendar-settings">
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Accéder aux paramètres
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -364,6 +471,12 @@ function CalendarStep({ onComplete, onSkip }: { onComplete: (patch: Partial<Onbo
 }
 
 function NotificationsStep({ onComplete, onSkip }: { onComplete: (patch: Partial<OnboardingData>) => void; onSkip: () => void }) {
+  const [, setLocation] = useLocation();
+  
+  const handleGoToSettings = () => {
+    setLocation("/settings/notifications");
+  };
+  
   return (
     <div className="space-y-6">
       <div>
@@ -380,6 +493,10 @@ function NotificationsStep({ onComplete, onSkip }: { onComplete: (patch: Partial
             <p className="text-sm text-muted-foreground">
               Recevez des alertes ISQ, rappels de suivi et notifications d'équipe.
             </p>
+            <Button variant="outline" size="sm" onClick={handleGoToSettings} data-testid="button-go-notifications-settings">
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Accéder aux paramètres
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -399,6 +516,12 @@ function NotificationsStep({ onComplete, onSkip }: { onComplete: (patch: Partial
 }
 
 function DocumentsStep({ onComplete, onSkip }: { onComplete: (patch: Partial<OnboardingData>) => void; onSkip: () => void }) {
+  const [, setLocation] = useLocation();
+  
+  const handleGoToDocuments = () => {
+    setLocation("/documents");
+  };
+  
   return (
     <div className="space-y-6">
       <div>
@@ -415,6 +538,10 @@ function DocumentsStep({ onComplete, onSkip }: { onComplete: (patch: Partial<Onb
             <p className="text-sm text-muted-foreground">
               Stockez radiographies, consentements et autres documents.
             </p>
+            <Button variant="outline" size="sm" onClick={handleGoToDocuments} data-testid="button-go-documents">
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Accéder aux documents
+            </Button>
           </div>
         </CardContent>
       </Card>
