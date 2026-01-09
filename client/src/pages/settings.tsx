@@ -595,6 +595,13 @@ function OnboardingSettingsSection() {
     setLocation(url);
   };
 
+  const handleResumeFirstIncomplete = () => {
+    const firstIncomplete = checklist?.items.find(item => !item.completed);
+    if (firstIncomplete) {
+      setLocation(firstIncomplete.actionUrl);
+    }
+  };
+
   const handleShowOnboarding = async () => {
     try {
       await showOnboarding();
@@ -632,7 +639,7 @@ function OnboardingSettingsSection() {
             <div className="flex items-center gap-2">
               {statusBadge}
               {!allCompleted && (
-                <Button size="sm" onClick={() => handleNavigate("/onboarding")} data-testid="button-resume-onboarding-settings">
+                <Button size="sm" onClick={handleResumeFirstIncomplete} data-testid="button-resume-onboarding-settings">
                   Reprendre
                 </Button>
               )}

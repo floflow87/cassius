@@ -5777,13 +5777,13 @@ export async function registerRoutes(
           id: "clinic",
           label: "Renseigner les infos du cabinet",
           completed: !!(onboardingData.clinicName && onboardingData.clinicName.trim().length > 0),
-          actionUrl: "/parametres?tab=organisation"
+          actionUrl: "/settings?tab=organisation"
         },
         {
           id: "team",
           label: "Ajouter un collaborateur",
           completed: userCount >= 2,
-          actionUrl: "/parametres?tab=collaborators"
+          actionUrl: "/settings?tab=collaborators"
         },
         {
           id: "patient",
@@ -5813,19 +5813,19 @@ export async function registerRoutes(
           id: "calendar",
           label: "Créer un rendez-vous",
           completed: appointmentCount >= 1,
-          actionUrl: "/calendrier"
+          actionUrl: "/calendar"
         },
         {
           id: "google",
           label: "Connecter Google Calendar",
           completed: !!(calendarIntegration?.accessToken),
-          actionUrl: "/parametres?tab=integrations"
+          actionUrl: "/settings?tab=integrations"
         },
         {
           id: "notifications",
           label: "Activer les notifications",
           completed: notificationEnabledCount >= 1,
-          actionUrl: "/parametres?tab=notifications"
+          actionUrl: "/settings?tab=notifications"
         },
         {
           id: "documents",
