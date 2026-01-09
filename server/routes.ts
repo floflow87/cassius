@@ -34,7 +34,13 @@ import {
   users,
   notifications,
   flags,
+  patientShareLinks,
+  surgeryImplants,
+  implants,
+  operations,
 } from "@shared/schema";
+import type { PublicPatientShareData, PatientShareLinkWithDetails, OnboardingData, OnboardingState } from "@shared/schema";
+import { onboardingState, appointments, documents, notificationPreferences, calendarIntegrations, visites } from "@shared/schema";
 import type {
   Patient,
   PatientDetail,
@@ -653,6 +659,222 @@ export async function registerRoutes(
     }
   });
 
+  // ========== PATIENT SHARE LINKS ==========
+
+  // Create a share link for a patient's implants
+  app.post("/api/patients/:patientId/share-links", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.jwtUser?.userId;
+    if (!userId) return res.status(401).json({ error: "User not authenticated" });
+
+    const { patientId } = req.params;
+    const { expiresInDays } = req.body as { expiresInDays?: number };
+
+    try {
+      // Verify patient exists and belongs to this org
+      const patient = await storage.getPatient(organisationId, patientId);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Generate a secure random token
+      const token = randomBytes(32).toString("hex");
+      const tokenHash = scryptSync(token, "salt_share_link", 64).toString("hex");
+
+      // Calculate expiration (default: no expiration)
+      const expiresAt = expiresInDays 
+        ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) 
+        : null;
+
+      // Insert the share link
+      const [shareLink] = await db.insert(patientShareLinks).values({
+        organisationId,
+        patientId,
+        sharedByUserId: userId,
+        tokenHash,
+        expiresAt,
+      }).returning();
+
+      // Return the token (only time it's visible - we store only the hash)
+      res.json({
+        id: shareLink.id,
+        token,
+        shareUrl: `${getBaseUrl()}/public/share/${token}`,
+        expiresAt: shareLink.expiresAt,
+        createdAt: shareLink.createdAt,
+      });
+    } catch (error) {
+      console.error("Error creating share link:", error);
+      res.status(500).json({ error: "Failed to create share link" });
+    }
+  });
+
+  // Get existing share links for a patient
+  app.get("/api/patients/:patientId/share-links", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    const { patientId } = req.params;
+
+    try {
+      // Verify patient exists
+      const patient = await storage.getPatient(organisationId, patientId);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Get all active share links for this patient
+      const links = await db.select({
+        id: patientShareLinks.id,
+        expiresAt: patientShareLinks.expiresAt,
+        revokedAt: patientShareLinks.revokedAt,
+        lastAccessedAt: patientShareLinks.lastAccessedAt,
+        accessCount: patientShareLinks.accessCount,
+        createdAt: patientShareLinks.createdAt,
+        sharedByUserName: sql<string>`(SELECT COALESCE(prenom || ' ' || nom, username) FROM users WHERE id = ${patientShareLinks.sharedByUserId})`,
+      }).from(patientShareLinks).where(
+        and(
+          eq(patientShareLinks.organisationId, organisationId),
+          eq(patientShareLinks.patientId, patientId)
+        )
+      ).orderBy(desc(patientShareLinks.createdAt));
+
+      res.json(links);
+    } catch (error) {
+      console.error("Error fetching share links:", error);
+      res.status(500).json({ error: "Failed to fetch share links" });
+    }
+  });
+
+  // Revoke a share link
+  app.delete("/api/patients/:patientId/share-links/:linkId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    const { patientId, linkId } = req.params;
+
+    try {
+      // Verify patient exists and belongs to this org
+      const patient = await storage.getPatient(organisationId, patientId);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Revoke the link by setting revokedAt
+      const result = await db.update(patientShareLinks)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(patientShareLinks.id, linkId),
+            eq(patientShareLinks.organisationId, organisationId),
+            eq(patientShareLinks.patientId, patientId)
+          )
+        )
+        .returning();
+
+      if (result.length === 0) {
+        return res.status(404).json({ error: "Share link not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error revoking share link:", error);
+      res.status(500).json({ error: "Failed to revoke share link" });
+    }
+  });
+
+  // Public endpoint to view shared patient data (NO AUTH REQUIRED)
+  app.get("/api/public/share/:token", async (req, res) => {
+    const { token } = req.params;
+
+    try {
+      // Hash the provided token to match against stored hash
+      const tokenHash = scryptSync(token, "salt_share_link", 64).toString("hex");
+
+      // Find the share link
+      const [link] = await db.select().from(patientShareLinks)
+        .where(eq(patientShareLinks.tokenHash, tokenHash))
+        .limit(1);
+
+      if (!link) {
+        return res.status(404).json({ error: "Lien de partage invalide ou expiré" });
+      }
+
+      // Check if revoked
+      if (link.revokedAt) {
+        return res.status(410).json({ error: "Ce lien de partage a été révoqué" });
+      }
+
+      // Check if expired
+      if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+        return res.status(410).json({ error: "Ce lien de partage a expiré" });
+      }
+
+      // Update access count and last accessed
+      await db.update(patientShareLinks)
+        .set({ 
+          accessCount: sql`${patientShareLinks.accessCount} + 1`,
+          lastAccessedAt: new Date(),
+        })
+        .where(eq(patientShareLinks.id, link.id));
+
+      // Get patient basic info
+      const [patient] = await db.select({
+        prenom: patients.prenom,
+        nom: patients.nom,
+        dateNaissance: patients.dateNaissance,
+      }).from(patients).where(eq(patients.id, link.patientId)).limit(1);
+
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Get implants for this patient (through operations)
+      const implantData = await db.select({
+        id: surgeryImplants.id,
+        siteFdi: surgeryImplants.siteFdi,
+        marque: implants.marque,
+        reference: implants.referenceFabricant,
+        diametre: implants.diametre,
+        longueur: implants.longueur,
+        position: surgeryImplants.positionImplant,
+        statut: surgeryImplants.statut,
+        datePose: surgeryImplants.datePose,
+        isqPose: surgeryImplants.isqPose,
+        isq2m: surgeryImplants.isq2m,
+        isq3m: surgeryImplants.isq3m,
+        isq6m: surgeryImplants.isq6m,
+      })
+        .from(surgeryImplants)
+        .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+        .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
+        .where(eq(operations.patientId, link.patientId))
+        .orderBy(desc(surgeryImplants.datePose));
+
+      // Get sharer name
+      const [sharer] = await db.select({
+        name: sql<string>`COALESCE(${users.prenom} || ' ' || ${users.nom}, ${users.username})`,
+      }).from(users).where(eq(users.id, link.sharedByUserId)).limit(1);
+
+      const responseData: PublicPatientShareData = {
+        patient: {
+          prenom: patient.prenom,
+          nom: patient.nom,
+          dateNaissance: patient.dateNaissance,
+        },
+        implants: implantData,
+        sharedByUserName: sharer?.name || "Utilisateur inconnu",
+        createdAt: link.createdAt.toISOString(),
+      };
+
+      res.json(responseData);
+    } catch (error) {
+      console.error("Error fetching shared patient data:", error);
+      res.status(500).json({ error: "Failed to fetch shared data" });
+    }
+  });
+
   // ========== OPERATIONS ==========
   app.get("/api/operations", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -823,6 +1045,37 @@ export async function registerRoutes(
         operationData,
         implantData
       );
+
+      // Auto-complete onboarding step 4 (first case) when operation is created
+      try {
+        const onboardingStateRow = await db
+          .select()
+          .from(onboardingState)
+          .where(eq(onboardingState.organisationId, organisationId))
+          .then(rows => rows[0]);
+        
+        if (onboardingStateRow && onboardingStateRow.status === "IN_PROGRESS") {
+          const completedSteps = JSON.parse(onboardingStateRow.completedSteps || "{}");
+          if (!completedSteps["4"]) {
+            completedSteps["4"] = true;
+            const data = JSON.parse(onboardingStateRow.data || "{}");
+            data.firstCaseCreated = true;
+            
+            await db
+              .update(onboardingState)
+              .set({
+                completedSteps: JSON.stringify(completedSteps),
+                data: JSON.stringify(data),
+                updatedAt: new Date(),
+              })
+              .where(eq(onboardingState.organisationId, organisationId));
+            
+            console.log("[Onboarding] Auto-completed step 4 after operation creation");
+          }
+        }
+      } catch (onboardingError) {
+        console.error("[Onboarding] Error auto-completing step 4:", onboardingError);
+      }
 
       res.status(201).json({ ...operation, surgeryImplants: createdSurgeryImplants });
     } catch (error) {
@@ -5474,6 +5727,643 @@ export async function registerRoutes(
       }
     } catch (error: any) {
       console.error("[Notifications] Test notification error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== ONBOARDING ROUTES ====================
+
+  // GET /api/onboarding/checklist - Get dynamic checklist with completion status
+  app.get("/api/onboarding/checklist", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      // Get onboarding state
+      const state = await db
+        .select()
+        .from(onboardingState)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .then(rows => rows[0]);
+
+      const onboardingData = state ? JSON.parse(state.data || "{}") as OnboardingData & { manuallyCompleted?: Record<string, boolean> } : {};
+      const manuallyCompleted = onboardingData.manuallyCompleted || {};
+
+      // Run all count queries in parallel for performance
+      const [
+        userCount,
+        patientCount,
+        operationCount,
+        surgeryImplantCount,
+        isqCount,
+        appointmentCount,
+        documentCount,
+        calendarIntegration,
+        notificationEnabledCount
+      ] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(operations).where(eq(operations.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(surgeryImplants).where(eq(surgeryImplants.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(visites).where(and(eq(visites.organisationId, organisationId), sql`${visites.isq} IS NOT NULL`)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(appointments).where(eq(appointments.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(documents).where(eq(documents.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select().from(calendarIntegrations).where(eq(calendarIntegrations.organisationId, organisationId)).then(rows => rows[0]),
+        db.select({ count: sql<number>`count(*)` }).from(notificationPreferences).where(and(eq(notificationPreferences.organisationId, organisationId), eq(notificationPreferences.inAppEnabled, true))).then(r => Number(r[0]?.count || 0))
+      ]);
+
+      // Build checklist items (real data OR manually marked as complete)
+      const items = [
+        {
+          id: "clinic",
+          label: "Renseigner les infos du cabinet",
+          completed: manuallyCompleted["clinic"] || !!(onboardingData.clinicName && onboardingData.clinicName.trim().length > 0),
+          actionUrl: "/settings?tab=organisation",
+          wizardStep: 1
+        },
+        {
+          id: "team",
+          label: "Ajouter un collaborateur",
+          completed: manuallyCompleted["team"] || userCount >= 2,
+          actionUrl: "/settings?tab=collaborators",
+          wizardStep: 2
+        },
+        {
+          id: "patient",
+          label: "Ajouter des patients",
+          completed: manuallyCompleted["patient"] || patientCount >= 1,
+          actionUrl: "/patients",
+          wizardStep: 3
+        },
+        {
+          id: "act",
+          label: "Créer un acte",
+          completed: manuallyCompleted["act"] || operationCount >= 1,
+          actionUrl: "/actes",
+          wizardStep: 4
+        },
+        {
+          id: "implant",
+          label: "Poser un implant",
+          completed: manuallyCompleted["implant"] || surgeryImplantCount >= 1,
+          actionUrl: "/actes",
+          wizardStep: 4
+        },
+        {
+          id: "isq",
+          label: "Renseigner un ISQ",
+          completed: manuallyCompleted["isq"] || isqCount >= 1,
+          actionUrl: "/patients",
+          wizardStep: null
+        },
+        {
+          id: "calendar",
+          label: "Créer un rendez-vous",
+          completed: manuallyCompleted["calendar"] || appointmentCount >= 1,
+          actionUrl: "/calendar",
+          wizardStep: 5
+        },
+        {
+          id: "google",
+          label: "Connecter Google Calendar",
+          completed: manuallyCompleted["google"] || !!(calendarIntegration?.accessToken),
+          actionUrl: "/settings?tab=integrations",
+          wizardStep: 5
+        },
+        {
+          id: "notifications",
+          label: "Activer les notifications",
+          completed: manuallyCompleted["notifications"] || notificationEnabledCount >= 1,
+          actionUrl: "/settings?tab=notifications",
+          wizardStep: 6
+        },
+        {
+          id: "documents",
+          label: "Ajouter un document",
+          completed: manuallyCompleted["documents"] || documentCount >= 1,
+          actionUrl: "/documents",
+          wizardStep: 7
+        }
+      ];
+
+      const completedCount = items.filter(i => i.completed).length;
+
+      res.json({
+        completedCount,
+        totalCount: items.length,
+        items
+      });
+    } catch (error: any) {
+      console.error("[Onboarding] Error getting checklist:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/onboarding - Get onboarding state for organisation
+  app.get("/api/onboarding", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      // Try to get existing state
+      let state = await db
+        .select()
+        .from(onboardingState)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .then(rows => rows[0]);
+
+      // If no state exists, create one
+      if (!state) {
+        const [newState] = await db
+          .insert(onboardingState)
+          .values({
+            organisationId,
+            currentStep: 0,
+            completedSteps: "{}",
+            skippedSteps: "{}",
+            data: "{}",
+            status: "IN_PROGRESS",
+          })
+          .returning();
+        state = newState;
+      }
+
+      // Parse JSON fields
+      const response = {
+        ...state,
+        completedSteps: JSON.parse(state.completedSteps || "{}"),
+        skippedSteps: JSON.parse(state.skippedSteps || "{}"),
+        data: JSON.parse(state.data || "{}") as OnboardingData,
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      console.error("[Onboarding] Error getting state:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/onboarding - Update onboarding state
+  app.patch("/api/onboarding", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { currentStep, markCompleteStep, markSkipStep, dataPatch } = req.body as {
+        currentStep?: number;
+        markCompleteStep?: number;
+        markSkipStep?: number;
+        dataPatch?: Partial<OnboardingData>;
+      };
+
+      // Required steps that cannot be skipped
+      const requiredSteps = [0, 1, 3, 4];
+
+      // Prevent skipping required steps
+      if (markSkipStep !== undefined && requiredSteps.includes(markSkipStep)) {
+        return res.status(400).json({ 
+          error: "Cette etape est obligatoire et ne peut pas etre passee",
+          requiredStep: markSkipStep 
+        });
+      }
+
+      // Get existing state
+      let state = await db
+        .select()
+        .from(onboardingState)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .then(rows => rows[0]);
+
+      if (!state) {
+        return res.status(404).json({ error: "Onboarding state not found" });
+      }
+
+      // Parse existing JSON fields
+      let completedSteps = JSON.parse(state.completedSteps || "{}") as Record<string, boolean>;
+      let skippedSteps = JSON.parse(state.skippedSteps || "{}") as Record<string, boolean>;
+      let data = JSON.parse(state.data || "{}") as OnboardingData;
+
+      // Apply updates
+      if (markCompleteStep !== undefined) {
+        completedSteps[String(markCompleteStep)] = true;
+        // Remove from skipped if was skipped
+        delete skippedSteps[String(markCompleteStep)];
+      }
+
+      if (markSkipStep !== undefined) {
+        skippedSteps[String(markSkipStep)] = true;
+        // Also mark as completed for progress tracking
+        completedSteps[String(markSkipStep)] = true;
+      }
+
+      if (dataPatch) {
+        data = { ...data, ...dataPatch };
+      }
+
+      // Update the state
+      const updateData: any = {
+        updatedAt: new Date(),
+        completedSteps: JSON.stringify(completedSteps),
+        skippedSteps: JSON.stringify(skippedSteps),
+        data: JSON.stringify(data),
+      };
+
+      if (currentStep !== undefined) {
+        updateData.currentStep = currentStep;
+      }
+
+      const [updatedState] = await db
+        .update(onboardingState)
+        .set(updateData)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .returning();
+
+      // Parse and return response
+      const response = {
+        ...updatedState,
+        completedSteps: JSON.parse(updatedState.completedSteps || "{}"),
+        skippedSteps: JSON.parse(updatedState.skippedSteps || "{}"),
+        data: JSON.parse(updatedState.data || "{}") as OnboardingData,
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      console.error("[Onboarding] Error updating state:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/onboarding/complete - Mark onboarding as completed
+  app.post("/api/onboarding/complete", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      // Get existing state
+      const state = await db
+        .select()
+        .from(onboardingState)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .then(rows => rows[0]);
+
+      if (!state) {
+        return res.status(404).json({ error: "Onboarding state not found" });
+      }
+
+      const completedSteps = JSON.parse(state.completedSteps || "{}") as Record<string, boolean>;
+      const skippedSteps = JSON.parse(state.skippedSteps || "{}") as Record<string, boolean>;
+
+      // Check required steps (0, 1, 3, 4 are required)
+      const requiredSteps = [0, 1, 3, 4];
+      const missingSteps = requiredSteps.filter(step => !completedSteps[String(step)]);
+
+      if (missingSteps.length > 0) {
+        return res.status(400).json({
+          error: "Required steps not completed",
+          missingSteps,
+        });
+      }
+
+      // Mark as completed
+      const [updatedState] = await db
+        .update(onboardingState)
+        .set({
+          status: "COMPLETED",
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(onboardingState.organisationId, organisationId))
+        .returning();
+
+      res.json({
+        success: true,
+        redirectTo: "/dashboard",
+        state: {
+          ...updatedState,
+          completedSteps: JSON.parse(updatedState.completedSteps || "{}"),
+          skippedSteps: JSON.parse(updatedState.skippedSteps || "{}"),
+          data: JSON.parse(updatedState.data || "{}"),
+        },
+      });
+    } catch (error: any) {
+      console.error("[Onboarding] Error completing:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/onboarding/dismiss - Hide onboarding widget
+  app.post("/api/onboarding/dismiss", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const [updatedState] = await db
+        .update(onboardingState)
+        .set({
+          dismissed: true,
+          dismissedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(onboardingState.organisationId, organisationId))
+        .returning();
+
+      if (!updatedState) {
+        return res.status(404).json({ error: "Onboarding state not found" });
+      }
+
+      res.json({
+        success: true,
+        state: {
+          ...updatedState,
+          completedSteps: JSON.parse(updatedState.completedSteps || "{}"),
+          skippedSteps: JSON.parse(updatedState.skippedSteps || "{}"),
+          data: JSON.parse(updatedState.data || "{}"),
+        },
+      });
+    } catch (error: any) {
+      console.error("[Onboarding] Error dismissing:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/onboarding/show - Show onboarding widget again
+  app.post("/api/onboarding/show", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const [updatedState] = await db
+        .update(onboardingState)
+        .set({
+          dismissed: false,
+          dismissedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(onboardingState.organisationId, organisationId))
+        .returning();
+
+      if (!updatedState) {
+        return res.status(404).json({ error: "Onboarding state not found" });
+      }
+
+      res.json({
+        success: true,
+        state: {
+          ...updatedState,
+          completedSteps: JSON.parse(updatedState.completedSteps || "{}"),
+          skippedSteps: JSON.parse(updatedState.skippedSteps || "{}"),
+          data: JSON.parse(updatedState.data || "{}"),
+        },
+      });
+    } catch (error: any) {
+      console.error("[Onboarding] Error showing:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/onboarding/checklist/:itemId/mark-done - Mark a checklist item as done manually
+  app.post("/api/onboarding/checklist/:itemId/mark-done", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = getUserId(req, res);
+    if (!userId) return;
+
+    const { itemId } = req.params;
+
+    // Valid checklist item IDs
+    const validItems = ["clinic", "team", "patient", "act", "implant", "isq", "calendar", "google", "notifications", "documents"];
+    if (!validItems.includes(itemId)) {
+      return res.status(400).json({ error: "Invalid checklist item ID" });
+    }
+
+    try {
+      // Get existing state
+      let state = await db
+        .select()
+        .from(onboardingState)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .then(rows => rows[0]);
+
+      if (!state) {
+        return res.status(404).json({ error: "Onboarding state not found" });
+      }
+
+      // Store manual completion overrides in onboardingState.data.manuallyCompleted
+      const onboardingData = JSON.parse(state.data || "{}") as OnboardingData & { manuallyCompleted?: Record<string, boolean> };
+      const manuallyCompleted = onboardingData.manuallyCompleted || {};
+      manuallyCompleted[itemId] = true;
+      onboardingData.manuallyCompleted = manuallyCompleted;
+
+      await db
+        .update(onboardingState)
+        .set({
+          data: JSON.stringify(onboardingData),
+          updatedAt: new Date(),
+        })
+        .where(eq(onboardingState.organisationId, organisationId));
+
+      // Re-fetch checklist to check if all items are now complete
+      const [
+        userCount,
+        patientCount,
+        operationCount,
+        surgeryImplantCount,
+        isqCount,
+        appointmentCount,
+        documentCount,
+        calendarIntegration,
+        notificationEnabledCount
+      ] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(operations).where(eq(operations.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(surgeryImplants).where(eq(surgeryImplants.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(visites).where(and(eq(visites.organisationId, organisationId), sql`${visites.isq} IS NOT NULL`)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(appointments).where(eq(appointments.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(documents).where(eq(documents.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select().from(calendarIntegrations).where(eq(calendarIntegrations.organisationId, organisationId)).then(rows => rows[0]),
+        db.select({ count: sql<number>`count(*)` }).from(notificationPreferences).where(and(eq(notificationPreferences.organisationId, organisationId), eq(notificationPreferences.inAppEnabled, true))).then(r => Number(r[0]?.count || 0))
+      ]);
+
+      // Calculate completion with manual overrides
+      const mc = onboardingData.manuallyCompleted || {};
+      const items = [
+        { id: "clinic", completed: mc["clinic"] || !!(onboardingData.clinicName && onboardingData.clinicName.trim().length > 0) },
+        { id: "team", completed: mc["team"] || userCount >= 2 },
+        { id: "patient", completed: mc["patient"] || patientCount >= 1 },
+        { id: "act", completed: mc["act"] || operationCount >= 1 },
+        { id: "implant", completed: mc["implant"] || surgeryImplantCount >= 1 },
+        { id: "isq", completed: mc["isq"] || isqCount >= 1 },
+        { id: "calendar", completed: mc["calendar"] || appointmentCount >= 1 },
+        { id: "google", completed: mc["google"] || !!(calendarIntegration?.accessToken) },
+        { id: "notifications", completed: mc["notifications"] || notificationEnabledCount >= 1 },
+        { id: "documents", completed: mc["documents"] || documentCount >= 1 },
+      ];
+
+      const allCompleted = items.every(i => i.completed);
+
+      if (allCompleted) {
+        // Check if we already created the completion notification
+        const existingNotif = await db
+          .select()
+          .from(notifications)
+          .where(and(
+            eq(notifications.organisationId, organisationId),
+            eq(notifications.type, "ONBOARDING_COMPLETED")
+          ))
+          .then(rows => rows[0]);
+
+        if (!existingNotif) {
+          // Create onboarding completed notification
+          await db.insert(notifications).values({
+            organisationId,
+            recipientUserId: userId,
+            kind: "SYSTEM",
+            type: "ONBOARDING_COMPLETED",
+            severity: "INFO",
+            title: "Onboarding terminé",
+            message: "Félicitations ! Vous avez terminé la configuration de Cassius.",
+          });
+        }
+      }
+
+      res.json({ success: true, itemId, allCompleted });
+    } catch (error: any) {
+      console.error("[Onboarding] Error marking item done:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/onboarding/demo - Generate demo data for the organization (atomic transaction)
+  app.post("/api/onboarding/demo", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      // Use transaction for atomicity - all or nothing
+      const result = await db.transaction(async (tx) => {
+        // Check if demo data already exists (inside transaction for isolation)
+        const existingPatients = await tx
+          .select({ count: sql<number>`count(*)` })
+          .from(patients)
+          .where(eq(patients.organisationId, organisationId));
+        
+        if (Number(existingPatients[0]?.count || 0) > 0) {
+          throw new Error("EXISTING_DATA");
+        }
+
+        // Demo patients data
+        const demoPatients = [
+          { nom: "Dupont", prenom: "Marie", dateNaissance: "1985-03-15", sexe: "F" as const, telephone: "0612345678", email: "marie.dupont@email.fr" },
+          { nom: "Martin", prenom: "Jean", dateNaissance: "1972-08-22", sexe: "M" as const, telephone: "0698765432", email: "jean.martin@email.fr" },
+          { nom: "Bernard", prenom: "Sophie", dateNaissance: "1990-11-30", sexe: "F" as const, telephone: "0645678901", email: "sophie.bernard@email.fr" },
+          { nom: "Petit", prenom: "Pierre", dateNaissance: "1968-05-10", sexe: "M" as const, telephone: "0654321098", email: "pierre.petit@email.fr" },
+          { nom: "Robert", prenom: "Isabelle", dateNaissance: "1978-02-28", sexe: "F" as const, telephone: "0687654321", email: "isabelle.robert@email.fr" },
+        ];
+
+        // Create patients
+        const createdPatients = await tx.insert(patients).values(
+          demoPatients.map(p => ({
+            organisationId,
+            nom: p.nom,
+            prenom: p.prenom,
+            dateNaissance: p.dateNaissance,
+            sexe: p.sexe,
+            telephone: p.telephone,
+            email: p.email,
+            statut: "ACTIF" as const,
+          }))
+        ).returning();
+
+        // Create demo implants catalog
+        const demoImplants = [
+          { marque: "Nobel Biocare", referenceFabricant: "NB-Replace CC", diametre: 4.3, longueur: 11.5 },
+          { marque: "Straumann", referenceFabricant: "BL Roxolid", diametre: 4.1, longueur: 10.0 },
+          { marque: "Zimmer Biomet", referenceFabricant: "TSV", diametre: 4.0, longueur: 13.0 },
+        ];
+
+        const createdImplants = await tx.insert(implants).values(
+          demoImplants.map(i => ({
+            organisationId,
+            typeImplant: "IMPLANT" as const,
+            marque: i.marque,
+            referenceFabricant: i.referenceFabricant,
+            diametre: i.diametre,
+            longueur: i.longueur,
+          }))
+        ).returning();
+
+        // Create demo operations with implants
+        const today = new Date();
+        const demoOperations = [
+          { patientIdx: 0, implantIdx: 0, daysAgo: 90, siteFdi: "36", typeIntervention: "POSE" as const, isqPose: 72 },
+          { patientIdx: 1, implantIdx: 1, daysAgo: 60, siteFdi: "46", typeIntervention: "POSE" as const, isqPose: 68 },
+          { patientIdx: 2, implantIdx: 2, daysAgo: 30, siteFdi: "24", typeIntervention: "POSE" as const, isqPose: 75 },
+          { patientIdx: 3, implantIdx: 0, daysAgo: 120, siteFdi: "11", typeIntervention: "POSE" as const, isqPose: 70 },
+          { patientIdx: 4, implantIdx: 1, daysAgo: 45, siteFdi: "21", typeIntervention: "POSE" as const, isqPose: 65 },
+        ];
+
+        for (const op of demoOperations) {
+          const opDate = new Date(today);
+          opDate.setDate(opDate.getDate() - op.daysAgo);
+          const dateStr = opDate.toISOString().split("T")[0];
+
+          const [createdOp] = await tx.insert(operations).values({
+            organisationId,
+            patientId: createdPatients[op.patientIdx].id,
+            dateOperation: dateStr,
+            typeIntervention: op.typeIntervention,
+          }).returning();
+
+          await tx.insert(surgeryImplants).values({
+            organisationId,
+            surgeryId: createdOp.id,
+            implantId: createdImplants[op.implantIdx].id,
+            siteFdi: op.siteFdi,
+            datePose: dateStr,
+            isqPose: op.isqPose,
+            statut: "EN_SUIVI" as const,
+          });
+        }
+
+        // Create demo appointments
+        const futureAppointments = [
+          { patientIdx: 0, daysFromNow: 7, type: "SUIVI" as const },
+          { patientIdx: 1, daysFromNow: 14, type: "CONTROLE" as const },
+          { patientIdx: 2, daysFromNow: 3, type: "CONSULTATION" as const },
+        ];
+
+        for (const apt of futureAppointments) {
+          const aptDate = new Date(today);
+          aptDate.setDate(aptDate.getDate() + apt.daysFromNow);
+          aptDate.setHours(10, 0, 0, 0);
+
+          const typeLabel = apt.type === "SUIVI" ? "Suivi" : apt.type === "CONTROLE" ? "Contrôle" : "Consultation";
+          await tx.insert(appointments).values({
+            organisationId,
+            patientId: createdPatients[apt.patientIdx].id,
+            titre: `${typeLabel} - ${createdPatients[apt.patientIdx].prenom} ${createdPatients[apt.patientIdx].nom}`,
+            dateDebut: aptDate,
+            dateFin: new Date(aptDate.getTime() + 30 * 60000),
+            typeRdv: apt.type,
+            statut: "PLANIFIE",
+          });
+        }
+
+        return {
+          patients: createdPatients.length,
+          implants: createdImplants.length,
+          operations: demoOperations.length,
+          appointments: futureAppointments.length,
+        };
+      });
+
+      res.json({ success: true, created: result });
+    } catch (error: any) {
+      if (error.message === "EXISTING_DATA") {
+        return res.status(400).json({ error: "Des données existent déjà dans cette organisation" });
+      }
+      console.error("[Onboarding] Error generating demo data:", error);
       res.status(500).json({ error: error.message });
     }
   });

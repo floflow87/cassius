@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Link } from "wouter";
+import { motion } from "framer-motion";
 import { 
   Bell, 
   AlertCircle, 
@@ -286,14 +287,7 @@ export default function NotificationsPage() {
   
   return (
     <div className="px-6 pb-6 w-full" data-testid="page-notifications">
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold">Notifications</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : "Toutes lues"}
-          </p>
-        </div>
-        
+      <div className="flex items-center justify-end gap-4 mb-6 flex-wrap">
         <div className="flex items-center gap-2">
           <Button 
             variant="outline" 
@@ -322,27 +316,43 @@ export default function NotificationsPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <CardHeader className="pb-0">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <TabsList>
-                <TabsTrigger value="all" data-testid="tab-all">
-                  Toutes
-                  {unreadCount > 0 && (
-                    <Badge variant="secondary" className="ml-2 text-xs">
-                      {unreadCount}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="alert" data-testid="tab-alert">
-                  Alertes
-                  {countByKind("ALERT") > 0 && (
-                    <Badge variant="destructive" className="ml-2 text-xs">
-                      {countByKind("ALERT")}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="activity" data-testid="tab-activity">Activité</TabsTrigger>
-                <TabsTrigger value="import" data-testid="tab-import">Imports</TabsTrigger>
-                <TabsTrigger value="system" data-testid="tab-system">Système</TabsTrigger>
-              </TabsList>
+              <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-full">
+                {[
+                  { value: "all", label: "Toutes", count: unreadCount },
+                  { value: "alert", label: "Alertes", count: countByKind("ALERT") },
+                  { value: "activity", label: "Activité", count: 0 },
+                  { value: "import", label: "Imports", count: 0 },
+                  { value: "system", label: "Système", count: 0 },
+                ].map((tab) => (
+                  <button
+                    key={tab.value}
+                    onClick={() => setActiveTab(tab.value)}
+                    className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                      activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    data-testid={`tab-${tab.value}`}
+                  >
+                    {activeTab === tab.value && (
+                      <motion.div
+                        layoutId="notification-filter-indicator"
+                        className="absolute inset-0 bg-primary rounded-full"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                      />
+                    )}
+                    <span className="relative z-10 flex items-center gap-2">
+                      {tab.label}
+                      {tab.count > 0 && (
+                        <Badge 
+                          variant={activeTab === tab.value ? "secondary" : "default"} 
+                          className="text-xs rounded-full"
+                        >
+                          {tab.count}
+                        </Badge>
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
               
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />

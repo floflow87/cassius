@@ -49,6 +49,14 @@ Cassius utilizes a modern full-stack architecture built for scalability and resp
     - **Idempotent upserts:** Creates new patients or updates existing with conflict handling.
     - **Error export:** Download CSV of failed rows for correction.
     - **Migration required:** Tables import_jobs, import_job_rows (migration 20241230_008).
+- **Patient Share Links:**
+    - **Secure sharing:** Generate time-limited links to share patient implant data externally.
+    - **Token security:** Tokens hashed with scrypt and unique salt before storage.
+    - **Expiration options:** Links can expire after 1, 7, 30, 90 days, or never.
+    - **Revocation:** Active links can be revoked at any time.
+    - **Access tracking:** Access count and last accessed timestamp tracked.
+    - **Public page:** Unauthenticated access to shared data at /share/:token.
+    - **API Endpoints:** POST /api/patients/:id/share-links, GET /api/patients/:id/share-links, DELETE /api/patients/:id/share-links/:linkId, GET /api/public/share/:token.
 
 ## External Dependencies
 - **Supabase PostgreSQL:** Database hosting and management.
@@ -121,6 +129,36 @@ The application includes a comprehensive in-app notification system with user pr
 - PATCH /api/notifications/read-all - Mark all as read
 - GET /api/notifications/preferences - Get user preferences
 - PUT /api/notifications/preferences - Update user preferences
+
+## Onboarding Wizard
+The application includes a comprehensive onboarding wizard for new organizations:
+
+**Wizard Steps (8 steps, 0-7):**
+- **Step 0 - Welcome:** Practice type (SOLO/CABINET), timezone, language
+- **Step 1 - Clinic & Security (required):** Clinic name, phone, address
+- **Step 2 - Team & Roles (optional):** Invite collaborators
+- **Step 3 - Data (required):** CSV import, demo mode, or manual entry
+- **Step 4 - First Clinical Case (required):** Create first operation with implant
+- **Step 5 - Calendar (optional):** Google Calendar integration
+- **Step 6 - Notifications (optional):** Configure notification preferences
+- **Step 7 - Documents (optional):** Upload first document
+
+**Features:**
+- Persistent state stored in `onboarding_state` table per organization
+- Auto-save with debounce on each action
+- Step completion tracking with required/optional distinction
+- Skip functionality for optional steps
+- Resume from any step via checklist on dashboard
+- Progress bar showing overall completion percentage
+
+**API Endpoints:**
+- GET /api/onboarding - Get/create onboarding state
+- PATCH /api/onboarding - Update step progress and data
+- POST /api/onboarding/complete - Mark onboarding as completed
+
+**Frontend:**
+- `/onboarding` - Full-screen wizard page
+- `<OnboardingChecklist />` - Dashboard component for incomplete onboarding
 
 ## Database Configuration
 **Important:** The application uses `SUPABASE_DB_URL_DEV` (Supabase PostgreSQL) for development, NOT `DATABASE_URL` (Replit PostgreSQL). 

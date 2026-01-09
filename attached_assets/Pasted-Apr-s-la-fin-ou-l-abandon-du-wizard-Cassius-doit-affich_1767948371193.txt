@@ -1,0 +1,249 @@
+Après la fin (ou l’abandon) du wizard, Cassius doit afficher une checklist de mise en route persistante pour aider l’utilisateur à compléter les étapes clés d’activation.
+
+Objectifs
+
+Afficher une checklist tant que onboarding_state.status !== COMPLETED
+
+Permettre d’accéder directement à l’action manquante
+
+Mettre à jour automatiquement l’état des items
+
+Disparaître quand tout est complété (ou rester accessible dans Paramètres)
+
+A) Modèle de données
+
+On réutilise onboarding_state (pas de nouvelle table).
+
+Chaque item de checklist correspond à :
+
+une étape du wizard
+
+ou une condition métier vérifiable
+
+B) Items de la checklist (V1)
+ID	Label	Condition de complétion	Action
+clinic	Renseigner les infos du cabinet	clinicName présent	/settings/organisation
+team	Ajouter un collaborateur	≥ 2 users OR skip	/settings/users
+patient	Ajouter des patients	≥ 1 patient	/patients
+act	Créer un acte	≥ 1 acte	/acts
+implant	Poser un implant	≥ 1 surgery_implant	/acts
+isq	Renseigner un ISQ	≥ 1 ISQ	/patients
+calendar	Créer un rendez-vous	≥ 1 appointment	/calendar
+google	Connecter Google Calendar	integration active	/settings/integrations/google-calendar
+notifications	Activer les notifications	≥ 1 channel ON	/settings/notifications
+documents	Ajouter un document	≥ 1 document	/documents
+C) API
+Endpoint
+
+GET /api/onboarding/checklist
+
+Retourne :
+
+{
+  "completedCount": 6,
+  "totalCount": 10,
+  "items": [
+    {
+      "id": "clinic",
+      "label": "Renseigner les infos du cabinet",
+      "completed": true,
+      "actionUrl": "/settings/organisation"
+    },
+    {
+      "id": "calendar",
+      "label": "Créer un rendez-vous",
+      "completed": false,
+      "actionUrl": "/calendar"
+    }
+  ]
+}
+
+
+⚠️ Calculé dynamiquement (pas stocké).
+
+D) UI
+Emplacement recommandé
+
+Dashboard → en haut, card pliable
+
+Titre :
+“Finaliser la mise en route de Cassius”
+
+Sous-titre :
+“Encore {{remaining}} étapes pour une expérience optimale”
+
+UX
+
+Checkbox visuelle (non cliquable)
+
+Clic sur la ligne → redirection
+
+Bouton “Masquer pour l’instant” (localStorage)
+
+Quand complété :
+
+message de félicitations
+
+bouton “Voir les paramètres avancés”
+
+E) Critères d’acceptation
+
+La checklist se met à jour automatiquement
+
+Pas de requêtes lourdes (use counts, EXISTS)
+
+Aucun impact sur la perf du dashboard
+
+Jamais bloquant
+
+2️⃣ Empty states intelligents (le vrai UX killer feature)
+Philosophie
+
+Un empty state doit répondre à 3 questions :
+
+Pourquoi c’est vide ?
+
+À quoi ça sert ?
+
+Quelle est la prochaine action unique ?
+
+Pas de blabla.
+Pas de 5 boutons.
+
+Prompt Replit — Empty states globaux
+Contexte
+
+Chaque page clé de Cassius doit afficher un empty state contextualisé lorsque les données sont absentes.
+
+Objectifs
+
+Guider l’utilisateur vers la prochaine action logique
+
+Réduire le sentiment de “page vide”
+
+Renforcer la compréhension produit
+
+A) Empty states par page (V1)
+🧑‍⚕️ Patients — /patients
+
+Condition : 0 patient
+
+Message
+
+Aucun patient pour le moment
+Commencez par créer votre premier patient pour suivre ses actes, implants et documents.
+
+CTA
+
+Bouton primaire : Créer un patient
+
+Bouton secondaire : Voir un exemple (optionnel, dataset démo)
+
+🦷 Actes — /acts
+
+Condition : patients > 0 mais 0 acte
+
+Message
+
+Aucun acte enregistré
+Les actes permettent de relier patients, implants et suivi clinique.
+
+CTA
+
+Créer un acte
+
+🔩 Implants posés — /patients/:id/implants
+
+Condition : 0 implant posé pour le patient
+
+Message
+
+Aucun implant posé pour ce patient
+Ajoutez un implant pour démarrer le suivi ISQ et la timeline clinique.
+
+CTA
+
+Ajouter un implant
+
+📅 Calendrier — /calendar
+
+Condition : 0 rendez-vous
+
+Message
+
+Aucun rendez-vous planifié
+Le calendrier centralise les suivis et consultations.
+
+CTA
+
+Créer un rendez-vous
+
+Lien secondaire : Connecter Google Calendar
+
+🔔 Notifications — /settings/notifications
+
+Condition : tout OFF
+
+Message
+
+Les notifications sont désactivées
+Activez-les pour être alerté en cas d’ISQ faible ou de suivi manquant.
+
+CTA
+
+Configurer les notifications
+
+Bouton secondaire : Envoyer une notification test
+
+📁 Documents — /documents
+
+Condition : 0 document
+
+Message
+
+Aucun document pour le moment
+Centralisez radios, comptes-rendus et documents cliniques.
+
+CTA
+
+Uploader un document
+
+📊 Statistiques — /stats
+
+Condition : pas assez de données
+
+Message
+
+Les statistiques apparaîtront ici
+Dès que vous aurez enregistré des actes et implants.
+
+CTA
+
+Créer un premier acte
+
+B) Implémentation technique
+
+Créer un composant générique <EmptyState />
+
+Props :
+
+title
+description
+primaryAction { label, onClick }
+secondaryAction? { label, onClick }
+icon?
+
+
+Chaque page décide localement quand afficher l’empty state
+
+Pas de logique globale compliquée
+
+C) Critères d’acceptation
+
+Aucun écran “vide”
+
+Une seule action claire
+
+Ton rassurant, jamais culpabilisant
+
+Aligné avec la checklist

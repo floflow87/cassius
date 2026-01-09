@@ -51,6 +51,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       const response = await apiRequest("POST", "/api/auth/login", {
         username: data.email,
         password: data.password,
+        rememberMe: data.rememberMe,
       });
       return response.json();
     },
@@ -218,7 +219,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 className="text-sm text-primary hover:underline font-medium mt-1 inline-block"
                 data-testid="link-request-access"
               >
-                Demander un accès
+                S'inscrire
               </Link>
             </div>
           </div>

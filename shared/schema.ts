@@ -94,6 +94,10 @@ export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"
 
 export const savedFilterPageTypeEnum = pgEnum("saved_filter_page_type", ["patients", "implants", "actes"]);
 
+// Onboarding enums
+export const onboardingStatusEnum = pgEnum("onboarding_status", ["IN_PROGRESS", "COMPLETED"]);
+export const practiceTypeEnum = pgEnum("practice_type", ["SOLO", "CABINET"]);
+
 // Flag system enums
 export const flagLevelEnum = pgEnum("flag_level", ["CRITICAL", "WARNING", "INFO"]);
 export const flagEntityTypeEnum = pgEnum("flag_entity_type", ["PATIENT", "OPERATION", "IMPLANT"]);
@@ -1181,6 +1185,58 @@ export const digestRunsRelations = relations(digestRuns, ({ one }) => ({
   }),
 }));
 
+// Patient share links for public sharing
+export const patientShareLinks = pgTable("patient_share_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  sharedByUserId: varchar("shared_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at"),
+  revokedAt: timestamp("revoked_at"),
+  lastAccessedAt: timestamp("last_accessed_at"),
+  accessCount: integer("access_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const patientShareLinksRelations = relations(patientShareLinks, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [patientShareLinks.organisationId],
+    references: [organisations.id],
+  }),
+  patient: one(patients, {
+    fields: [patientShareLinks.patientId],
+    references: [patients.id],
+  }),
+  sharedByUser: one(users, {
+    fields: [patientShareLinks.sharedByUserId],
+    references: [users.id],
+  }),
+}));
+
+// Onboarding state for wizard
+export const onboardingState = pgTable("onboarding_state", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }).unique(),
+  currentStep: integer("current_step").default(0).notNull(),
+  completedSteps: text("completed_steps").default("{}").notNull(),
+  skippedSteps: text("skipped_steps").default("{}").notNull(),
+  data: text("data").default("{}").notNull(),
+  status: onboardingStatusEnum("status").default("IN_PROGRESS").notNull(),
+  dismissed: boolean("dismissed").default(false).notNull(),
+  dismissedAt: timestamp("dismissed_at"),
+  completedAt: timestamp("completed_at"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const onboardingStateRelations = relations(onboardingState, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [onboardingState.organisationId],
+    references: [organisations.id],
+  }),
+}));
+
 // Insert schemas for new tables
 export const insertEmailTokenSchema = createInsertSchema(emailTokens).omit({
   id: true,
@@ -1211,6 +1267,18 @@ export const insertNotificationPreferenceSchema = createInsertSchema(notificatio
 export const insertDigestRunSchema = createInsertSchema(digestRuns).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertPatientShareLinkSchema = createInsertSchema(patientShareLinks).omit({
+  id: true,
+  createdAt: true,
+  accessCount: true,
+});
+
+export const insertOnboardingStateSchema = createInsertSchema(onboardingState).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertOrganisation = z.infer<typeof insertOrganisationSchema>;
@@ -1282,6 +1350,30 @@ export type NotificationPreference = typeof notificationPreferences.$inferSelect
 export type InsertDigestRun = z.infer<typeof insertDigestRunSchema>;
 export type DigestRun = typeof digestRuns.$inferSelect;
 
+export type InsertPatientShareLink = z.infer<typeof insertPatientShareLinkSchema>;
+export type PatientShareLink = typeof patientShareLinks.$inferSelect;
+
+export type InsertOnboardingState = z.infer<typeof insertOnboardingStateSchema>;
+export type OnboardingState = typeof onboardingState.$inferSelect;
+
+// Onboarding data interface
+export interface OnboardingData {
+  practiceType?: "SOLO" | "CABINET";
+  timezone?: string;
+  language?: string;
+  clinicName?: string;
+  phone?: string;
+  address?: string;
+  sessionTimeoutMinutes?: number;
+  emailVerified?: boolean;
+  demoModeEnabled?: boolean;
+  importCompleted?: boolean;
+  firstCaseCreated?: boolean;
+  googleConnected?: boolean;
+  notificationsConfigured?: boolean;
+  documentUploaded?: boolean;
+}
+
 // Extended types for API responses
 export interface SurgeryImplantWithDetails extends SurgeryImplant {
   implant: Implant;
@@ -1315,4 +1407,33 @@ export interface AppointmentWithPatient extends Appointment {
 export interface DocumentWithDetails extends Document {
   patient?: Patient;
   operation?: Operation;
+}
+
+export interface PatientShareLinkWithDetails extends PatientShareLink {
+  sharedByUserName?: string;
+}
+
+export interface PublicPatientShareData {
+  patient: {
+    prenom: string;
+    nom: string;
+    dateNaissance?: string | null;
+  };
+  implants: Array<{
+    id: string;
+    siteFdi: string;
+    marque?: string | null;
+    reference?: string | null;
+    diametre?: number | null;
+    longueur?: number | null;
+    position?: string | null;
+    statut?: string | null;
+    datePose: string;
+    isqPose?: number | null;
+    isq2m?: number | null;
+    isq3m?: number | null;
+    isq6m?: number | null;
+  }>;
+  sharedByUserName: string;
+  createdAt: string;
 }

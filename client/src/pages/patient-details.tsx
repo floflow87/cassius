@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Plus,
@@ -30,6 +31,10 @@ import {
   GripVertical,
   LayoutGrid,
   LayoutList,
+  Share2,
+  Copy,
+  ExternalLink,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -317,6 +322,68 @@ export default function PatientDetailsPage() {
     return "all";
   });
 
+  // Share dialog state
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareExpiryDays, setShareExpiryDays] = useState<number | null>(null);
+  const [newShareLink, setNewShareLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // Share links query
+  interface ShareLinkData {
+    id: string;
+    expiresAt: string | null;
+    revokedAt: string | null;
+    createdAt: string;
+    accessCount: number;
+    sharedByUserName?: string;
+  }
+  const { data: shareLinks = [], isLoading: shareLinksLoading } = useQuery<ShareLinkData[]>({
+    queryKey: ["/api/patients", patientId, "share-links"],
+    enabled: !!patientId && shareDialogOpen,
+  });
+
+  // Create share link mutation
+  const createShareLinkMutation = useMutation({
+    mutationFn: async (expiresInDays: number | null) => {
+      const res = await apiRequest("POST", `/api/patients/${patientId}/share-links`, { 
+        expiresInDays 
+      });
+      return res.json();
+    },
+    onSuccess: (data: { token: string }) => {
+      const link = `${window.location.origin}/share/${data.token}`;
+      setNewShareLink(link);
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "share-links"] });
+      toast({ title: "Lien créé", description: "Le lien de partage a été généré avec succès." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de créer le lien de partage.", variant: "destructive" });
+    },
+  });
+
+  // Revoke share link mutation
+  const revokeShareLinkMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      await apiRequest("DELETE", `/api/patients/${patientId}/share-links/${linkId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "share-links"] });
+      toast({ title: "Lien révoqué", description: "Le lien de partage a été désactivé." });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de révoquer le lien.", variant: "destructive" });
+    },
+  });
+
+  const handleCopyLink = () => {
+    if (newShareLink) {
+      navigator.clipboard.writeText(newShareLink);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+      toast({ title: "Copié", description: "Le lien a été copié dans le presse-papiers." });
+    }
+  };
+
   // Persist implant view preferences
   useEffect(() => {
     try {
@@ -599,7 +666,7 @@ export default function PatientDetailsPage() {
           <Tooltip>
             <TooltipTrigger asChild>
               <span>
-                <Badge variant="secondary" className="font-mono cursor-help">
+                <Badge variant="default" className="rounded-full cursor-help">
                   {operation.surgeryImplants?.length || 0}
                 </Badge>
               </span>
@@ -1396,57 +1463,35 @@ export default function PatientDetailsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-white dark:bg-zinc-900 p-1 h-auto gap-1 border-b-0 rounded-full">
-          <TabsTrigger 
-            value="overview" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-overview"
-          >
-            Vue d'ensemble
-          </TabsTrigger>
-          <TabsTrigger 
-            value="implants" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-implants"
-          >
-            Implants <span className="text-xs italic ml-1">({implantCount})</span>
-          </TabsTrigger>
-          <TabsTrigger 
-            value="operations" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-operations"
-          >
-            Actes chirurgicaux
-          </TabsTrigger>
-          <TabsTrigger 
-            value="radios" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-radios"
-          >
-            Radiographies
-          </TabsTrigger>
-          <TabsTrigger 
-            value="documents" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-documents"
-          >
-            Documents
-          </TabsTrigger>
-          <TabsTrigger 
-            value="visits" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-visits"
-          >
-            Suivi & Visites
-          </TabsTrigger>
-          <TabsTrigger 
-            value="notes" 
-            className="text-sm px-4 py-2 rounded-[50px] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-            data-testid="tab-notes"
-          >
-            Notes
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit">
+          {[
+            { value: "overview", label: "Vue d'ensemble" },
+            { value: "implants", label: `Implants (${implantCount})` },
+            { value: "operations", label: "Actes chirurgicaux" },
+            { value: "radios", label: "Radiographies" },
+            { value: "documents", label: "Documents" },
+            { value: "visits", label: "Suivi & Visites" },
+            { value: "notes", label: "Notes" },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value)}
+              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid={`tab-${tab.value}`}
+            >
+              {activeTab === tab.value && (
+                <motion.div
+                  layoutId="patient-tab-indicator"
+                  className="absolute inset-0 bg-primary rounded-full"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                />
+              )}
+              <span className="relative z-10">{tab.label}</span>
+            </button>
+          ))}
+        </div>
 
         <TabsContent value="overview" className="mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1995,6 +2040,131 @@ export default function PatientDetailsPage() {
                       >
                         Voir détails
                       </Button>
+                      <Dialog open={shareDialogOpen} onOpenChange={(open) => {
+                        setShareDialogOpen(open);
+                        if (!open) {
+                          setNewShareLink(null);
+                          setShareExpiryDays(null);
+                        }
+                      }}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="bg-white dark:bg-zinc-900"
+                          onClick={() => setShareDialogOpen(true)}
+                          data-testid="button-share-patient"
+                        >
+                          <Share2 className="h-4 w-4 mr-1" />
+                          Partager
+                        </Button>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Partager les données implants</DialogTitle>
+                            <DialogDescription>
+                              Créez un lien sécurisé pour partager les informations d'implants de ce patient.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            {newShareLink ? (
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Input 
+                                    value={newShareLink} 
+                                    readOnly 
+                                    className="font-mono text-sm bg-muted"
+                                    data-testid="input-share-link"
+                                  />
+                                  <Button 
+                                    size="icon" 
+                                    variant="outline" 
+                                    onClick={handleCopyLink}
+                                    data-testid="button-copy-link"
+                                  >
+                                    {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </Button>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  Ce lien permet à quiconque d'accéder aux données d'implants du patient sans connexion.
+                                </p>
+                                <Button 
+                                  variant="outline" 
+                                  className="w-full"
+                                  onClick={() => setNewShareLink(null)}
+                                >
+                                  Créer un autre lien
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                <div>
+                                  <Label>Expiration du lien</Label>
+                                  <Select 
+                                    value={shareExpiryDays?.toString() || "never"} 
+                                    onValueChange={(v) => setShareExpiryDays(v === "never" ? null : parseInt(v))}
+                                  >
+                                    <SelectTrigger className="w-full mt-1" data-testid="select-expiry">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="never">Sans expiration</SelectItem>
+                                      <SelectItem value="1">1 jour</SelectItem>
+                                      <SelectItem value="7">7 jours</SelectItem>
+                                      <SelectItem value="30">30 jours</SelectItem>
+                                      <SelectItem value="90">90 jours</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <Button 
+                                  className="w-full" 
+                                  onClick={() => createShareLinkMutation.mutate(shareExpiryDays)}
+                                  disabled={createShareLinkMutation.isPending}
+                                  data-testid="button-create-share-link"
+                                >
+                                  {createShareLinkMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                  <Link2 className="h-4 w-4 mr-2" />
+                                  Générer un lien de partage
+                                </Button>
+                              </div>
+                            )}
+
+                            {shareLinks.length > 0 && (
+                              <div className="border-t pt-4">
+                                <h4 className="text-sm font-medium mb-3">Liens actifs</h4>
+                                <div className="space-y-2">
+                                  {shareLinks
+                                    .filter(l => !l.revokedAt)
+                                    .map((link) => (
+                                      <div 
+                                        key={link.id} 
+                                        className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                                      >
+                                        <div className="text-sm">
+                                          <p className="text-muted-foreground">
+                                            Créé le {new Date(link.createdAt).toLocaleDateString("fr-FR")}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {link.accessCount} accès
+                                            {link.expiresAt && ` · Expire le ${new Date(link.expiresAt).toLocaleDateString("fr-FR")}`}
+                                          </p>
+                                        </div>
+                                        <Button 
+                                          size="sm" 
+                                          variant="ghost" 
+                                          className="text-destructive"
+                                          onClick={() => revokeShareLinkMutation.mutate(link.id)}
+                                          disabled={revokeShareLinkMutation.isPending}
+                                          data-testid={`button-revoke-link-${link.id}`}
+                                        >
+                                          Révoquer
+                                        </Button>
+                                      </div>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                       <Sheet open={operationDialogOpen} onOpenChange={setOperationDialogOpen}>
                         <SheetTrigger asChild>
                           <Button size="sm" data-testid="button-new-act">
@@ -2087,58 +2257,58 @@ export default function PatientDetailsPage() {
             <>
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center bg-white dark:bg-zinc-900 rounded-full p-1 gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`rounded-full ${implantTypeFilter === "all" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                      onClick={() => setImplantTypeFilter("all")}
-                      data-testid="button-filter-all"
-                    >
-                      Tous
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`rounded-full ${implantTypeFilter === "IMPLANT" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                      onClick={() => setImplantTypeFilter("IMPLANT")}
-                      data-testid="button-filter-implants"
-                    >
-                      Implants
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`rounded-full ${implantTypeFilter === "MINI_IMPLANT" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                      onClick={() => setImplantTypeFilter("MINI_IMPLANT")}
-                      data-testid="button-filter-mini-implants"
-                    >
-                      Mini-implants
-                    </Button>
+                  <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full">
+                    {[
+                      { value: "all" as const, label: "Tous" },
+                      { value: "IMPLANT" as const, label: "Implants" },
+                      { value: "MINI_IMPLANT" as const, label: "Mini-implants" },
+                    ].map((filter) => (
+                      <button
+                        key={filter.value}
+                        onClick={() => setImplantTypeFilter(filter.value)}
+                        className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                          implantTypeFilter === filter.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        data-testid={`button-filter-${filter.value.toLowerCase()}`}
+                      >
+                        {implantTypeFilter === filter.value && (
+                          <motion.div
+                            layoutId="implant-type-filter-indicator"
+                            className="absolute inset-0 bg-primary rounded-full"
+                            transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                          />
+                        )}
+                        <span className="relative z-10">{filter.label}</span>
+                      </button>
+                    ))}
                   </div>
                   <span className="text-sm text-muted-foreground">
                     {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
                   </span>
                 </div>
-                <div className="flex items-center bg-white dark:bg-zinc-900 rounded-full p-1 gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`rounded-full ${implantViewMode === "table" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                    onClick={() => setImplantViewMode("table")}
-                    data-testid="button-view-table"
-                  >
-                    <LayoutList className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`rounded-full ${implantViewMode === "cards" ? "bg-primary text-white hover:bg-primary/90" : "text-muted-foreground"}`}
-                    onClick={() => setImplantViewMode("cards")}
-                    data-testid="button-view-cards"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
+                <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full">
+                  {[
+                    { value: "table" as const, icon: LayoutList },
+                    { value: "cards" as const, icon: LayoutGrid },
+                  ].map((mode) => (
+                    <button
+                      key={mode.value}
+                      onClick={() => setImplantViewMode(mode.value)}
+                      className={`relative p-2 rounded-full transition-colors duration-200 ${
+                        implantViewMode === mode.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      data-testid={`button-view-${mode.value}`}
+                    >
+                      {implantViewMode === mode.value && (
+                        <motion.div
+                          layoutId="implant-view-mode-indicator"
+                          className="absolute inset-0 bg-primary rounded-full"
+                          transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                        />
+                      )}
+                      <mode.icon className="h-4 w-4 relative z-10" />
+                    </button>
+                  ))}
                 </div>
               </div>
 

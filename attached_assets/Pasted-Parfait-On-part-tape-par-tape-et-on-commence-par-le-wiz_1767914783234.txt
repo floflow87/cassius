@@ -1,0 +1,229 @@
+Parfait. On part étape par étape, et on commence par le wizard complet (structure + data + UX + contraintes multi-tenant), propre et robuste.
+
+Ci-dessous, je te donne un prompt Replit “bunker” pour implémenter le wizard de bout en bout.
+
+⸻
+
+Prompt Replit — Wizard complet “Mise en route Cassius”
+
+Contexte
+Nous voulons implémenter un wizard d’onboarding complet, accessible après le 1er login, qui guide un cabinet vers la configuration initiale de Cassius (multi-tenant / organisation). Le wizard doit être persistant, reprenable, et afficher une checklist de progression.
+
+Objectifs
+	•	Avoir une route dédiée : /onboarding
+	•	Wizard en 7 étapes (avec possibilité de “Passer pour l’instant” sur certaines étapes)
+	•	Progression stockée en DB (par organisation + utilisateur si besoin)
+	•	Fin : redirection vers dashboard + checklist persistante légère (non bloquante)
+
+⸻
+
+A) Modèle de données (DB)
+
+1) Table onboarding_state
+
+Créer une table onboarding_state :
+	•	id uuid pk
+	•	organisation_id (fk organisations) unique (un état par org)
+	•	current_step int (0..7)
+	•	completed_steps jsonb (ex: { "1": true, "2": true })
+	•	skipped_steps jsonb (ex: { "5": true })
+	•	data jsonb (stocke les inputs du wizard : type cabinet, timezone, etc.)
+	•	status enum: IN_PROGRESS | COMPLETED
+	•	completed_at timestamp nullable
+	•	updated_at timestamp default now()
+	•	created_at timestamp default now()
+
+Index : organisation_id unique + updated_at.
+
+⚠️ Multi-tenant : toutes les requêtes doivent filtrer par organisation_id issu de la session JWT.
+
+⸻
+
+B) API (Backend)
+
+Endpoints
+	1.	GET /api/onboarding
+
+	•	Retourne l’état onboarding de l’organisation
+	•	Si inexistant → le créer avec current_step=0
+
+	2.	PATCH /api/onboarding
+
+	•	Body: { currentStep?, markCompleteStep?, markSkipStep?, dataPatch? }
+	•	Merge intelligent de data (jsonb) : ne pas écraser si non fourni
+	•	Met à jour updated_at
+	•	Si toutes les étapes obligatoires sont complétées → status=COMPLETED + completed_at
+
+	3.	POST /api/onboarding/complete
+
+	•	Marque l’onboarding comme terminé
+	•	Validation : étapes obligatoires OK
+	•	Retourne redirect target
+
+Règles “obligatoire vs skippable”
+	•	Obligatoires : Étape 1 (Clinique & sécurité), Étape 3 (Données) minimum (import OU mode démo), Étape 4 (Premier cas)
+	•	Skippable : Étape 2 (équipe), Étape 5 (Google), Étape 6 (notifs), Étape 7 (docs)
+
+⸻
+
+C) UI / UX (Frontend)
+
+Route
+	•	Ajouter route /onboarding
+	•	Si onboarding status !== COMPLETED :
+	•	à chaque login, rediriger vers /onboarding (mais permettre “Continuer plus tard” si on veut — config via flag onboarding_required=true dans settings org)
+
+Layout du wizard
+	•	Card centrale avec :
+	•	Header : “Mise en route Cassius”
+	•	Stepper vertical à gauche (7 étapes)
+	•	Contenu étape à droite
+	•	Footer : boutons “Retour”, “Continuer”, “Passer pour l’instant” (si autorisé)
+	•	Progress bar globale
+
+UX clés
+	•	Auto-save à chaque action (debounce 500ms)
+	•	Bouton “Quitter” (revient au dashboard, mais affiche un bandeau “Onboarding incomplet” + bouton “Reprendre”)
+	•	Chaque étape a :
+	•	1 objectif
+	•	1 action principale
+	•	1 indicateur “fait”
+
+⸻
+
+D) Contenu des étapes (détails)
+
+Étape 0 — Bienvenue (profil)
+
+Champs :
+	•	practiceType : SOLO | CABINET
+	•	timezone (auto détectée)
+	•	language (FR par défaut)
+
+CTA : Continuer.
+
+✅ complete si practiceType défini.
+
+⸻
+
+Étape 1 — Clinique & sécurité (obligatoire)
+
+Champs :
+	•	clinicName (required)
+	•	phone (optional)
+	•	address (optional)
+	•	bloc sécurité :
+	•	sessionTimeoutMinutes (default 120)
+	•	affichage: “email vérifié” (status user)
+
+CTA :
+	•	“Enregistrer”
+	•	Si email non vérifié : bouton “Renvoyer email vérif”
+
+✅ complete si clinicName + (email vérifié OU demande envoyée).
+
+⸻
+
+Étape 2 — Équipe & rôles (skippable)
+
+UI :
+	•	Tableau “Collaborateurs”
+	•	Ajouter email + rôle (2 rôles V1 : ADMIN / MEMBER)
+	•	Envoi invitation via email (si dispo) sinon “copier lien”
+
+✅ complete si au moins 1 invitation envoyée OU skip.
+
+⸻
+
+Étape 3 — Import / données (obligatoire)
+
+3 choix :
+	1.	Import CSV
+	2.	Mode Démo (seed dataset dans org)
+	3.	Saisie manuelle
+
+UI Import :
+	•	upload CSV + mapping colonnes + preview 10 lignes
+	•	bouton “Lancer import”
+	•	barre progression + résultats
+
+✅ complete si :
+	•	import terminé avec >= 1 patient
+OU mode démo activé
+
+⸻
+
+Étape 4 — Premier cas clinique (obligatoire)
+
+Guided flow :
+	1.	Choisir patient (autocomplete)
+	2.	Créer acte (date, type)
+	3.	Ajouter implant posé (catalog implant + site)
+	4.	Ajouter ISQ (valeur + date)
+
+CTA : “Créer le premier cas”
+✅ complete si : 1 acte + 1 surgery_implant + 1 ISQ.
+
+⸻
+
+Étape 5 — Calendrier + Google (skippable)
+
+Deux blocs :
+	•	Calendrier Cassius : créer 1 rendez-vous
+	•	Google : connecter + choisir calendrier + activer sync + “Sync now”
+
+✅ complete si : 1 rendez-vous créé (même sans Google) OU skip.
+
+⸻
+
+Étape 6 — Notifications (skippable)
+
+UI :
+	•	toggles in-app/email par type
+	•	bouton “Envoyer une notif test”
+	•	bouton “Créer un scénario test ISQ bas”
+
+✅ complete si au moins 1 canal activé OU skip.
+
+⸻
+
+Étape 7 — Documents (skippable)
+
+UI :
+	•	uploader 1 document (PDF/image)
+	•	rattacher patient ou acte
+	•	ajouter tag
+
+✅ complete si 1 document uploadé OU skip.
+
+⸻
+
+E) Checklist persistante (après wizard)
+
+Sur dashboard (et/ou settings) afficher une “Checklist” compacte si onboarding incomplet :
+	•	même items que les étapes
+	•	clic → deep link vers étape correspondante /onboarding?step=5
+
+⸻
+
+F) Critères d’acceptation
+	•	Onboarding persiste après refresh / logout
+	•	Multi-tenant OK (pas de fuite d’org)
+	•	Étapes obligatoires bloquent la complétion
+	•	Auto-save + reprise au même step
+	•	UX fluide (skeleton, pas de layout qui saute)
+
+⸻
+
+G) Implementation notes
+	•	Centraliser la logique dans server/routes/onboarding.ts (ou routes.ts section dédiée)
+	•	Créer un hook React useOnboarding() :
+	•	fetch state
+	•	patch updates
+	•	helpers : completeStep(step), skipStep(step), goToStep(step)
+	•	Utiliser le design system existant (Cards, Buttons, Toasts succès #DCFCE7)
+	•	Ne pas casser le layout global : /onboarding doit utiliser le layout standard sidebar/topbar (sauf si tu choisis un “fullpage onboarding” volontaire)
+
+⸻
+
+Si tu veux, prochaine micro-étape : je te rédige juste le prompt de l’étape 3 Import CSV (c’est la plus lourde), mais là tu as déjà le prompt complet pour que Replit génère tout le wizard d’un coup.

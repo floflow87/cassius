@@ -31,6 +31,8 @@ import AcceptInvitationPage from "@/pages/accept-invitation";
 import VerifyEmailPage from "@/pages/verify-email";
 import ImportPatientsPage from "@/pages/import-patients";
 import NotificationsPage from "@/pages/notifications";
+import PublicSharePage from "@/pages/public-share";
+import OnboardingPage from "@/pages/onboarding";
 import { apiRequest } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -204,6 +206,8 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/documents" component={DocumentsPage} />
       <Route path="/calendar" component={CalendarPage} />
       <Route path="/notifications" component={NotificationsPage} />
+      <Route path="/onboarding" component={OnboardingPage} />
+      <Route path="/share/:token" component={PublicSharePage} />
       <Route path="/settings/integrations/:rest*">
         <IntegrationsPage />
       </Route>
@@ -262,6 +266,7 @@ function AuthenticatedApp() {
   if (!user) {
     return (
       <Switch>
+        <Route path="/share/:token" component={PublicSharePage} />
         <Route path="/register">
           {() => <RegisterPage onRegisterSuccess={() => refetch()} />}
         </Route>

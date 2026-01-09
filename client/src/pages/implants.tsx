@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { 
   Plus, 
   Search, 
@@ -16,6 +17,7 @@ import { ImplantsAdvancedFilterDrawer, ImplantFilterChips, type ImplantFilterGro
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CatalogImplantsListSkeleton } from "@/components/page-skeletons";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -375,16 +377,19 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
         );
       case "poseCount":
         return (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-foreground">
-              {implant.poseCount}
-            </span>
-            {implant.lastPoseDate && (
-              <span className="text-xs text-muted-foreground">
-                {new Date(implant.lastPoseDate).toLocaleDateString('fr-FR')}
-              </span>
-            )}
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="default" className="cursor-pointer">
+                {implant.poseCount}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              {implant.lastPoseDate 
+                ? `Dernière pose: ${new Date(implant.lastPoseDate).toLocaleDateString('fr-FR')}`
+                : "Aucune pose enregistrée"
+              }
+            </TooltipContent>
+          </Tooltip>
         );
       case "successRate":
         if (implant.successRate === null) {
@@ -475,12 +480,30 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
-          <Tabs value={implantType} onValueChange={(v) => setImplantType(v as "implants" | "mini")}>
-            <TabsList>
-              <TabsTrigger value="implants" data-testid="tab-implants">Implants</TabsTrigger>
-              <TabsTrigger value="mini" data-testid="tab-mini-implants">Mini-implants</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full">
+            {[
+              { value: "implants" as const, label: "Implants" },
+              { value: "mini" as const, label: "Mini-implants" },
+            ].map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setImplantType(tab.value)}
+                className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                  implantType === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid={tab.value === "implants" ? "tab-implants" : "tab-mini-implants"}
+              >
+                {implantType === tab.value && (
+                  <motion.div
+                    layoutId="catalog-implant-type-indicator"
+                    className="absolute inset-0 bg-primary rounded-full"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                  />
+                )}
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            ))}
+          </div>
           <span className="text-sm text-muted-foreground">{totalImplants} implant{totalImplants > 1 ? "s" : ""}</span>
         </div>
 

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { motion } from "framer-motion";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -271,34 +272,53 @@ function CalendarSidebar({
           </CollapsibleTrigger>
           
           <CollapsibleContent>
-            <div className="px-3 pb-3 space-y-1.5">
-              {[
-                { value: "all" as SourceFilter, label: "Tous les événements", icon: null },
-                { value: "cassius" as SourceFilter, label: "Cassius", icon: null },
-                { value: "google" as SourceFilter, label: "Google Calendar", icon: <SiGoogle className="h-3.5 w-3.5" /> },
-                { value: "conflicts" as SourceFilter, label: "Conflits", icon: <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />, count: conflictsCount },
-              ].map(source => (
+            <div className="px-3 pb-3 space-y-2">
+              <div className="flex flex-wrap gap-1 p-1 rounded-full bg-white dark:bg-zinc-900 border border-border/50">
+                {[
+                  { value: "all" as SourceFilter, label: "Tous" },
+                  { value: "cassius" as SourceFilter, label: "Cassius" },
+                  { value: "google" as SourceFilter, label: "Google" },
+                ].map(source => (
+                  <button
+                    key={source.value}
+                    onClick={() => onSourceFilterChange(source.value)}
+                    className="relative flex-1 px-2 py-1.5 text-xs font-medium rounded-full transition-colors"
+                    data-testid={`source-filter-${source.value}`}
+                  >
+                    {sourceFilter === source.value && (
+                      <motion.div
+                        layoutId="calendar-source-filter"
+                        className="absolute inset-0 bg-primary rounded-full"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                      />
+                    )}
+                    <span className={`relative z-10 flex items-center justify-center gap-1.5 ${sourceFilter === source.value ? "text-white" : "text-muted-foreground"}`}>
+                      {source.value === "google" && <SiGoogle className="h-3 w-3" />}
+                      {source.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              
+              {conflictsCount > 0 && (
                 <button
-                  key={source.value}
-                  onClick={() => onSourceFilterChange(source.value)}
-                  className={`flex items-center justify-between w-full px-2 py-1.5 rounded-md text-sm transition-colors ${
-                    sourceFilter === source.value 
-                      ? "bg-primary/10 text-primary font-medium" 
-                      : "hover-elevate"
+                  onClick={() => onSourceFilterChange("conflicts")}
+                  className={`flex items-center justify-between w-full px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    sourceFilter === "conflicts" 
+                      ? "bg-orange-500 text-white" 
+                      : "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
                   }`}
-                  data-testid={`source-filter-${source.value}`}
+                  data-testid="source-filter-conflicts"
                 >
                   <div className="flex items-center gap-2">
-                    {source.icon}
-                    <span>{source.label}</span>
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    <span>Conflits</span>
                   </div>
-                  {source.count !== undefined && source.count > 0 && (
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                      {source.count}
-                    </Badge>
-                  )}
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-white/20 text-current border-0">
+                    {conflictsCount}
+                  </Badge>
                 </button>
-              ))}
+              )}
               
               {googleConnected && (
                 <div className="pt-2 border-t mt-2">
@@ -1895,27 +1915,30 @@ export default function CalendarPage() {
               }}
             />
             
-            <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-full gap-1">
+            <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-full gap-1 border border-border/50">
               {[
                 { key: "timeGridDay", label: "Jour" },
                 { key: "timeGridWeek", label: "Semaine" },
                 { key: "dayGridMonth", label: "Mois" },
                 { key: "listWeek", label: "Agenda" },
               ].map(v => (
-                <Button
+                <button
                   key={v.key}
-                  variant="ghost"
-                  size="sm"
-                  className={`rounded-full transition-all duration-200 ${
-                    currentView === v.key 
-                      ? "bg-primary text-white shadow-none" 
-                      : "bg-transparent text-muted-foreground"
-                  }`}
+                  className="relative px-3 py-1.5 text-sm font-medium rounded-full transition-colors"
                   onClick={() => changeView(v.key as typeof currentView)}
                   data-testid={`button-view-${v.key}`}
                 >
-                  {v.label}
-                </Button>
+                  {currentView === v.key && (
+                    <motion.div
+                      layoutId="calendar-view-indicator"
+                      className="absolute inset-0 bg-primary rounded-full"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                    />
+                  )}
+                  <span className={`relative z-10 ${currentView === v.key ? "text-white" : "text-muted-foreground"}`}>
+                    {v.label}
+                  </span>
+                </button>
               ))}
             </div>
             

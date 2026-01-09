@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { PatientsListSkeleton } from "@/components/page-skeletons";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -59,7 +60,7 @@ interface PatientsPageProps {
 }
 
 type SortDirection = "asc" | "desc" | null;
-type ColumnId = "patient" | "dateNaissance" | "sexe" | "contact" | "implants" | "derniereVisite" | "flags" | "statut";
+type ColumnId = "patient" | "dateNaissance" | "contact" | "implants" | "derniereVisite" | "flags" | "statut";
 
 interface ColumnConfig {
   id: ColumnId;
@@ -71,7 +72,6 @@ interface ColumnConfig {
 const defaultColumns: ColumnConfig[] = [
   { id: "patient", label: "Patient", width: "w-56", sortable: true },
   { id: "dateNaissance", label: "Date de naissance", width: "w-40", sortable: true },
-  { id: "sexe", label: "Sexe", width: "w-20", sortable: true },
   { id: "contact", label: "Contact", width: "w-44", sortable: true },
   { id: "implants", label: "Implants", width: "w-28", sortable: true },
   { id: "derniereVisite", label: "Dernière visite", width: "w-40", sortable: true },
@@ -110,9 +110,9 @@ function ImplantHoverList({ patientId, implantCount }: { patientId: string; impl
   
   if (implantCount === 0) {
     return (
-      <span className="text-sm text-muted-foreground">
-        <span className="font-medium text-foreground">0</span> implants
-      </span>
+      <Badge variant="secondary" className="rounded-full text-xs">
+        0
+      </Badge>
     );
   }
   
@@ -129,9 +129,9 @@ function ImplantHoverList({ patientId, implantCount }: { patientId: string; impl
   return (
     <HoverCard openDelay={300} closeDelay={100} onOpenChange={setIsOpen}>
       <HoverCardTrigger asChild>
-        <span className="text-sm text-muted-foreground cursor-pointer underline decoration-dotted">
-          <span className="font-medium text-foreground">{implantCount}</span> implant{implantCount !== 1 ? 's' : ''}
-        </span>
+        <Badge variant="default" className="rounded-full text-xs cursor-pointer">
+          {implantCount}
+        </Badge>
       </HoverCardTrigger>
       <HoverCardContent className="w-80" side="right" align="start">
         <div className="space-y-2">
@@ -383,9 +383,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
           break;
         case "dateNaissance":
           comparison = new Date(a.dateNaissance).getTime() - new Date(b.dateNaissance).getTime();
-          break;
-        case "sexe":
-          comparison = (a.sexe || "").localeCompare(b.sexe || "");
           break;
         case "contact":
           comparison = (a.telephone || "").localeCompare(b.telephone || "");
@@ -648,12 +645,6 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         return (
           <span className="text-sm text-muted-foreground">
             {formatDateWithAge(patient.dateNaissance)}
-          </span>
-        );
-      case "sexe":
-        return (
-          <span className="text-sm text-muted-foreground">
-            {patient.sexe === "M" ? "H" : patient.sexe === "F" ? "F" : "—"}
           </span>
         );
       case "contact":
