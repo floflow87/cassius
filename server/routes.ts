@@ -40,7 +40,7 @@ import {
   operations,
 } from "@shared/schema";
 import type { PublicPatientShareData, PatientShareLinkWithDetails, OnboardingData, OnboardingState } from "@shared/schema";
-import { onboardingState } from "@shared/schema";
+import { onboardingState, appointments, documents, notificationPreferences, calendarIntegrations, visites } from "@shared/schema";
 import type {
   Patient,
   PatientDetail,
@@ -5732,6 +5732,121 @@ export async function registerRoutes(
   });
 
   // ==================== ONBOARDING ROUTES ====================
+
+  // GET /api/onboarding/checklist - Get dynamic checklist with completion status
+  app.get("/api/onboarding/checklist", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      // Get onboarding state
+      const state = await db
+        .select()
+        .from(onboardingState)
+        .where(eq(onboardingState.organisationId, organisationId))
+        .then(rows => rows[0]);
+
+      const onboardingData = state ? JSON.parse(state.data || "{}") as OnboardingData : {};
+
+      // Run all count queries in parallel for performance
+      const [
+        userCount,
+        patientCount,
+        operationCount,
+        surgeryImplantCount,
+        isqCount,
+        appointmentCount,
+        documentCount,
+        calendarIntegration,
+        notificationEnabledCount
+      ] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(operations).where(eq(operations.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(surgeryImplants).where(eq(surgeryImplants.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(visites).where(and(eq(visites.organisationId, organisationId), sql`${visites.isq} IS NOT NULL`)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(appointments).where(eq(appointments.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select({ count: sql<number>`count(*)` }).from(documents).where(eq(documents.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
+        db.select().from(calendarIntegrations).where(eq(calendarIntegrations.organisationId, organisationId)).then(rows => rows[0]),
+        db.select({ count: sql<number>`count(*)` }).from(notificationPreferences).where(and(eq(notificationPreferences.organisationId, organisationId), eq(notificationPreferences.inAppEnabled, true))).then(r => Number(r[0]?.count || 0))
+      ]);
+
+      // Build checklist items
+      const items = [
+        {
+          id: "clinic",
+          label: "Renseigner les infos du cabinet",
+          completed: !!(onboardingData.clinicName && onboardingData.clinicName.trim().length > 0),
+          actionUrl: "/parametres?tab=organisation"
+        },
+        {
+          id: "team",
+          label: "Ajouter un collaborateur",
+          completed: userCount >= 2,
+          actionUrl: "/parametres?tab=collaborators"
+        },
+        {
+          id: "patient",
+          label: "Ajouter des patients",
+          completed: patientCount >= 1,
+          actionUrl: "/patients"
+        },
+        {
+          id: "act",
+          label: "Créer un acte",
+          completed: operationCount >= 1,
+          actionUrl: "/actes"
+        },
+        {
+          id: "implant",
+          label: "Poser un implant",
+          completed: surgeryImplantCount >= 1,
+          actionUrl: "/actes"
+        },
+        {
+          id: "isq",
+          label: "Renseigner un ISQ",
+          completed: isqCount >= 1,
+          actionUrl: "/patients"
+        },
+        {
+          id: "calendar",
+          label: "Créer un rendez-vous",
+          completed: appointmentCount >= 1,
+          actionUrl: "/calendrier"
+        },
+        {
+          id: "google",
+          label: "Connecter Google Calendar",
+          completed: !!(calendarIntegration?.accessToken),
+          actionUrl: "/parametres?tab=integrations"
+        },
+        {
+          id: "notifications",
+          label: "Activer les notifications",
+          completed: notificationEnabledCount >= 1,
+          actionUrl: "/parametres?tab=notifications"
+        },
+        {
+          id: "documents",
+          label: "Ajouter un document",
+          completed: documentCount >= 1,
+          actionUrl: "/documents"
+        }
+      ];
+
+      const completedCount = items.filter(i => i.completed).length;
+
+      res.json({
+        completedCount,
+        totalCount: items.length,
+        items
+      });
+    } catch (error: any) {
+      console.error("[Onboarding] Error getting checklist:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // GET /api/onboarding - Get onboarding state for organisation
   app.get("/api/onboarding", requireJwtOrSession, async (req, res) => {
