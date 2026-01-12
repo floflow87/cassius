@@ -418,40 +418,65 @@ export function ClinicalFollowUp({
         {suggestions.length > 0 && (
           <>
             <Separator />
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Suggestions</Label>
-              {suggestions.map((suggestion) => (
-                <div 
-                  key={suggestion.id}
-                  className={`flex items-center justify-between p-2 rounded-md border ${
-                    suggestion.priority === "HIGH" ? "border-destructive/50 bg-destructive/5" :
-                    suggestion.priority === "MEDIUM" ? "border-orange-500/50 bg-orange-500/5" :
-                    "border-muted"
-                  }`}
-                  data-testid={`suggestion-${suggestion.suggestedStatus.toLowerCase()}`}
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <Badge 
-                        variant={suggestion.suggestedStatus === "COMPLICATION" ? "destructive" : "default"}
-                        className="text-xs"
-                      >
-                        {suggestion.suggestedStatus}
-                      </Badge>
-                      <span className="text-sm">{suggestion.reasonLabel}</span>
-                    </div>
-                  </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Suggestions de statut</span>
+                  {lastMeasurement?.isqValue !== undefined && (
+                    <span className="text-xs text-muted-foreground">(ISQ: {lastMeasurement.isqValue})</span>
+                  )}
+                </div>
+                {statusHistory.length > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleApplySuggestion(suggestion)}
-                    data-testid={`button-apply-suggestion-${suggestion.id}`}
+                    onClick={() => setStatusHistoryOpen(!statusHistoryOpen)}
+                    className="text-xs h-7"
+                    data-testid="button-toggle-history"
                   >
-                    Appliquer
-                    <ArrowRight className="h-3 w-3 ml-1" />
+                    <Clock className="h-3 w-3 mr-1" />
+                    Historique
                   </Button>
-                </div>
-              ))}
+                )}
+              </div>
+              <div className="space-y-2">
+                {suggestions.map((suggestion) => {
+                  const priorityLabel = suggestion.priority === "HIGH" ? "Confiance elevee" : 
+                                        suggestion.priority === "MEDIUM" ? "Confiance moderee" : "A evaluer";
+                  return (
+                    <div 
+                      key={suggestion.id}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                      data-testid={`suggestion-${suggestion.suggestedStatus.toLowerCase()}`}
+                    >
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <Badge 
+                          variant={suggestion.suggestedStatus === "ECHEC" ? "destructive" : 
+                                   suggestion.suggestedStatus === "COMPLICATION" ? "destructive" : "default"}
+                          className="text-xs"
+                        >
+                          {statusConfig[suggestion.suggestedStatus]?.label || suggestion.suggestedStatus}
+                        </Badge>
+                        <Badge 
+                          variant="secondary"
+                          className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                        >
+                          {priorityLabel}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">{suggestion.reasonLabel}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleApplySuggestion(suggestion)}
+                        data-testid={`button-apply-suggestion-${suggestion.id}`}
+                      >
+                        Appliquer
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </>
         )}
@@ -485,65 +510,62 @@ export function ClinicalFollowUp({
         )}
 
         {statusHistory.length > 0 && (
-          <>
-            <Separator />
-            <Collapsible open={statusHistoryOpen} onOpenChange={setStatusHistoryOpen}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="w-full justify-between">
-                  <span className="text-sm">Historique des statuts ({statusHistory.length})</span>
-                  {statusHistoryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-2">
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {statusHistory.map((entry) => (
-                    <div 
-                      key={entry.id}
-                      className="p-2 bg-muted/30 rounded border text-sm space-y-1"
-                      data-testid={`status-history-${entry.id}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          {entry.fromStatus && (
-                            <>
-                              <Badge variant="outline" className="text-xs">
-                                {statusConfig[entry.fromStatus]?.label || entry.fromStatus}
-                              </Badge>
-                              <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                            </>
-                          )}
-                          <Badge 
-                            variant={statusConfig[entry.toStatus]?.variant || "secondary"} 
-                            className="text-xs"
-                          >
-                            {statusConfig[entry.toStatus]?.label || entry.toStatus}
-                          </Badge>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(entry.changedAt).toLocaleDateString("fr-FR")}
-                        </span>
+          <Collapsible open={statusHistoryOpen} onOpenChange={setStatusHistoryOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between">
+                <span className="text-sm">Historique des statuts ({statusHistory.length})</span>
+                {statusHistoryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {statusHistory.map((entry) => (
+                  <div 
+                    key={entry.id}
+                    className="p-2 bg-muted/30 rounded border text-sm space-y-1"
+                    data-testid={`status-history-${entry.id}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {entry.fromStatus && (
+                          <>
+                            <Badge variant="outline" className="text-xs">
+                              {statusConfig[entry.fromStatus]?.label || entry.fromStatus}
+                            </Badge>
+                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                          </>
+                        )}
+                        <Badge 
+                          variant={statusConfig[entry.toStatus]?.variant || "secondary"} 
+                          className="text-xs"
+                        >
+                          {statusConfig[entry.toStatus]?.label || entry.toStatus}
+                        </Badge>
                       </div>
-                      {entry.reasonLabel && (
-                        <p className="text-xs text-muted-foreground">
-                          {entry.reasonLabel}
-                        </p>
-                      )}
-                      {entry.reasonFreeText && (
-                        <p className="text-xs italic border-l-2 border-muted-foreground/30 pl-2 mt-1">
-                          {entry.reasonFreeText}
-                        </p>
-                      )}
-                      {entry.changedByPrenom && entry.changedByNom && (
-                        <p className="text-xs text-muted-foreground/70">
-                          Par {entry.changedByPrenom} {entry.changedByNom}
-                        </p>
-                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(entry.changedAt).toLocaleDateString("fr-FR")}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </>
+                    {entry.reasonLabel && (
+                      <p className="text-xs text-muted-foreground">
+                        {entry.reasonLabel}
+                      </p>
+                    )}
+                    {entry.reasonFreeText && (
+                      <p className="text-xs italic border-l-2 border-muted-foreground/30 pl-2 mt-1">
+                        {entry.reasonFreeText}
+                      </p>
+                    )}
+                    {entry.changedByPrenom && entry.changedByNom && (
+                      <p className="text-xs text-muted-foreground/70">
+                        Par {entry.changedByPrenom} {entry.changedByNom}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {appointmentType === "URGENCE" && (
