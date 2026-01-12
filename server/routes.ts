@@ -2895,6 +2895,88 @@ export async function registerRoutes(
     }
   });
 
+  // ========== APPOINTMENT CLINICAL DATA ==========
+  // GET clinical data for an appointment (implant, ISQ history, flags, suggestions)
+  app.get("/api/appointments/:id/clinical", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const clinicalData = await storage.getAppointmentClinicalData(organisationId, id);
+      if (!clinicalData) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      res.json(clinicalData);
+    } catch (error) {
+      console.error("Error fetching clinical data:", error);
+      res.status(500).json({ error: "Failed to fetch clinical data" });
+    }
+  });
+
+  // POST ISQ measurement for an appointment (upsert)
+  app.post("/api/appointments/:id/isq", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id: appointmentId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const { surgeryImplantId, isqValue, notes } = req.body;
+      if (!surgeryImplantId || isqValue === undefined || isqValue === null) {
+        return res.status(400).json({ error: "surgeryImplantId and isqValue are required" });
+      }
+
+      // Get appointment to determine measurement type
+      const appointment = await storage.getAppointmentById(organisationId, appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      // Map appointment type to measurement type
+      const measurementTypeMap: Record<string, 'POSE' | 'FOLLOW_UP' | 'CONTROL' | 'EMERGENCY'> = {
+        'CHIRURGIE': 'POSE',
+        'CONTROLE': 'CONTROL',
+        'SUIVI': 'FOLLOW_UP',
+        'URGENCE': 'EMERGENCY',
+        'CONSULTATION': 'FOLLOW_UP',
+        'AUTRE': 'FOLLOW_UP',
+      };
+      const measurementType = measurementTypeMap[appointment.type] || 'FOLLOW_UP';
+
+      // Upsert the measurement
+      const measurement = await storage.upsertImplantMeasurement(organisationId, {
+        surgeryImplantId,
+        appointmentId,
+        type: measurementType,
+        isqValue: Number(isqValue),
+        notes: notes || null,
+        measuredByUserId: userId,
+        measuredAt: appointment.dateStart,
+      });
+
+      // Also update the appointment's ISQ field for backward compatibility
+      await storage.updateAppointment(organisationId, appointmentId, { isq: Number(isqValue) });
+
+      // Recalculate flags and get suggestions
+      const flags = await storage.calculateIsqFlags(organisationId, surgeryImplantId);
+      const suggestions = await storage.generateStatusSuggestions(organisationId, surgeryImplantId, flags);
+
+      res.status(201).json({
+        measurement,
+        flags,
+        suggestions,
+      });
+    } catch (error) {
+      console.error("Error saving ISQ measurement:", error);
+      res.status(500).json({ error: "Failed to save ISQ measurement" });
+    }
+  });
+
   // ========== SAVED FILTERS ==========
   app.get("/api/saved-filters/:pageType", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

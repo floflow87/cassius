@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum, bigint, integer, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum, bigint, integer, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1331,7 +1331,59 @@ export const implantStatusHistoryRelations = relations(implantStatusHistory, ({ 
   }),
 }));
 
+// ============================================
+// IMPLANT MEASUREMENTS - Source de vérité ISQ
+// ============================================
+
+export const measurementTypeEnum = pgEnum("measurement_type", ["POSE", "FOLLOW_UP", "CONTROL", "EMERGENCY"]);
+
+export const implantMeasurements = pgTable("implant_measurements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  surgeryImplantId: varchar("surgery_implant_id").notNull().references(() => surgeryImplants.id, { onDelete: "cascade" }),
+  appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  type: measurementTypeEnum("type").notNull(),
+  isqValue: real("isq_value"),
+  isqStability: text("isq_stability"), // low, moderate, high
+  boneLossScore: integer("bone_loss_score"),
+  notes: text("notes"),
+  measuredAt: timestamp("measured_at").notNull(),
+  measuredByUserId: varchar("measured_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+}, (table) => [
+  index("idx_implant_measurements_org").on(table.organisationId),
+  index("idx_implant_measurements_implant").on(table.surgeryImplantId),
+  index("idx_implant_measurements_appointment").on(table.appointmentId),
+  index("idx_implant_measurements_measured_at").on(table.measuredAt),
+]);
+
+export const implantMeasurementsRelations = relations(implantMeasurements, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [implantMeasurements.organisationId],
+    references: [organisations.id],
+  }),
+  surgeryImplant: one(surgeryImplants, {
+    fields: [implantMeasurements.surgeryImplantId],
+    references: [surgeryImplants.id],
+  }),
+  appointment: one(appointments, {
+    fields: [implantMeasurements.appointmentId],
+    references: [appointments.id],
+  }),
+  measuredBy: one(users, {
+    fields: [implantMeasurements.measuredByUserId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas for new tables
+export const insertImplantMeasurementSchema = createInsertSchema(implantMeasurements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertEmailTokenSchema = createInsertSchema(emailTokens).omit({
   id: true,
   createdAt: true,
@@ -1474,6 +1526,9 @@ export type ImplantStatusReason = typeof implantStatusReasons.$inferSelect;
 
 export type InsertImplantStatusHistory = z.infer<typeof insertImplantStatusHistorySchema>;
 export type ImplantStatusHistory = typeof implantStatusHistory.$inferSelect;
+
+export type InsertImplantMeasurement = z.infer<typeof insertImplantMeasurementSchema>;
+export type ImplantMeasurement = typeof implantMeasurements.$inferSelect;
 
 // Onboarding data interface
 export interface OnboardingData {

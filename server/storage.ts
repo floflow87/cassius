@@ -66,11 +66,13 @@ import {
   radioNotes,
   implantStatusReasons,
   implantStatusHistory,
+  implantMeasurements,
   type RadioNote,
   type RadioNoteWithAuthor,
   type ImplantStatusReason,
   type ImplantStatusHistory,
   type ImplantStatusHistoryWithDetails,
+  type ImplantMeasurement,
   SYSTEM_STATUS_REASONS,
 } from "@shared/schema";
 import type {
@@ -97,6 +99,9 @@ import type {
   DocumentTreeNode,
   DocumentFilters,
   UnifiedFile,
+  AppointmentClinicalData,
+  ClinicalFlag,
+  StatusSuggestion,
 } from "@shared/types";
 import { db, pool } from "./db";
 import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL, isNull, not } from "drizzle-orm";
@@ -337,6 +342,22 @@ export interface IStorage {
   // Implant status history methods
   getImplantStatusHistory(organisationId: string, implantId: string): Promise<import("@shared/schema").ImplantStatusHistoryWithDetails[]>;
   changeImplantStatus(organisationId: string, data: { implantId: string; fromStatus?: 'EN_SUIVI' | 'SUCCES' | 'COMPLICATION' | 'ECHEC' | null; toStatus: 'EN_SUIVI' | 'SUCCES' | 'COMPLICATION' | 'ECHEC'; reasonId?: string | null; reasonFreeText?: string | null; evidence?: string | null; changedByUserId: string }): Promise<import("@shared/schema").ImplantStatusHistory>;
+
+  // Implant measurements methods (source of truth for ISQ)
+  upsertImplantMeasurement(organisationId: string, data: {
+    surgeryImplantId: string;
+    appointmentId: string;
+    type: 'POSE' | 'FOLLOW_UP' | 'CONTROL' | 'EMERGENCY';
+    isqValue: number | null;
+    notes?: string | null;
+    measuredByUserId: string;
+    measuredAt: Date;
+  }): Promise<import("@shared/schema").ImplantMeasurement>;
+  getImplantMeasurements(organisationId: string, surgeryImplantId: string): Promise<import("@shared/schema").ImplantMeasurement[]>;
+  getAppointmentMeasurement(organisationId: string, appointmentId: string): Promise<import("@shared/schema").ImplantMeasurement | undefined>;
+  getAppointmentClinicalData(organisationId: string, appointmentId: string): Promise<import("@shared/types").AppointmentClinicalData | undefined>;
+  calculateIsqFlags(organisationId: string, surgeryImplantId: string): Promise<import("@shared/types").ClinicalFlag[]>;
+  generateStatusSuggestions(organisationId: string, surgeryImplantId: string, flags: import("@shared/types").ClinicalFlag[]): Promise<import("@shared/types").StatusSuggestion[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4406,6 +4427,321 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return historyEntry;
+  }
+
+  // ========== IMPLANT MEASUREMENTS ==========
+  async upsertImplantMeasurement(organisationId: string, data: {
+    surgeryImplantId: string;
+    appointmentId: string;
+    type: 'POSE' | 'FOLLOW_UP' | 'CONTROL' | 'EMERGENCY';
+    isqValue: number | null;
+    notes?: string | null;
+    measuredByUserId: string;
+    measuredAt: Date;
+  }): Promise<ImplantMeasurement> {
+    // Check if measurement already exists for this appointment + implant
+    const existing = await db.select()
+      .from(implantMeasurements)
+      .where(and(
+        eq(implantMeasurements.organisationId, organisationId),
+        eq(implantMeasurements.appointmentId, data.appointmentId),
+        eq(implantMeasurements.surgeryImplantId, data.surgeryImplantId)
+      ))
+      .limit(1);
+
+    // Determine ISQ stability
+    let isqStability: string | null = null;
+    if (data.isqValue !== null) {
+      if (data.isqValue < 60) isqStability = 'low';
+      else if (data.isqValue < 70) isqStability = 'moderate';
+      else isqStability = 'high';
+    }
+
+    if (existing.length > 0) {
+      // Update existing measurement
+      const [updated] = await db.update(implantMeasurements)
+        .set({
+          isqValue: data.isqValue,
+          isqStability,
+          notes: data.notes || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(implantMeasurements.id, existing[0].id))
+        .returning();
+      return updated;
+    } else {
+      // Create new measurement
+      const [created] = await db.insert(implantMeasurements)
+        .values({
+          organisationId,
+          surgeryImplantId: data.surgeryImplantId,
+          appointmentId: data.appointmentId,
+          type: data.type,
+          isqValue: data.isqValue,
+          isqStability,
+          notes: data.notes || null,
+          measuredAt: data.measuredAt,
+          measuredByUserId: data.measuredByUserId,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async getImplantMeasurements(organisationId: string, surgeryImplantId: string): Promise<ImplantMeasurement[]> {
+    return db.select()
+      .from(implantMeasurements)
+      .where(and(
+        eq(implantMeasurements.organisationId, organisationId),
+        eq(implantMeasurements.surgeryImplantId, surgeryImplantId)
+      ))
+      .orderBy(desc(implantMeasurements.measuredAt));
+  }
+
+  async getAppointmentMeasurement(organisationId: string, appointmentId: string): Promise<ImplantMeasurement | undefined> {
+    const [measurement] = await db.select()
+      .from(implantMeasurements)
+      .where(and(
+        eq(implantMeasurements.organisationId, organisationId),
+        eq(implantMeasurements.appointmentId, appointmentId)
+      ))
+      .limit(1);
+    return measurement || undefined;
+  }
+
+  async getAppointmentClinicalData(organisationId: string, appointmentId: string): Promise<AppointmentClinicalData | undefined> {
+    // Get the appointment
+    const [appointment] = await db.select()
+      .from(appointments)
+      .where(and(
+        eq(appointments.id, appointmentId),
+        eq(appointments.organisationId, organisationId)
+      ))
+      .limit(1);
+
+    if (!appointment) return undefined;
+
+    let implant: SurgeryImplantWithDetails | null = null;
+    let lastMeasurement: ImplantMeasurement | null = null;
+    let measurementHistory: ImplantMeasurement[] = [];
+    let clinicalFlags: ClinicalFlag[] = [];
+    let suggestions: StatusSuggestion[] = [];
+    let linkedRadios: Radio[] = [];
+
+    // Get the linked implant if any
+    if (appointment.surgeryImplantId) {
+      const implantData = await this.getSurgeryImplantWithDetails(organisationId, appointment.surgeryImplantId);
+      if (implantData) {
+        implant = {
+          ...implantData,
+          implant: implantData.implant,
+        };
+      }
+
+      // Get measurement history for this implant
+      measurementHistory = await this.getImplantMeasurements(organisationId, appointment.surgeryImplantId);
+      lastMeasurement = measurementHistory.length > 0 ? measurementHistory[0] : null;
+
+      // Calculate flags for this implant
+      clinicalFlags = await this.calculateIsqFlags(organisationId, appointment.surgeryImplantId);
+
+      // Generate suggestions based on flags
+      suggestions = await this.generateStatusSuggestions(organisationId, appointment.surgeryImplantId, clinicalFlags);
+    }
+
+    // Get linked radios (via operationId or appointmentId)
+    if (appointment.operationId) {
+      linkedRadios = await db.select()
+        .from(radios)
+        .where(and(
+          eq(radios.organisationId, organisationId),
+          eq(radios.operationId, appointment.operationId)
+        ))
+        .orderBy(desc(radios.createdAt));
+    }
+
+    return {
+      appointment: {
+        id: appointment.id,
+        type: appointment.type,
+        status: appointment.status,
+        title: appointment.title,
+        dateStart: appointment.dateStart,
+        patientId: appointment.patientId,
+        surgeryImplantId: appointment.surgeryImplantId,
+        operationId: appointment.operationId,
+      },
+      implant,
+      lastMeasurement,
+      measurementHistory,
+      flags: clinicalFlags,
+      suggestions,
+      linkedRadios,
+    };
+  }
+
+  async calculateIsqFlags(organisationId: string, surgeryImplantId: string): Promise<ClinicalFlag[]> {
+    const flags: ClinicalFlag[] = [];
+    const now = new Date();
+
+    // Get all measurements for this implant
+    const measurements = await this.getImplantMeasurements(organisationId, surgeryImplantId);
+
+    if (measurements.length === 0) {
+      // No measurements yet
+      return flags;
+    }
+
+    const latestMeasurement = measurements[0];
+    const latestIsq = latestMeasurement.isqValue;
+
+    // ISQ_LOW: Latest ISQ < 60
+    if (latestIsq !== null && latestIsq < 60) {
+      flags.push({
+        id: `flag_isq_low_${surgeryImplantId}`,
+        type: 'ISQ_LOW',
+        level: latestIsq < 50 ? 'CRITICAL' : 'WARNING',
+        label: latestIsq < 50 ? 'ISQ critique' : 'ISQ faible',
+        value: latestIsq,
+        createdAt: now,
+      });
+    }
+
+    // ISQ_DECLINING: ISQ dropped by 10+ points from previous
+    if (measurements.length >= 2 && latestIsq !== null) {
+      const previousMeasurement = measurements[1];
+      const previousIsq = previousMeasurement.isqValue;
+      if (previousIsq !== null) {
+        const delta = latestIsq - previousIsq;
+        if (delta <= -10) {
+          flags.push({
+            id: `flag_isq_declining_${surgeryImplantId}`,
+            type: 'ISQ_DECLINING',
+            level: delta <= -15 ? 'CRITICAL' : 'WARNING',
+            label: 'ISQ en déclin',
+            value: latestIsq,
+            delta: delta,
+            createdAt: now,
+          });
+        }
+      }
+    }
+
+    // UNSTABLE_ISQ_HISTORY: 3+ consecutive low ISQs (most recent consecutive run)
+    let consecutiveLowCount = 0;
+    // Walk from most recent to oldest, count consecutive lows
+    for (const m of measurements) {
+      if (m.isqValue !== null && m.isqValue < 60) {
+        consecutiveLowCount++;
+      } else {
+        break; // Stop at first non-low reading
+      }
+    }
+    if (consecutiveLowCount >= 3) {
+      flags.push({
+        id: `flag_unstable_${surgeryImplantId}`,
+        type: 'UNSTABLE_ISQ_HISTORY',
+        level: 'WARNING',
+        label: 'Historique ISQ instable',
+        createdAt: now,
+      });
+    }
+
+    // NO_RECENT_ISQ: No measurement in last 3 months (for implants older than 2 months)
+    const lastMeasurementDate = new Date(latestMeasurement.measuredAt);
+    const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    if (lastMeasurementDate < threeMonthsAgo) {
+      flags.push({
+        id: `flag_no_recent_${surgeryImplantId}`,
+        type: 'NO_RECENT_ISQ',
+        level: 'INFO',
+        label: 'Pas de mesure ISQ récente',
+        createdAt: now,
+      });
+    }
+
+    return flags;
+  }
+
+  async generateStatusSuggestions(organisationId: string, surgeryImplantId: string, flags: ClinicalFlag[]): Promise<StatusSuggestion[]> {
+    const suggestions: StatusSuggestion[] = [];
+
+    // Get the implant's current status
+    const implant = await this.getSurgeryImplant(organisationId, surgeryImplantId);
+    if (!implant || implant.statut !== 'EN_SUIVI') {
+      // Only generate suggestions for implants in EN_SUIVI status
+      return suggestions;
+    }
+
+    // Find the latest measurement for evidence
+    const measurements = await this.getImplantMeasurements(organisationId, surgeryImplantId);
+    const latestMeasurement = measurements.length > 0 ? measurements[0] : null;
+
+    // ISQ_LOW or DECLINING suggests COMPLICATION
+    const lowFlag = flags.find(f => f.type === 'ISQ_LOW');
+    const decliningFlag = flags.find(f => f.type === 'ISQ_DECLINING');
+
+    if (lowFlag && lowFlag.level === 'CRITICAL') {
+      suggestions.push({
+        id: `suggestion_complication_critical_${surgeryImplantId}`,
+        suggestedStatus: 'COMPLICATION',
+        reasonCode: 'ISQ_CRITICAL',
+        reasonLabel: 'ISQ critique (< 50)',
+        evidence: {
+          measurementId: latestMeasurement?.id,
+          isqValue: lowFlag.value,
+        },
+        priority: 'HIGH',
+      });
+    } else if (lowFlag) {
+      suggestions.push({
+        id: `suggestion_complication_low_${surgeryImplantId}`,
+        suggestedStatus: 'COMPLICATION',
+        reasonCode: 'ISQ_LOW',
+        reasonLabel: 'ISQ faible (< 60)',
+        evidence: {
+          measurementId: latestMeasurement?.id,
+          isqValue: lowFlag.value,
+        },
+        priority: 'MEDIUM',
+      });
+    }
+
+    if (decliningFlag && decliningFlag.level === 'CRITICAL') {
+      suggestions.push({
+        id: `suggestion_complication_declining_${surgeryImplantId}`,
+        suggestedStatus: 'COMPLICATION',
+        reasonCode: 'ISQ_DECLINING',
+        reasonLabel: 'Chute ISQ importante',
+        evidence: {
+          measurementId: latestMeasurement?.id,
+          isqValue: decliningFlag.value,
+          isqDelta: decliningFlag.delta,
+        },
+        priority: 'HIGH',
+      });
+    }
+
+    // If no issues and good ISQ history, suggest SUCCES
+    const hasIssues = flags.some(f => f.type === 'ISQ_LOW' || f.type === 'ISQ_DECLINING' || f.type === 'UNSTABLE_ISQ_HISTORY');
+    if (!hasIssues && measurements.length >= 3) {
+      const allGood = measurements.slice(0, 3).every(m => m.isqValue !== null && m.isqValue >= 70);
+      if (allGood && latestMeasurement) {
+        suggestions.push({
+          id: `suggestion_success_${surgeryImplantId}`,
+          suggestedStatus: 'SUCCES',
+          reasonCode: 'STABLE_HIGH_ISQ',
+          reasonLabel: 'ISQ stable et élevé (3+ mesures > 70)',
+          evidence: {
+            measurementId: latestMeasurement.id,
+            isqValue: latestMeasurement.isqValue ?? undefined,
+          },
+          priority: 'LOW',
+        });
+      }
+    }
+
+    return suggestions;
   }
 }
 

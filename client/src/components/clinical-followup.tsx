@@ -1,0 +1,626 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { 
+  Activity, 
+  AlertTriangle, 
+  TrendingDown, 
+  Clock, 
+  CheckCircle,
+  Loader2,
+  AlertCircle,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  ChevronRight
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { 
+  AppointmentClinicalData, 
+  ClinicalFlag, 
+  StatusSuggestion 
+} from "@shared/types";
+
+interface StatusReason {
+  id: string;
+  organisationId: string | null;
+  status: string;
+  code: string;
+  label: string;
+  isSystem: boolean;
+  isActive: boolean;
+}
+
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  EN_SUIVI: { label: "En suivi", variant: "secondary" },
+  SUCCES: { label: "Succes", variant: "default" },
+  COMPLICATION: { label: "Complication", variant: "destructive" },
+  ECHEC: { label: "Echec", variant: "destructive" },
+};
+
+interface ClinicalFollowUpProps {
+  appointmentId: string;
+  appointmentType: string;
+  surgeryImplantId?: string | null;
+  onStatusChange?: (suggestion: StatusSuggestion) => void;
+}
+
+const typeLabels: Record<string, string> = {
+  CONTROLE: "Controle",
+  CHIRURGIE: "Chirurgie",
+  URGENCE: "Urgence",
+  SUIVI: "Suivi",
+  CONSULTATION: "Consultation",
+  AUTRE: "Autre",
+};
+
+const flagIcons: Record<string, typeof AlertTriangle> = {
+  ISQ_LOW: AlertTriangle,
+  ISQ_DECLINING: TrendingDown,
+  NO_RECENT_ISQ: Clock,
+  UNSTABLE_ISQ_HISTORY: Activity,
+};
+
+const flagColors: Record<string, string> = {
+  CRITICAL: "destructive",
+  WARNING: "secondary",
+  INFO: "outline",
+};
+
+function getIsqColor(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "text-muted-foreground";
+  if (value < 50) return "text-destructive";
+  if (value < 60) return "text-orange-500";
+  if (value < 70) return "text-yellow-600";
+  return "text-green-600";
+}
+
+function getIsqLabel(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "Non mesure";
+  if (value < 50) return "Critique";
+  if (value < 60) return "Faible";
+  if (value < 70) return "Modere";
+  return "Eleve";
+}
+
+export function ClinicalFollowUp({ 
+  appointmentId, 
+  appointmentType,
+  surgeryImplantId,
+  onStatusChange 
+}: ClinicalFollowUpProps) {
+  const { toast } = useToast();
+  const [isqValue, setIsqValue] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [applySheetOpen, setApplySheetOpen] = useState(false);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<StatusSuggestion | null>(null);
+  const [selectedReasonId, setSelectedReasonId] = useState<string>("");
+  const [freeTextReason, setFreeTextReason] = useState("");
+  const [evidence, setEvidence] = useState("");
+
+  const { data: clinicalData, isLoading, refetch } = useQuery<AppointmentClinicalData>({
+    queryKey: [`/api/appointments/${appointmentId}/clinical`],
+    enabled: !!surgeryImplantId,
+  });
+
+  const reasonsQuery = useQuery<StatusReason[]>({
+    queryKey: ["/api/status-reasons", selectedSuggestion?.suggestedStatus],
+    queryFn: async () => {
+      const url = selectedSuggestion?.suggestedStatus 
+        ? `/api/status-reasons?status=${selectedSuggestion.suggestedStatus}`
+        : "/api/status-reasons";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch reasons");
+      return res.json();
+    },
+    enabled: !!selectedSuggestion,
+  });
+
+  const applyStatusMutation = useMutation({
+    mutationFn: async (data: { toStatus: string; fromStatus: string; reasonId?: string; reasonFreeText?: string; evidence?: string }) => {
+      const res = await apiRequest("POST", `/api/surgery-implants/${surgeryImplantId}/status`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/surgery-implants/${surgeryImplantId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/appointments/${appointmentId}/clinical`] });
+      toast({ title: "Statut mis a jour", variant: "success" });
+      setApplySheetOpen(false);
+      setSelectedSuggestion(null);
+      setSelectedReasonId("");
+      setFreeTextReason("");
+      setEvidence("");
+      refetch();
+      if (onStatusChange && selectedSuggestion) {
+        onStatusChange(selectedSuggestion);
+      }
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de mettre a jour le statut.", variant: "destructive" });
+    },
+  });
+
+  const saveIsqMutation = useMutation({
+    mutationFn: async (data: { surgeryImplantId: string; isqValue: number; notes?: string }) => {
+      return apiRequest("POST", `/api/appointments/${appointmentId}/isq`, data);
+    },
+    onSuccess: async (response) => {
+      const result = await response.json();
+      toast({
+        title: "ISQ enregistre",
+        description: `Valeur ISQ ${isqValue} enregistree avec succes.`,
+        variant: "success",
+      });
+      setIsqValue("");
+      setNotes("");
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+
+      if (result.flags && result.flags.length > 0) {
+        const criticalFlag = result.flags.find((f: ClinicalFlag) => f.level === "CRITICAL");
+        if (criticalFlag) {
+          toast({
+            title: "Alerte clinique",
+            description: criticalFlag.label,
+            variant: "destructive",
+          });
+        }
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible d'enregistrer la mesure ISQ",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveIsq = () => {
+    if (!surgeryImplantId || !isqValue) return;
+    
+    const value = parseFloat(isqValue);
+    if (isNaN(value) || value < 0 || value > 100) {
+      toast({
+        title: "Valeur invalide",
+        description: "L'ISQ doit etre entre 0 et 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    saveIsqMutation.mutate({
+      surgeryImplantId,
+      isqValue: value,
+      notes: notes || undefined,
+    });
+  };
+
+  const handleApplySuggestion = (suggestion: StatusSuggestion) => {
+    setSelectedSuggestion(suggestion);
+    setSelectedReasonId("");
+    setFreeTextReason("");
+    // Set user notes area to be empty - let user add optional notes
+    setEvidence("");
+    setApplySheetOpen(true);
+  };
+
+  const handleConfirmApply = () => {
+    if (!selectedSuggestion || !surgeryImplantId || !clinicalData?.implant) return;
+    
+    // Build structured evidence with clinical traceability + user notes
+    const structuredEvidence = {
+      type: "clinical_followup",
+      appointmentId,
+      measurementId: selectedSuggestion.evidence?.measurementId || null,
+      isqValue: selectedSuggestion.evidence?.isqValue ?? null,
+      isqDelta: selectedSuggestion.evidence?.isqDelta ?? null,
+      reasonCode: selectedSuggestion.reasonCode,
+      reasonLabel: selectedSuggestion.reasonLabel,
+      clinicianNotes: evidence.trim() || null,
+    };
+    
+    applyStatusMutation.mutate({
+      toStatus: selectedSuggestion.suggestedStatus,
+      fromStatus: clinicalData.implant.statut || "EN_SUIVI",
+      reasonId: selectedReasonId || undefined,
+      reasonFreeText: freeTextReason || undefined,
+      evidence: JSON.stringify(structuredEvidence),
+    });
+  };
+
+  const showIsqInput = ["CONTROLE", "CHIRURGIE", "URGENCE", "SUIVI"].includes(appointmentType);
+  const isqRequired = appointmentType === "CONTROLE";
+  const isqOptional = appointmentType === "CHIRURGIE";
+
+  if (!surgeryImplantId) {
+    return (
+      <Card className="bg-muted/30">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Suivi clinique
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Aucun implant lie a ce rendez-vous. Liez un implant pour activer le suivi clinique.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Card className="bg-muted/30">
+        <CardContent className="py-6">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const implant = clinicalData?.implant;
+  const lastMeasurement = clinicalData?.lastMeasurement;
+  const flags = clinicalData?.flags || [];
+  const suggestions = clinicalData?.suggestions || [];
+  const measurementHistory = clinicalData?.measurementHistory || [];
+
+  return (
+    <>
+      <Card data-testid="card-clinical-followup">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Suivi clinique
+          </div>
+          {implant && (
+            <Badge variant="outline" className="text-xs">
+              Site {implant.siteFdi}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {flags.length > 0 && (
+          <div className="space-y-2">
+            {flags.map((flag) => {
+              const FlagIcon = flagIcons[flag.type] || AlertCircle;
+              return (
+                <div 
+                  key={flag.id}
+                  className={`flex items-center gap-2 p-2 rounded-md ${
+                    flag.level === "CRITICAL" ? "bg-destructive/10 text-destructive" :
+                    flag.level === "WARNING" ? "bg-orange-500/10 text-orange-600" :
+                    "bg-muted"
+                  }`}
+                  data-testid={`flag-${flag.type.toLowerCase()}`}
+                >
+                  <FlagIcon className="h-4 w-4 shrink-0" />
+                  <span className="text-sm font-medium">{flag.label}</span>
+                  {flag.value !== undefined && (
+                    <span className="text-sm ml-auto">ISQ: {flag.value}</span>
+                  )}
+                  {flag.delta !== undefined && (
+                    <span className="text-xs">({flag.delta > 0 ? "+" : ""}{flag.delta})</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {lastMeasurement && (
+          <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+            <span className="text-sm text-muted-foreground">Dernier ISQ</span>
+            <div className="flex items-center gap-2">
+              <span className={`text-lg font-bold ${getIsqColor(lastMeasurement.isqValue)}`}>
+                {lastMeasurement.isqValue ?? "-"}
+              </span>
+              <Badge variant="outline" className="text-xs">
+                {getIsqLabel(lastMeasurement.isqValue)}
+              </Badge>
+            </div>
+          </div>
+        )}
+
+        {showIsqInput && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isq-input" className="text-sm font-medium">
+                  Mesure ISQ
+                </Label>
+                {isqRequired && !lastMeasurement && (
+                  <Badge variant="secondary" className="text-xs">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Recommande
+                  </Badge>
+                )}
+                {isqOptional && (
+                  <Badge variant="outline" className="text-xs">Optionnel</Badge>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  id="isq-input"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="0-100"
+                  value={isqValue}
+                  onChange={(e) => setIsqValue(e.target.value)}
+                  className="w-24"
+                  data-testid="input-isq-value"
+                />
+                <Button
+                  onClick={handleSaveIsq}
+                  disabled={!isqValue || saveIsqMutation.isPending}
+                  size="sm"
+                  data-testid="button-save-isq"
+                >
+                  {saveIsqMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Enregistrer"
+                  )}
+                </Button>
+              </div>
+              <Textarea
+                placeholder="Notes (optionnel)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="text-sm"
+                rows={2}
+                data-testid="textarea-isq-notes"
+              />
+            </div>
+          </>
+        )}
+
+        {suggestions.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Suggestions</Label>
+              {suggestions.map((suggestion) => (
+                <div 
+                  key={suggestion.id}
+                  className={`flex items-center justify-between p-2 rounded-md border ${
+                    suggestion.priority === "HIGH" ? "border-destructive/50 bg-destructive/5" :
+                    suggestion.priority === "MEDIUM" ? "border-orange-500/50 bg-orange-500/5" :
+                    "border-muted"
+                  }`}
+                  data-testid={`suggestion-${suggestion.suggestedStatus.toLowerCase()}`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant={suggestion.suggestedStatus === "COMPLICATION" ? "destructive" : "default"}
+                        className="text-xs"
+                      >
+                        {suggestion.suggestedStatus}
+                      </Badge>
+                      <span className="text-sm">{suggestion.reasonLabel}</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleApplySuggestion(suggestion)}
+                    data-testid={`button-apply-suggestion-${suggestion.id}`}
+                  >
+                    Appliquer
+                    <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {measurementHistory.length > 1 && (
+          <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between">
+                <span className="text-sm">Historique ({measurementHistory.length} mesures)</span>
+                {historyOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {measurementHistory.map((m, idx) => (
+                  <div 
+                    key={m.id}
+                    className="flex items-center justify-between p-2 text-sm bg-muted/30 rounded"
+                  >
+                    <span className="text-muted-foreground">
+                      {new Date(m.measuredAt).toLocaleDateString("fr-FR")}
+                    </span>
+                    <span className={`font-medium ${getIsqColor(m.isqValue)}`}>
+                      {m.isqValue ?? "-"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {appointmentType === "URGENCE" && (
+          <div className="p-2 bg-destructive/10 rounded-md">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-medium">Rendez-vous d'urgence</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Verifiez l'etat de l'implant et envisagez un changement de statut si necessaire.
+            </p>
+          </div>
+        )}
+
+        {isqRequired && !lastMeasurement && (
+          <div className="p-2 bg-orange-500/10 rounded-md">
+            <div className="flex items-center gap-2 text-orange-600">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">ISQ non mesure</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Une mesure ISQ est recommandee pour ce type de rendez-vous.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+
+    <Sheet open={applySheetOpen} onOpenChange={setApplySheetOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Changer le statut de l'implant</SheetTitle>
+            <SheetDescription>
+              {selectedSuggestion && clinicalData?.implant && (
+                <span className="flex items-center gap-2 mt-1">
+                  <Badge variant={statusConfig[clinicalData.implant.statut || "EN_SUIVI"]?.variant || "secondary"}>
+                    {statusConfig[clinicalData.implant.statut || "EN_SUIVI"]?.label || clinicalData.implant.statut}
+                  </Badge>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  <Badge variant={statusConfig[selectedSuggestion.suggestedStatus]?.variant || "secondary"}>
+                    {statusConfig[selectedSuggestion.suggestedStatus]?.label || selectedSuggestion.suggestedStatus}
+                  </Badge>
+                </span>
+              )}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 py-6">
+            {selectedSuggestion && (
+              <div className="p-3 rounded-lg bg-muted/50 border space-y-2">
+                <p className="text-sm text-muted-foreground">Raison suggeree:</p>
+                <p className="text-sm font-medium">{selectedSuggestion.reasonLabel}</p>
+                {(selectedSuggestion.evidence?.isqValue !== undefined || selectedSuggestion.evidence?.isqDelta !== undefined) && (
+                  <div className="flex items-center gap-3 pt-2 border-t text-xs">
+                    {selectedSuggestion.evidence?.isqValue !== undefined && (
+                      <span className="flex items-center gap-1">
+                        <span className="text-muted-foreground">ISQ:</span>
+                        <span className={`font-medium ${selectedSuggestion.evidence.isqValue < 60 ? "text-destructive" : "text-foreground"}`}>
+                          {selectedSuggestion.evidence.isqValue}
+                        </span>
+                      </span>
+                    )}
+                    {selectedSuggestion.evidence?.isqDelta !== undefined && (
+                      <span className="flex items-center gap-1">
+                        <span className="text-muted-foreground">Delta:</span>
+                        <span className={`font-medium ${selectedSuggestion.evidence.isqDelta < 0 ? "text-destructive" : "text-foreground"}`}>
+                          {selectedSuggestion.evidence.isqDelta > 0 ? "+" : ""}{selectedSuggestion.evidence.isqDelta}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            <Separator />
+            <div className="space-y-2">
+              <Label>Motif</Label>
+              {reasonsQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Chargement des motifs...
+                </div>
+              ) : reasonsQuery.data?.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  Aucun motif predefini disponible
+                </p>
+              ) : (
+                <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
+                  <SelectTrigger data-testid="select-status-reason">
+                    <SelectValue placeholder="Selectionner un motif (optionnel)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reasonsQuery.data?.map((reason) => (
+                      <SelectItem key={reason.id} value={reason.id}>
+                        {reason.label}
+                        {reason.isSystem && <Badge variant="outline" className="ml-2 text-xs">Systeme</Badge>}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Motif personnalise (optionnel)</Label>
+              <Textarea
+                value={freeTextReason}
+                onChange={(e) => setFreeTextReason(e.target.value)}
+                placeholder="Ajouter un commentaire libre..."
+                className="min-h-[80px]"
+                data-testid="textarea-free-text-reason"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Notes cliniciennes (optionnel)</Label>
+              <Textarea
+                value={evidence}
+                onChange={(e) => setEvidence(e.target.value)}
+                placeholder="Ajouter des observations cliniques supplementaires..."
+                className="min-h-[80px]"
+                data-testid="textarea-clinician-notes"
+              />
+              <p className="text-xs text-muted-foreground">
+                Les donnees ISQ et de mesure seront automatiquement enregistrees.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setApplySheetOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handleConfirmApply}
+              disabled={applyStatusMutation.isPending}
+              data-testid="button-confirm-status-change"
+            >
+              {applyStatusMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Confirmer
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Calendar, Clock, MoreVertical, Pencil, Trash2, CheckCircle, XCircle, Activity, Stethoscope, AlertCircle, ClipboardList } from "lucide-react";
+import { Calendar, Clock, MoreVertical, Pencil, Trash2, CheckCircle, XCircle, Activity, Stethoscope, AlertCircle, ClipboardList, HeartPulse } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,10 +27,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Appointment, AppointmentType, AppointmentStatus } from "@shared/schema";
 import { AppointmentForm } from "./appointment-form";
+import { ClinicalFollowUp } from "./clinical-followup";
 
 interface AppointmentCardProps {
   appointment: Appointment;
@@ -89,8 +96,10 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
   const { toast } = useToast();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [clinicalOpen, setClinicalOpen] = useState(false);
 
   const TypeIcon = typeIcons[appointment.type];
+  const hasClinicalFollowUp = ["CONTROLE", "CHIRURGIE", "URGENCE", "SUIVI"].includes(appointment.type);
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -189,6 +198,15 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
                   <Pencil className="h-4 w-4 mr-2" />
                   Modifier
                 </DropdownMenuItem>
+                {hasClinicalFollowUp && (
+                  <DropdownMenuItem 
+                    onClick={() => setClinicalOpen(true)}
+                    data-testid="menuitem-clinical-followup"
+                  >
+                    <HeartPulse className="h-4 w-4 mr-2" />
+                    Suivi clinique
+                  </DropdownMenuItem>
+                )}
                 {appointment.status === "UPCOMING" && (
                   <DropdownMenuItem 
                     onClick={() => updateStatusMutation.mutate("COMPLETED")}
@@ -255,6 +273,27 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
           />
         </DialogContent>
       </Dialog>
+
+      <Sheet open={clinicalOpen} onOpenChange={setClinicalOpen}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <HeartPulse className="h-5 w-5" />
+              Suivi clinique
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <ClinicalFollowUp
+              appointmentId={appointment.id}
+              appointmentType={appointment.type}
+              surgeryImplantId={appointment.surgeryImplantId}
+              onStatusChange={(suggestion) => {
+                setClinicalOpen(false);
+              }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
