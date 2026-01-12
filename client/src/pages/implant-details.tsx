@@ -62,6 +62,7 @@ import {
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { OperationForm } from "@/components/operation-form";
+import { ImplantStatusSuggestions } from "@/components/implant-status-suggestions";
 import type { ImplantDetail } from "@shared/types";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -859,6 +860,8 @@ export default function ImplantDetailsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ImplantStatusSuggestions implantId={implantId || ""} currentStatus={implantData.statut} />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
