@@ -1244,6 +1244,93 @@ export const onboardingStateRelations = relations(onboardingState, ({ one }) => 
   }),
 }));
 
+// ============================================
+// RADIO NOTES - Remarques sur les radios
+// ============================================
+
+export const radioNotes = pgTable("radio_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  radioId: varchar("radio_id").notNull().references(() => radios.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const radioNotesRelations = relations(radioNotes, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [radioNotes.organisationId],
+    references: [organisations.id],
+  }),
+  radio: one(radios, {
+    fields: [radioNotes.radioId],
+    references: [radios.id],
+  }),
+  author: one(users, {
+    fields: [radioNotes.authorId],
+    references: [users.id],
+  }),
+}));
+
+// ============================================
+// IMPLANT STATUS REASONS - Motifs de statut
+// ============================================
+
+export const implantStatusReasons = pgTable("implant_status_reasons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").references(() => organisations.id, { onDelete: "cascade" }), // NULL = system
+  status: statutImplantEnum("status").notNull(), // SUCCES, COMPLICATION, ECHEC
+  code: text("code").notNull(), // Stable code like ISQ_LOW
+  label: text("label").notNull(), // Human-readable label
+  isSystem: boolean("is_system").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const implantStatusReasonsRelations = relations(implantStatusReasons, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [implantStatusReasons.organisationId],
+    references: [organisations.id],
+  }),
+}));
+
+// ============================================
+// IMPLANT STATUS HISTORY - Historique des statuts
+// ============================================
+
+export const implantStatusHistory = pgTable("implant_status_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  implantId: varchar("implant_id").notNull().references(() => surgeryImplants.id, { onDelete: "cascade" }),
+  fromStatus: statutImplantEnum("from_status"),
+  toStatus: statutImplantEnum("to_status").notNull(),
+  reasonId: varchar("reason_id").references(() => implantStatusReasons.id, { onDelete: "set null" }),
+  reasonFreeText: text("reason_free_text"),
+  evidence: text("evidence"), // JSON string with ISQ, radioId, visitId, etc.
+  changedByUserId: varchar("changed_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+});
+
+export const implantStatusHistoryRelations = relations(implantStatusHistory, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [implantStatusHistory.organisationId],
+    references: [organisations.id],
+  }),
+  implant: one(surgeryImplants, {
+    fields: [implantStatusHistory.implantId],
+    references: [surgeryImplants.id],
+  }),
+  reason: one(implantStatusReasons, {
+    fields: [implantStatusHistory.reasonId],
+    references: [implantStatusReasons.id],
+  }),
+  changedBy: one(users, {
+    fields: [implantStatusHistory.changedByUserId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas for new tables
 export const insertEmailTokenSchema = createInsertSchema(emailTokens).omit({
   id: true,
@@ -1286,6 +1373,22 @@ export const insertOnboardingStateSchema = createInsertSchema(onboardingState).o
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertRadioNoteSchema = createInsertSchema(radioNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertImplantStatusReasonSchema = createInsertSchema(implantStatusReasons).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertImplantStatusHistorySchema = createInsertSchema(implantStatusHistory).omit({
+  id: true,
+  changedAt: true,
 });
 
 export type InsertOrganisation = z.infer<typeof insertOrganisationSchema>;
@@ -1362,6 +1465,15 @@ export type PatientShareLink = typeof patientShareLinks.$inferSelect;
 
 export type InsertOnboardingState = z.infer<typeof insertOnboardingStateSchema>;
 export type OnboardingState = typeof onboardingState.$inferSelect;
+
+export type InsertRadioNote = z.infer<typeof insertRadioNoteSchema>;
+export type RadioNote = typeof radioNotes.$inferSelect;
+
+export type InsertImplantStatusReason = z.infer<typeof insertImplantStatusReasonSchema>;
+export type ImplantStatusReason = typeof implantStatusReasons.$inferSelect;
+
+export type InsertImplantStatusHistory = z.infer<typeof insertImplantStatusHistorySchema>;
+export type ImplantStatusHistory = typeof implantStatusHistory.$inferSelect;
 
 // Onboarding data interface
 export interface OnboardingData {
@@ -1444,3 +1556,54 @@ export interface PublicPatientShareData {
   sharedByUserName: string;
   createdAt: string;
 }
+
+// Radio note with author details
+export interface RadioNoteWithAuthor extends RadioNote {
+  authorNom?: string | null;
+  authorPrenom?: string | null;
+}
+
+// Implant status suggestion from clinical assistant
+export interface ImplantStatusSuggestion {
+  toStatus: "SUCCES" | "COMPLICATION" | "ECHEC";
+  confidence: "low" | "medium" | "high";
+  message: string;
+  evidence: {
+    latestIsq?: number;
+    isqDelta?: number;
+    daysSinceLastIsq?: number;
+    daysSincePose?: number;
+    isqHistory?: Array<{ value: number; date: string }>;
+  };
+  defaultReasonCode: string;
+}
+
+// Implant status history with details
+export interface ImplantStatusHistoryWithDetails extends ImplantStatusHistory {
+  reasonLabel?: string | null;
+  reasonCode?: string | null;
+  changedByNom?: string | null;
+  changedByPrenom?: string | null;
+}
+
+// System status reason codes
+export const SYSTEM_STATUS_REASONS = {
+  SUCCES: [
+    { code: "SUCCESS_OSSEOINTEGRATION", label: "Ostéo-intégration confirmée" },
+    { code: "SUCCESS_PROSTHESIS", label: "Prothèse posée avec succès" },
+    { code: "SUCCESS_STABLE_ISQ", label: "ISQ stable et satisfaisant" },
+  ],
+  COMPLICATION: [
+    { code: "ISQ_LOW", label: "ISQ faible" },
+    { code: "ISQ_DECLINING", label: "ISQ en diminution" },
+    { code: "INFECTION", label: "Infection" },
+    { code: "PAIN", label: "Douleur persistante" },
+    { code: "MOBILITY", label: "Mobilité de l'implant" },
+    { code: "RADIO_ANOMALY", label: "Anomalie radiologique" },
+  ],
+  ECHEC: [
+    { code: "FAILURE_NO_OSSEOINTEGRATION", label: "Absence d'ostéo-intégration" },
+    { code: "FAILURE_IMPLANT_LOST", label: "Implant perdu / déposé" },
+    { code: "FAILURE_MOBILITY", label: "Mobilité irréversible" },
+  ],
+} as const;
