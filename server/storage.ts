@@ -63,6 +63,15 @@ import {
   type EmailToken,
   type Invitation,
   type EmailOutbox,
+  radioNotes,
+  implantStatusReasons,
+  implantStatusHistory,
+  type RadioNote,
+  type RadioNoteWithAuthor,
+  type ImplantStatusReason,
+  type ImplantStatusHistory,
+  type ImplantStatusHistoryWithDetails,
+  SYSTEM_STATUS_REASONS,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -313,6 +322,21 @@ export interface IStorage {
   // Email outbox methods
   logEmail(data: { organisationId?: string | null; toEmail: string; template: string; subject: string; payload?: string | null; status: 'PENDING' | 'SENT' | 'FAILED'; sentAt?: Date | null; errorMessage?: string | null }): Promise<EmailOutbox>;
   updateEmailStatus(id: string, status: 'PENDING' | 'SENT' | 'FAILED', errorMessage?: string | null): Promise<void>;
+
+  // Radio notes methods
+  getRadioNotes(organisationId: string, radioId: string): Promise<import("@shared/schema").RadioNoteWithAuthor[]>;
+  createRadioNote(organisationId: string, authorId: string, radioId: string, body: string): Promise<import("@shared/schema").RadioNote>;
+  updateRadioNote(organisationId: string, id: string, body: string): Promise<import("@shared/schema").RadioNote | undefined>;
+  deleteRadioNote(organisationId: string, id: string): Promise<boolean>;
+
+  // Implant status reasons methods
+  getStatusReasons(organisationId: string, status?: 'SUCCES' | 'COMPLICATION' | 'ECHEC'): Promise<import("@shared/schema").ImplantStatusReason[]>;
+  createStatusReason(organisationId: string, data: { status: 'SUCCES' | 'COMPLICATION' | 'ECHEC'; code: string; label: string }): Promise<import("@shared/schema").ImplantStatusReason>;
+  seedSystemStatusReasons(): Promise<void>;
+
+  // Implant status history methods
+  getImplantStatusHistory(organisationId: string, implantId: string): Promise<import("@shared/schema").ImplantStatusHistoryWithDetails[]>;
+  changeImplantStatus(organisationId: string, data: { implantId: string; fromStatus?: 'EN_SUIVI' | 'SUCCES' | 'COMPLICATION' | 'ECHEC' | null; toStatus: 'EN_SUIVI' | 'SUCCES' | 'COMPLICATION' | 'ECHEC'; reasonId?: string | null; reasonFreeText?: string | null; evidence?: string | null; changedByUserId: string }): Promise<import("@shared/schema").ImplantStatusHistory>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4199,6 +4223,189 @@ export class DatabaseStorage implements IStorage {
         errorMessage: errorMessage || null,
       })
       .where(eq(emailOutbox.id, id));
+  }
+
+  // ========== RADIO NOTES ==========
+  async getRadioNotes(organisationId: string, radioId: string): Promise<RadioNoteWithAuthor[]> {
+    const notes = await db.select({
+      id: radioNotes.id,
+      organisationId: radioNotes.organisationId,
+      radioId: radioNotes.radioId,
+      authorId: radioNotes.authorId,
+      body: radioNotes.body,
+      createdAt: radioNotes.createdAt,
+      updatedAt: radioNotes.updatedAt,
+      authorNom: users.nom,
+      authorPrenom: users.prenom,
+    })
+      .from(radioNotes)
+      .leftJoin(users, eq(radioNotes.authorId, users.id))
+      .where(and(
+        eq(radioNotes.organisationId, organisationId),
+        eq(radioNotes.radioId, radioId)
+      ))
+      .orderBy(desc(radioNotes.createdAt));
+    return notes;
+  }
+
+  async createRadioNote(organisationId: string, authorId: string, radioId: string, body: string): Promise<RadioNote> {
+    const [note] = await db.insert(radioNotes)
+      .values({
+        organisationId,
+        radioId,
+        authorId,
+        body,
+      })
+      .returning();
+    return note;
+  }
+
+  async updateRadioNote(organisationId: string, id: string, body: string): Promise<RadioNote | undefined> {
+    const [note] = await db.update(radioNotes)
+      .set({ body, updatedAt: new Date() })
+      .where(and(
+        eq(radioNotes.id, id),
+        eq(radioNotes.organisationId, organisationId)
+      ))
+      .returning();
+    return note || undefined;
+  }
+
+  async deleteRadioNote(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(radioNotes)
+      .where(and(
+        eq(radioNotes.id, id),
+        eq(radioNotes.organisationId, organisationId)
+      ));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // ========== IMPLANT STATUS REASONS ==========
+  async getStatusReasons(organisationId: string, status?: 'SUCCES' | 'COMPLICATION' | 'ECHEC'): Promise<ImplantStatusReason[]> {
+    const conditions = [
+      or(
+        isNull(implantStatusReasons.organisationId), // System reasons
+        eq(implantStatusReasons.organisationId, organisationId) // Org-specific
+      ),
+      eq(implantStatusReasons.isActive, true),
+    ];
+    if (status) {
+      conditions.push(eq(implantStatusReasons.status, status));
+    }
+    return db.select().from(implantStatusReasons)
+      .where(and(...conditions))
+      .orderBy(desc(implantStatusReasons.isSystem), implantStatusReasons.label);
+  }
+
+  async createStatusReason(organisationId: string, data: { status: 'SUCCES' | 'COMPLICATION' | 'ECHEC'; code: string; label: string }): Promise<ImplantStatusReason> {
+    const [reason] = await db.insert(implantStatusReasons)
+      .values({
+        organisationId,
+        status: data.status,
+        code: data.code,
+        label: data.label,
+        isSystem: false,
+        isActive: true,
+      })
+      .returning();
+    return reason;
+  }
+
+  async seedSystemStatusReasons(): Promise<void> {
+    // Check if system reasons already exist
+    const existingReasons = await db.select({ id: implantStatusReasons.id })
+      .from(implantStatusReasons)
+      .where(eq(implantStatusReasons.isSystem, true))
+      .limit(1);
+    
+    if (existingReasons.length > 0) {
+      return; // Already seeded
+    }
+
+    // Seed all system reasons
+    const allReasons: { status: 'SUCCES' | 'COMPLICATION' | 'ECHEC'; code: string; label: string }[] = [];
+    
+    for (const reason of SYSTEM_STATUS_REASONS.SUCCES) {
+      allReasons.push({ status: 'SUCCES', code: reason.code, label: reason.label });
+    }
+    for (const reason of SYSTEM_STATUS_REASONS.COMPLICATION) {
+      allReasons.push({ status: 'COMPLICATION', code: reason.code, label: reason.label });
+    }
+    for (const reason of SYSTEM_STATUS_REASONS.ECHEC) {
+      allReasons.push({ status: 'ECHEC', code: reason.code, label: reason.label });
+    }
+
+    await db.insert(implantStatusReasons)
+      .values(allReasons.map(r => ({
+        organisationId: null,
+        status: r.status,
+        code: r.code,
+        label: r.label,
+        isSystem: true,
+        isActive: true,
+      })));
+  }
+
+  // ========== IMPLANT STATUS HISTORY ==========
+  async getImplantStatusHistory(organisationId: string, implantId: string): Promise<ImplantStatusHistoryWithDetails[]> {
+    const history = await db.select({
+      id: implantStatusHistory.id,
+      organisationId: implantStatusHistory.organisationId,
+      implantId: implantStatusHistory.implantId,
+      fromStatus: implantStatusHistory.fromStatus,
+      toStatus: implantStatusHistory.toStatus,
+      reasonId: implantStatusHistory.reasonId,
+      reasonFreeText: implantStatusHistory.reasonFreeText,
+      evidence: implantStatusHistory.evidence,
+      changedByUserId: implantStatusHistory.changedByUserId,
+      changedAt: implantStatusHistory.changedAt,
+      reasonLabel: implantStatusReasons.label,
+      reasonCode: implantStatusReasons.code,
+      changedByNom: users.nom,
+      changedByPrenom: users.prenom,
+    })
+      .from(implantStatusHistory)
+      .leftJoin(implantStatusReasons, eq(implantStatusHistory.reasonId, implantStatusReasons.id))
+      .leftJoin(users, eq(implantStatusHistory.changedByUserId, users.id))
+      .where(and(
+        eq(implantStatusHistory.organisationId, organisationId),
+        eq(implantStatusHistory.implantId, implantId)
+      ))
+      .orderBy(desc(implantStatusHistory.changedAt));
+    return history;
+  }
+
+  async changeImplantStatus(organisationId: string, data: { 
+    implantId: string; 
+    fromStatus?: 'EN_SUIVI' | 'SUCCES' | 'COMPLICATION' | 'ECHEC' | null; 
+    toStatus: 'EN_SUIVI' | 'SUCCES' | 'COMPLICATION' | 'ECHEC'; 
+    reasonId?: string | null; 
+    reasonFreeText?: string | null; 
+    evidence?: string | null; 
+    changedByUserId: string 
+  }): Promise<ImplantStatusHistory> {
+    // Update the surgery implant status
+    await db.update(surgeryImplants)
+      .set({ statut: data.toStatus })
+      .where(and(
+        eq(surgeryImplants.id, data.implantId),
+        eq(surgeryImplants.organisationId, organisationId)
+      ));
+
+    // Record in history
+    const [historyEntry] = await db.insert(implantStatusHistory)
+      .values({
+        organisationId,
+        implantId: data.implantId,
+        fromStatus: data.fromStatus || null,
+        toStatus: data.toStatus,
+        reasonId: data.reasonId || null,
+        reasonFreeText: data.reasonFreeText || null,
+        evidence: data.evidence || null,
+        changedByUserId: data.changedByUserId,
+      })
+      .returning();
+    return historyEntry;
   }
 }
 
