@@ -1736,6 +1736,254 @@ export async function registerRoutes(
     }
   });
 
+  // ========== RADIO NOTES ==========
+  app.get("/api/radios/:radioId/notes", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const notes = await storage.getRadioNotes(organisationId, req.params.radioId);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching radio notes:", error);
+      res.status(500).json({ error: "Failed to fetch radio notes" });
+    }
+  });
+
+  app.post("/api/radios/:radioId/notes", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.jwtUser?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    try {
+      const { body } = req.body;
+      if (!body || typeof body !== "string" || body.trim().length === 0) {
+        return res.status(400).json({ error: "body is required" });
+      }
+      const note = await storage.createRadioNote(organisationId, userId, req.params.radioId, body.trim());
+      res.status(201).json(note);
+    } catch (error) {
+      console.error("Error creating radio note:", error);
+      res.status(500).json({ error: "Failed to create radio note" });
+    }
+  });
+
+  app.patch("/api/radios/:radioId/notes/:noteId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { body } = req.body;
+      if (!body || typeof body !== "string" || body.trim().length === 0) {
+        return res.status(400).json({ error: "body is required" });
+      }
+      const note = await storage.updateRadioNote(organisationId, req.params.noteId, body.trim());
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error("Error updating radio note:", error);
+      res.status(500).json({ error: "Failed to update radio note" });
+    }
+  });
+
+  app.delete("/api/radios/:radioId/notes/:noteId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const deleted = await storage.deleteRadioNote(organisationId, req.params.noteId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting radio note:", error);
+      res.status(500).json({ error: "Failed to delete radio note" });
+    }
+  });
+
+  // ========== IMPLANT STATUS REASONS ==========
+  app.get("/api/status-reasons", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const status = req.query.status as 'SUCCES' | 'COMPLICATION' | 'ECHEC' | undefined;
+      const reasons = await storage.getStatusReasons(organisationId, status);
+      res.json(reasons);
+    } catch (error) {
+      console.error("Error fetching status reasons:", error);
+      res.status(500).json({ error: "Failed to fetch status reasons" });
+    }
+  });
+
+  app.post("/api/status-reasons", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { status, code, label } = req.body;
+      if (!status || !code || !label) {
+        return res.status(400).json({ error: "status, code, and label are required" });
+      }
+      if (!['SUCCES', 'COMPLICATION', 'ECHEC'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+      const reason = await storage.createStatusReason(organisationId, { status, code, label });
+      res.status(201).json(reason);
+    } catch (error) {
+      console.error("Error creating status reason:", error);
+      res.status(500).json({ error: "Failed to create status reason" });
+    }
+  });
+
+  // ========== IMPLANT STATUS HISTORY ==========
+  app.get("/api/surgery-implants/:implantId/status-history", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const history = await storage.getImplantStatusHistory(organisationId, req.params.implantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching implant status history:", error);
+      res.status(500).json({ error: "Failed to fetch status history" });
+    }
+  });
+
+  app.post("/api/surgery-implants/:implantId/status", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.jwtUser?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    try {
+      const { toStatus, fromStatus, reasonId, reasonFreeText, evidence } = req.body;
+      if (!toStatus || !['EN_SUIVI', 'SUCCES', 'COMPLICATION', 'ECHEC'].includes(toStatus)) {
+        return res.status(400).json({ error: "Valid toStatus is required" });
+      }
+      const history = await storage.changeImplantStatus(organisationId, {
+        implantId: req.params.implantId,
+        fromStatus,
+        toStatus,
+        reasonId,
+        reasonFreeText,
+        evidence,
+        changedByUserId: userId,
+      });
+      res.status(201).json(history);
+    } catch (error) {
+      console.error("Error changing implant status:", error);
+      res.status(500).json({ error: "Failed to change implant status" });
+    }
+  });
+
+  // ========== IMPLANT STATUS SUGGESTIONS (MVP Rules) ==========
+  app.get("/api/surgery-implants/:implantId/status-suggestions", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const implantId = req.params.implantId;
+      // Fetch surgery implant with ISQ data
+      const implant = await storage.getSurgeryImplant(organisationId, implantId);
+      if (!implant) {
+        return res.status(404).json({ error: "Implant not found" });
+      }
+
+      const suggestions: Array<{
+        status: 'SUCCES' | 'COMPLICATION' | 'ECHEC';
+        confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+        rule: string;
+        reasonCode?: string;
+      }> = [];
+
+      // MVP Rules based on ISQ values
+      const isqValues: number[] = [];
+      if (implant.isqPose !== null && implant.isqPose !== undefined) isqValues.push(implant.isqPose);
+      if (implant.isq2m !== null && implant.isq2m !== undefined) isqValues.push(implant.isq2m);
+      if (implant.isq3m !== null && implant.isq3m !== undefined) isqValues.push(implant.isq3m);
+      if (implant.isq6m !== null && implant.isq6m !== undefined) isqValues.push(implant.isq6m);
+
+      const latestIsq = isqValues.length > 0 ? isqValues[isqValues.length - 1] : null;
+      const poseIsq = implant.isqPose;
+      const isq6m = implant.isq6m;
+
+      // Rule 1: ISQ 6 mois >= 70 -> SUCCES (HIGH confidence)
+      if (isq6m !== null && isq6m !== undefined && isq6m >= 70) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'HIGH',
+          rule: 'ISQ à 6 mois ≥ 70',
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
+      // Rule 2: ISQ stable and >= 60 at 3 months -> SUCCES (MEDIUM confidence)
+      if (!isq6m && implant.isq3m !== null && implant.isq3m !== undefined && implant.isq3m >= 60) {
+        if (poseIsq !== null && poseIsq !== undefined && implant.isq3m >= poseIsq - 5) {
+          suggestions.push({
+            status: 'SUCCES',
+            confidence: 'MEDIUM',
+            rule: 'ISQ stable à 3 mois (≥ 60, pas de chute > 5)',
+            reasonCode: 'OSTEOINTEGRATION_OK',
+          });
+        }
+      }
+
+      // Rule 3: ISQ drop > 15 points -> COMPLICATION (HIGH confidence)
+      if (isqValues.length >= 2) {
+        const maxDrop = Math.max(...isqValues.slice(0, -1)) - (latestIsq ?? 0);
+        if (maxDrop > 15) {
+          suggestions.push({
+            status: 'COMPLICATION',
+            confidence: 'HIGH',
+            rule: 'Chute ISQ > 15 points',
+            reasonCode: 'ISQ_DROP',
+          });
+        }
+      }
+
+      // Rule 4: Latest ISQ < 50 -> ECHEC (HIGH confidence)
+      if (latestIsq !== null && latestIsq < 50) {
+        suggestions.push({
+          status: 'ECHEC',
+          confidence: 'HIGH',
+          rule: 'ISQ le plus récent < 50',
+          reasonCode: 'DEPOSE',
+        });
+      }
+
+      // Rule 5: Latest ISQ between 50-60 -> COMPLICATION (MEDIUM confidence)
+      if (latestIsq !== null && latestIsq >= 50 && latestIsq < 60) {
+        suggestions.push({
+          status: 'COMPLICATION',
+          confidence: 'MEDIUM',
+          rule: 'ISQ entre 50-60 (ostéointégration insuffisante)',
+          reasonCode: 'ISQ_DROP',
+        });
+      }
+
+      res.json({
+        implantId,
+        currentStatus: implant.statut,
+        latestIsq,
+        isqHistory: { pose: poseIsq, m2: implant.isq2m, m3: implant.isq3m, m6: isq6m },
+        suggestions,
+      });
+    } catch (error) {
+      console.error("Error generating status suggestions:", error);
+      res.status(500).json({ error: "Failed to generate suggestions" });
+    }
+  });
+
   // ========== DOCUMENTS (PDF) ==========
   // NOTE: /api/documents/* routes are now handled by the modular Documents router
   // mounted above via app.use("/api/documents", documentsRouter).
