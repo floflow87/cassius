@@ -92,7 +92,7 @@ export const syncConflictSourceEnum = pgEnum("sync_conflict_source", [
 ]);
 export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
 export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
-export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"]);
+export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT", "PROTHESE"]);
 
 export const savedFilterPageTypeEnum = pgEnum("saved_filter_page_type", ["patients", "implants", "actes"]);
 
@@ -182,7 +182,6 @@ export const operationsRelations = relations(operations, ({ one, many }) => ({
     references: [patients.id],
   }),
   surgeryImplants: many(surgeryImplants),
-  surgeryProtheses: many(surgeryProtheses),
   radios: many(radios),
 }));
 
@@ -197,6 +196,11 @@ export const implants = pgTable("implants", {
   longueur: real("longueur").notNull(),
   lot: text("lot"), // Numéro de lot fabricant
   notes: text("notes"), // Notes générales sur ce type d'implant
+  // Champs spécifiques aux prothèses (optionnels, utilisés uniquement quand typeImplant = PROTHESE)
+  typeProthese: typeProtheseEnum("type_prothese"), // vissée, scellée
+  quantite: quantiteProtheseEnum("quantite"), // unitaire, plurale
+  mobilite: mobiliteProtheseEnum("mobilite"), // amovible, fixe
+  typePilier: typePilierEnum("type_pilier"), // multi-unit, droit, angulé
 });
 
 export const implantsRelations = relations(implants, ({ one, many }) => ({
@@ -208,51 +212,6 @@ export const implantsRelations = relations(implants, ({ one, many }) => ({
   radios: many(radios),
   visites: many(visites),
   protheses: many(protheses),
-}));
-
-// Table catalogueProtheses - référentiel/catalogue de prothèses (informations produit uniquement)
-export const catalogueProtheses = pgTable("catalogue_protheses", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
-  nom: text("nom").notNull(),
-  typeProthese: typeProtheseEnum("type_prothese").notNull(),
-  quantite: quantiteProtheseEnum("quantite").notNull(),
-  mobilite: mobiliteProtheseEnum("mobilite").notNull(),
-  typePilier: typePilierEnum("type_pilier").notNull(),
-  notes: text("notes"),
-});
-
-export const catalogueProthesesRelations = relations(catalogueProtheses, ({ one, many }) => ({
-  organisation: one(organisations, {
-    fields: [catalogueProtheses.organisationId],
-    references: [organisations.id],
-  }),
-  surgeryProtheses: many(surgeryProtheses),
-}));
-
-// Table de liaison surgery_protheses - représente une prothèse posée lors d'une chirurgie
-export const surgeryProtheses = pgTable("surgery_protheses", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
-  surgeryId: varchar("surgery_id").notNull().references(() => operations.id, { onDelete: "cascade" }),
-  protheseId: varchar("prothese_id").notNull().references(() => catalogueProtheses.id, { onDelete: "cascade" }),
-  datePose: date("date_pose").notNull(),
-  notes: text("notes"),
-});
-
-export const surgeryProthesesRelations = relations(surgeryProtheses, ({ one }) => ({
-  organisation: one(organisations, {
-    fields: [surgeryProtheses.organisationId],
-    references: [organisations.id],
-  }),
-  surgery: one(operations, {
-    fields: [surgeryProtheses.surgeryId],
-    references: [operations.id],
-  }),
-  prothese: one(catalogueProtheses, {
-    fields: [surgeryProtheses.protheseId],
-    references: [catalogueProtheses.id],
-  }),
 }));
 
 // Table de liaison surgery_implants - représente un implant posé lors d'une chirurgie
@@ -912,16 +871,6 @@ export const insertProtheseSchema = createInsertSchema(protheses).omit({
   organisationId: true,
 });
 
-export const insertCatalogueProtheseSchema = createInsertSchema(catalogueProtheses).omit({
-  id: true,
-  organisationId: true,
-});
-
-export const insertSurgeryProtheseSchema = createInsertSchema(surgeryProtheses).omit({
-  id: true,
-  organisationId: true,
-});
-
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -1377,12 +1326,6 @@ export type Visite = typeof visites.$inferSelect;
 
 export type InsertProthese = z.infer<typeof insertProtheseSchema>;
 export type Prothese = typeof protheses.$inferSelect;
-
-export type InsertCatalogueProthese = z.infer<typeof insertCatalogueProtheseSchema>;
-export type CatalogueProthese = typeof catalogueProtheses.$inferSelect;
-
-export type InsertSurgeryProthese = z.infer<typeof insertSurgeryProtheseSchema>;
-export type SurgeryProthese = typeof surgeryProtheses.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
