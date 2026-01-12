@@ -460,15 +460,7 @@ export default function ImplantDetailsPage() {
   const getISQTimeline = (): ISQPoint[] => {
     const points: ISQPoint[] = [];
 
-    if (implantData?.isqPose && implantData?.datePose) {
-      points.push({ 
-        label: "Pose", 
-        sublabel: "Jour de la pose",
-        value: implantData.isqPose, 
-        date: implantData.datePose,
-        source: "isqPose"
-      });
-    }
+    // Skip Pose ISQ - show only follow-up measurements
     if (implantData?.isq2m && implantData?.datePose) {
       const date2m = new Date(implantData.datePose);
       date2m.setMonth(date2m.getMonth() + 2);
@@ -526,7 +518,8 @@ export default function ImplantDetailsPage() {
         });
       });
 
-    return points;
+    // Reverse to show most recent first
+    return points.reverse();
   };
 
   const getSuccessRateFromBoneLoss = (score: number): number => {
@@ -718,10 +711,9 @@ export default function ImplantDetailsPage() {
                         <SelectValue placeholder="Sélectionner" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ANTERIEUR">Antérieur</SelectItem>
-                        <SelectItem value="POSTERIEUR">Postérieur</SelectItem>
-                        <SelectItem value="MAXILLAIRE">Maxillaire</SelectItem>
-                        <SelectItem value="MANDIBULAIRE">Mandibulaire</SelectItem>
+                        <SelectItem value="CRESTAL">Crestal</SelectItem>
+                        <SelectItem value="SOUS_CRESTAL">Sous-crestal</SelectItem>
+                        <SelectItem value="SUPRA_CRESTAL">Supra-crestal</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1247,9 +1239,11 @@ export default function ImplantDetailsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon">
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                    <Link href={`/actes/${implantData.surgeryId}`}>
+                      <Button variant="ghost" size="icon" data-testid="button-view-operation">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ) : (

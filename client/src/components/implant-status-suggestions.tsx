@@ -192,89 +192,67 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Lightbulb className="h-4 w-4 text-amber-500" />
+        <CardHeader className="flex flex-row items-center justify-between gap-2 py-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
             Suggestions de statut
+            {suggestionsQuery.data?.latestIsq && (
+              <span className="text-xs font-normal text-muted-foreground">
+                (ISQ: {suggestionsQuery.data.latestIsq})
+              </span>
+            )}
           </CardTitle>
           <Button
             variant="ghost"
             size="sm"
+            className="h-7 text-xs"
             onClick={() => setHistorySheetOpen(true)}
             data-testid="button-view-status-history"
           >
-            <History className="h-4 w-4 mr-1" />
+            <History className="h-3.5 w-3.5 mr-1" />
             Historique
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="py-2">
           {suggestionsQuery.isLoading ? (
-            <div className="flex items-center justify-center py-6">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-3">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           ) : !hasSuggestions ? (
-            <div className="text-center py-6">
-              <p className="text-sm text-muted-foreground">
-                Aucune suggestion de changement de statut pour le moment.
-              </p>
-              {suggestionsQuery.data?.latestIsq && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Dernier ISQ: {suggestionsQuery.data.latestIsq}
-                </p>
-              )}
-            </div>
+            <p className="text-xs text-muted-foreground text-center py-2">
+              Aucune suggestion pour le moment
+            </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {suggestions.map((suggestion, index) => {
                 const config = statusConfig[suggestion.status] || statusConfig.EN_SUIVI;
                 const confidenceConf = confidenceConfig[suggestion.confidence] || confidenceConfig.LOW;
-                const Icon = config.icon;
 
                 return (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+                    className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30"
                     data-testid={`suggestion-${suggestion.status}-${index}`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${
-                        suggestion.status === "SUCCES" ? "bg-emerald-100 dark:bg-emerald-900/30" :
-                        suggestion.status === "COMPLICATION" ? "bg-amber-100 dark:bg-amber-900/30" :
-                        "bg-red-100 dark:bg-red-900/30"
-                      }`}>
-                        <Icon className={`h-4 w-4 ${
-                          suggestion.status === "SUCCES" ? "text-emerald-600 dark:text-emerald-400" :
-                          suggestion.status === "COMPLICATION" ? "text-amber-600 dark:text-amber-400" :
-                          "text-red-600 dark:text-red-400"
-                        }`} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={config.variant}>{config.label}</Badge>
-                          <Badge variant="outline" className={confidenceConf.className}>
-                            {confidenceConf.label}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">{suggestion.rule}</p>
-                      </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant={config.variant} className="text-xs shrink-0">{config.label}</Badge>
+                      <Badge variant="outline" className={`text-xs shrink-0 ${confidenceConf.className}`}>
+                        {confidenceConf.label}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground truncate">{suggestion.rule}</span>
                     </div>
                     <Button
                       size="sm"
                       variant="outline"
+                      className="h-7 text-xs shrink-0"
                       onClick={() => handleApplySuggestion(suggestion)}
                       data-testid={`button-apply-suggestion-${index}`}
                     >
                       Appliquer
-                      <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   </div>
                 );
               })}
-              {suggestionsQuery.data?.latestIsq !== null && (
-                <p className="text-xs text-muted-foreground text-center pt-2 border-t">
-                  Base sur ISQ actuel: {suggestionsQuery.data?.latestIsq}
-                </p>
-              )}
             </div>
           )}
         </CardContent>

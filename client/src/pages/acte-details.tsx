@@ -37,6 +37,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { RadioUploadForm } from "@/components/radio-upload-form";
+import { RadioCard } from "@/components/radio-card";
 import { OperationEditForm } from "@/components/operation-edit-form";
 import { SurgeryImplantEditSheet } from "@/components/surgery-implant-edit-sheet";
 import { SurgeryImplantAddSheet } from "@/components/surgery-implant-add-sheet";
@@ -271,6 +272,50 @@ export default function ActeDetailsPage() {
                 <p className="text-sm mt-1">{operation.observationsPostop}</p>
               </div>
             )}
+            {(() => {
+              const implantsWithProthese = operation.surgeryImplants.filter(si => si.implant.typeProthese);
+              const hasProthese = implantsWithProthese.length > 0;
+              return (
+                <>
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <span className="text-sm text-muted-foreground">Prothèse supra-implantaire</span>
+                    {hasProthese ? (
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">
+                        {implantsWithProthese.length} implant{implantsWithProthese.length > 1 ? "s" : ""}
+                      </Badge>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Non configurée</span>
+                    )}
+                  </div>
+                  {hasProthese && implantsWithProthese.map((si) => (
+                    <div key={si.id} className="pl-4 space-y-1 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Site {si.siteFdi}</span>
+                        <span>{si.implant.typeProthese === "VISSEE" ? "Vissée" : "Scellée"}</span>
+                      </div>
+                      {si.implant.quantite && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Quantité</span>
+                          <span>{si.implant.quantite === "UNITAIRE" ? "Unitaire" : "Plurale"}</span>
+                        </div>
+                      )}
+                      {si.implant.mobilite && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Mobilité</span>
+                          <span>{si.implant.mobilite === "FIXE" ? "Fixe" : "Amovible"}</span>
+                        </div>
+                      )}
+                      {si.implant.typePilier && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Type de pilier</span>
+                          <span>{si.implant.typePilier.replace(/_/g, " ")}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
@@ -440,17 +485,11 @@ export default function ActeDetailsPage() {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {operation.radios.map((radio) => (
-                <div
+                <RadioCard
                   key={radio.id}
-                  className="border rounded-md p-3 hover-elevate cursor-pointer"
-                  data-testid={`card-radio-${radio.id}`}
-                >
-                  <div className="aspect-square bg-muted rounded-md mb-2 flex items-center justify-center">
-                    <FileImage className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium truncate">{radio.title || "Radio"}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(radio.date)}</p>
-                </div>
+                  radio={radio}
+                  patientId={operation.patient.id}
+                />
               ))}
             </div>
           )}
