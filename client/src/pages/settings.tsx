@@ -14,6 +14,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useOnboarding, ONBOARDING_STEPS } from "@/hooks/use-onboarding";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -563,6 +564,30 @@ function OnboardingSettingsSection() {
     refetchInterval: 30000,
   });
 
+  const markDoneMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      const response = await apiRequest("POST", `/api/onboarding/checklist/${itemId}/mark-done`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/onboarding/checklist"] });
+      if (data.allCompleted) {
+        toast({
+          title: "Félicitations !",
+          description: "Vous avez terminé la configuration de Cassius.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de marquer comme fait",
+        variant: "destructive",
+      });
+    },
+  });
+
   const isLoading = onboardingLoading || checklistLoading;
 
   if (isLoading) {
@@ -590,10 +615,6 @@ function OnboardingSettingsSection() {
   ) : (
     <Badge variant="secondary">En cours</Badge>
   );
-
-  const handleNavigate = (url: string) => {
-    setLocation(url);
-  };
 
   const handleResumeFirstIncomplete = () => {
     // Find first incomplete item with a wizard step
@@ -670,23 +691,35 @@ function OnboardingSettingsSection() {
               {checklist?.items.map((item) => (
                 <div 
                   key={item.id}
-                  className="flex items-center justify-between gap-2 text-sm py-2 px-2 -mx-2 rounded cursor-pointer hover-elevate"
-                  onClick={() => handleNavigate(item.actionUrl)}
+                  className="flex items-center justify-between gap-2 text-sm py-2 px-2 -mx-2 rounded hover-elevate"
                   data-testid={`settings-onboarding-step-${item.id}`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div 
+                    className="flex items-center gap-2 flex-1 cursor-pointer"
+                    onClick={() => item.wizardStep !== null ? setLocation(`/onboarding?step=${item.wizardStep}`) : setLocation(item.actionUrl)}
+                  >
                     {item.completed ? (
                       <Check className="w-4 h-4 text-green-500" />
                     ) : (
                       <Circle className="w-4 h-4 text-muted-foreground" />
                     )}
-                    <span className={item.completed ? "text-muted-foreground" : ""}>
+                    <span className={item.completed ? "text-muted-foreground line-through" : ""}>
                       {item.label}
                     </span>
                   </div>
-                  <Badge variant={item.completed ? "default" : "outline"} className={item.completed ? "bg-green-500 hover:bg-green-600" : ""}>
-                    {item.completed ? "Validé" : "À faire"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {!item.completed && (
+                      <Checkbox 
+                        checked={false}
+                        onCheckedChange={() => markDoneMutation.mutate(item.id)}
+                        disabled={markDoneMutation.isPending}
+                        data-testid={`settings-checkbox-${item.id}`}
+                      />
+                    )}
+                    <Badge variant={item.completed ? "default" : "outline"} className={item.completed ? "bg-green-500 hover:bg-green-600" : ""}>
+                      {item.completed ? "Validé" : "À faire"}
+                    </Badge>
+                  </div>
                 </div>
               ))}
             </div>

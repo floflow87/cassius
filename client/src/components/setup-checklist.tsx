@@ -9,6 +9,7 @@ import { Check, ChevronDown, ChevronRight, Circle, Sparkles, X, Play } from "luc
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useOnboarding } from "@/hooks/use-onboarding";
 
 interface ChecklistItem {
   id: string;
@@ -28,18 +29,11 @@ export function SetupChecklist() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isDismissed: serverDismissed, isLoading: onboardingLoading, dismissOnboarding } = useOnboarding();
   const [isOpen, setIsOpen] = useState(() => {
     const saved = localStorage.getItem("cassius_checklist_open");
     return saved !== null ? saved === "true" : true;
   });
-  const [isDismissed, setIsDismissed] = useState(false);
-
-  useEffect(() => {
-    const dismissed = localStorage.getItem("cassius_checklist_dismissed");
-    if (dismissed === "true") {
-      setIsDismissed(true);
-    }
-  }, []);
 
   useEffect(() => {
     localStorage.setItem("cassius_checklist_open", String(isOpen));
@@ -74,18 +68,16 @@ export function SetupChecklist() {
     },
   });
 
-  const handleDismiss = () => {
-    localStorage.setItem("cassius_checklist_dismissed", "true");
-    setIsDismissed(true);
-  };
-
-  const handleNavigate = (url: string) => {
-    setLocation(url);
-  };
-
-  const handleMarkDone = (e: React.MouseEvent, itemId: string) => {
-    e.stopPropagation();
-    markDoneMutation.mutate(itemId);
+  const handleDismiss = async () => {
+    try {
+      await dismissOnboarding();
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de masquer la checklist",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleResume = () => {
@@ -103,7 +95,7 @@ export function SetupChecklist() {
     }
   };
 
-  if (isLoading || isDismissed) {
+  if (isLoading || onboardingLoading || serverDismissed) {
     return null;
   }
 
@@ -175,7 +167,7 @@ export function SetupChecklist() {
                 >
                   <div 
                     className="flex items-center gap-2 flex-1 cursor-pointer"
-                    onClick={() => item.wizardStep !== null ? setLocation(`/onboarding?step=${item.wizardStep}`) : handleNavigate(item.actionUrl)}
+                    onClick={() => item.wizardStep !== null ? setLocation(`/onboarding?step=${item.wizardStep}`) : setLocation(item.actionUrl)}
                   >
                     {item.completed ? (
                       <Check className="w-4 h-4 text-green-500 shrink-0" />
