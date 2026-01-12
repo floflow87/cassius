@@ -504,7 +504,7 @@ export default function ActeDetailsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <SurgeryTimeline operationId={operation.id} />
+          <SurgeryTimeline operationId={operation.id} patientId={operation.patient.id} />
         </CardContent>
       </Card>
 

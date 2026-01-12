@@ -20,14 +20,6 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
@@ -258,49 +250,66 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
         </CardContent>
       </Card>
 
-      <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Changer le statut de l'implant</DialogTitle>
-            <DialogDescription>
+      <Sheet open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Changer le statut de l'implant</SheetTitle>
+            <SheetDescription>
               {selectedSuggestion && (
-                <>
-                  Passer de{" "}
+                <span className="flex items-center gap-2 mt-1">
                   <Badge variant={statusConfig[currentStatus]?.variant || "secondary"}>
                     {statusConfig[currentStatus]?.label || currentStatus}
-                  </Badge>{" "}
-                  a{" "}
+                  </Badge>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   <Badge variant={statusConfig[selectedSuggestion.status]?.variant || "secondary"}>
                     {statusConfig[selectedSuggestion.status]?.label || selectedSuggestion.status}
                   </Badge>
-                </>
+                </span>
               )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 py-6">
+            {selectedSuggestion?.rule && (
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <p className="text-sm text-muted-foreground">Raison suggérée:</p>
+                <p className="text-sm font-medium mt-1">{selectedSuggestion.rule}</p>
+              </div>
+            )}
+            <Separator />
             <div className="space-y-2">
               <Label>Motif</Label>
-              <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
-                <SelectTrigger data-testid="select-status-reason">
-                  <SelectValue placeholder="Selectionner un motif (optionnel)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {reasonsQuery.data?.map((reason) => (
-                    <SelectItem key={reason.id} value={reason.id}>
-                      {reason.label}
-                      {reason.isSystem && <span className="text-muted-foreground ml-1">(systeme)</span>}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {reasonsQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Chargement des motifs...
+                </div>
+              ) : reasonsQuery.data?.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  Aucun motif prédéfini disponible
+                </p>
+              ) : (
+                <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
+                  <SelectTrigger data-testid="select-status-reason">
+                    <SelectValue placeholder="Sélectionner un motif (optionnel)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reasonsQuery.data?.map((reason) => (
+                      <SelectItem key={reason.id} value={reason.id}>
+                        {reason.label}
+                        {reason.isSystem && <Badge variant="outline" className="ml-2 text-xs">Système</Badge>}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2">
-              <Label>Motif personnalise (optionnel)</Label>
+              <Label>Motif personnalisé (optionnel)</Label>
               <Textarea
                 value={freeTextReason}
                 onChange={(e) => setFreeTextReason(e.target.value)}
                 placeholder="Ajouter un commentaire libre..."
-                className="min-h-[60px]"
+                className="min-h-[80px]"
                 data-testid="textarea-free-text-reason"
               />
             </div>
@@ -310,16 +319,17 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
                 value={evidence}
                 onChange={(e) => setEvidence(e.target.value)}
                 placeholder="Evidence clinique justifiant ce changement..."
-                className="min-h-[60px]"
+                className="min-h-[80px]"
                 data-testid="textarea-evidence"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApplyDialogOpen(false)}>
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setApplyDialogOpen(false)}>
               Annuler
             </Button>
             <Button
+              className="flex-1"
               onClick={handleConfirmApply}
               disabled={applyStatusMutation.isPending}
               data-testid="button-confirm-status-change"
@@ -327,11 +337,11 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
               {applyStatusMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
-              Confirmer le changement
+              Confirmer
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={historySheetOpen} onOpenChange={setHistorySheetOpen}>
         <SheetContent className="w-full sm:max-w-lg">

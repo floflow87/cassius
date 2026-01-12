@@ -8,6 +8,7 @@ import type { OperationTimeline, TimelineEvent } from "@shared/types";
 
 interface SurgeryTimelineProps {
   operationId: string;
+  patientId: string;
 }
 
 const typeIcons = {
@@ -30,7 +31,7 @@ const stabilityConfig = {
   high: { label: "Élevée", variant: "default" as const },
 };
 
-export function SurgeryTimeline({ operationId }: SurgeryTimelineProps) {
+export function SurgeryTimeline({ operationId, patientId }: SurgeryTimelineProps) {
   const { data: timeline, isLoading } = useQuery<OperationTimeline>({
     queryKey: ["/api/operations", operationId, "timeline"],
   });
@@ -185,8 +186,8 @@ export function SurgeryTimeline({ operationId }: SurgeryTimelineProps) {
                           </p>
                         )}
                         
-                        {event.surgeryImplantId && (
-                          <Link href={`/implants/${event.surgeryImplantId}`}>
+                        {event.surgeryImplantId && patientId && (
+                          <Link href={`/patients/${patientId}/implants/${event.surgeryImplantId}`}>
                             <span 
                               className="text-sm text-primary hover:underline cursor-pointer mt-1 inline-block"
                               data-testid={`link-implant-${event.surgeryImplantId}`}

@@ -55,6 +55,7 @@ export interface Patient {
 export interface Operation {
   id: string;
   patientId: string;
+  organisationId: string;
   dateOperation: string;
   typeIntervention: TypeIntervention;
   typeChirurgieTemps: TypeChirurgieTemps | null;
@@ -82,6 +83,10 @@ export interface Implant {
   longueur: number;
   lot: string | null;
   notes: string | null;
+  typeProthese: "VISSEE" | "SCELLEE" | null;
+  quantite: "UNITAIRE" | "PLURALE" | null;
+  mobilite: "AMOVIBLE" | "FIXE" | null;
+  typePilier: "DROIT" | "ANGULE" | "MULTI_UNIT" | null;
 }
 
 // SurgeryImplant = implant posé lors d'une chirurgie (avec contexte de pose)
