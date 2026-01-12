@@ -609,14 +609,11 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                 control={form.control}
                 name="greffeOsseuse"
                 render={({ field }) => (
-                  <FormItem 
-                    className="flex flex-row items-center justify-between rounded-lg border p-3 cursor-pointer"
-                    onClick={() => field.onChange(!field.value)}
-                  >
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                     <div className="space-y-0.5 flex items-center gap-2">
                       <Plus className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <FormLabel className="cursor-pointer">Greffe osseuse réalisée</FormLabel>
+                        <FormLabel>Greffe osseuse réalisée</FormLabel>
                         <FormDescription>
                           Indiquez si une greffe a été effectuée
                         </FormDescription>
