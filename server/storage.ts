@@ -4524,6 +4524,7 @@ export class DatabaseStorage implements IStorage {
     let implant: SurgeryImplantWithDetails | null = null;
     let lastMeasurement: ImplantMeasurement | null = null;
     let measurementHistory: ImplantMeasurement[] = [];
+    let statusHistory: ImplantStatusHistoryWithDetails[] = [];
     let clinicalFlags: ClinicalFlag[] = [];
     let suggestions: StatusSuggestion[] = [];
     let linkedRadios: Radio[] = [];
@@ -4547,6 +4548,9 @@ export class DatabaseStorage implements IStorage {
 
       // Generate suggestions based on flags
       suggestions = await this.generateStatusSuggestions(organisationId, appointment.surgeryImplantId, clinicalFlags);
+
+      // Get status history for this implant
+      statusHistory = await this.getImplantStatusHistory(organisationId, appointment.surgeryImplantId);
     }
 
     // Get linked radios (via operationId or appointmentId)
@@ -4574,6 +4578,7 @@ export class DatabaseStorage implements IStorage {
       implant,
       lastMeasurement,
       measurementHistory,
+      statusHistory,
       flags: clinicalFlags,
       suggestions,
       linkedRadios,

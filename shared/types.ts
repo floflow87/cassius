@@ -774,6 +774,8 @@ export interface ImplantMeasurement {
   updatedAt: Date | null;
 }
 
+export { type ImplantStatusHistoryWithDetails } from "@shared/schema";
+
 export interface AppointmentClinicalData {
   appointment: {
     id: string;
@@ -788,6 +790,7 @@ export interface AppointmentClinicalData {
   implant: SurgeryImplantWithDetails | null;
   lastMeasurement: ImplantMeasurement | null;
   measurementHistory: ImplantMeasurement[];
+  statusHistory: ImplantStatusHistoryWithDetails[];
   flags: ClinicalFlag[];
   suggestions: StatusSuggestion[];
   linkedRadios: Radio[];

@@ -44,7 +44,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { 
   AppointmentClinicalData, 
   ClinicalFlag, 
-  StatusSuggestion 
+  StatusSuggestion,
+  ImplantStatusHistoryWithDetails
 } from "@shared/types";
 
 interface StatusReason {
@@ -119,6 +120,7 @@ export function ClinicalFollowUp({
   const [isqValue, setIsqValue] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [statusHistoryOpen, setStatusHistoryOpen] = useState(false);
   const [applySheetOpen, setApplySheetOpen] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] = useState<StatusSuggestion | null>(null);
   const [selectedReasonId, setSelectedReasonId] = useState<string>("");
@@ -157,6 +159,7 @@ export function ClinicalFollowUp({
       setSelectedReasonId("");
       setFreeTextReason("");
       setEvidence("");
+      setStatusHistoryOpen(true); // Show history after status change
       refetch();
       if (onStatusChange && selectedSuggestion) {
         onStatusChange(selectedSuggestion);
@@ -295,6 +298,7 @@ export function ClinicalFollowUp({
   const flags = clinicalData?.flags || [];
   const suggestions = clinicalData?.suggestions || [];
   const measurementHistory = clinicalData?.measurementHistory || [];
+  const statusHistory = clinicalData?.statusHistory || [];
 
   return (
     <>
@@ -456,13 +460,13 @@ export function ClinicalFollowUp({
           <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="w-full justify-between">
-                <span className="text-sm">Historique ({measurementHistory.length} mesures)</span>
+                <span className="text-sm">Historique ISQ ({measurementHistory.length} mesures)</span>
                 {historyOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2">
               <div className="space-y-1 max-h-40 overflow-y-auto">
-                {measurementHistory.map((m, idx) => (
+                {measurementHistory.map((m) => (
                   <div 
                     key={m.id}
                     className="flex items-center justify-between p-2 text-sm bg-muted/30 rounded"
@@ -478,6 +482,68 @@ export function ClinicalFollowUp({
               </div>
             </CollapsibleContent>
           </Collapsible>
+        )}
+
+        {statusHistory.length > 0 && (
+          <>
+            <Separator />
+            <Collapsible open={statusHistoryOpen} onOpenChange={setStatusHistoryOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-full justify-between">
+                  <span className="text-sm">Historique des statuts ({statusHistory.length})</span>
+                  {statusHistoryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2">
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {statusHistory.map((entry) => (
+                    <div 
+                      key={entry.id}
+                      className="p-2 bg-muted/30 rounded border text-sm space-y-1"
+                      data-testid={`status-history-${entry.id}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {entry.fromStatus && (
+                            <>
+                              <Badge variant="outline" className="text-xs">
+                                {statusConfig[entry.fromStatus]?.label || entry.fromStatus}
+                              </Badge>
+                              <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                            </>
+                          )}
+                          <Badge 
+                            variant={statusConfig[entry.toStatus]?.variant || "secondary"} 
+                            className="text-xs"
+                          >
+                            {statusConfig[entry.toStatus]?.label || entry.toStatus}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(entry.changedAt).toLocaleDateString("fr-FR")}
+                        </span>
+                      </div>
+                      {entry.reasonLabel && (
+                        <p className="text-xs text-muted-foreground">
+                          {entry.reasonLabel}
+                        </p>
+                      )}
+                      {entry.reasonFreeText && (
+                        <p className="text-xs italic border-l-2 border-muted-foreground/30 pl-2 mt-1">
+                          {entry.reasonFreeText}
+                        </p>
+                      )}
+                      {entry.changedByPrenom && entry.changedByNom && (
+                        <p className="text-xs text-muted-foreground/70">
+                          Par {entry.changedByPrenom} {entry.changedByNom}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </>
         )}
 
         {appointmentType === "URGENCE" && (
