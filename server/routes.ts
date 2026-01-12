@@ -6125,8 +6125,10 @@ export async function registerRoutes(
   app.post("/api/onboarding/checklist/:itemId/mark-done", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
-    const userId = getUserId(req, res);
-    if (!userId) return;
+    const userId = req.jwtUser?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Utilisateur non authentifié" });
+    }
 
     const { itemId } = req.params;
 
