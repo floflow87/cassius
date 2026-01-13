@@ -9,7 +9,7 @@ import {
   flags,
   type InsertFlag,
 } from "@shared/schema";
-import { eq, and, sql, lt, isNull, desc } from "drizzle-orm";
+import { eq, and, or, sql, lt, isNull, desc } from "drizzle-orm";
 
 const ISQ_LOW_THRESHOLD = 56; // ISQ <= 55 triggers alert (uses < 56)
 const ISQ_DECLINE_THRESHOLD = 10;
@@ -280,13 +280,17 @@ async function detectNoRecentAppointment(organisationId: string, candidates: Fla
 
     if (hasImplants.length === 0) continue;
 
+    // Check for any recent appointment (UPCOMING or COMPLETED) as proof of activity
     const recentAppointment = await db
       .select({ id: appointments.id })
       .from(appointments)
       .where(and(
         eq(appointments.organisationId, organisationId),
         eq(appointments.patientId, patient.id),
-        eq(appointments.status, "COMPLETED"),
+        or(
+          eq(appointments.status, "COMPLETED"),
+          eq(appointments.status, "UPCOMING")
+        ),
         sql`${appointments.dateStart} > ${cutoffDate.toISOString()}::timestamp`
       ))
       .limit(1);
