@@ -26,7 +26,26 @@ Cassius utilizes a modern full-stack architecture built for scalability and resp
 - **Timeline Features:** Provides chronological views of surgery events, ISQ measurements, visits, and radiographs, including ISQ delta calculations.
 - **Unified Appointments System:** Manages various visit types (CONSULTATION, SUIVI, CHIRURGIE, CONTROLE, URGENCE, AUTRE) with CRUD APIs and status tracking.
 - **Clinical Flag System:** Automated alerts (CRITICAL, WARNING, INFO) for clinical issues and data completeness (e.g., ISQ_LOW, NO_POSTOP_FOLLOWUP).
+- **ISQ Measurements System:**
+    - **Recording:** ISQ (Implant Stability Quotient) values recorded at implant placement and follow-up visits.
+    - **Thresholds:** ISQ < 60 triggers low stability alert, ISQ drop ≥ 10 points triggers declining alert.
+    - **Timeline:** All ISQ measurements displayed chronologically in the surgery timeline.
+    - **Delta Calculation:** Shows ISQ change between measurements (e.g., "+5" or "-10").
+    - **Status Suggestions:** Clinical assistant suggests status changes based on ISQ trends (SUCCES, COMPLICATION, ECHEC).
+- **Visites de Suivi (Follow-up Visits):**
+    - **Data Source:** Visits are stored in the `visites` table linked to operations via `operationId`.
+    - **Display:** Shown in the "Visites de suivi" card on the operation details page (`/actes/:id`).
+    - **Fields:** Date, ISQ measurement, and notes for each visit.
+    - **Purpose:** Track post-operative healing and implant stability over time.
+    - **Note:** This legacy system coexists with the newer unified appointments system.
+- **Surgery Timeline:**
+    - **Location:** Displayed in the "Historique" card on operation details page.
+    - **Events:** Shows all events related to an operation: surgery date, ISQ measurements, visits, radiographs.
+    - **Chronological:** Events sorted by date with visual timeline representation.
+    - **API:** GET /api/operations/:id/timeline returns timeline events.
 - **Document Explorer:** Global document management with folder tree navigation, search, sort, and a document viewer, allowing documents to be linked to operations.
+    - **RadioDrawer:** Click "Modifier" on radiographs to open detailed view with notes, zoom, and rename capabilities.
+    - **Radio Notes:** Add clinical notes to radiographs (stored in `radio_notes` table).
 - **Calendar Page:** Professional scheduling page using FullCalendar, supporting day, week, month, and agenda views, with drag-and-drop rescheduling and quick appointment creation.
     - **Unified Calendar View:** Displays both Cassius appointments and Google Calendar events in a single view.
     - **Source Filters:** Filter by source (All | Cassius | Google | Conflicts) in the sidebar.
@@ -122,6 +141,11 @@ The application includes a comprehensive in-app notification system with user pr
 - Google Calendar sync errors: Notifies the user
 - CSV import completion: Notifies the importer
 
+**Notification Enrichment:**
+- Notifications include patient context (name and ID) when relevant.
+- Metadata parsed from JSON to extract patientName/patientId for display in notification UI.
+- Clicking a notification with patient info navigates to the patient's profile.
+
 **API Endpoints:**
 - GET /api/notifications - List notifications (with pagination, filtering)
 - GET /api/notifications/unread-count - Get unread count
@@ -165,3 +189,19 @@ The application includes a comprehensive onboarding wizard for new organizations
 - `drizzle.config.ts` uses `DATABASE_URL` for migrations
 - `server/db.ts` uses `SUPABASE_DB_URL_DEV` for development
 - Schema changes must be applied to both databases or use `psql "$SUPABASE_DB_URL_DEV"` to apply directly
+
+## UI/UX Standards
+**Badge Sizing:**
+- All badges use `text-[10px]` font size site-wide for consistency.
+- Status badge variants: `echec` (red), `complication` (amber), `ensuivi` (blue), `default` (green for success).
+
+**Status Colors:**
+- EN_SUIVI: Blue background (variant "ensuivi")
+- SUCCES: Green background (variant "default")
+- COMPLICATION: Amber/yellow background (variant "complication")
+- ECHEC: Red background (variant "echec")
+
+**Typography on Detail Pages:**
+- Section titles (Patient, Détails, Implants posés, etc.): `text-base font-medium`
+- Content text: `text-xs` for all non-title text
+- Badges: `text-[10px]`

@@ -44,11 +44,11 @@ import { SurgeryImplantAddSheet } from "@/components/surgery-implant-add-sheet";
 import { SurgeryTimeline } from "@/components/surgery-timeline";
 import type { OperationDetail, SurgeryImplantWithDetails } from "@shared/types";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  EN_SUIVI: { label: "En suivi", variant: "secondary" },
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" }> = {
+  EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
   SUCCES: { label: "Succès", variant: "default" },
-  COMPLICATION: { label: "Complication", variant: "outline" },
-  ECHEC: { label: "Échec", variant: "destructive" },
+  COMPLICATION: { label: "Complication", variant: "complication" },
+  ECHEC: { label: "Échec", variant: "echec" },
 };
 
 const typeInterventionLabels: Record<string, string> = {
@@ -140,7 +140,7 @@ export default function ActeDetailsPage() {
           <h1 className="text-xl font-semibold" data-testid="text-acte-title">
             {typeInterventionLabels[operation.typeIntervention] || operation.typeIntervention}
           </h1>
-          <p className="text-sm text-muted-foreground" data-testid="text-acte-date">
+          <p className="text-xs text-muted-foreground" data-testid="text-acte-date">
             {formatDate(operation.dateOperation)}
           </p>
         </div>
@@ -169,11 +169,11 @@ export default function ActeDetailsPage() {
                 <p className="font-medium" data-testid="text-patient-name">
                   {operation.patient.prenom} {operation.patient.nom}
                 </p>
-                <p className="text-sm text-muted-foreground" data-testid="text-patient-dob">
+                <p className="text-xs text-muted-foreground" data-testid="text-patient-dob">
                   Né(e) le {formatDate(operation.patient.dateNaissance)}
                 </p>
                 {operation.patient.telephone && (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {operation.patient.telephone}
                   </p>
                 )}
@@ -199,77 +199,77 @@ export default function ActeDetailsPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Type</span>
-              <span className="text-sm font-medium">
+              <span className="text-xs text-muted-foreground">Type</span>
+              <span className="text-xs font-medium">
                 {typeInterventionLabels[operation.typeIntervention] || operation.typeIntervention}
               </span>
             </div>
             {operation.typeChirurgieApproche && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Approche</span>
-                <span className="text-sm">
+                <span className="text-xs text-muted-foreground">Approche</span>
+                <span className="text-xs">
                   {approchLabels[operation.typeChirurgieApproche] || operation.typeChirurgieApproche}
                 </span>
               </div>
             )}
             {operation.typeChirurgieTemps && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Temps</span>
-                <span className="text-sm">
+                <span className="text-xs text-muted-foreground">Temps</span>
+                <span className="text-xs">
                   {tempsLabels[operation.typeChirurgieTemps] || operation.typeChirurgieTemps}
                 </span>
               </div>
             )}
             {operation.typeMiseEnCharge && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Mise en charge</span>
-                <span className="text-sm">
+                <span className="text-xs text-muted-foreground">Mise en charge</span>
+                <span className="text-xs">
                   {miseEnChargeLabels[operation.typeMiseEnCharge] || operation.typeMiseEnCharge}
                 </span>
               </div>
             )}
             {operation.greffeOsseuse && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Greffe osseuse</span>
-                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+                <span className="text-xs text-muted-foreground">Greffe osseuse</span>
+                <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
                   Oui
                 </Badge>
               </div>
             )}
             {operation.typeGreffe && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Type de greffe</span>
-                <span className="text-sm">{operation.typeGreffe}</span>
+                <span className="text-xs text-muted-foreground">Type de greffe</span>
+                <span className="text-xs">{operation.typeGreffe}</span>
               </div>
             )}
             {operation.greffeQuantite && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Quantité greffe</span>
-                <span className="text-sm">{operation.greffeQuantite}</span>
+                <span className="text-xs text-muted-foreground">Quantité greffe</span>
+                <span className="text-xs">{operation.greffeQuantite}</span>
               </div>
             )}
             {operation.greffeLocalisation && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Localisation greffe</span>
-                <span className="text-sm">{operation.greffeLocalisation}</span>
+                <span className="text-xs text-muted-foreground">Localisation greffe</span>
+                <span className="text-xs">{operation.greffeLocalisation}</span>
               </div>
             )}
             {operation.conditionsMedicalesPreop && (
               <div className="pt-2 border-t">
-                <span className="text-sm text-muted-foreground">Conditions préopératoires</span>
-                <p className="text-sm mt-1">{operation.conditionsMedicalesPreop}</p>
+                <span className="text-xs text-muted-foreground">Conditions préopératoires</span>
+                <p className="text-xs mt-1">{operation.conditionsMedicalesPreop}</p>
               </div>
             )}
             {operation.notesPerop && (
               <div className="pt-2 border-t">
-                <span className="text-sm text-muted-foreground">Notes peropératoires</span>
-                <p className="text-sm mt-1">{operation.notesPerop}</p>
+                <span className="text-xs text-muted-foreground">Notes peropératoires</span>
+                <p className="text-xs mt-1">{operation.notesPerop}</p>
               </div>
             )}
             {operation.observationsPostop && (
               <div className="pt-2 border-t">
-                <span className="text-sm text-muted-foreground">Observations postopératoires</span>
-                <p className="text-sm mt-1">{operation.observationsPostop}</p>
+                <span className="text-xs text-muted-foreground">Observations postopératoires</span>
+                <p className="text-xs mt-1">{operation.observationsPostop}</p>
               </div>
             )}
             {(() => {
@@ -278,17 +278,17 @@ export default function ActeDetailsPage() {
               return (
                 <>
                   <div className="flex items-center justify-between pt-2 border-t">
-                    <span className="text-sm text-muted-foreground">Prothèse supra-implantaire</span>
+                    <span className="text-xs text-muted-foreground">Prothèse supra-implantaire</span>
                     {hasProthese ? (
-                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">
+                      <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">
                         {implantsWithProthese.length} implant{implantsWithProthese.length > 1 ? "s" : ""}
                       </Badge>
                     ) : (
-                      <span className="text-sm text-muted-foreground">Non configurée</span>
+                      <span className="text-xs text-muted-foreground">Non configurée</span>
                     )}
                   </div>
                   {hasProthese && implantsWithProthese.map((si) => (
-                    <div key={si.id} className="pl-4 space-y-1 text-sm">
+                    <div key={si.id} className="pl-4 space-y-1 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Site {si.siteFdi}</span>
                         <span>{si.implant.typeProthese === "VISSEE" ? "Vissée" : "Scellée"}</span>
@@ -337,7 +337,7 @@ export default function ActeDetailsPage() {
         </CardHeader>
         <CardContent>
           {operation.surgeryImplants.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
+            <p className="text-xs text-muted-foreground text-center py-8">
               Aucun implant posé lors de cette intervention
             </p>
           ) : (
@@ -374,14 +374,14 @@ export default function ActeDetailsPage() {
                     </TableCell>
                     <TableCell>
                       {si.typeOs ? (
-                        <span className="text-sm">{si.typeOs}</span>
+                        <span className="text-xs">{si.typeOs}</span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell>
                       {si.miseEnCharge ? (
-                        <span className="text-sm">{miseEnChargeLabels[si.miseEnCharge] || si.miseEnCharge}</span>
+                        <span className="text-xs">{miseEnChargeLabels[si.miseEnCharge] || si.miseEnCharge}</span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
@@ -395,7 +395,7 @@ export default function ActeDetailsPage() {
                     </TableCell>
                     <TableCell>
                       {si.statut && statusConfig[si.statut] ? (
-                        <Badge variant={statusConfig[si.statut].variant} className="text-xs">
+                        <Badge variant={statusConfig[si.statut].variant} className="text-[10px]">
                           {statusConfig[si.statut].label}
                         </Badge>
                       ) : (
@@ -479,7 +479,7 @@ export default function ActeDetailsPage() {
         </CardHeader>
         <CardContent>
           {operation.radios.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
+            <p className="text-xs text-muted-foreground text-center py-8">
               Aucune radiographie associée à cette intervention
             </p>
           ) : (
