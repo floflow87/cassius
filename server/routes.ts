@@ -1898,6 +1898,27 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Implant not found" });
       }
 
+      // Fetch status history and measurements to check for applied suggestions
+      const [statusHistory, measurements] = await Promise.all([
+        storage.getImplantStatusHistory(organisationId, implantId),
+        storage.getImplantMeasurements(organisationId, implantId),
+      ]);
+
+      // Get last status change date and last ISQ measurement date
+      const lastStatusChange = statusHistory.length > 0 ? new Date(statusHistory[0].changedAt) : null;
+      const lastMeasurement = measurements.length > 0 ? new Date(measurements[0].measuredAt) : null;
+
+      // Check if suggestion should be hidden (applied after last ISQ)
+      const isSuggestionApplied = (suggestedStatus: string): boolean => {
+        if (!lastStatusChange) return false;
+        // If current status matches suggestion and status was changed after last ISQ, hide it
+        // If no measurement exists, show the suggestion (can't compare without ISQ data)
+        if (implant.statut === suggestedStatus && lastMeasurement) {
+          return lastStatusChange > lastMeasurement;
+        }
+        return false;
+      };
+
       const suggestions: Array<{
         status: 'SUCCES' | 'COMPLICATION' | 'ECHEC';
         confidence: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -1971,12 +1992,15 @@ export async function registerRoutes(
         });
       }
 
+      // Filter out suggestions that have been applied and no new ISQ since
+      const filteredSuggestions = suggestions.filter(s => !isSuggestionApplied(s.status));
+
       res.json({
         implantId,
         currentStatus: implant.statut,
         latestIsq,
         isqHistory: { pose: poseIsq, m2: implant.isq2m, m3: implant.isq3m, m6: isq6m },
-        suggestions,
+        suggestions: filteredSuggestions,
       });
     } catch (error) {
       console.error("Error generating status suggestions:", error);

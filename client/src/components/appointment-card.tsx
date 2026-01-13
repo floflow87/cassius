@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Calendar, Clock, MoreVertical, Pencil, Trash2, CheckCircle, XCircle, Activity, Stethoscope, AlertCircle, ClipboardList, HeartPulse } from "lucide-react";
+import { Calendar, Clock, MoreVertical, Pencil, Trash2, CheckCircle, XCircle, Activity, Stethoscope, AlertCircle, ClipboardList, HeartPulse, CalendarPlus, Loader2 } from "lucide-react";
+import type { RecommendedActionType } from "@shared/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,8 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [clinicalOpen, setClinicalOpen] = useState(false);
+  const [control14dOpen, setControl14dOpen] = useState(false);
+  const [control14dDate, setControl14dDate] = useState<Date | null>(null);
 
   const TypeIcon = typeIcons[appointment.type];
   const hasClinicalFollowUp = ["CONTROLE", "CHIRURGIE", "URGENCE", "SUIVI"].includes(appointment.type);
@@ -142,6 +145,64 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
       });
     },
   });
+
+  const createControl14dMutation = useMutation({
+    mutationFn: async () => {
+      if (!control14dDate) throw new Error("Date non définie");
+      const dateHeure = control14dDate.toISOString();
+      await apiRequest("POST", "/api/appointments", {
+        patientId,
+        type: "CONTROLE",
+        dateHeure,
+        title: "Contrôle ISQ à 14 jours",
+        description: "Contrôle de stabilité de l'implant planifié automatiquement",
+        surgeryImplantId: appointment.surgeryImplantId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+      toast({
+        title: "Contrôle planifié",
+        description: "Un rendez-vous de contrôle à 14 jours a été créé.",
+        variant: "success",
+      });
+      setControl14dOpen(false);
+      setClinicalOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAction = (actionType: RecommendedActionType, params?: Record<string, unknown>) => {
+    if (actionType === "plan_control_14d") {
+      let targetDate: Date;
+      if (params?.targetDate && typeof params.targetDate === 'string') {
+        targetDate = new Date(params.targetDate);
+      } else {
+        targetDate = new Date();
+        targetDate.setDate(targetDate.getDate() + 14);
+        targetDate.setHours(9, 0, 0, 0);
+      }
+      setControl14dDate(targetDate);
+      setControl14dOpen(true);
+    } else if (actionType === "open_status_modal") {
+      toast({
+        title: "Action",
+        description: "Ouvrir le modal de statut",
+      });
+    } else if (actionType === "add_or_link_radio") {
+      toast({
+        title: "Action",
+        description: "Ajouter ou lier une radiographie",
+      });
+    }
+  };
 
   return (
     <>
@@ -290,10 +351,61 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
               onStatusChange={(suggestion) => {
                 setClinicalOpen(false);
               }}
+              onAction={handleAction}
             />
           </div>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={control14dOpen} onOpenChange={setControl14dOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <CalendarPlus className="h-5 w-5 text-primary" />
+              Planifier un contrôle à 14 jours
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>Un rendez-vous de contrôle sera créé pour mesurer la stabilité de l'implant.</p>
+              {control14dDate && (
+                <div className="p-3 bg-muted rounded-lg text-sm">
+                  <p className="font-medium text-foreground">Date proposée :</p>
+                  <p className="text-muted-foreground mt-1">
+                    {control14dDate.toLocaleDateString("fr-FR", {
+                      weekday: "long",
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })} à {control14dDate.toLocaleTimeString("fr-FR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-control-14d">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => createControl14dMutation.mutate()}
+              disabled={createControl14dMutation.isPending}
+              data-testid="button-confirm-control-14d"
+            >
+              {createControl14dMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Création...
+                </>
+              ) : (
+                <>
+                  <CalendarPlus className="h-4 w-4 mr-2" />
+                  Confirmer
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
