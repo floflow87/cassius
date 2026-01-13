@@ -561,6 +561,45 @@ export const insertAppointmentExternalLinkSchema = createInsertSchema(appointmen
 export type InsertAppointmentExternalLink = z.infer<typeof insertAppointmentExternalLinkSchema>;
 export type AppointmentExternalLink = typeof appointmentExternalLinks.$inferSelect;
 
+// Table appointment_radios - Links radios to appointments (many-to-many)
+export const appointmentRadios = pgTable("appointment_radios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: "cascade" }),
+  radioId: varchar("radio_id").notNull().references(() => radios.id, { onDelete: "cascade" }),
+  linkedBy: varchar("linked_by").references(() => users.id, { onDelete: "set null" }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("appointment_radios_unique_idx").on(table.appointmentId, table.radioId),
+]);
+
+export const appointmentRadiosRelations = relations(appointmentRadios, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [appointmentRadios.organisationId],
+    references: [organisations.id],
+  }),
+  appointment: one(appointments, {
+    fields: [appointmentRadios.appointmentId],
+    references: [appointments.id],
+  }),
+  radio: one(radios, {
+    fields: [appointmentRadios.radioId],
+    references: [radios.id],
+  }),
+  linkedByUser: one(users, {
+    fields: [appointmentRadios.linkedBy],
+    references: [users.id],
+  }),
+}));
+
+export const insertAppointmentRadioSchema = createInsertSchema(appointmentRadios).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAppointmentRadio = z.infer<typeof insertAppointmentRadioSchema>;
+export type AppointmentRadio = typeof appointmentRadios.$inferSelect;
+
 // Table google_calendar_events - Imported Google Calendar events for V2 bidirectional sync
 export const googleCalendarEvents = pgTable("google_calendar_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Lightbulb, ChevronRight, AlertTriangle, CheckCircle2, XCircle, Loader2, History } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -183,17 +182,18 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 py-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
-            Suggestions de statut
+      {/* Inline section - no Card wrapper for embedding in ISQ section */}
+      <div className="mt-4 pt-4 border-t space-y-3" data-testid="status-suggestions-section">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-medium">Suggestions de statut</span>
             {suggestionsQuery.data?.latestIsq && (
-              <span className="text-xs font-normal text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 (ISQ: {suggestionsQuery.data.latestIsq})
               </span>
             )}
-          </CardTitle>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -204,51 +204,50 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
             <History className="h-3.5 w-3.5 mr-1" />
             Historique
           </Button>
-        </CardHeader>
-        <CardContent className="py-2">
-          {suggestionsQuery.isLoading ? (
-            <div className="flex items-center justify-center py-3">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            </div>
-          ) : !hasSuggestions ? (
-            <p className="text-xs text-muted-foreground text-center py-2">
-              Aucune suggestion pour le moment
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {suggestions.map((suggestion, index) => {
-                const config = statusConfig[suggestion.status] || statusConfig.EN_SUIVI;
-                const confidenceConf = confidenceConfig[suggestion.confidence] || confidenceConfig.LOW;
+        </div>
+        
+        {suggestionsQuery.isLoading ? (
+          <div className="flex items-center justify-center py-3">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : !hasSuggestions ? (
+          <p className="text-xs text-muted-foreground text-center py-2">
+            Aucune suggestion pour le moment
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {suggestions.map((suggestion, index) => {
+              const config = statusConfig[suggestion.status] || statusConfig.EN_SUIVI;
+              const confidenceConf = confidenceConfig[suggestion.confidence] || confidenceConfig.LOW;
 
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30"
-                    data-testid={`suggestion-${suggestion.status}-${index}`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Badge variant={config.variant} className="text-xs shrink-0">{config.label}</Badge>
-                      <Badge variant="outline" className={`text-xs shrink-0 ${confidenceConf.className}`}>
-                        {confidenceConf.label}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground truncate">{suggestion.rule}</span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs shrink-0"
-                      onClick={() => handleApplySuggestion(suggestion)}
-                      data-testid={`button-apply-suggestion-${index}`}
-                    >
-                      Appliquer
-                    </Button>
+              return (
+                <div
+                  key={index}
+                  className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30"
+                  data-testid={`suggestion-${suggestion.status}-${index}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <Badge variant={config.variant} className="text-xs shrink-0">{config.label}</Badge>
+                    <Badge variant="outline" className={`text-xs shrink-0 ${confidenceConf.className}`}>
+                      {confidenceConf.label}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{suggestion.rule}</span>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs shrink-0"
+                    onClick={() => handleApplySuggestion(suggestion)}
+                    data-testid={`button-apply-suggestion-${index}`}
+                  >
+                    Appliquer
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <Sheet open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">

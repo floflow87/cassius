@@ -796,6 +796,21 @@ export interface AppointmentClinicalData {
   linkedRadios: Radio[];
 }
 
+export type RecommendedActionType = 
+  | "plan_control_14d"
+  | "add_or_link_radio"
+  | "add_radio_note"
+  | "open_status_modal"
+  | "review_isq_history"
+  | "schedule_followup";
+
+export interface RecommendedAction {
+  type: RecommendedActionType;
+  label: string;
+  priority: "PRIMARY" | "SECONDARY";
+  params?: Record<string, unknown>;
+}
+
 export interface ClinicalFlag {
   id: string;
   type: "ISQ_LOW" | "ISQ_DECLINING" | "NO_RECENT_ISQ" | "UNSTABLE_ISQ_HISTORY";
@@ -804,6 +819,7 @@ export interface ClinicalFlag {
   value?: number;
   delta?: number;
   createdAt: Date;
+  recommendedActions: RecommendedAction[];
 }
 
 export interface StatusSuggestion {
@@ -819,6 +835,7 @@ export interface StatusSuggestion {
     radioId?: string;
   };
   priority: "HIGH" | "MEDIUM" | "LOW";
+  recommendedActions: RecommendedAction[];
 }
 
 export interface UpsertIsqRequest {

@@ -67,12 +67,14 @@ import {
   implantStatusReasons,
   implantStatusHistory,
   implantMeasurements,
+  appointmentRadios,
   type RadioNote,
   type RadioNoteWithAuthor,
   type ImplantStatusReason,
   type ImplantStatusHistory,
   type ImplantStatusHistoryWithDetails,
   type ImplantMeasurement,
+  type AppointmentRadio,
   SYSTEM_STATUS_REASONS,
 } from "@shared/schema";
 import type {
@@ -358,6 +360,11 @@ export interface IStorage {
   getAppointmentClinicalData(organisationId: string, appointmentId: string): Promise<import("@shared/types").AppointmentClinicalData | undefined>;
   calculateIsqFlags(organisationId: string, surgeryImplantId: string): Promise<import("@shared/types").ClinicalFlag[]>;
   generateStatusSuggestions(organisationId: string, surgeryImplantId: string, flags: import("@shared/types").ClinicalFlag[]): Promise<import("@shared/types").StatusSuggestion[]>;
+  
+  // Appointment radio linking methods
+  getAppointmentRadios(organisationId: string, appointmentId: string): Promise<import("@shared/schema").AppointmentRadio[]>;
+  linkRadioToAppointment(organisationId: string, appointmentId: string, radioId: string, linkedBy: string, notes?: string): Promise<import("@shared/schema").AppointmentRadio>;
+  unlinkRadioFromAppointment(organisationId: string, appointmentId: string, radioId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4602,13 +4609,19 @@ export class DatabaseStorage implements IStorage {
 
     // ISQ_LOW: Latest ISQ < 60
     if (latestIsq !== null && latestIsq < 60) {
+      const isCritical = latestIsq < 50;
       flags.push({
         id: `flag_isq_low_${surgeryImplantId}`,
         type: 'ISQ_LOW',
-        level: latestIsq < 50 ? 'CRITICAL' : 'WARNING',
-        label: latestIsq < 50 ? 'ISQ critique' : 'ISQ faible',
+        level: isCritical ? 'CRITICAL' : 'WARNING',
+        label: isCritical ? 'ISQ critique' : 'ISQ faible',
         value: latestIsq,
         createdAt: now,
+        recommendedActions: [
+          { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'PRIMARY' },
+          { type: 'plan_control_14d', label: 'Planifier controle (14j)', priority: 'PRIMARY' },
+          { type: 'open_status_modal', label: 'Changer le statut', priority: 'SECONDARY' },
+        ],
       });
     }
 
@@ -4619,14 +4632,20 @@ export class DatabaseStorage implements IStorage {
       if (previousIsq !== null) {
         const delta = latestIsq - previousIsq;
         if (delta <= -10) {
+          const isCritical = delta <= -15;
           flags.push({
             id: `flag_isq_declining_${surgeryImplantId}`,
             type: 'ISQ_DECLINING',
-            level: delta <= -15 ? 'CRITICAL' : 'WARNING',
+            level: isCritical ? 'CRITICAL' : 'WARNING',
             label: 'ISQ en déclin',
             value: latestIsq,
             delta: delta,
             createdAt: now,
+            recommendedActions: [
+              { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'PRIMARY' },
+              { type: 'plan_control_14d', label: 'Planifier controle (14j)', priority: 'PRIMARY' },
+              { type: 'review_isq_history', label: 'Voir historique ISQ', priority: 'SECONDARY' },
+            ],
           });
         }
       }
@@ -4649,6 +4668,10 @@ export class DatabaseStorage implements IStorage {
         level: 'WARNING',
         label: 'Historique ISQ instable',
         createdAt: now,
+        recommendedActions: [
+          { type: 'open_status_modal', label: 'Evaluer statut', priority: 'PRIMARY' },
+          { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'SECONDARY' },
+        ],
       });
     }
 
@@ -4662,6 +4685,10 @@ export class DatabaseStorage implements IStorage {
         level: 'INFO',
         label: 'Pas de mesure ISQ récente',
         createdAt: now,
+        recommendedActions: [
+          { type: 'plan_control_14d', label: 'Planifier un controle', priority: 'PRIMARY' },
+          { type: 'schedule_followup', label: 'Planifier suivi', priority: 'SECONDARY' },
+        ],
       });
     }
 
@@ -4697,6 +4724,10 @@ export class DatabaseStorage implements IStorage {
           isqValue: lowFlag.value,
         },
         priority: 'HIGH',
+        recommendedActions: [
+          { type: 'open_status_modal', label: 'Appliquer ce statut', priority: 'PRIMARY' },
+          { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'SECONDARY' },
+        ],
       });
     } else if (lowFlag) {
       suggestions.push({
@@ -4709,6 +4740,10 @@ export class DatabaseStorage implements IStorage {
           isqValue: lowFlag.value,
         },
         priority: 'MEDIUM',
+        recommendedActions: [
+          { type: 'open_status_modal', label: 'Appliquer ce statut', priority: 'PRIMARY' },
+          { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'SECONDARY' },
+        ],
       });
     }
 
@@ -4724,6 +4759,11 @@ export class DatabaseStorage implements IStorage {
           isqDelta: decliningFlag.delta,
         },
         priority: 'HIGH',
+        recommendedActions: [
+          { type: 'open_status_modal', label: 'Appliquer ce statut', priority: 'PRIMARY' },
+          { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'SECONDARY' },
+          { type: 'review_isq_history', label: 'Voir historique', priority: 'SECONDARY' },
+        ],
       });
     }
 
@@ -4736,17 +4776,59 @@ export class DatabaseStorage implements IStorage {
           id: `suggestion_success_${surgeryImplantId}`,
           suggestedStatus: 'SUCCES',
           reasonCode: 'STABLE_HIGH_ISQ',
-          reasonLabel: 'ISQ stable et élevé (3+ mesures > 70)',
+          reasonLabel: 'ISQ stable et eleve (3+ mesures > 70)',
           evidence: {
             measurementId: latestMeasurement.id,
             isqValue: latestMeasurement.isqValue ?? undefined,
           },
           priority: 'LOW',
+          recommendedActions: [
+            { type: 'open_status_modal', label: 'Valider le succes', priority: 'PRIMARY' },
+          ],
         });
       }
     }
 
     return suggestions;
+  }
+
+  // ========== APPOINTMENT RADIOS ==========
+  async getAppointmentRadios(organisationId: string, appointmentId: string): Promise<AppointmentRadio[]> {
+    return db.select().from(appointmentRadios)
+      .where(and(
+        eq(appointmentRadios.organisationId, organisationId),
+        eq(appointmentRadios.appointmentId, appointmentId)
+      ))
+      .orderBy(desc(appointmentRadios.createdAt));
+  }
+
+  async linkRadioToAppointment(
+    organisationId: string, 
+    appointmentId: string, 
+    radioId: string, 
+    linkedBy: string, 
+    notes?: string
+  ): Promise<AppointmentRadio> {
+    const [link] = await db.insert(appointmentRadios)
+      .values({
+        organisationId,
+        appointmentId,
+        radioId,
+        linkedBy,
+        notes: notes || null,
+      })
+      .returning();
+    return link;
+  }
+
+  async unlinkRadioFromAppointment(organisationId: string, appointmentId: string, radioId: string): Promise<boolean> {
+    const result = await db.delete(appointmentRadios)
+      .where(and(
+        eq(appointmentRadios.organisationId, organisationId),
+        eq(appointmentRadios.appointmentId, appointmentId),
+        eq(appointmentRadios.radioId, radioId)
+      ));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 

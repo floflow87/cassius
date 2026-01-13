@@ -11,7 +11,15 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
-  ChevronRight
+  ChevronRight,
+  Calendar,
+  FileImage,
+  FileText,
+  History,
+  CalendarPlus,
+  Link,
+  X,
+  Plus
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -45,8 +53,11 @@ import type {
   AppointmentClinicalData, 
   ClinicalFlag, 
   StatusSuggestion,
-  ImplantStatusHistoryWithDetails
+  ImplantStatusHistoryWithDetails,
+  RecommendedAction,
+  RecommendedActionType
 } from "@shared/types";
+import type { Radio, AppointmentRadio } from "@shared/schema";
 
 interface StatusReason {
   id: string;
@@ -70,6 +81,7 @@ interface ClinicalFollowUpProps {
   appointmentType: string;
   surgeryImplantId?: string | null;
   onStatusChange?: (suggestion: StatusSuggestion) => void;
+  onAction?: (actionType: RecommendedActionType, params?: Record<string, unknown>) => void;
 }
 
 const typeLabels: Record<string, string> = {
@@ -94,6 +106,15 @@ const flagColors: Record<string, string> = {
   INFO: "outline",
 };
 
+const actionIcons: Record<RecommendedActionType, typeof Calendar> = {
+  plan_control_14d: CalendarPlus,
+  add_or_link_radio: FileImage,
+  add_radio_note: FileText,
+  open_status_modal: CheckCircle,
+  review_isq_history: History,
+  schedule_followup: Calendar,
+};
+
 function getIsqColor(value: number | null | undefined): string {
   if (value === null || value === undefined) return "text-muted-foreground";
   if (value < 50) return "text-destructive";
@@ -114,7 +135,8 @@ export function ClinicalFollowUp({
   appointmentId, 
   appointmentType,
   surgeryImplantId,
-  onStatusChange 
+  onStatusChange,
+  onAction
 }: ClinicalFollowUpProps) {
   const { toast } = useToast();
   const [isqValue, setIsqValue] = useState<string>("");
@@ -126,6 +148,11 @@ export function ClinicalFollowUp({
   const [selectedReasonId, setSelectedReasonId] = useState<string>("");
   const [freeTextReason, setFreeTextReason] = useState("");
   const [evidence, setEvidence] = useState("");
+  const [linkedRadiosOpen, setLinkedRadiosOpen] = useState(false);
+
+  interface AppointmentRadioWithDetails extends AppointmentRadio {
+    radio?: Radio;
+  }
 
   const { data: clinicalData, isLoading, refetch } = useQuery<AppointmentClinicalData>({
     queryKey: [`/api/appointments/${appointmentId}/clinical`],
@@ -203,6 +230,25 @@ export function ClinicalFollowUp({
         description: error.message || "Impossible d'enregistrer la mesure ISQ",
         variant: "destructive",
       });
+    },
+  });
+
+  const linkedRadiosQuery = useQuery<AppointmentRadioWithDetails[]>({
+    queryKey: [`/api/appointments/${appointmentId}/radios`],
+    enabled: true,
+  });
+
+  const unlinkRadioMutation = useMutation({
+    mutationFn: async (radioId: string) => {
+      const res = await apiRequest("DELETE", `/api/appointments/${appointmentId}/radios/${radioId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/appointments/${appointmentId}/radios`] });
+      toast({ title: "Radio dissociee", variant: "success" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de dissocier la radio.", variant: "destructive" });
     },
   });
 
@@ -321,23 +367,52 @@ export function ClinicalFollowUp({
           <div className="space-y-2">
             {flags.map((flag) => {
               const FlagIcon = flagIcons[flag.type] || AlertCircle;
+              const primaryActions = flag.recommendedActions?.filter(a => a.priority === "PRIMARY") || [];
               return (
                 <div 
                   key={flag.id}
-                  className={`flex items-center gap-2 p-2 rounded-md ${
-                    flag.level === "CRITICAL" ? "bg-destructive/10 text-destructive" :
-                    flag.level === "WARNING" ? "bg-orange-500/10 text-orange-600" :
-                    "bg-muted"
+                  className={`p-3 rounded-md border ${
+                    flag.level === "CRITICAL" ? "bg-destructive/10 border-destructive/20" :
+                    flag.level === "WARNING" ? "bg-orange-500/10 border-orange-500/20" :
+                    "bg-muted border-muted"
                   }`}
                   data-testid={`flag-${flag.type.toLowerCase()}`}
                 >
-                  <FlagIcon className="h-4 w-4 shrink-0" />
-                  <span className="text-sm font-medium">{flag.label}</span>
-                  {flag.value !== undefined && (
-                    <span className="text-sm ml-auto">ISQ: {flag.value}</span>
-                  )}
-                  {flag.delta !== undefined && (
-                    <span className="text-xs">({flag.delta > 0 ? "+" : ""}{flag.delta})</span>
+                  <div className="flex items-center gap-2">
+                    <FlagIcon className={`h-4 w-4 shrink-0 ${
+                      flag.level === "CRITICAL" ? "text-destructive" :
+                      flag.level === "WARNING" ? "text-orange-600" : "text-muted-foreground"
+                    }`} />
+                    <span className={`text-sm font-medium ${
+                      flag.level === "CRITICAL" ? "text-destructive" :
+                      flag.level === "WARNING" ? "text-orange-600" : ""
+                    }`}>{flag.label}</span>
+                    {flag.value !== undefined && (
+                      <span className="text-sm ml-auto">ISQ: {flag.value}</span>
+                    )}
+                    {flag.delta !== undefined && (
+                      <span className="text-xs text-muted-foreground">({flag.delta > 0 ? "+" : ""}{flag.delta})</span>
+                    )}
+                  </div>
+                  {primaryActions.length > 0 && onAction && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {primaryActions.map((action) => {
+                        const ActionIcon = actionIcons[action.type];
+                        return (
+                          <Button
+                            key={action.type}
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => onAction(action.type, action.params)}
+                            data-testid={`button-action-${action.type}`}
+                          >
+                            <ActionIcon className="h-3 w-3 mr-1" />
+                            {action.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               );
@@ -443,36 +518,59 @@ export function ClinicalFollowUp({
                 {suggestions.map((suggestion) => {
                   const priorityLabel = suggestion.priority === "HIGH" ? "Confiance elevee" : 
                                         suggestion.priority === "MEDIUM" ? "Confiance moderee" : "A evaluer";
+                  const secondaryActions = suggestion.recommendedActions?.filter(a => a.priority === "SECONDARY") || [];
                   return (
                     <div 
                       key={suggestion.id}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                      className="p-3 rounded-lg border bg-card space-y-2"
                       data-testid={`suggestion-${suggestion.suggestedStatus.toLowerCase()}`}
                     >
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <Badge 
-                          variant={suggestion.suggestedStatus === "ECHEC" ? "destructive" : 
-                                   suggestion.suggestedStatus === "COMPLICATION" ? "destructive" : "default"}
-                          className="text-xs"
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <Badge 
+                            variant={suggestion.suggestedStatus === "ECHEC" ? "destructive" : 
+                                     suggestion.suggestedStatus === "COMPLICATION" ? "destructive" : "default"}
+                            className="text-xs"
+                          >
+                            {statusConfig[suggestion.suggestedStatus]?.label || suggestion.suggestedStatus}
+                          </Badge>
+                          <Badge 
+                            variant="secondary"
+                            className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                          >
+                            {priorityLabel}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">{suggestion.reasonLabel}</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleApplySuggestion(suggestion)}
+                          data-testid={`button-apply-suggestion-${suggestion.id}`}
                         >
-                          {statusConfig[suggestion.suggestedStatus]?.label || suggestion.suggestedStatus}
-                        </Badge>
-                        <Badge 
-                          variant="secondary"
-                          className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                        >
-                          {priorityLabel}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">{suggestion.reasonLabel}</span>
+                          Appliquer
+                        </Button>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleApplySuggestion(suggestion)}
-                        data-testid={`button-apply-suggestion-${suggestion.id}`}
-                      >
-                        Appliquer
-                      </Button>
+                      {secondaryActions.length > 0 && onAction && (
+                        <div className="flex flex-wrap gap-2 pt-1 border-t border-border/50">
+                          {secondaryActions.map((action) => {
+                            const ActionIcon = actionIcons[action.type];
+                            return (
+                              <Button
+                                key={action.type}
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-muted-foreground"
+                                onClick={() => onAction(action.type, action.params)}
+                                data-testid={`button-suggestion-action-${action.type}`}
+                              >
+                                <ActionIcon className="h-3 w-3 mr-1" />
+                                {action.label}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -480,6 +578,90 @@ export function ClinicalFollowUp({
             </div>
           </>
         )}
+
+        <Separator />
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileImage className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Radios liees</span>
+              {linkedRadiosQuery.data && linkedRadiosQuery.data.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {linkedRadiosQuery.data.length}
+                </Badge>
+              )}
+            </div>
+            {onAction && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => onAction("add_or_link_radio")}
+                data-testid="button-link-radio"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Lier une radio
+              </Button>
+            )}
+          </div>
+          
+          {linkedRadiosQuery.isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : linkedRadiosQuery.data && linkedRadiosQuery.data.length > 0 ? (
+            <div className="space-y-2">
+              {linkedRadiosQuery.data.map((link) => (
+                <div 
+                  key={link.id}
+                  className="flex items-center justify-between p-2 bg-muted/30 rounded border"
+                  data-testid={`linked-radio-${link.radioId}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <FileImage className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm font-medium truncate block">
+                        {link.radio?.title || "Radio"}
+                      </span>
+                      {link.radio?.date && (
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(link.radio.date).toLocaleDateString("fr-FR")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {onAction && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => onAction("add_radio_note", { radioId: link.radioId })}
+                        data-testid={`button-radio-note-${link.radioId}`}
+                      >
+                        <FileText className="h-3 w-3" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                      onClick={() => unlinkRadioMutation.mutate(link.radioId)}
+                      disabled={unlinkRadioMutation.isPending}
+                      data-testid={`button-unlink-radio-${link.radioId}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-2">
+              Aucune radio liee a ce rendez-vous
+            </p>
+          )}
+        </div>
 
         {measurementHistory.length > 1 && (
           <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>

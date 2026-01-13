@@ -2977,6 +2977,87 @@ export async function registerRoutes(
     }
   });
 
+  // ========== APPOINTMENT RADIOS ==========
+  // GET radios linked to an appointment
+  app.get("/api/appointments/:id/radios", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const links = await storage.getAppointmentRadios(organisationId, id);
+      
+      // Get full radio details for each link
+      const radiosWithDetails = await Promise.all(
+        links.map(async (link) => {
+          const radio = await storage.getRadio(organisationId, link.radioId);
+          return { ...link, radio };
+        })
+      );
+      
+      res.json(radiosWithDetails);
+    } catch (error) {
+      console.error("Error fetching appointment radios:", error);
+      res.status(500).json({ error: "Failed to fetch appointment radios" });
+    }
+  });
+
+  // POST link a radio to an appointment
+  app.post("/api/appointments/:id/radios", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = getUserId(req, res);
+    if (!userId) return;
+
+    try {
+      const { id: appointmentId } = req.params;
+      const { radioId, notes } = req.body;
+
+      if (!radioId) {
+        return res.status(400).json({ error: "radioId is required" });
+      }
+
+      // Verify appointment exists
+      const appointment = await storage.getAppointmentById(organisationId, appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      // Verify radio exists
+      const radio = await storage.getRadio(organisationId, radioId);
+      if (!radio) {
+        return res.status(404).json({ error: "Radio not found" });
+      }
+
+      const link = await storage.linkRadioToAppointment(organisationId, appointmentId, radioId, userId, notes);
+      res.status(201).json({ ...link, radio });
+    } catch (error: any) {
+      if (error.code === "23505") {
+        return res.status(409).json({ error: "Radio already linked to this appointment" });
+      }
+      console.error("Error linking radio to appointment:", error);
+      res.status(500).json({ error: "Failed to link radio to appointment" });
+    }
+  });
+
+  // DELETE unlink a radio from an appointment
+  app.delete("/api/appointments/:id/radios/:radioId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id: appointmentId, radioId } = req.params;
+      const deleted = await storage.unlinkRadioFromAppointment(organisationId, appointmentId, radioId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Link not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error unlinking radio from appointment:", error);
+      res.status(500).json({ error: "Failed to unlink radio from appointment" });
+    }
+  });
+
   // ========== SAVED FILTERS ==========
   app.get("/api/saved-filters/:pageType", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

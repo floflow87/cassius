@@ -9,10 +9,14 @@ import {
   CheckCircle2,
   TrendingUp,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   FileText,
   Trash2,
   Plus,
   Info,
+  History,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +63,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { OperationForm } from "@/components/operation-form";
@@ -83,6 +92,20 @@ interface ISQPoint {
   source: ISQSource;
   visiteId?: string;
   notes?: string;
+}
+
+interface StatusHistoryEntry {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  reasonId: string | null;
+  reasonFreeText: string | null;
+  evidence: string | null;
+  changedAt: string;
+  reasonLabel: string | null;
+  reasonCode: string | null;
+  changedByNom: string | null;
+  changedByPrenom: string | null;
 }
 
 function getISQBadge(value: number): { label: string; className: string; pointColor: string } {
@@ -142,9 +165,20 @@ export default function ImplantDetailsPage() {
   const [editIsqSheetOpen, setEditIsqSheetOpen] = useState(false);
   const [deleteIsqDialogOpen, setDeleteIsqDialogOpen] = useState(false);
   const [isqPointToDelete, setIsqPointToDelete] = useState<ISQPoint | null>(null);
+  const [statusHistoryOpen, setStatusHistoryOpen] = useState(false);
 
   const { data: implantData, isLoading, isFetching } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
+    enabled: !!implantId,
+  });
+
+  const { data: statusHistory = [] } = useQuery<StatusHistoryEntry[]>({
+    queryKey: ["/api/surgery-implants", implantId, "status-history"],
+    queryFn: async () => {
+      const res = await fetch(`/api/surgery-implants/${implantId}/status-history`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch history");
+      return res.json();
+    },
     enabled: !!implantId,
   });
 
@@ -853,8 +887,6 @@ export default function ImplantDetailsPage() {
         </Card>
       </div>
 
-      <ImplantStatusSuggestions implantId={implantId || ""} currentStatus={implantData.statut} />
-
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
           <div className="flex items-center gap-2">
@@ -1023,6 +1055,9 @@ export default function ImplantDetailsPage() {
                 </div>
               </div>
 
+              {/* Status Suggestions - between timeline and scale */}
+              <ImplantStatusSuggestions implantId={implantId || ""} currentStatus={implantData.statut} />
+
               {/* ISQ Gradient Scale/Frise */}
               <div className="mt-6 pt-4 border-t">
                 <div className="flex items-center gap-2 mb-2">
@@ -1054,6 +1089,69 @@ export default function ImplantDetailsPage() {
                   <span className="text-xs text-muted-foreground">100</span>
                 </div>
               </div>
+
+              {/* Status History Section */}
+              {statusHistory.length > 0 && (
+                <Collapsible open={statusHistoryOpen} onOpenChange={setStatusHistoryOpen} className="mt-4 pt-4 border-t">
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full justify-between">
+                      <span className="flex items-center gap-2 text-sm">
+                        <History className="h-4 w-4" />
+                        Historique des statuts ({statusHistory.length})
+                      </span>
+                      {statusHistoryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {statusHistory.map((entry) => (
+                        <div 
+                          key={entry.id}
+                          className="p-2 bg-muted/30 rounded border text-sm space-y-1"
+                          data-testid={`status-history-${entry.id}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {entry.fromStatus && (
+                                <>
+                                  <Badge variant="outline" className="text-xs">
+                                    {statusConfig[entry.fromStatus]?.label || entry.fromStatus}
+                                  </Badge>
+                                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                </>
+                              )}
+                              <Badge 
+                                variant={statusConfig[entry.toStatus]?.variant || "secondary"} 
+                                className="text-xs"
+                              >
+                                {statusConfig[entry.toStatus]?.label || entry.toStatus}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(entry.changedAt).toLocaleDateString("fr-FR")}
+                            </span>
+                          </div>
+                          {(entry.reasonLabel || entry.reasonFreeText) && (
+                            <p className="text-xs text-muted-foreground">
+                              {entry.reasonLabel || entry.reasonFreeText}
+                            </p>
+                          )}
+                          {entry.evidence && (
+                            <p className="text-xs text-muted-foreground italic">
+                              Evidence: {entry.evidence}
+                            </p>
+                          )}
+                          {(entry.changedByPrenom || entry.changedByNom) && (
+                            <p className="text-xs text-muted-foreground">
+                              Par {entry.changedByPrenom} {entry.changedByNom}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </div>
           )}
         </CardContent>
