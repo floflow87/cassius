@@ -3087,8 +3087,10 @@ export async function registerRoutes(
   app.post("/api/appointments/:id/radios", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
-    const userId = getUserId(req, res);
-    if (!userId) return;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
 
     try {
       const { id: appointmentId } = req.params;
