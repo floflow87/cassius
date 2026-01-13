@@ -56,11 +56,12 @@ type FormData = z.infer<typeof formSchema>;
 
 interface SurgeryImplant {
   id: string;
-  site: string;
-  implantReference?: string;
+  siteFdi: string;
   implant?: {
-    name?: string;
-    brand?: string;
+    marque?: string;
+    referenceFabricant?: string;
+    diametre?: number | null;
+    longueur?: number | null;
   };
 }
 
@@ -180,10 +181,12 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   const getImplantLabel = (implant: SurgeryImplant) => {
-    const parts = [implant.site];
-    if (implant.implant?.brand) parts.push(implant.implant.brand);
-    if (implant.implant?.name) parts.push(implant.implant.name);
-    if (implant.implantReference) parts.push(`(${implant.implantReference})`);
+    const parts = [`Site ${implant.siteFdi}`];
+    if (implant.implant?.marque) parts.push(implant.implant.marque);
+    if (implant.implant?.diametre && implant.implant?.longueur) {
+      parts.push(`${implant.implant.diametre}x${implant.implant.longueur}mm`);
+    }
+    if (implant.implant?.referenceFabricant) parts.push(`(${implant.implant.referenceFabricant})`);
     return parts.join(" - ");
   };
 
