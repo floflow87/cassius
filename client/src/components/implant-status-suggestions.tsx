@@ -73,11 +73,11 @@ interface ImplantStatusSuggestionsProps {
   currentStatus: string;
 }
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof CheckCircle2 }> = {
-  EN_SUIVI: { label: "En suivi", variant: "secondary", icon: History },
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi"; icon: typeof CheckCircle2 }> = {
+  EN_SUIVI: { label: "En suivi", variant: "ensuivi", icon: History },
   SUCCES: { label: "Succes", variant: "default", icon: CheckCircle2 },
-  COMPLICATION: { label: "Complication", variant: "outline", icon: AlertTriangle },
-  ECHEC: { label: "Echec", variant: "destructive", icon: XCircle },
+  COMPLICATION: { label: "Complication", variant: "complication", icon: AlertTriangle },
+  ECHEC: { label: "Echec", variant: "echec", icon: XCircle },
 };
 
 const confidenceConfig: Record<string, { label: string; className: string }> = {
@@ -184,26 +184,14 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
     <>
       {/* Inline section - no Card wrapper for embedding in ISQ section */}
       <div className="mt-4 pt-4 border-t space-y-3" data-testid="status-suggestions-section">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Lightbulb className="h-4 w-4 text-amber-500" />
-            <span className="text-sm font-medium">Suggestions de statut</span>
-            {suggestionsQuery.data?.latestIsq && (
-              <span className="text-xs text-muted-foreground">
-                (ISQ: {suggestionsQuery.data.latestIsq})
-              </span>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setHistorySheetOpen(true)}
-            data-testid="button-view-status-history"
-          >
-            <History className="h-3.5 w-3.5 mr-1" />
-            Historique
-          </Button>
+        <div className="flex items-center gap-2">
+          <Lightbulb className="h-4 w-4 text-amber-500" />
+          <span className="text-sm font-medium">Suggestions de statut</span>
+          {suggestionsQuery.data?.latestIsq && (
+            <span className="text-xs text-muted-foreground">
+              (ISQ: {suggestionsQuery.data.latestIsq})
+            </span>
+          )}
         </div>
         
         {suggestionsQuery.isLoading ? (
@@ -215,7 +203,7 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
             Aucune suggestion pour le moment
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {suggestions.map((suggestion, index) => {
               const config = statusConfig[suggestion.status] || statusConfig.EN_SUIVI;
               const confidenceConf = confidenceConfig[suggestion.confidence] || confidenceConfig.LOW;
@@ -223,20 +211,19 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
               return (
                 <div
                   key={index}
-                  className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/30"
+                  className="flex flex-col gap-3 p-3 rounded-lg border bg-card shadow-sm"
                   data-testid={`suggestion-${suggestion.status}-${index}`}
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                    <Badge variant={config.variant} className="text-xs shrink-0">{config.label}</Badge>
-                    <Badge variant="outline" className={`text-xs shrink-0 ${confidenceConf.className}`}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant={config.variant} className="text-xs">{config.label}</Badge>
+                    <Badge variant="outline" className={`text-xs ${confidenceConf.className}`}>
                       {confidenceConf.label}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">{suggestion.rule}</span>
                   </div>
+                  <p className="text-xs text-muted-foreground flex-1">{suggestion.rule}</p>
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="h-7 text-xs shrink-0"
+                    className="w-full"
                     onClick={() => handleApplySuggestion(suggestion)}
                     data-testid={`button-apply-suggestion-${index}`}
                   >

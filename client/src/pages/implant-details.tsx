@@ -74,11 +74,11 @@ import { OperationForm } from "@/components/operation-form";
 import { ImplantStatusSuggestions } from "@/components/implant-status-suggestions";
 import type { ImplantDetail } from "@shared/types";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  EN_SUIVI: { label: "En suivi", variant: "secondary" },
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" }> = {
+  EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
   SUCCES: { label: "Succès", variant: "default" },
-  COMPLICATION: { label: "Complication", variant: "outline" },
-  ECHEC: { label: "Échec", variant: "destructive" },
+  COMPLICATION: { label: "Complication", variant: "complication" },
+  ECHEC: { label: "Échec", variant: "echec" },
 };
 
 type ISQSource = "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite";
