@@ -2775,6 +2775,21 @@ export async function registerRoutes(
     }
   });
 
+  // Get surgery implants for a specific patient (via their operations)
+  app.get("/api/patients/:patientId/surgery-implants", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId } = req.params;
+      const surgeryImplants = await storage.getPatientSurgeryImplants(organisationId, patientId);
+      res.json(surgeryImplants);
+    } catch (error) {
+      console.error("Error fetching patient surgery implants:", error);
+      res.status(500).json({ error: "Failed to fetch surgery implants" });
+    }
+  });
+
   app.get("/api/appointments/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -2831,8 +2846,10 @@ export async function registerRoutes(
         console.error("Flag detection failed after appointment creation:", err)
       );
       
-      // Send notification about new appointment
+      // Send notification about new appointment with patient name
       if (userId) {
+        const patient = await storage.getPatient(organisationId, patientId);
+        const patientName = patient ? `${patient.lastName} ${patient.firstName}` : "Patient";
         notificationService.notificationEvents.onAppointmentCreated({
           organisationId,
           recipientUserId: userId,
@@ -2840,6 +2857,7 @@ export async function registerRoutes(
           appointmentId: appointment.id,
           appointmentDate: appointment.dateStart.toISOString(),
           patientId,
+          patientName,
         }).catch(err => console.error("[Notification] Appointment created notification failed:", err));
       }
       

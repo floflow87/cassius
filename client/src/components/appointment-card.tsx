@@ -23,12 +23,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -331,18 +325,20 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Modifier le rendez-vous</DialogTitle>
-          </DialogHeader>
-          <AppointmentForm
-            patientId={patientId}
-            appointment={appointment}
-            onSuccess={() => setEditOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
+      <Sheet open={editOpen} onOpenChange={setEditOpen}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Modifier le rendez-vous</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <AppointmentForm
+              patientId={patientId}
+              appointment={appointment}
+              onSuccess={() => setEditOpen(false)}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={clinicalOpen} onOpenChange={setClinicalOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
