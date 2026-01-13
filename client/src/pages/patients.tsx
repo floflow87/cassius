@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { 
   Plus, 
   Search, 
@@ -210,6 +211,15 @@ const appointmentStatusClasses: Record<AppointmentStatus, string> = {
   UPCOMING: "bg-[#EFF6FF] text-blue-700",
   COMPLETED: "bg-[#DCFCE7] text-green-700",
   CANCELLED: "bg-[#FEF2F2] text-red-700",
+};
+
+const appointmentTypeClasses: Record<AppointmentType, string> = {
+  CONSULTATION: "bg-blue-500 text-white",
+  SUIVI: "bg-green-500 text-white",
+  CHIRURGIE: "bg-red-500 text-white",
+  CONTROLE: "bg-yellow-500 text-white",
+  URGENCE: "bg-orange-500 text-white",
+  AUTRE: "bg-gray-500 text-white",
 };
 
 interface AppointmentWithPatient extends Appointment {
@@ -795,7 +805,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                 <Badge className={`text-[10px] ${appointmentStatusClasses[apt.status]}`}>
                   {appointmentStatusLabels[apt.status]}
                 </Badge>
-                <Badge variant="outline" className="text-[10px]">
+                <Badge className={`text-[10px] ${appointmentTypeClasses[apt.type]}`}>
                   {appointmentTypeLabels[apt.type]}
                 </Badge>
               </div>
@@ -834,22 +844,30 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "patients" | "suivi")} className="w-full">
-        <TabsList className="mb-4 bg-white dark:bg-zinc-900 p-1 h-auto rounded-full w-fit" data-testid="tabs-patients-page">
-          <TabsTrigger 
-            value="patients" 
-            className="relative data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none rounded-full px-4 py-1.5 text-sm transition-all"
-            data-testid="tab-patients"
-          >
-            Patients
-          </TabsTrigger>
-          <TabsTrigger 
-            value="suivi" 
-            className="relative data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none rounded-full px-4 py-1.5 text-sm transition-all"
-            data-testid="tab-suivi"
-          >
-            Suivi
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit mb-4" data-testid="tabs-patients-page">
+          {[
+            { value: "patients", label: "Patients" },
+            { value: "suivi", label: "Suivi" },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value as "patients" | "suivi")}
+              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid={`tab-${tab.value}`}
+            >
+              {activeTab === tab.value && (
+                <motion.div
+                  layoutId="patients-tab-indicator"
+                  className="absolute inset-0 bg-primary rounded-full"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                />
+              )}
+              <span className="relative z-10">{tab.label}</span>
+            </button>
+          ))}
+        </div>
 
         <TabsContent value="patients" className="mt-0">
           <div className="flex items-center gap-4 mb-5">

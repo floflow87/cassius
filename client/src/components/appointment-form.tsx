@@ -276,7 +276,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
 
         <div className="flex justify-end gap-2">
           <Button type="submit" disabled={isPending} data-testid="button-submit-appointment">
-            {isPending ? "Enregistrement..." : isEditing ? "Modifier" : "Creer"}
+            {isPending ? "Enregistrement..." : isEditing ? "Modifier" : "Créer"}
           </Button>
         </div>
       </form>

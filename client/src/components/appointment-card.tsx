@@ -76,6 +76,15 @@ const statusClasses: Record<AppointmentStatus, string> = {
   CANCELLED: "bg-[#FEF2F2] text-red-700 hover:bg-[#FEE2E2]",
 };
 
+const typeClasses: Record<AppointmentType, string> = {
+  CONSULTATION: "bg-blue-500 text-white",
+  SUIVI: "bg-green-500 text-white",
+  CHIRURGIE: "bg-red-500 text-white",
+  CONTROLE: "bg-yellow-500 text-white",
+  URGENCE: "bg-orange-500 text-white",
+  AUTRE: "bg-gray-500 text-white",
+};
+
 function formatDate(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleDateString("fr-FR", {
@@ -221,7 +230,7 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
                   <Badge className={`text-[10px] ${statusClasses[appointment.status]}`} data-testid="badge-appointment-status">
                     {statusLabels[appointment.status]}
                   </Badge>
-                  <Badge variant="outline" className="text-[10px]" data-testid="badge-appointment-type">
+                  <Badge className={`text-[10px] ${typeClasses[appointment.type]}`} data-testid="badge-appointment-type">
                     {typeLabels[appointment.type]}
                   </Badge>
                 </div>
