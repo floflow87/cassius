@@ -640,33 +640,33 @@ export default function ImplantDetailsPage() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
-                <span className="text-sm text-muted-foreground">Marque</span>
-                <p className="font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
+                <span className="text-xs text-muted-foreground">Marque</span>
+                <p className="text-sm font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Type</span>
-                <p className="font-medium" data-testid="text-implant-type">{typeLabel}</p>
+                <span className="text-xs text-muted-foreground">Type</span>
+                <p className="text-sm font-medium" data-testid="text-implant-type">{typeLabel}</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Référence fabricant</span>
-                <p className="font-medium font-mono" data-testid="text-implant-reference">
+                <span className="text-xs text-muted-foreground">Référence fabricant</span>
+                <p className="text-sm font-medium font-mono" data-testid="text-implant-reference">
                   {implantData.implant.referenceFabricant || "-"}
                 </p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Diamètre</span>
-                <p className="font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
+                <span className="text-xs text-muted-foreground">Diamètre</span>
+                <p className="text-sm font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Longueur</span>
-                <p className="font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
+                <span className="text-xs text-muted-foreground">Longueur</span>
+                <p className="text-sm font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
               </div>
             </div>
             <div className="flex justify-end mt-4 pt-4 border-t">
               <Link href={`/implants/${implantData.implant.id}`}>
-                <span className="text-sm text-primary flex items-center cursor-pointer hover:underline" data-testid="link-view-catalog-implant">
+                <span className="text-xs text-primary flex items-center cursor-pointer hover:underline" data-testid="link-view-catalog-implant">
                   Voir l'implant catalogue
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
                 </span>
               </Link>
             </div>
@@ -685,14 +685,14 @@ export default function ImplantDetailsPage() {
               <span className={`text-5xl font-bold ${getSuccessRateColor()}`} data-testid="text-success-rate">
                 {successRate}%
               </span>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {successRate === 100 ? "Aucune perte osseuse" : successRate >= 80 ? "Perte osseuse minimale" : successRate >= 60 ? "Perte osseuse modérée" : "Perte osseuse importante"}
               </p>
             </div>
             <div className="pt-2 border-t">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm text-muted-foreground">Score de perte osseuse</Label>
+                  <Label className="text-xs text-muted-foreground">Score de perte osseuse</Label>
                 </div>
                 <Select 
                   value={boneLossScore.toString()} 
@@ -817,22 +817,22 @@ export default function ImplantDetailsPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="text-sm text-muted-foreground">Position</span>
-                <p className="font-medium" data-testid="text-position">
+                <span className="text-xs text-muted-foreground">Position</span>
+                <p className="text-sm font-medium" data-testid="text-position">
                   {implantData.positionImplant?.replace(/_/g, " ") || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Site FDI</span>
-                <p className="font-medium font-mono" data-testid="text-site-fdi">{implantData.siteFdi}</p>
+                <span className="text-xs text-muted-foreground">Site FDI</span>
+                <p className="text-sm font-medium font-mono" data-testid="text-site-fdi">{implantData.siteFdi}</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Type d'os</span>
-                <p className="font-medium" data-testid="text-type-os">{implantData.typeOs || "—"}</p>
+                <span className="text-xs text-muted-foreground">Type d'os</span>
+                <p className="text-sm font-medium" data-testid="text-type-os">{implantData.typeOs || "—"}</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Greffe</span>
-                <p className="font-medium" data-testid="text-greffe">
+                <span className="text-xs text-muted-foreground">Greffe</span>
+                <p className="text-sm font-medium" data-testid="text-greffe">
                   {implantData.greffeOsseuse ? (implantData.typeGreffe || "Oui") : "Non"}
                 </p>
               </div>
@@ -1004,25 +1004,27 @@ export default function ImplantDetailsPage() {
                           <div className="flex-1 min-w-0">
                             {/* Label and ISQ value */}
                             <div className="flex items-center gap-3 flex-wrap">
-                              <span className="text-sm font-semibold text-blue-600 uppercase">{point.label}</span>
+                              <span className="text-xs font-semibold text-blue-600 uppercase">{point.label}</span>
                               <span className="text-2xl font-bold">{point.value}</span>
                               {point.delta !== undefined && point.delta !== 0 && (
-                                <span className={`text-sm font-medium flex items-center ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                                  <TrendingUp className={`h-4 w-4 ${point.delta < 0 ? "rotate-180" : ""}`} />
+                                <span className={`text-xs font-medium flex items-center ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                  <TrendingUp className={`h-3.5 w-3.5 ${point.delta < 0 ? "rotate-180" : ""}`} />
                                   {point.delta > 0 ? "+" : ""}{point.delta}
                                 </span>
                               )}
                               <Badge className={`${badge.className} text-[10px]`}>{badge.label}</Badge>
                             </div>
                             
-                            {/* Date */}
-                            <div className="text-sm text-muted-foreground mt-1">
-                              {formatShortDate(point.date)}
-                            </div>
+                            {/* Date - only show if source is not visite (visite label already shows date) */}
+                            {point.source !== "visite" && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {formatShortDate(point.date)}
+                              </div>
+                            )}
                             
                             {/* Notes if any */}
                             {point.notes && (
-                              <p className="text-sm text-muted-foreground mt-1">{point.notes}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{point.notes}</p>
                             )}
                           </div>
                           
