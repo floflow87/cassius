@@ -618,18 +618,18 @@ export default function ImplantDetailsPage() {
               {implantType} {implantData.implant.marque} {typeLabel}
             </h1>
             {implantData.implant.typeImplant === "MINI_IMPLANT" && (
-              <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+              <Badge variant="outline" className="text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                 Mini
               </Badge>
             )}
+            <Badge variant={status.variant} className="text-[10px]" data-testid="badge-implant-status">
+              {status.label}
+            </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
             Ø {implantData.implant.diametre}mm × {implantData.implant.longueur}mm
           </p>
         </div>
-        <Badge variant={status.variant} className="text-sm" data-testid="badge-implant-status">
-          {status.label}
-        </Badge>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1012,7 +1012,7 @@ export default function ImplantDetailsPage() {
                                   {point.delta > 0 ? "+" : ""}{point.delta}
                                 </span>
                               )}
-                              <Badge className={`${badge.className} text-xs`}>{badge.label}</Badge>
+                              <Badge className={`${badge.className} text-[10px]`}>{badge.label}</Badge>
                             </div>
                             
                             {/* Date */}

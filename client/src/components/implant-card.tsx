@@ -23,11 +23,11 @@ interface ImplantCardProps {
   patientId: string;
 }
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  EN_SUIVI: { label: "En suivi", variant: "secondary" },
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" }> = {
+  EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
   SUCCES: { label: "Succès", variant: "default" },
-  COMPLICATION: { label: "Complication", variant: "outline" },
-  ECHEC: { label: "Échec", variant: "destructive" },
+  COMPLICATION: { label: "Complication", variant: "complication" },
+  ECHEC: { label: "Échec", variant: "echec" },
 };
 
 export function ImplantCard({ surgeryImplant, patientId }: ImplantCardProps) {
@@ -74,7 +74,7 @@ export function ImplantCard({ surgeryImplant, patientId }: ImplantCardProps) {
               </p>
             </div>
           </div>
-          <Badge variant={status.variant}>{status.label}</Badge>
+          <Badge variant={status.variant} className="text-[10px]">{status.label}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

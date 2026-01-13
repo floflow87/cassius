@@ -291,12 +291,14 @@ function FileRow({
               Voir le patient
             </DropdownMenuItem>
           )}
-          {onNavigateToOperation && (
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onNavigateToOperation(); }}>
-              <Stethoscope className="h-4 w-4 mr-2" />
-              Voir l'acte
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem 
+            onClick={(e) => { e.stopPropagation(); onNavigateToOperation?.(); }}
+            disabled={!onNavigateToOperation}
+            className={!onNavigateToOperation ? "text-muted-foreground cursor-not-allowed" : ""}
+          >
+            <Stethoscope className="h-4 w-4 mr-2" />
+            Voir l'acte
+          </DropdownMenuItem>
           {!isRadio && (
             <>
               <DropdownMenuSeparator />
@@ -383,12 +385,14 @@ function FileGridItem({
                 Voir le patient
               </DropdownMenuItem>
             )}
-            {onNavigateToOperation && (
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onNavigateToOperation(); }}>
-                <Stethoscope className="h-4 w-4 mr-2" />
-                Voir l'acte
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem 
+              onClick={(e) => { e.stopPropagation(); onNavigateToOperation?.(); }}
+              disabled={!onNavigateToOperation}
+              className={!onNavigateToOperation ? "text-muted-foreground cursor-not-allowed" : ""}
+            >
+              <Stethoscope className="h-4 w-4 mr-2" />
+              Voir l'acte
+            </DropdownMenuItem>
             {!isRadio && (
               <>
                 <DropdownMenuSeparator />

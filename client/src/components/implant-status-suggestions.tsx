@@ -215,8 +215,8 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
                   data-testid={`suggestion-${suggestion.status}-${index}`}
                 >
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={config.variant} className="text-xs">{config.label}</Badge>
-                    <Badge variant="outline" className={`text-xs ${confidenceConf.className}`}>
+                    <Badge variant={config.variant} className="text-[10px]">{config.label}</Badge>
+                    <Badge variant="outline" className={`text-[10px] ${confidenceConf.className}`}>
                       {confidenceConf.label}
                     </Badge>
                   </div>
@@ -282,7 +282,7 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
                     {reasonsQuery.data?.map((reason) => (
                       <SelectItem key={reason.id} value={reason.id}>
                         {reason.label}
-                        {reason.isSystem && <Badge variant="outline" className="ml-2 text-xs">Système</Badge>}
+                        {reason.isSystem && <Badge variant="outline" className="ml-2 text-[10px]">Système</Badge>}
                       </SelectItem>
                     ))}
                   </SelectContent>

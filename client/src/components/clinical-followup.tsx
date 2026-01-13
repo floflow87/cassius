@@ -528,15 +528,15 @@ export function ClinicalFollowUp({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-wrap">
                           <Badge 
-                            variant={suggestion.suggestedStatus === "ECHEC" ? "destructive" : 
-                                     suggestion.suggestedStatus === "COMPLICATION" ? "destructive" : "default"}
-                            className="text-xs"
+                            variant={suggestion.suggestedStatus === "ECHEC" ? "echec" : 
+                                     suggestion.suggestedStatus === "COMPLICATION" ? "complication" : "default"}
+                            className="text-[10px]"
                           >
                             {statusConfig[suggestion.suggestedStatus]?.label || suggestion.suggestedStatus}
                           </Badge>
                           <Badge 
                             variant="secondary"
-                            className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                            className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                           >
                             {priorityLabel}
                           </Badge>

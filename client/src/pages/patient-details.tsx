@@ -1023,14 +1023,14 @@ export default function PatientDetailsPage() {
   };
 
   const getStatusBadge = (statut: string) => {
-    const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+    const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" }> = {
       SUCCES: { label: "Succès", variant: "default" },
-      EN_SUIVI: { label: "En suivi", variant: "secondary" },
-      COMPLICATION: { label: "Complication", variant: "outline" },
-      ECHEC: { label: "Echec", variant: "destructive" },
+      EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
+      COMPLICATION: { label: "Complication", variant: "complication" },
+      ECHEC: { label: "Échec", variant: "echec" },
     };
     const config = statusConfig[statut] || statusConfig.EN_SUIVI;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    return <Badge variant={config.variant} className="text-[10px]">{config.label}</Badge>;
   };
 
   const getRadioLabel = (type: string) => {
@@ -2035,7 +2035,7 @@ export default function PatientDetailsPage() {
                     <div className="flex items-center gap-2">
                       <Button 
                         variant="ghost" 
-                        className="text-primary text-sm p-0 h-auto"
+                        className="text-primary text-[12px] p-0 h-auto"
                         onClick={() => setActiveTab("implants")}
                       >
                         Voir détails

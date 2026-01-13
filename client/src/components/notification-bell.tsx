@@ -176,7 +176,7 @@ export function NotificationBell() {
           <h4 className="font-medium text-sm">Notifications</h4>
           {unreadCount > 0 && (
             <Button 
-              variant="ghost" 
+              variant="default" 
               size="sm" 
               className="h-7 text-xs"
               onClick={() => markAllAsReadMutation.mutate()}
@@ -219,7 +219,7 @@ export function NotificationBell() {
         <div className="border-t p-2">
           <Button 
             variant="ghost" 
-            className="w-full text-xs h-8"
+            className="w-full text-xs h-8 text-primary hover:text-primary"
             asChild
             onClick={() => setOpen(false)}
             data-testid="link-view-all-notifications"
