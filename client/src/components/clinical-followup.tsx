@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   Activity, 
@@ -19,7 +19,8 @@ import {
   CalendarPlus,
   Link,
   X,
-  Plus
+  Plus,
+  Upload
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -149,6 +150,12 @@ export function ClinicalFollowUp({
   const [freeTextReason, setFreeTextReason] = useState("");
   const [evidence, setEvidence] = useState("");
   const [linkedRadiosOpen, setLinkedRadiosOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"];
 
   interface AppointmentRadioWithDetails extends AppointmentRadio {
     radio?: Radio;
@@ -251,6 +258,83 @@ export function ClinicalFollowUp({
       toast({ title: "Erreur", description: "Impossible de dissocier la radio.", variant: "destructive" });
     },
   });
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      toast({ title: "Erreur", description: "Type de fichier non supporte. Utilisez JPEG, PNG, GIF, WebP ou PDF.", variant: "destructive" });
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      toast({ title: "Erreur", description: "Le fichier est trop volumineux. Maximum 10 Mo.", variant: "destructive" });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const patientId = clinicalData?.appointment?.patientId;
+      if (!patientId) throw new Error("Patient non trouve");
+
+      const urlRes = await apiRequest("POST", "/api/radios/upload-url", {
+        patientId,
+        fileName: file.name,
+        mimeType: file.type,
+      });
+      const urlData = await urlRes.json();
+      if (!urlData.signedUrl || !urlData.filePath) throw new Error("Impossible d'obtenir l'URL d'upload");
+
+      const uploadRes = await fetch(urlData.signedUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type, "x-upsert": "true" },
+      });
+      if (!uploadRes.ok) throw new Error(`Echec du televersement: ${uploadRes.status}`);
+
+      const radioRes = await apiRequest("POST", "/api/radios", {
+        patientId,
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        type: "PANORAMIQUE",
+        date: new Date().toISOString().split("T")[0],
+        filePath: urlData.filePath,
+        fileName: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        operationId: clinicalData?.appointment?.operationId || null,
+      });
+      const newRadio = await radioRes.json();
+
+      await apiRequest("POST", `/api/appointments/${appointmentId}/radios`, { radioId: newRadio.id });
+
+      queryClient.invalidateQueries({ queryKey: [`/api/appointments/${appointmentId}/radios`] });
+      toast({ title: "Radio ajoutee", description: "La radiographie a ete uploade et liee au RDV.", variant: "success" });
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error.message || "Impossible d'uploader le fichier.", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [appointmentId, clinicalData, toast]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
+  }, [handleFileUpload]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileUpload(file);
+  }, [handleFileUpload]);
 
   const handleSaveIsq = () => {
     if (!surgeryImplantId || !isqValue) return;
@@ -422,7 +506,14 @@ export function ClinicalFollowUp({
 
         {lastMeasurement && (
           <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
-            <span className="text-sm text-muted-foreground">Dernier ISQ</span>
+            <div className="flex flex-col">
+              <span className="text-sm text-muted-foreground">Dernier ISQ</span>
+              {lastMeasurement.measuredAt && (
+                <span className="text-xs text-muted-foreground/70">
+                  {new Date(lastMeasurement.measuredAt).toLocaleDateString("fr-FR")}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <span className={`text-lg font-bold ${getIsqColor(lastMeasurement.isqValue)}`}>
                 {lastMeasurement.isqValue ?? "-"}
@@ -597,12 +688,49 @@ export function ClinicalFollowUp({
                 size="sm"
                 className="h-7 text-xs"
                 onClick={() => onAction("add_or_link_radio")}
-                data-testid="button-link-radio"
+                data-testid="button-link-existing-radio"
               >
-                <Plus className="h-3 w-3 mr-1" />
-                Lier une radio
+                <Link className="h-3 w-3 mr-1" />
+                Lier existante
               </Button>
             )}
+          </div>
+          
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onClick={() => !isUploading && fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-lg p-3 transition-colors cursor-pointer ${
+              isDragOver
+                ? "border-primary bg-primary/5"
+                : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30"
+            } ${isUploading ? "pointer-events-none opacity-60" : ""}`}
+            data-testid="dropzone-radio-upload"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+              onChange={handleFileInputChange}
+              className="hidden"
+              data-testid="input-radio-file"
+            />
+            <div className="flex flex-col items-center justify-center gap-1 text-center">
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <p className="text-xs text-muted-foreground">Telechargement...</p>
+                </>
+              ) : (
+                <>
+                  <Upload className="h-5 w-5 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">
+                    Glissez ou cliquez pour ajouter une nouvelle radio
+                  </p>
+                </>
+              )}
+            </div>
           </div>
           
           {linkedRadiosQuery.isLoading ? (
@@ -658,11 +786,7 @@ export function ClinicalFollowUp({
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-2">
-              Aucune radio liee a ce rendez-vous
-            </p>
-          )}
+          ) : null}
         </div>
 
         {measurementHistory.length > 1 && (

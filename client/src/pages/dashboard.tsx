@@ -138,12 +138,13 @@ function SecondaryStatCard({ title, icon, iconBgColor, stats }: SecondaryStatCar
 interface AppointmentItemProps {
   date: Date;
   title: string;
-  description: string;
+  patientName: string;
+  patientId: string;
   type: "consultation" | "suivi" | "action";
   time?: string;
 }
 
-function AppointmentItem({ date, title, description, type, time }: AppointmentItemProps) {
+function AppointmentItem({ date, title, patientName, patientId, type, time }: AppointmentItemProps) {
   const day = date.getDate();
   const month = date.toLocaleDateString("fr-FR", { month: "short" }).toUpperCase();
   
@@ -166,22 +167,24 @@ function AppointmentItem({ date, title, description, type, time }: AppointmentIt
     : "Action";
 
   return (
-    <div className={`flex items-center gap-4 p-3 border-l-4 ${borderColor} bg-muted/30 rounded-r-md`}>
-      <div className="flex flex-col items-center justify-center min-w-[48px]">
-        <span className="text-2xl font-bold">{day}</span>
-        <span className="text-xs text-muted-foreground">{month}</span>
+    <Link href={`/patients/${patientId}`} className="block" data-testid={`link-appointment-patient-${patientId}`}>
+      <div className={`flex items-center gap-4 p-3 border-l-4 ${borderColor} bg-muted/30 rounded-r-md hover-elevate cursor-pointer`}>
+        <div className="flex flex-col items-center justify-center min-w-[48px]">
+          <span className="text-2xl font-bold">{day}</span>
+          <span className="text-xs text-muted-foreground">{month}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{title}</p>
+          <p className="text-sm text-primary hover:underline truncate">{patientName}</p>
+        </div>
+        <Badge className={`${badgeVariant} no-default-hover-elevate no-default-active-elevate`}>
+          {badgeLabel}
+        </Badge>
+        {time && (
+          <span className="text-sm text-muted-foreground whitespace-nowrap">{time}</span>
+        )}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{title}</p>
-        <p className="text-sm text-muted-foreground truncate">{description}</p>
-      </div>
-      <Badge className={`${badgeVariant} no-default-hover-elevate no-default-active-elevate`}>
-        {badgeLabel}
-      </Badge>
-      {time && (
-        <span className="text-sm text-muted-foreground whitespace-nowrap">{time}</span>
-      )}
-    </div>
+    </Link>
   );
 }
 
@@ -552,7 +555,8 @@ export default function DashboardPage() {
                   key={apt.id}
                   date={new Date(apt.dateStart)}
                   title={apt.title}
-                  description={`${apt.patientPrenom} ${apt.patientNom}${apt.description ? ` - ${apt.description}` : ""}`}
+                  patientName={`${apt.patientPrenom || ""} ${apt.patientNom || ""}`.trim() || "Patient"}
+                  patientId={apt.patientId}
                   type={apt.type.toLowerCase() === "chirurgie" ? "action" : apt.type.toLowerCase() as "consultation" | "suivi" | "action"}
                   time={new Date(apt.dateStart).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 />

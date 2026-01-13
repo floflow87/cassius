@@ -5831,11 +5831,11 @@ export async function registerRoutes(
 
     return appointments
       .filter((apt) => {
-        const aptDate = new Date(apt.dateHeure);
+        const aptDate = new Date(apt.dateStart);
         return aptDate >= today && aptDate < dayAfter;
       })
       .map((apt) => {
-        const aptDate = new Date(apt.dateHeure);
+        const aptDate = new Date(apt.dateStart);
         const isToday = aptDate >= today && aptDate < tomorrow;
         const timeStr = aptDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
         
@@ -5949,7 +5949,7 @@ export async function registerRoutes(
       dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
       
       const upcomingAppointmentsCount = appointments.filter((apt: any) => {
-        const aptDate = new Date(apt.dateHeure);
+        const aptDate = new Date(apt.dateStart);
         return aptDate >= today && aptDate < dayAfterTomorrow;
       }).length;
       
