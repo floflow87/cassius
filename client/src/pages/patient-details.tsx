@@ -1462,7 +1462,7 @@ export default function PatientDetailsPage() {
               // Determine follow-up status: upcoming takes priority, then most recent completed/cancelled
               if (upcomingAppointments.length > 0) {
                 return (
-                  <Badge className="bg-blue-500 text-white text-[10px] gap-1" data-testid="badge-followup-status">
+                  <Badge className="bg-[#EFF6FF] text-blue-700 text-[10px] gap-1" data-testid="badge-followup-status">
                     <Calendar className="w-3 h-3" />
                     À venir
                   </Badge>
@@ -1472,7 +1472,7 @@ export default function PatientDetailsPage() {
                 const lastAppointment = completedAppointments[0];
                 if (lastAppointment.status === "COMPLETED") {
                   return (
-                    <Badge className="bg-green-600 text-white text-[10px] gap-1" data-testid="badge-followup-status">
+                    <Badge className="bg-[#DCFCE7] text-green-700 text-[10px] gap-1" data-testid="badge-followup-status">
                       <CheckCircle2 className="w-3 h-3" />
                       Terminé
                     </Badge>
@@ -1480,7 +1480,7 @@ export default function PatientDetailsPage() {
                 }
                 if (lastAppointment.status === "CANCELLED") {
                   return (
-                    <Badge variant="secondary" className="text-[10px] gap-1" data-testid="badge-followup-status">
+                    <Badge className="bg-[#FEF2F2] text-red-700 text-[10px] gap-1" data-testid="badge-followup-status">
                       <XCircle className="w-3 h-3" />
                       Annulé
                     </Badge>

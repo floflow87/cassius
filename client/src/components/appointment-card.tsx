@@ -71,9 +71,9 @@ const statusLabels: Record<AppointmentStatus, string> = {
 };
 
 const statusClasses: Record<AppointmentStatus, string> = {
-  UPCOMING: "bg-blue-500 text-white hover:bg-blue-600",
-  COMPLETED: "bg-green-600 text-white hover:bg-green-700",
-  CANCELLED: "bg-muted text-muted-foreground",
+  UPCOMING: "bg-[#EFF6FF] text-blue-700 hover:bg-[#DBEAFE]",
+  COMPLETED: "bg-[#DCFCE7] text-green-700 hover:bg-[#BBF7D0]",
+  CANCELLED: "bg-[#FEF2F2] text-red-700 hover:bg-[#FEE2E2]",
 };
 
 function formatDate(date: Date | string): string {

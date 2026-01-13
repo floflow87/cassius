@@ -207,9 +207,9 @@ const appointmentStatusLabels: Record<AppointmentStatus, string> = {
 };
 
 const appointmentStatusClasses: Record<AppointmentStatus, string> = {
-  UPCOMING: "bg-blue-500 text-white",
-  COMPLETED: "bg-green-600 text-white",
-  CANCELLED: "bg-muted text-muted-foreground",
+  UPCOMING: "bg-[#EFF6FF] text-blue-700",
+  COMPLETED: "bg-[#DCFCE7] text-green-700",
+  CANCELLED: "bg-[#FEF2F2] text-red-700",
 };
 
 interface AppointmentWithPatient extends Appointment {
@@ -392,15 +392,13 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     enabled: activeTab === "suivi",
   });
 
-  // Separate appointments into upcoming and past
+  // Separate appointments into upcoming and past based on status only
   const { upcomingAppointments, pastAppointments } = useMemo(() => {
-    const now = new Date();
     const upcoming: AppointmentWithPatient[] = [];
     const past: AppointmentWithPatient[] = [];
     
     allAppointments.forEach(apt => {
-      const aptDate = new Date(apt.dateStart);
-      if (apt.status === "UPCOMING" && aptDate >= now) {
+      if (apt.status === "UPCOMING") {
         upcoming.push(apt);
       } else {
         past.push(apt);
@@ -836,17 +834,17 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "patients" | "suivi")} className="w-full">
-        <TabsList className="mb-4 bg-muted/30 p-1 h-auto" data-testid="tabs-patients-page">
+        <TabsList className="mb-4 bg-white dark:bg-zinc-900 p-1 h-auto rounded-full w-fit" data-testid="tabs-patients-page">
           <TabsTrigger 
             value="patients" 
-            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm rounded-md px-4 py-2 text-sm transition-all"
+            className="relative data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none rounded-full px-4 py-1.5 text-sm transition-all"
             data-testid="tab-patients"
           >
             Patients
           </TabsTrigger>
           <TabsTrigger 
             value="suivi" 
-            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm rounded-md px-4 py-2 text-sm transition-all"
+            className="relative data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none rounded-full px-4 py-1.5 text-sm transition-all"
             data-testid="tab-suivi"
           >
             Suivi
@@ -1200,7 +1198,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                     {upcomingExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
                     À venir
                   </CollapsibleTrigger>
-                  <Badge className="bg-blue-500 text-white text-[10px]">{upcomingAppointments.length}</Badge>
+                  <Badge className="bg-[#EFF6FF] text-blue-700 text-[10px]">{upcomingAppointments.length}</Badge>
                 </div>
                 <CollapsibleContent>
                   {upcomingAppointments.length === 0 ? (
