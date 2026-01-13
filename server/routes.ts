@@ -2849,7 +2849,7 @@ export async function registerRoutes(
       // Send notification about new appointment with patient name
       if (userId) {
         const patient = await storage.getPatient(organisationId, patientId);
-        const patientName = patient ? `${patient.lastName} ${patient.firstName}` : "Patient";
+        const patientName = patient ? `${patient.prenom} ${patient.nom}` : "Patient";
         notificationService.notificationEvents.onAppointmentCreated({
           organisationId,
           recipientUserId: userId,

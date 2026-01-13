@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { motion } from "framer-motion";
 import { 
   Plus, 
   Search, 
@@ -223,7 +222,8 @@ const appointmentTypeClasses: Record<AppointmentType, string> = {
 };
 
 interface AppointmentWithPatient extends Appointment {
-  patient?: { id: string; nom: string; prenom: string };
+  patientNom?: string;
+  patientPrenom?: string;
 }
 
 export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPageProps) {
@@ -809,13 +809,13 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                   {appointmentTypeLabels[apt.type]}
                 </Badge>
               </div>
-              {apt.patient && (
+              {apt.patientPrenom && apt.patientNom && (
                 <Link 
-                  href={`/patients/${apt.patient.id}`}
+                  href={`/patients/${apt.patientId}`}
                   className="text-xs text-primary hover:underline mt-1 block"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {apt.patient.prenom} {apt.patient.nom}
+                  {apt.patientPrenom} {apt.patientNom}
                 </Link>
               )}
               <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
@@ -852,19 +852,10 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
             <TabsTrigger
               key={tab.value}
               value={tab.value}
-              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:shadow-none ${
-                activeTab !== tab.value ? "text-muted-foreground hover:text-foreground" : ""
-              }`}
+              className="relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
               data-testid={`tab-${tab.value}`}
             >
-              {activeTab === tab.value && (
-                <motion.div
-                  layoutId="patients-tab-indicator"
-                  className="absolute inset-0 bg-primary rounded-full -z-10"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
-                />
-              )}
-              <span className="relative z-10">{tab.label}</span>
+              {tab.label}
             </TabsTrigger>
           ))}
         </TabsList>
