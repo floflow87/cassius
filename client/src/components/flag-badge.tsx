@@ -70,7 +70,7 @@ export function FlagBadge({ flag, showResolve = false, compact = false, onResolv
             <Icon className="w-3 h-3" />
           </Badge>
         </TooltipTrigger>
-        <TooltipContent>
+        <TooltipContent className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg">
           <p className="font-medium">{flag.label}</p>
           {flag.description && <p className="text-xs text-muted-foreground">{flag.description}</p>}
         </TooltipContent>
@@ -172,7 +172,7 @@ export function CompactFlagList({ flags, maxVisible = 3 }: CompactFlagListProps)
               +{remainingCount}
             </Badge>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-sm">
+          <TooltipContent side="bottom" className="max-w-sm z-[99999] bg-white dark:bg-zinc-900 border shadow-lg">
             <div className="space-y-2">
               {remainingFlags.map((flag) => {
                 const IconComponent = levelConfig[flag.level].icon;
@@ -228,7 +228,7 @@ export function TopFlagSummary({ topFlag, activeFlagCount = 0 }: TopFlagSummaryP
             <span className="text-xs">{typeLabel}</span>
           </Badge>
         </TooltipTrigger>
-        <TooltipContent>
+        <TooltipContent className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg">
           <p className="font-medium">{topFlag.label}</p>
         </TooltipContent>
       </Tooltip>
@@ -276,7 +276,7 @@ export function FlagsTooltipBadge({ flags, variant = "default" }: FlagsTooltipBa
           <span className="text-xs">{flags.length}</span>
         </Badge>
       </TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-xs">
+      <TooltipContent side="bottom" className="max-w-xs z-[99999] bg-white dark:bg-zinc-900 border shadow-lg">
         <div className="space-y-2">
           {sortedFlags.map((flag) => {
             const config = levelConfig[flag.level];

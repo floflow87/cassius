@@ -619,6 +619,7 @@ export async function registerRoutes(
       if (userId) {
         const orgUsers = await storage.getUsersByOrganisation(organisationId);
         const changedFields = Object.keys(data);
+        const patientName = `${patient.prenom || ''} ${patient.nom || ''}`.trim();
         
         for (const user of orgUsers) {
           if (user.id !== userId) {
@@ -627,6 +628,7 @@ export async function registerRoutes(
               recipientUserId: user.id,
               actorUserId: userId,
               patientId: patient.id,
+              patientName,
               changes: changedFields,
             }).catch(err => console.error("[Notification] Patient updated notification failed:", err));
           }
@@ -2248,6 +2250,13 @@ export async function registerRoutes(
       // Send notification about new document to other team members
       if (userId) {
         const orgUsers = await storage.getUsersByOrganisation(organisationId);
+        let patientNameForDoc: string | undefined;
+        if (doc.patientId) {
+          const patient = await storage.getPatient(organisationId, doc.patientId);
+          if (patient) {
+            patientNameForDoc = `${patient.prenom || ''} ${patient.nom || ''}`.trim();
+          }
+        }
         
         for (const user of orgUsers) {
           if (user.id !== userId) {
@@ -2258,6 +2267,7 @@ export async function registerRoutes(
               documentId: doc.id,
               documentName: doc.title || doc.fileName,
               patientId: doc.patientId || undefined,
+              patientName: patientNameForDoc,
             }).catch(err => console.error("[Notification] Document uploaded notification failed:", err));
           }
         }
@@ -2384,6 +2394,11 @@ export async function registerRoutes(
           
           // Send notification for low ISQ (< 60)
           if (data.isq < 60 && userId) {
+            const patientForNotif = await storage.getPatient(organisationId, data.patientId);
+            const patientNameForNotif = patientForNotif ? `${patientForNotif.prenom} ${patientForNotif.nom}` : "Patient";
+            const surgeryImplantForNotif = await storage.getSurgeryImplant(organisationId, surgeryImplantId);
+            const implantSiteForNotif = surgeryImplantForNotif?.siteFdi || "inconnu";
+            
             notificationService.createNotification({
               organisationId,
               recipientUserId: userId,
@@ -2391,9 +2406,16 @@ export async function registerRoutes(
               type: "ISQ_LOW",
               severity: data.isq < 50 ? "CRITICAL" : "WARNING",
               title: `ISQ faible detecte: ${data.isq}`,
-              body: `L'implant sur le site a un ISQ de ${data.isq}, ce qui est en dessous du seuil recommande.`,
-              entityType: "IMPLANT",
-              entityId: surgeryImplantId,
+              body: `${patientNameForNotif} - Site ${implantSiteForNotif}: ISQ de ${data.isq}, en dessous du seuil recommande.`,
+              entityType: "PATIENT",
+              entityId: data.patientId,
+              metadata: {
+                patientName: patientNameForNotif,
+                patientId: data.patientId,
+                implantSite: implantSiteForNotif,
+                isqValue: data.isq,
+                surgeryImplantId,
+              },
               dedupeKey: `isq_low_${surgeryImplantId}_${data.isq}`,
             }).catch(err => console.error("[Notification] ISQ_LOW notification failed:", err));
           }

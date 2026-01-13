@@ -722,6 +722,7 @@ export const notificationEvents = {
     documentId: string;
     documentName: string;
     patientId?: string;
+    patientName?: string;
   }) {
     return createNotification({
       organisationId: params.organisationId,
@@ -730,11 +731,13 @@ export const notificationEvents = {
       type: "DOCUMENT_ADDED",
       severity: "INFO",
       title: "Document ajouté",
-      body: `Un document a été ajouté.`,
+      body: params.patientName 
+        ? `${params.patientName} - Document "${params.documentName}" ajouté.`
+        : `Un document "${params.documentName}" a été ajouté.`,
       entityType: "DOCUMENT",
       entityId: params.documentId,
       actorUserId: params.actorUserId,
-      metadata: { documentName: params.documentName, patientId: params.patientId },
+      metadata: { documentName: params.documentName, patientId: params.patientId, patientName: params.patientName },
     });
   },
 
@@ -827,6 +830,7 @@ export const notificationEvents = {
     recipientUserId: string;
     actorUserId: string;
     patientId: string;
+    patientName?: string;
     changes: string[];
   }) {
     return createNotification({
@@ -836,11 +840,13 @@ export const notificationEvents = {
       type: "PATIENT_UPDATED",
       severity: "INFO",
       title: "Fiche patient modifiée",
-      body: `Des modifications ont été apportées à une fiche patient.`,
+      body: params.patientName 
+        ? `${params.patientName} - Modifications apportées à la fiche.`
+        : `Des modifications ont été apportées à une fiche patient.`,
       entityType: "PATIENT",
       entityId: params.patientId,
       actorUserId: params.actorUserId,
-      metadata: { changes: params.changes },
+      metadata: { changes: params.changes, patientName: params.patientName, patientId: params.patientId },
     });
   },
 

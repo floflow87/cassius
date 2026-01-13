@@ -669,9 +669,13 @@ export default function DocumentsPage() {
       if (!response.ok) throw new Error('Failed to get URL');
       const { signedUrl } = await response.json();
       
-      const isViewable = file.mimeType?.startsWith('image/') || file.mimeType === 'application/pdf';
-      if (isViewable) {
+      const isImage = file.mimeType?.startsWith('image/');
+      const isPdf = file.mimeType === 'application/pdf';
+      
+      if (isImage) {
         setViewingFile({ file, url: signedUrl });
+      } else if (isPdf) {
+        window.open(signedUrl, '_blank');
       } else {
         window.open(signedUrl, '_blank');
       }
@@ -932,7 +936,7 @@ export default function DocumentsPage() {
                   isSelected={selectedFiles.has(`${file.sourceType}-${file.id}`)}
                   onToggleSelect={() => toggleFileSelection(`${file.sourceType}-${file.id}`)}
                   onNavigateToPatient={file.patientId ? () => setLocation(`/patients/${file.patientId}`) : undefined}
-                  onNavigateToOperation={file.operationId ? () => setLocation(`/actes/${file.operationId}`) : undefined}
+                  onNavigateToOperation={file.operationId && file.operationId.trim() !== '' ? () => setLocation(`/actes/${file.operationId}`) : undefined}
                 />
               ))}
             </div>
@@ -958,7 +962,7 @@ export default function DocumentsPage() {
                     isSelected={selectedFiles.has(`${file.sourceType}-${file.id}`)}
                     onToggleSelect={() => toggleFileSelection(`${file.sourceType}-${file.id}`)}
                     onNavigateToPatient={file.patientId ? () => setLocation(`/patients/${file.patientId}`) : undefined}
-                    onNavigateToOperation={file.operationId ? () => setLocation(`/actes/${file.operationId}`) : undefined}
+                    onNavigateToOperation={file.operationId && file.operationId.trim() !== '' ? () => setLocation(`/actes/${file.operationId}`) : undefined}
                   />
                 ))}
               </div>
