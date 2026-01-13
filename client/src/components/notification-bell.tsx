@@ -23,6 +23,8 @@ interface Notification {
   body?: string;
   entityType?: string;
   entityId?: string;
+  patientName?: string;
+  patientId?: string;
   createdAt: string;
   readAt?: string;
 }
@@ -81,15 +83,24 @@ function NotificationItem({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className={`text-sm ${isUnread ? 'font-medium' : ''}`}>{notification.title}</p>
+          <p className={`text-xs ${isUnread ? 'font-medium' : ''}`}>{notification.title}</p>
           {isUnread && (
             <div className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1" />
           )}
         </div>
-        {notification.body && (
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notification.body}</p>
+        {notification.patientName && (
+          <Link 
+            href={notification.patientId ? `/patients/${notification.patientId}` : "#"}
+            className="text-xs text-primary hover:underline mt-0.5 block"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {notification.patientName}
+          </Link>
         )}
-        <p className="text-xs text-muted-foreground mt-1">
+        {notification.body && (
+          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{notification.body}</p>
+        )}
+        <p className="text-[10px] text-muted-foreground mt-1">
           {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true, locale: fr })}
         </p>
       </div>

@@ -1114,15 +1114,16 @@ export default function ImplantDetailsPage() {
                             <div className="flex items-center gap-2">
                               {entry.fromStatus && (
                                 <>
-                                  <Badge variant="outline" className="text-xs">
+                                  <Badge 
+                                    variant={statusConfig[entry.fromStatus]?.variant || "secondary"}
+                                  >
                                     {statusConfig[entry.fromStatus]?.label || entry.fromStatus}
                                   </Badge>
                                   <ArrowRight className="h-3 w-3 text-muted-foreground" />
                                 </>
                               )}
                               <Badge 
-                                variant={statusConfig[entry.toStatus]?.variant || "secondary"} 
-                                className="text-xs"
+                                variant={statusConfig[entry.toStatus]?.variant || "secondary"}
                               >
                                 {statusConfig[entry.toStatus]?.label || entry.toStatus}
                               </Badge>

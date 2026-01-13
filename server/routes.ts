@@ -5711,28 +5711,32 @@ export async function registerRoutes(
     };
     
     const titleMap: Record<string, string> = {
-      ISQ_LOW: "ISQ bas detecte",
-      ISQ_CRITICAL: "ISQ critique",
-      NO_POSTOP_FOLLOWUP: "Suivi post-operatoire manquant",
-      INCOMPLETE_DATA: "Donnees incompletes",
-      OVERDUE_APPOINTMENT: "Rendez-vous en retard",
-      MISSING_XRAY: "Radiographie manquante",
+      ISQ_LOW: "ISQ Bas Détecté",
+      ISQ_CRITICAL: "ISQ Critique",
+      NO_POSTOP_FOLLOWUP: "Suivi Post-opératoire Manquant",
+      INCOMPLETE_DATA: "Données Incomplètes",
+      OVERDUE_APPOINTMENT: "Rendez-vous en Retard",
+      MISSING_XRAY: "Radiographie Manquante",
     };
     
-    return flags.map((flag) => ({
-      id: `flag-${flag.id}`,
-      kind: "ALERT",
-      type: flag.type,
-      severity: severityMap[flag.severity] || "INFO",
-      title: titleMap[flag.type] || flag.type,
-      body: flag.message || `Alerte pour le patient ${flag.patient?.prenom || ""} ${flag.patient?.nom || ""}`.trim(),
-      entityType: "PATIENT",
-      entityId: flag.patientId,
-      createdAt: flag.createdAt || new Date().toISOString(),
-      readAt: flag.resolvedAt || null,
-      isVirtual: true,
-      patientName: flag.patient ? `${flag.patient.prenom || ""} ${flag.patient.nom || ""}`.trim() : null,
-    }));
+    return flags.map((flag) => {
+      const patientName = flag.patient ? `${flag.patient.prenom || ""} ${flag.patient.nom || ""}`.trim() : null;
+      return {
+        id: `flag-${flag.id}`,
+        kind: "ALERT",
+        type: flag.type,
+        severity: severityMap[flag.severity] || "INFO",
+        title: titleMap[flag.type] || flag.type,
+        body: flag.message || (patientName ? `Alerte pour ${patientName}` : "Alerte clinique"),
+        entityType: "PATIENT",
+        entityId: flag.patientId,
+        patientName,
+        patientId: flag.patientId,
+        createdAt: flag.createdAt || new Date().toISOString(),
+        readAt: flag.resolvedAt || null,
+        isVirtual: true,
+      };
+    });
   }
 
   // Helper: Convert upcoming appointments to notification-like objects
@@ -5754,19 +5758,21 @@ export async function registerRoutes(
         const isToday = aptDate >= today && aptDate < tomorrow;
         const timeStr = aptDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
         
+        const patientName = apt.patient ? `${apt.patient.prenom || ""} ${apt.patient.nom || ""}`.trim() : null;
         return {
           id: `apt-${apt.id}`,
           kind: "REMINDER",
           type: "UPCOMING_APPOINTMENT",
           severity: isToday ? "WARNING" : "INFO",
-          title: isToday ? `RDV aujourd'hui a ${timeStr}` : `RDV demain a ${timeStr}`,
-          body: apt.patient ? `${apt.patient.prenom || ""} ${apt.patient.nom || ""} - ${apt.type}`.trim() : apt.type,
+          title: isToday ? `RDV Aujourd'hui à ${timeStr}` : `RDV Demain à ${timeStr}`,
+          body: patientName ? `${patientName} - ${apt.type}` : apt.type,
           entityType: "APPOINTMENT",
           entityId: apt.id,
+          patientName,
+          patientId: apt.patientId,
           createdAt: apt.createdAt || new Date().toISOString(),
           readAt: null,
           isVirtual: true,
-          patientName: apt.patient ? `${apt.patient.prenom || ""} ${apt.patient.nom || ""}`.trim() : null,
         };
       });
   }

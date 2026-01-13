@@ -645,12 +645,14 @@ export function ClinicalFollowUp({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                      className="h-7 px-2 text-destructive hover:text-destructive text-xs"
                       onClick={() => unlinkRadioMutation.mutate(link.radioId)}
                       disabled={unlinkRadioMutation.isPending}
                       data-testid={`button-unlink-radio-${link.radioId}`}
+                      title="Dissocier du RDV"
                     >
-                      <X className="h-3 w-3" />
+                      <X className="h-3 w-3 mr-1" />
+                      Dissocier
                     </Button>
                   </div>
                 </div>
