@@ -750,6 +750,8 @@ export interface UnifiedFile {
   patient?: Patient;
   operation?: Operation;
   signedUrl?: string | null;
+  // Last note (for radios)
+  lastNote?: string | null;
 }
 
 // ============================================

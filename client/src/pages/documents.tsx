@@ -67,6 +67,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DocumentUploadForm } from "@/components/document-upload-form";
 import { RadioDrawer } from "@/components/radio-drawer";
 import type { DocumentWithDetails, Patient, Radio } from "@shared/schema";
@@ -236,7 +237,18 @@ function FileRow({
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm truncate">{file.title}</span>
+          {file.lastNote ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-sm truncate cursor-default">{file.title}</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg max-w-xs">
+                <p className="text-xs">{file.lastNote}</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <span className="text-sm truncate">{file.title}</span>
+          )}
           {isRadio && (
             <Badge variant="secondary" className={`text-xs ${RADIO_BADGE_COLOR}`}>
               Radio

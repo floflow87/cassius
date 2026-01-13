@@ -2965,7 +2965,8 @@ export class DatabaseStorage implements IStorage {
       SELECT 
         u.*,
         p.id as p_id, p.nom as p_nom, p.prenom as p_prenom, p.date_naissance as p_date_naissance, p.sexe as p_sexe,
-        o.id as o_id, o.date_operation as o_date_operation, o.type_intervention as o_type_intervention, o.patient_id as o_patient_id
+        o.id as o_id, o.date_operation as o_date_operation, o.type_intervention as o_type_intervention, o.patient_id as o_patient_id,
+        (SELECT rn.body FROM radio_notes rn WHERE rn.radio_id = u.id AND u.source_type = 'radio' ORDER BY rn.created_at DESC LIMIT 1) as last_note
       FROM unified u
       LEFT JOIN patients p ON u.patient_id = p.id
       LEFT JOIN operations o ON u.operation_id = o.id
@@ -3003,6 +3004,7 @@ export class DatabaseStorage implements IStorage {
       radioType: row.radio_type,
       radioDate: row.radio_date,
       implantId: row.implant_id,
+      lastNote: row.last_note || null,
       patient: row.p_id ? {
         id: row.p_id,
         organisationId,
