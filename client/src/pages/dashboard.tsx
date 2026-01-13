@@ -283,9 +283,12 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const upcomingVisites = upcomingAppointments?.filter(apt => 
-    apt.status === 'UPCOMING'
-  ).slice(0, 4) || [];
+  const now = new Date();
+  const upcomingVisites = upcomingAppointments?.filter(apt => {
+    const aptDate = new Date(apt.dateStart);
+    return apt.status === 'UPCOMING' && aptDate >= now;
+  }).sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime())
+    .slice(0, 4) || [];
 
   const isqStats = {
     success: stats?.implantsByStatus?.["SUCCES"] || 0,

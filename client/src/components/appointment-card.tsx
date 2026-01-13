@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Calendar, Clock, MoreVertical, Pencil, Trash2, CheckCircle, XCircle, Activity, Stethoscope, AlertCircle, ClipboardList, HeartPulse, CalendarPlus, Loader2 } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Calendar, Clock, MoreVertical, Pencil, Trash2, CheckCircle, XCircle, Activity, Stethoscope, AlertCircle, ClipboardList, HeartPulse, CalendarPlus, Loader2, FileImage, Link as LinkIcon } from "lucide-react";
 import type { RecommendedActionType } from "@shared/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,9 +30,12 @@ import {
 } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Appointment, AppointmentType, AppointmentStatus } from "@shared/schema";
+import type { Appointment, AppointmentType, AppointmentStatus, Radio } from "@shared/schema";
 import { AppointmentForm } from "./appointment-form";
 import { ClinicalFollowUp } from "./clinical-followup";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface AppointmentCardProps {
   appointment: Appointment;
@@ -103,9 +106,38 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
   const [clinicalOpen, setClinicalOpen] = useState(false);
   const [control14dOpen, setControl14dOpen] = useState(false);
   const [control14dDate, setControl14dDate] = useState<Date | null>(null);
+  const [linkRadioOpen, setLinkRadioOpen] = useState(false);
+  const [radioSearch, setRadioSearch] = useState("");
 
   const TypeIcon = typeIcons[appointment.type];
   const hasClinicalFollowUp = ["CONTROLE", "CHIRURGIE", "URGENCE", "SUIVI"].includes(appointment.type);
+  
+  const { data: patientRadios } = useQuery<Radio[]>({
+    queryKey: ["/api/patients", patientId, "radios"],
+    enabled: linkRadioOpen,
+  });
+
+  const linkRadioMutation = useMutation({
+    mutationFn: async (radioId: string) => {
+      await apiRequest("POST", `/api/appointments/${appointment.id}/radios`, { radioId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments", appointment.id, "radios"] });
+      toast({
+        title: "Radio liée",
+        description: "La radiographie a été associée au rendez-vous.",
+        variant: "success",
+      });
+      setLinkRadioOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de lier la radio",
+        variant: "destructive",
+      });
+    },
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -200,12 +232,16 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
         description: "Ouvrir le modal de statut",
       });
     } else if (actionType === "add_or_link_radio") {
-      toast({
-        title: "Action",
-        description: "Ajouter ou lier une radiographie",
-      });
+      setLinkRadioOpen(true);
     }
   };
+  
+  const filteredRadios = patientRadios?.filter(radio => {
+    if (!radioSearch) return true;
+    const search = radioSearch.toLowerCase();
+    return radio.title?.toLowerCase().includes(search) || 
+           radio.type?.toLowerCase().includes(search);
+  }) || [];
 
   return (
     <>
@@ -411,6 +447,60 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={linkRadioOpen} onOpenChange={setLinkRadioOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LinkIcon className="h-5 w-5" />
+              Lier une radiographie existante
+            </DialogTitle>
+            <DialogDescription>
+              Sélectionnez une radio du patient à associer à ce rendez-vous.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Rechercher une radio..."
+              value={radioSearch}
+              onChange={(e) => setRadioSearch(e.target.value)}
+              data-testid="input-search-radio"
+            />
+            <ScrollArea className="h-[300px]">
+              <div className="space-y-2">
+                {filteredRadios.length > 0 ? (
+                  filteredRadios.map((radio) => (
+                    <div
+                      key={radio.id}
+                      className="flex items-center justify-between p-3 rounded-md border hover-elevate cursor-pointer"
+                      onClick={() => linkRadioMutation.mutate(radio.id)}
+                      data-testid={`radio-option-${radio.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileImage className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">{radio.title || "Radio sans titre"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {radio.type} - {radio.date ? new Date(radio.date).toLocaleDateString("fr-FR") : "Sans date"}
+                          </p>
+                        </div>
+                      </div>
+                      {linkRadioMutation.isPending && (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileImage className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Aucune radio trouvée</p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -45,6 +45,9 @@ interface Notification {
   createdAt: string;
   readAt?: string;
   isVirtual?: boolean;
+  metadata?: string;
+  patientName?: string;
+  patientId?: string;
 }
 
 const KIND_ICONS: Record<string, typeof AlertCircle> = {
@@ -94,6 +97,9 @@ function NotificationRow({
   const isUnread = !notification.readAt;
   
   const getEntityLink = () => {
+    if (notification.patientId) {
+      return `/patients/${notification.patientId}`;
+    }
     if (!notification.entityType || !notification.entityId) return null;
     switch (notification.entityType) {
       case "PATIENT":
@@ -110,6 +116,19 @@ function NotificationRow({
   };
   
   const link = getEntityLink();
+  
+  const parsePatientInfo = () => {
+    if (notification.patientName) return { name: notification.patientName, id: notification.patientId };
+    if (notification.metadata) {
+      try {
+        const meta = JSON.parse(notification.metadata);
+        if (meta.patientName) return { name: meta.patientName, id: meta.patientId };
+      } catch {}
+    }
+    return null;
+  };
+  
+  const patientInfo = parsePatientInfo();
   
   return (
     <div 
@@ -141,6 +160,15 @@ function NotificationRow({
             </div>
             {notification.body && (
               <p className="text-sm text-muted-foreground mt-1">{notification.body}</p>
+            )}
+            {patientInfo && (
+              <Link 
+                href={`/patients/${patientInfo.id}`}
+                className="text-sm text-primary hover:underline mt-1 inline-block"
+                data-testid={`link-notification-patient-${patientInfo.id}`}
+              >
+                {patientInfo.name}
+              </Link>
             )}
             <div className="flex items-center gap-3 mt-2 flex-wrap">
               <span className="text-xs text-muted-foreground">
