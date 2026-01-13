@@ -71,8 +71,8 @@ const statusLabels: Record<AppointmentStatus, string> = {
 };
 
 const statusVariants: Record<AppointmentStatus, "default" | "secondary" | "outline"> = {
-  UPCOMING: "default",
-  COMPLETED: "secondary",
+  UPCOMING: "secondary",
+  COMPLETED: "default",
   CANCELLED: "outline",
 };
 
@@ -215,17 +215,17 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium truncate" data-testid="text-appointment-title">
+                  <span className="text-sm font-medium truncate" data-testid="text-appointment-title">
                     {appointment.title}
                   </span>
-                  <Badge variant={statusVariants[appointment.status]} className="text-xs" data-testid="badge-appointment-status">
+                  <Badge variant={statusVariants[appointment.status]} className="text-[10px]" data-testid="badge-appointment-status">
                     {statusLabels[appointment.status]}
                   </Badge>
-                  <Badge variant="outline" className="text-xs" data-testid="badge-appointment-type">
+                  <Badge variant="outline" className="text-[10px]" data-testid="badge-appointment-type">
                     {typeLabels[appointment.type]}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1" data-testid="text-appointment-date">
                     <Calendar className="h-3 w-3" />
                     {formatDate(appointment.dateStart)}
