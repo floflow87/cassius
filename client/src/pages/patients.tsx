@@ -844,30 +844,30 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "patients" | "suivi")} className="w-full">
-        <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit mb-4" data-testid="tabs-patients-page">
+        <TabsList className="mb-4 bg-white dark:bg-zinc-900 p-1 h-auto rounded-full w-fit" data-testid="tabs-patients-page">
           {[
             { value: "patients", label: "Patients" },
             { value: "suivi", label: "Suivi" },
           ].map((tab) => (
-            <button
+            <TabsTrigger
               key={tab.value}
-              onClick={() => setActiveTab(tab.value as "patients" | "suivi")}
-              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
-                activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+              value={tab.value}
+              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:shadow-none ${
+                activeTab !== tab.value ? "text-muted-foreground hover:text-foreground" : ""
               }`}
               data-testid={`tab-${tab.value}`}
             >
               {activeTab === tab.value && (
                 <motion.div
                   layoutId="patients-tab-indicator"
-                  className="absolute inset-0 bg-primary rounded-full"
+                  className="absolute inset-0 bg-primary rounded-full -z-10"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
                 />
               )}
               <span className="relative z-10">{tab.label}</span>
-            </button>
+            </TabsTrigger>
           ))}
-        </div>
+        </TabsList>
 
         <TabsContent value="patients" className="mt-0">
           <div className="flex items-center gap-4 mb-5">
