@@ -1547,12 +1547,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPatientRadios(organisationId: string, patientId: string): Promise<Radio[]> {
-    return db.select().from(radios)
-      .where(and(
-        eq(radios.patientId, patientId),
-        eq(radios.organisationId, organisationId)
-      ))
-      .orderBy(desc(radios.createdAt));
+    const result = await pool.query(`
+      SELECT 
+        r.*,
+        (SELECT rn.body FROM radio_notes rn WHERE rn.radio_id = r.id ORDER BY rn.created_at DESC LIMIT 1) as last_note
+      FROM radios r
+      WHERE r.patient_id = $1 AND r.organisation_id = $2
+      ORDER BY r.created_at DESC
+    `, [patientId, organisationId]);
+    
+    return result.rows.map(row => ({
+      id: row.id,
+      organisationId: row.organisation_id,
+      patientId: row.patient_id,
+      operationId: row.operation_id,
+      implantId: row.implant_id,
+      type: row.type,
+      title: row.title,
+      filePath: row.file_path,
+      url: row.url,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes ? Number(row.size_bytes) : null,
+      fileName: row.file_name,
+      date: row.date,
+      createdBy: row.created_by,
+      createdAt: new Date(row.created_at),
+      lastNote: row.last_note || null,
+    }));
   }
 
   async createRadio(organisationId: string, radio: InsertRadio & { createdBy?: string | null }): Promise<Radio> {

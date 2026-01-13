@@ -136,6 +136,7 @@ export interface Radio {
   createdBy: string | null;
   createdAt: Date;
   signedUrl?: string | null;
+  lastNote?: string | null; // Last note from radio_notes table
 }
 
 export interface Visite {

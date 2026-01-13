@@ -151,6 +151,7 @@ async function detectNoRecentIsq(organisationId: string, candidates: FlagCandida
     ));
 
   for (const si of implantsMissingIsq) {
+    // Check appointments with ISQ
     const recentIsqAppointment = await db
       .select({ id: appointments.id })
       .from(appointments)
@@ -162,7 +163,40 @@ async function detectNoRecentIsq(organisationId: string, candidates: FlagCandida
       ))
       .limit(1);
 
-    if (recentIsqAppointment.length === 0) {
+    // Also check visites with ISQ (legacy system)
+    const recentIsqVisite = await db.execute(sql`
+      SELECT id FROM visites 
+      WHERE operation_id IN (
+        SELECT operation_id FROM surgery_implants WHERE id = ${si.id}
+      )
+      AND isq IS NOT NULL 
+      AND date > ${cutoffDate.toISOString()}::date
+      LIMIT 1
+    `);
+
+    // Check if implant has any ISQ on the fixed fields recorded recently based on datePose + months
+    const datePose = new Date(si.datePose!);
+    const hasRecentFixedIsq = (() => {
+      // If ISQ at 2/3/6 months exists and is within 90 days from now, it counts as recent
+      const now = new Date();
+      const date2m = new Date(datePose);
+      date2m.setMonth(date2m.getMonth() + 2);
+      const date3m = new Date(datePose);
+      date3m.setMonth(date3m.getMonth() + 3);
+      const date6m = new Date(datePose);
+      date6m.setMonth(date6m.getMonth() + 6);
+      
+      // Check if any milestone date is within the last 90 days
+      const daysSince2m = (now.getTime() - date2m.getTime()) / (1000 * 60 * 60 * 24);
+      const daysSince3m = (now.getTime() - date3m.getTime()) / (1000 * 60 * 60 * 24);
+      const daysSince6m = (now.getTime() - date6m.getTime()) / (1000 * 60 * 60 * 24);
+      
+      return (daysSince2m >= 0 && daysSince2m <= DAYS_NO_RECENT_ISQ) ||
+             (daysSince3m >= 0 && daysSince3m <= DAYS_NO_RECENT_ISQ) ||
+             (daysSince6m >= 0 && daysSince6m <= DAYS_NO_RECENT_ISQ);
+    })();
+
+    if (recentIsqAppointment.length === 0 && recentIsqVisite.rows.length === 0 && !hasRecentFixedIsq) {
       candidates.push({
         level: "WARNING",
         type: "NO_RECENT_ISQ",

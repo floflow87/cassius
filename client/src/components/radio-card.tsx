@@ -3,6 +3,7 @@ import { Calendar, FileImage, Loader2, MoreHorizontal, Pencil, Trash2, Download 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -159,9 +160,22 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
         <CardContent className="p-3">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0" onClick={handleCardClick}>
-              <p className="font-medium text-sm truncate" data-testid={`text-radio-title-${radio.id}`}>
-                {radio.title || "Sans titre"}
-              </p>
+              {radio.lastNote ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="font-medium text-sm truncate cursor-default" data-testid={`text-radio-title-${radio.id}`}>
+                      {radio.title || "Sans titre"}
+                    </p>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg max-w-xs">
+                    <p className="text-xs">{radio.lastNote}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <p className="font-medium text-sm truncate" data-testid={`text-radio-title-${radio.id}`}>
+                  {radio.title || "Sans titre"}
+                </p>
+              )}
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <Calendar className="h-3 w-3" />
                 <span>{formatDate(radio.date)}</span>

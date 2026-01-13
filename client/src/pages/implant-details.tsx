@@ -310,9 +310,10 @@ export default function ImplantDetailsPage() {
       source: "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite";
       visiteId?: string;
       value: number;
+      notes?: string;
     }) => {
       if (data.source === "visite" && data.visiteId) {
-        return apiRequest("PATCH", `/api/visites/${data.visiteId}`, { isq: data.value });
+        return apiRequest("PATCH", `/api/visites/${data.visiteId}`, { isq: data.value, notes: data.notes });
       } else {
         const fieldMap = {
           isqPose: "isqPose",
@@ -458,6 +459,7 @@ export default function ImplantDetailsPage() {
       source: editingIsqPoint.source,
       visiteId: editingIsqPoint.visiteId,
       value: parseInt(editingIsqPoint.value),
+      notes: editingIsqPoint.notes,
     });
   };
 
@@ -699,16 +701,16 @@ export default function ImplantDetailsPage() {
                   onValueChange={handleBoneLossChange}
                   disabled={updatePoseInfoMutation.isPending}
                 >
-                  <SelectTrigger data-testid="select-bone-loss" className="bg-white dark:bg-white dark:text-black">
+                  <SelectTrigger data-testid="select-bone-loss" className="bg-white dark:bg-white dark:text-black text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white dark:bg-white">
-                    <SelectItem value="0" className="cursor-pointer dark:text-black">0 - Excellente (100%)</SelectItem>
-                    <SelectItem value="1" className="cursor-pointer dark:text-black">1 - Très bonne (80%)</SelectItem>
-                    <SelectItem value="2" className="cursor-pointer dark:text-black">2 - Bonne (60%)</SelectItem>
-                    <SelectItem value="3" className="cursor-pointer dark:text-black">3 - Modérée (40%)</SelectItem>
-                    <SelectItem value="4" className="cursor-pointer dark:text-black">4 - Faible (20%)</SelectItem>
-                    <SelectItem value="5" className="cursor-pointer dark:text-black">5 - Critique (0%)</SelectItem>
+                    <SelectItem value="0" className="cursor-pointer dark:text-black text-xs">0 - Excellente (100%)</SelectItem>
+                    <SelectItem value="1" className="cursor-pointer dark:text-black text-xs">1 - Très bonne (80%)</SelectItem>
+                    <SelectItem value="2" className="cursor-pointer dark:text-black text-xs">2 - Bonne (60%)</SelectItem>
+                    <SelectItem value="3" className="cursor-pointer dark:text-black text-xs">3 - Modérée (40%)</SelectItem>
+                    <SelectItem value="4" className="cursor-pointer dark:text-black text-xs">4 - Faible (20%)</SelectItem>
+                    <SelectItem value="5" className="cursor-pointer dark:text-black text-xs">5 - Critique (0%)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground text-center">
@@ -1190,6 +1192,17 @@ export default function ImplantDetailsPage() {
                 data-testid="input-edit-isq-value" 
               />
             </div>
+            {editingIsqPoint?.source === "visite" && (
+              <div className="space-y-2">
+                <Label>Notes (optionnel)</Label>
+                <Input 
+                  placeholder="Ex: Bonne stabilité" 
+                  value={editingIsqPoint?.notes || ""}
+                  onChange={(e) => setEditingIsqPoint(prev => prev ? { ...prev, notes: e.target.value } : null)}
+                  data-testid="input-edit-isq-notes" 
+                />
+              </div>
+            )}
             <div className="pt-4">
               <Button 
                 className="w-full" 
