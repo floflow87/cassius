@@ -68,7 +68,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DocumentUploadForm } from "@/components/document-upload-form";
-import type { DocumentWithDetails, Patient } from "@shared/schema";
+import { RadioDrawer } from "@/components/radio-drawer";
+import type { DocumentWithDetails, Patient, Radio } from "@shared/schema";
 import type { DocumentTree, DocumentTreeNode, DocumentFilters, UnifiedFile, TypeRadio } from "@shared/types";
 
 type FolderPath = {
@@ -299,15 +300,11 @@ function FileRow({
             <Stethoscope className="h-4 w-4 mr-2" />
             Voir l'acte
           </DropdownMenuItem>
-          {!isRadio && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                <Edit2 className="h-4 w-4 mr-2" />
-                Renommer
-              </DropdownMenuItem>
-            </>
-          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+            <Edit2 className="h-4 w-4 mr-2" />
+            {isRadio ? "Modifier" : "Renommer"}
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem 
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -393,15 +390,11 @@ function FileGridItem({
               <Stethoscope className="h-4 w-4 mr-2" />
               Voir l'acte
             </DropdownMenuItem>
-            {!isRadio && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Renommer
-                </DropdownMenuItem>
-              </>
-            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+              <Edit2 className="h-4 w-4 mr-2" />
+              {isRadio ? "Modifier" : "Renommer"}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -467,6 +460,7 @@ export default function DocumentsPage() {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
   const [uploadPatientId, setUploadPatientId] = useState<string>("");
+  const [selectedRadioForEdit, setSelectedRadioForEdit] = useState<{ radio: Radio & { signedUrl?: string | null }; patientId: string } | null>(null);
 
   const currentFolder = currentPath[currentPath.length - 1];
 
@@ -712,6 +706,27 @@ export default function DocumentsPage() {
     if (file.sourceType === 'document') {
       setEditingDoc(file);
       setEditTitle(file.title);
+    } else if (file.sourceType === 'radio') {
+      // Convert UnifiedFile to Radio for RadioDrawer
+      const radioData: Radio & { signedUrl?: string | null } = {
+        id: file.id,
+        organisationId: '',
+        patientId: file.patientId || '',
+        operationId: file.operationId || null,
+        implantId: file.implantId || null,
+        title: file.title,
+        type: file.radioType || 'RETROALVEOLAIRE',
+        date: file.radioDate || new Date(file.createdAt).toISOString().split('T')[0],
+        filePath: file.filePath || null,
+        url: null,
+        mimeType: file.mimeType || null,
+        sizeBytes: file.sizeBytes || null,
+        fileName: file.fileName || null,
+        createdBy: file.createdBy || null,
+        createdAt: new Date(file.createdAt),
+        signedUrl: file.signedUrl || null,
+      };
+      setSelectedRadioForEdit({ radio: radioData, patientId: file.patientId || '' });
     }
   };
 
@@ -917,7 +932,7 @@ export default function DocumentsPage() {
                   isSelected={selectedFiles.has(`${file.sourceType}-${file.id}`)}
                   onToggleSelect={() => toggleFileSelection(`${file.sourceType}-${file.id}`)}
                   onNavigateToPatient={file.patientId ? () => setLocation(`/patients/${file.patientId}`) : undefined}
-                  onNavigateToOperation={file.operationId ? () => setLocation(`/operations/${file.operationId}`) : undefined}
+                  onNavigateToOperation={file.operationId ? () => setLocation(`/actes/${file.operationId}`) : undefined}
                 />
               ))}
             </div>
@@ -943,7 +958,7 @@ export default function DocumentsPage() {
                     isSelected={selectedFiles.has(`${file.sourceType}-${file.id}`)}
                     onToggleSelect={() => toggleFileSelection(`${file.sourceType}-${file.id}`)}
                     onNavigateToPatient={file.patientId ? () => setLocation(`/patients/${file.patientId}`) : undefined}
-                    onNavigateToOperation={file.operationId ? () => setLocation(`/operations/${file.operationId}`) : undefined}
+                    onNavigateToOperation={file.operationId ? () => setLocation(`/actes/${file.operationId}`) : undefined}
                   />
                 ))}
               </div>
@@ -1120,6 +1135,22 @@ export default function DocumentsPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {selectedRadioForEdit && (
+        <RadioDrawer
+          radio={selectedRadioForEdit.radio}
+          patientId={selectedRadioForEdit.patientId}
+          open={!!selectedRadioForEdit}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedRadioForEdit(null);
+              // Refresh file list after editing
+              queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/documents/tree"] });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

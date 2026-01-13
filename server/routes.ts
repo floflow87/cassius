@@ -332,7 +332,7 @@ export async function registerRoutes(
   setDocumentsStorageProvider({
     isStorageConfigured: supabaseStorage.isStorageConfigured,
     createSignedUploadUrl: supabaseStorage.createSignedUploadUrl,
-    getSignedDownloadUrl: supabaseStorage.getSignedDownloadUrl,
+    getSignedDownloadUrl: supabaseStorage.getSignedUrl,
     deleteFile: supabaseStorage.deleteFile,
   });
   
@@ -5828,9 +5828,27 @@ export async function registerRoutes(
       const virtualFromFlags = flagsToNotifications(flags);
       const virtualFromAppointments = appointmentsToNotifications(appointments);
       
+      // Enrich stored notifications with patient info from metadata
+      const enrichedStoredNotifications = result.notifications.map((notif: any) => {
+        let metadata: any = {};
+        try {
+          if (notif.metadata && typeof notif.metadata === 'string') {
+            metadata = JSON.parse(notif.metadata);
+          } else if (notif.metadata) {
+            metadata = notif.metadata;
+          }
+        } catch (e) { /* ignore parse errors */ }
+        
+        return {
+          ...notif,
+          patientName: metadata.patientName || metadata.patientNom || null,
+          patientId: notif.entityType === 'PATIENT' ? notif.entityId : (metadata.patientId || null),
+        };
+      });
+      
       // Merge and sort by date (newest first)
       const allNotifications = [
-        ...result.notifications,
+        ...enrichedStoredNotifications,
         ...virtualFromFlags,
         ...virtualFromAppointments,
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
