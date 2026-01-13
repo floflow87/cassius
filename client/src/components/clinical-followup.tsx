@@ -320,7 +320,7 @@ export function ClinicalFollowUp({
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Aucun implant lie a ce rendez-vous. Liez un implant pour activer le suivi clinique.
+            Aucun implant lié à ce rendez-vous. Liez un implant pour activer le suivi clinique.
           </p>
         </CardContent>
       </Card>

@@ -2813,7 +2813,7 @@ export async function registerRoutes(
       
       const userId = req.jwtUser?.userId;
       
-      // If it's a future appointment, resolve the "NO_RECENT_APPOINTMENT" flag for this patient
+      // Immediately resolve NO_RECENT_APPOINTMENT flag for this patient if it's a future appointment
       if (appointment.dateStart >= new Date() && userId) {
         const resolvedCount = await storage.resolveFlagByTypeAndPatient(
           organisationId, 
@@ -2825,6 +2825,11 @@ export async function registerRoutes(
           console.log(`[APPOINTMENT] Resolved ${resolvedCount} NO_RECENT_APPOINTMENT flag(s) for patient ${patientId}`);
         }
       }
+      
+      // Also trigger full flag detection asynchronously for other flag types
+      runFlagDetection(organisationId).catch(err => 
+        console.error("Flag detection failed after appointment creation:", err)
+      );
       
       // Send notification about new appointment
       if (userId) {
@@ -2856,6 +2861,12 @@ export async function registerRoutes(
       if (!appointment) {
         return res.status(404).json({ error: "Appointment not found" });
       }
+      
+      // Trigger flag detection asynchronously to update flags based on appointment changes
+      runFlagDetection(organisationId).catch(err => 
+        console.error("Flag detection failed after appointment update:", err)
+      );
+      
       res.json(appointment);
     } catch (error) {
       console.error("Error updating appointment:", error);
@@ -2873,6 +2884,12 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Appointment not found" });
       }
+      
+      // Trigger flag detection asynchronously to update flags after appointment deletion
+      runFlagDetection(organisationId).catch(err => 
+        console.error("Flag detection failed after appointment deletion:", err)
+      );
+      
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting appointment:", error);
