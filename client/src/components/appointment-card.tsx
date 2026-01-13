@@ -65,15 +65,15 @@ const typeIcons: Record<AppointmentType, typeof Stethoscope> = {
 };
 
 const statusLabels: Record<AppointmentStatus, string> = {
-  UPCOMING: "A venir",
-  COMPLETED: "Termine",
-  CANCELLED: "Annule",
+  UPCOMING: "À venir",
+  COMPLETED: "Terminé",
+  CANCELLED: "Annulé",
 };
 
-const statusVariants: Record<AppointmentStatus, "default" | "secondary" | "outline"> = {
-  UPCOMING: "secondary",
-  COMPLETED: "default",
-  CANCELLED: "outline",
+const statusClasses: Record<AppointmentStatus, string> = {
+  UPCOMING: "bg-blue-500 text-white hover:bg-blue-600",
+  COMPLETED: "bg-green-600 text-white hover:bg-green-700",
+  CANCELLED: "bg-muted text-muted-foreground",
 };
 
 function formatDate(date: Date | string): string {
@@ -218,7 +218,7 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
                   <span className="text-sm font-medium truncate" data-testid="text-appointment-title">
                     {appointment.title}
                   </span>
-                  <Badge variant={statusVariants[appointment.status]} className="text-[10px]" data-testid="badge-appointment-status">
+                  <Badge className={`text-[10px] ${statusClasses[appointment.status]}`} data-testid="badge-appointment-status">
                     {statusLabels[appointment.status]}
                   </Badge>
                   <Badge variant="outline" className="text-[10px]" data-testid="badge-appointment-type">

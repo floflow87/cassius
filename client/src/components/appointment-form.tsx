@@ -34,9 +34,9 @@ const appointmentTypes: { value: AppointmentType; label: string }[] = [
 ];
 
 const appointmentStatuses: { value: AppointmentStatus; label: string }[] = [
-  { value: "UPCOMING", label: "A venir" },
-  { value: "COMPLETED", label: "Termine" },
-  { value: "CANCELLED", label: "Annule" },
+  { value: "UPCOMING", label: "À venir" },
+  { value: "COMPLETED", label: "Terminé" },
+  { value: "CANCELLED", label: "Annulé" },
 ];
 
 const formSchema = z.object({

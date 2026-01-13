@@ -53,6 +53,10 @@ import type { FilterRule, PatientSearchResult, TopFlag } from "@shared/types";
 import { AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronUp, Activity, Clock, CheckCircle, Stethoscope, AlertCircle, ClipboardList } from "lucide-react";
+import type { Appointment, AppointmentType, AppointmentStatus } from "@shared/schema";
 
 interface PatientsPageProps {
   searchQuery: string;
@@ -177,6 +181,41 @@ function ImplantHoverList({ patientId, implantCount }: { patientId: string; impl
   );
 }
 
+// Appointment display helpers
+const appointmentTypeLabels: Record<AppointmentType, string> = {
+  CONSULTATION: "Consultation",
+  SUIVI: "Suivi",
+  CHIRURGIE: "Chirurgie",
+  CONTROLE: "Contrôle",
+  URGENCE: "Urgence",
+  AUTRE: "Autre",
+};
+
+const appointmentTypeIcons: Record<AppointmentType, typeof Stethoscope> = {
+  CONSULTATION: Stethoscope,
+  SUIVI: Activity,
+  CHIRURGIE: ClipboardList,
+  CONTROLE: CheckCircle,
+  URGENCE: AlertCircle,
+  AUTRE: Calendar,
+};
+
+const appointmentStatusLabels: Record<AppointmentStatus, string> = {
+  UPCOMING: "À venir",
+  COMPLETED: "Terminé",
+  CANCELLED: "Annulé",
+};
+
+const appointmentStatusClasses: Record<AppointmentStatus, string> = {
+  UPCOMING: "bg-blue-500 text-white",
+  COMPLETED: "bg-green-600 text-white",
+  CANCELLED: "bg-muted text-muted-foreground",
+};
+
+interface AppointmentWithPatient extends Appointment {
+  patient?: { id: string; nom: string; prenom: string };
+}
+
 export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPageProps) {
   const [, setLocation] = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -184,6 +223,9 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   const [advancedFilters, setAdvancedFilters] = useState<FilterGroup | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<"patients" | "suivi">("patients");
+  const [upcomingExpanded, setUpcomingExpanded] = useState(true);
+  const [pastExpanded, setPastExpanded] = useState(true);
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<"table" | "cards">(() => {
     try {
@@ -338,6 +380,40 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     });
     return grouped;
   }, [summaryData?.flagsByPatient, allFlags]);
+
+  // Fetch all appointments with patient info for the Suivi tab
+  const { data: allAppointments = [], isLoading: isAppointmentsLoading } = useQuery<AppointmentWithPatient[]>({
+    queryKey: ["/api/appointments", "withPatient"],
+    queryFn: async () => {
+      const res = await fetch("/api/appointments?withPatient=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch appointments");
+      return res.json();
+    },
+    enabled: activeTab === "suivi",
+  });
+
+  // Separate appointments into upcoming and past
+  const { upcomingAppointments, pastAppointments } = useMemo(() => {
+    const now = new Date();
+    const upcoming: AppointmentWithPatient[] = [];
+    const past: AppointmentWithPatient[] = [];
+    
+    allAppointments.forEach(apt => {
+      const aptDate = new Date(apt.dateStart);
+      if (apt.status === "UPCOMING" && aptDate >= now) {
+        upcoming.push(apt);
+      } else {
+        past.push(apt);
+      }
+    });
+    
+    // Sort upcoming by date ascending (closest first)
+    upcoming.sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
+    // Sort past by date descending (most recent first)
+    past.sort((a, b) => new Date(b.dateStart).getTime() - new Date(a.dateStart).getTime());
+    
+    return { upcomingAppointments: upcoming, pastAppointments: past };
+  }, [allAppointments]);
   
   const isLoading = hasActiveFilters ? isSearchLoading : isSummaryLoading;
   const patients = hasActiveFilters ? searchData?.patients : summaryData?.patients;
@@ -694,26 +770,108 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     );
   }
 
+  // Helper to format appointment date
+  const formatAppointmentDate = (date: Date | string) => {
+    const d = typeof date === "string" ? new Date(date) : date;
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+  };
+
+  const formatAppointmentTime = (date: Date | string) => {
+    const d = typeof date === "string" ? new Date(date) : date;
+    return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  // Render appointment card for Suivi tab
+  const renderAppointmentItem = (apt: AppointmentWithPatient) => {
+    const TypeIcon = appointmentTypeIcons[apt.type] || Calendar;
+    return (
+      <Card key={apt.id} className="group hover-elevate" data-testid={`card-suivi-${apt.id}`}>
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 p-2 rounded-md bg-muted">
+              <TypeIcon className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium truncate">{apt.title}</span>
+                <Badge className={`text-[10px] ${appointmentStatusClasses[apt.status]}`}>
+                  {appointmentStatusLabels[apt.status]}
+                </Badge>
+                <Badge variant="outline" className="text-[10px]">
+                  {appointmentTypeLabels[apt.type]}
+                </Badge>
+              </div>
+              {apt.patient && (
+                <Link 
+                  href={`/patients/${apt.patient.id}`}
+                  className="text-xs text-primary hover:underline mt-1 block"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {apt.patient.prenom} {apt.patient.nom}
+                </Link>
+              )}
+              <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {formatAppointmentDate(apt.dateStart)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatAppointmentTime(apt.dateStart)}
+                </span>
+                {apt.isq !== null && (
+                  <span className="flex items-center gap-1">
+                    <Activity className="h-3 w-3" />
+                    ISQ: {apt.isq}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6">
-      <div className="flex items-center gap-4 mb-5">
-        <CassiusSearchInput
-          placeholder="Rechercher un patient..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          icon={<Search className="h-4 w-4" />}
-          className="max-w-sm"
-          data-testid="input-search-patients"
-        />
-        <span className="text-sm italic text-muted-foreground">
-          {patients?.length?.toLocaleString() || 0} patients
-        </span>
-        
-        <AdvancedFilterDrawer
-          filters={advancedFilters}
-          onFiltersChange={setAdvancedFilters}
-          activeFilterCount={activeFilterCount}
-        />
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "patients" | "suivi")} className="w-full">
+        <TabsList className="mb-4 bg-muted/30 p-1 h-auto" data-testid="tabs-patients-page">
+          <TabsTrigger 
+            value="patients" 
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm rounded-md px-4 py-2 text-sm transition-all"
+            data-testid="tab-patients"
+          >
+            Patients
+          </TabsTrigger>
+          <TabsTrigger 
+            value="suivi" 
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm rounded-md px-4 py-2 text-sm transition-all"
+            data-testid="tab-suivi"
+          >
+            Suivi
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="patients" className="mt-0">
+          <div className="flex items-center gap-4 mb-5">
+            <CassiusSearchInput
+              placeholder="Rechercher un patient..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              icon={<Search className="h-4 w-4" />}
+              className="max-w-sm"
+              data-testid="input-search-patients"
+            />
+            <span className="text-sm italic text-muted-foreground">
+              {patients?.length?.toLocaleString() || 0} patients
+            </span>
+            
+            <AdvancedFilterDrawer
+              filters={advancedFilters}
+              onFiltersChange={setAdvancedFilters}
+              activeFilterCount={activeFilterCount}
+            />
 
         <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-full gap-1">
           <Button
@@ -1001,28 +1159,93 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         </div>
       )}
 
-      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer {selectedIds.size} patient{selectedIds.size > 1 ? "s" : ""} ? 
-              Cette action est irréversible et supprimera également toutes les données associées 
-              (opérations, implants, radiographies, visites, documents et notes).
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-bulk-delete-patients">Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-bulk-delete-patients"
-            >
-              {bulkDeleteMutation.isPending ? "Suppression..." : "Supprimer"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Êtes-vous sûr de vouloir supprimer {selectedIds.size} patient{selectedIds.size > 1 ? "s" : ""} ? 
+                  Cette action est irréversible et supprimera également toutes les données associées 
+                  (opérations, implants, radiographies, visites, documents et notes).
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-bulk-delete-patients">Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  data-testid="button-confirm-bulk-delete-patients"
+                >
+                  {bulkDeleteMutation.isPending ? "Suppression..." : "Supprimer"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </TabsContent>
+
+        <TabsContent value="suivi" className="mt-0 space-y-4">
+          {isAppointmentsLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <p className="text-sm text-muted-foreground">Chargement des suivis...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Upcoming appointments */}
+              <Collapsible open={upcomingExpanded} onOpenChange={setUpcomingExpanded}>
+                <div className="flex items-center gap-2 mb-3">
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors" data-testid="trigger-upcoming">
+                    {upcomingExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                    À venir
+                  </CollapsibleTrigger>
+                  <Badge className="bg-blue-500 text-white text-[10px]">{upcomingAppointments.length}</Badge>
+                </div>
+                <CollapsibleContent>
+                  {upcomingAppointments.length === 0 ? (
+                    <Card className="p-6">
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <Calendar className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                        <p className="text-sm text-muted-foreground">Aucun rendez-vous à venir</p>
+                      </div>
+                    </Card>
+                  ) : (
+                    <div className="space-y-2">
+                      {upcomingAppointments.map(renderAppointmentItem)}
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Past appointments */}
+              <Collapsible open={pastExpanded} onOpenChange={setPastExpanded}>
+                <div className="flex items-center gap-2 mb-3">
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors" data-testid="trigger-past">
+                    {pastExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                    Passés
+                  </CollapsibleTrigger>
+                  <Badge variant="secondary" className="text-[10px]">{pastAppointments.length}</Badge>
+                </div>
+                <CollapsibleContent>
+                  {pastAppointments.length === 0 ? (
+                    <Card className="p-6">
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <CheckCircle className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                        <p className="text-sm text-muted-foreground">Aucun rendez-vous passé</p>
+                      </div>
+                    </Card>
+                  ) : (
+                    <div className="space-y-2">
+                      {pastAppointments.map(renderAppointmentItem)}
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
   Pill,
   Heart,
   CheckCircle,
+  CheckCircle2,
   Check,
   Image as ImageIcon,
   Stethoscope,
@@ -35,6 +36,7 @@ import {
   Copy,
   ExternalLink,
   Link2,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1455,6 +1457,38 @@ export default function PatientDetailsPage() {
                 </TooltipContent>
               </Tooltip>
             )}
+            {/* Follow-up status badge */}
+            {(() => {
+              // Determine follow-up status: upcoming takes priority, then most recent completed/cancelled
+              if (upcomingAppointments.length > 0) {
+                return (
+                  <Badge className="bg-blue-500 text-white text-[10px] gap-1" data-testid="badge-followup-status">
+                    <Calendar className="w-3 h-3" />
+                    À venir
+                  </Badge>
+                );
+              }
+              if (completedAppointments.length > 0) {
+                const lastAppointment = completedAppointments[0];
+                if (lastAppointment.status === "COMPLETED") {
+                  return (
+                    <Badge className="bg-green-600 text-white text-[10px] gap-1" data-testid="badge-followup-status">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Terminé
+                    </Badge>
+                  );
+                }
+                if (lastAppointment.status === "CANCELLED") {
+                  return (
+                    <Badge variant="secondary" className="text-[10px] gap-1" data-testid="badge-followup-status">
+                      <XCircle className="w-3 h-3" />
+                      Annulé
+                    </Badge>
+                  );
+                }
+              }
+              return null;
+            })()}
           </div>
           <p className="text-sm text-muted-foreground">
             {calculateAge(patient.dateNaissance)} ans - Depuis {new Date(patient.createdAt).getFullYear()}

@@ -139,8 +139,9 @@ export function NotificationBell() {
   const markAllAsReadMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/notifications/mark-all-read"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+      // Force refetch to ensure UI is updated
+      queryClient.refetchQueries({ queryKey: ['/api/notifications'] });
+      queryClient.refetchQueries({ queryKey: ['/api/notifications/unread-count'] });
     },
   });
   
