@@ -455,15 +455,8 @@ export class DatabaseStorage implements IStorage {
       surgeryImplants: surgeryImplantsMap.get(op.id) || [],
     }));
 
-    // Query 4: Get all radios for patient
-    const patientRadios = await db
-      .select()
-      .from(radios)
-      .where(and(
-        eq(radios.patientId, id),
-        eq(radios.organisationId, organisationId)
-      ))
-      .orderBy(desc(radios.date));
+    // Query 4: Get all radios for patient with lastNote
+    const patientRadios = await this.getPatientRadios(organisationId, id);
 
     return {
       ...patient,

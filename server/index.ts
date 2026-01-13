@@ -5,6 +5,8 @@ import { createServer } from "http";
 import { setupAuth } from "./auth";
 import { logSchemaCheck } from "./schemaCheck";
 import { startDigestScheduler } from "./notifications/digestScheduler";
+import { registerJob } from "./jobs";
+import { appointmentAutoCompleteJob } from "./jobs/appointmentAutoComplete";
 import { storage } from "./storage";
 import { 
   createRequestContext, 
@@ -159,6 +161,9 @@ app.use((req, res, next) => {
       
       // Start the notification digest scheduler
       startDigestScheduler();
+      
+      // Start the appointment auto-complete job
+      registerJob(appointmentAutoCompleteJob);
     },
   );
 })();
