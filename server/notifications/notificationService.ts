@@ -856,7 +856,8 @@ export const notificationEvents = {
     actorUserId?: string;
     appointmentId: string;
     appointmentDate: string;
-    patientId?: string;
+    patientId: string;
+    patientName: string;
   }) {
     return createNotification({
       organisationId: params.organisationId,
@@ -865,11 +866,11 @@ export const notificationEvents = {
       type: "APPOINTMENT_CREATED",
       severity: "INFO",
       title: "Nouveau rendez-vous",
-      body: `Un rendez-vous a été programmé.`,
-      entityType: "APPOINTMENT",
-      entityId: params.appointmentId,
+      body: `${params.patientName} - Un rendez-vous a été programmé.`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
       actorUserId: params.actorUserId,
-      metadata: { appointmentDate: params.appointmentDate, patientId: params.patientId },
+      metadata: { appointmentDate: params.appointmentDate, patientId: params.patientId, patientName: params.patientName, appointmentId: params.appointmentId },
     });
   },
 
