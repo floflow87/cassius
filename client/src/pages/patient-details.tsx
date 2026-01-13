@@ -1458,7 +1458,7 @@ export default function PatientDetailsPage() {
               </Tooltip>
             )}
             {/* Follow-up status badge */}
-            {(() => {
+            {!appointmentsLoading && (() => {
               // Determine follow-up status: upcoming takes priority, then most recent completed/cancelled
               if (upcomingAppointments.length > 0) {
                 return (
