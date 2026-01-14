@@ -168,7 +168,7 @@ export function ClinicalFollowUp({
   const surgeryImplantId = selectedImplantId || propSurgeryImplantId;
   
   const { data: patientImplants } = useQuery<SurgeryImplantBasic[]>({
-    queryKey: ["/api/patients", patientId, "surgery-implants"],
+    queryKey: [`/api/patients/${patientId}/surgery-implants`],
     enabled: !!patientId && !propSurgeryImplantId,
   });
 
