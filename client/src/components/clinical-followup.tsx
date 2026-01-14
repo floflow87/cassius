@@ -77,10 +77,19 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   ECHEC: { label: "Echec", variant: "destructive" },
 };
 
+interface SurgeryImplantBasic {
+  id: string;
+  siteFdi: string;
+  marque: string;
+  modele?: string;
+  statut?: string;
+}
+
 interface ClinicalFollowUpProps {
   appointmentId: string;
   appointmentType: string;
   surgeryImplantId?: string | null;
+  patientId?: string;
   onStatusChange?: (suggestion: StatusSuggestion) => void;
   onAction?: (actionType: RecommendedActionType, params?: Record<string, unknown>) => void;
 }
@@ -135,7 +144,8 @@ function getIsqLabel(value: number | null | undefined): string {
 export function ClinicalFollowUp({ 
   appointmentId, 
   appointmentType,
-  surgeryImplantId,
+  surgeryImplantId: propSurgeryImplantId,
+  patientId,
   onStatusChange,
   onAction
 }: ClinicalFollowUpProps) {
@@ -152,7 +162,15 @@ export function ClinicalFollowUp({
   const [linkedRadiosOpen, setLinkedRadiosOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedImplantId, setSelectedImplantId] = useState<string | null>(propSurgeryImplantId || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const surgeryImplantId = selectedImplantId || propSurgeryImplantId;
+  
+  const { data: patientImplants } = useQuery<SurgeryImplantBasic[]>({
+    queryKey: ["/api/patients", patientId, "surgery-implants"],
+    enabled: !!patientId && !propSurgeryImplantId,
+  });
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
   const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"];
@@ -162,7 +180,15 @@ export function ClinicalFollowUp({
   }
 
   const { data: clinicalData, isLoading, refetch } = useQuery<AppointmentClinicalData>({
-    queryKey: [`/api/appointments/${appointmentId}/clinical`],
+    queryKey: [`/api/appointments/${appointmentId}/clinical`, surgeryImplantId],
+    queryFn: async () => {
+      const params = surgeryImplantId && surgeryImplantId !== propSurgeryImplantId 
+        ? `?surgeryImplantId=${surgeryImplantId}` 
+        : '';
+      const res = await fetch(`/api/appointments/${appointmentId}/clinical${params}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch clinical data');
+      return res.json();
+    },
     enabled: !!surgeryImplantId,
   });
 
@@ -393,6 +419,36 @@ export function ClinicalFollowUp({
   const isqRequired = appointmentType === "CONTROLE";
   const isqOptional = appointmentType === "CHIRURGIE";
 
+  if (!surgeryImplantId && patientImplants && patientImplants.length > 0) {
+    return (
+      <Card className="bg-muted/30">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Suivi clinique
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Selectionnez l'implant pour ce suivi clinique :
+          </p>
+          <Select value={selectedImplantId || ""} onValueChange={setSelectedImplantId}>
+            <SelectTrigger data-testid="select-implant-trigger">
+              <SelectValue placeholder="Choisir un implant..." />
+            </SelectTrigger>
+            <SelectContent>
+              {patientImplants.map((impl) => (
+                <SelectItem key={impl.id} value={impl.id} data-testid={`select-implant-${impl.id}`}>
+                  Site {impl.siteFdi} - {impl.marque} {impl.modele || ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   if (!surgeryImplantId) {
     return (
       <Card className="bg-muted/30">

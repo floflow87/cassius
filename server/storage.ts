@@ -357,7 +357,7 @@ export interface IStorage {
   }): Promise<import("@shared/schema").ImplantMeasurement>;
   getImplantMeasurements(organisationId: string, surgeryImplantId: string): Promise<import("@shared/schema").ImplantMeasurement[]>;
   getAppointmentMeasurement(organisationId: string, appointmentId: string): Promise<import("@shared/schema").ImplantMeasurement | undefined>;
-  getAppointmentClinicalData(organisationId: string, appointmentId: string): Promise<import("@shared/types").AppointmentClinicalData | undefined>;
+  getAppointmentClinicalData(organisationId: string, appointmentId: string, overrideSurgeryImplantId?: string): Promise<import("@shared/types").AppointmentClinicalData | undefined>;
   calculateIsqFlags(organisationId: string, surgeryImplantId: string): Promise<import("@shared/types").ClinicalFlag[]>;
   generateStatusSuggestions(organisationId: string, surgeryImplantId: string, flags: import("@shared/types").ClinicalFlag[]): Promise<import("@shared/types").StatusSuggestion[]>;
   
@@ -4532,7 +4532,7 @@ export class DatabaseStorage implements IStorage {
     return measurement || undefined;
   }
 
-  async getAppointmentClinicalData(organisationId: string, appointmentId: string): Promise<AppointmentClinicalData | undefined> {
+  async getAppointmentClinicalData(organisationId: string, appointmentId: string, overrideSurgeryImplantId?: string): Promise<AppointmentClinicalData | undefined> {
     // Get the appointment
     const [appointment] = await db.select()
       .from(appointments)
@@ -4552,9 +4552,12 @@ export class DatabaseStorage implements IStorage {
     let suggestions: StatusSuggestion[] = [];
     let linkedRadios: Radio[] = [];
 
+    // Use override surgeryImplantId if provided, otherwise use appointment's linked implant
+    const targetSurgeryImplantId = overrideSurgeryImplantId || appointment.surgeryImplantId;
+
     // Get the linked implant if any
-    if (appointment.surgeryImplantId) {
-      const implantData = await this.getSurgeryImplantWithDetails(organisationId, appointment.surgeryImplantId);
+    if (targetSurgeryImplantId) {
+      const implantData = await this.getSurgeryImplantWithDetails(organisationId, targetSurgeryImplantId);
       if (implantData) {
         implant = {
           ...implantData,
@@ -4563,17 +4566,17 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Get measurement history for this implant
-      measurementHistory = await this.getImplantMeasurements(organisationId, appointment.surgeryImplantId);
+      measurementHistory = await this.getImplantMeasurements(organisationId, targetSurgeryImplantId);
       lastMeasurement = measurementHistory.length > 0 ? measurementHistory[0] : null;
 
       // Calculate flags for this implant
-      clinicalFlags = await this.calculateIsqFlags(organisationId, appointment.surgeryImplantId);
+      clinicalFlags = await this.calculateIsqFlags(organisationId, targetSurgeryImplantId);
 
       // Generate suggestions based on flags
-      suggestions = await this.generateStatusSuggestions(organisationId, appointment.surgeryImplantId, clinicalFlags);
+      suggestions = await this.generateStatusSuggestions(organisationId, targetSurgeryImplantId, clinicalFlags);
 
       // Get status history for this implant
-      statusHistory = await this.getImplantStatusHistory(organisationId, appointment.surgeryImplantId);
+      statusHistory = await this.getImplantStatusHistory(organisationId, targetSurgeryImplantId);
     }
 
     // Get linked radios (via operationId or appointmentId)

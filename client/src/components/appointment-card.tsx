@@ -389,6 +389,7 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
               appointmentId={appointment.id}
               appointmentType={appointment.type}
               surgeryImplantId={appointment.surgeryImplantId}
+              patientId={patientId}
               onStatusChange={(suggestion) => {
                 setClinicalOpen(false);
               }}

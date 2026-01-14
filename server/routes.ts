@@ -2984,7 +2984,14 @@ export async function registerRoutes(
 
     try {
       const { id } = req.params;
-      const clinicalData = await storage.getAppointmentClinicalData(organisationId, id);
+      const { surgeryImplantId } = req.query;
+      
+      // If surgeryImplantId is provided, use it to get clinical data for that specific implant
+      const clinicalData = await storage.getAppointmentClinicalData(
+        organisationId, 
+        id, 
+        surgeryImplantId as string | undefined
+      );
       if (!clinicalData) {
         return res.status(404).json({ error: "Appointment not found" });
       }
