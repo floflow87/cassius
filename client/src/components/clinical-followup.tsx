@@ -186,9 +186,11 @@ export function ClinicalFollowUp({
   
   const surgeryImplantId = selectedImplantId || propSurgeryImplantId;
   
-  const { data: patientImplants } = useQuery<SurgeryImplantBasic[]>({
+  // Always fetch patient implants if patientId is available, so user can select an implant
+  // even when no implant is linked to the appointment
+  const { data: patientImplants, isLoading: patientImplantsLoading } = useQuery<SurgeryImplantBasic[]>({
     queryKey: [`/api/patients/${patientId}/surgery-implants`],
-    enabled: !!patientId && !propSurgeryImplantId,
+    enabled: !!patientId,
   });
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -438,6 +440,20 @@ export function ClinicalFollowUp({
   const isqRequired = appointmentType === "CONTROLE";
   const isqOptional = appointmentType === "CHIRURGIE";
 
+  // Show loading state while fetching patient implants
+  if (!surgeryImplantId && patientImplantsLoading) {
+    return (
+      <Card className="bg-muted/30">
+        <CardContent className="py-6">
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Chargement des implants...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!surgeryImplantId && patientImplants && patientImplants.length > 0) {
     return (
       <Card className="bg-muted/30">
@@ -449,7 +465,7 @@ export function ClinicalFollowUp({
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Selectionnez l'implant pour ce suivi clinique :
+            Sélectionnez l'implant pour ce suivi clinique :
           </p>
           <Select value={selectedImplantId || ""} onValueChange={setSelectedImplantId}>
             <SelectTrigger data-testid="select-implant-trigger">
