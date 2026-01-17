@@ -1363,18 +1363,21 @@ export default function StatsPage() {
                             const modele = imp.referenceFabricant || imp.implant?.referenceFabricant || "";
                             return (
                               <TableRow key={imp.id} data-testid={`cohorte-row-${idx}`}>
-                                <TableCell className="text-sm font-medium sticky left-0 bg-card z-10 py-0.5">
+                                <TableCell className="text-sm font-medium sticky left-0 bg-card z-10 py-1">
                                   <div className="flex items-center gap-2">
-                                    <span>{format(poseDate, "dd MMM yyyy", { locale: fr })}</span>
-                                    <span className="text-xs text-muted-foreground">{imp.implant?.marque}{modele ? ` - ${modele}` : ""}</span>
+                                    <span className="text-xs">{format(poseDate, "dd MMM yyyy", { locale: fr })}</span>
+                                    <span className="text-sm text-muted-foreground">{imp.implant?.marque}{modele ? ` - ${modele}` : ""}</span>
                                   </div>
                                 </TableCell>
                                 {cohortePeriods.map((period) => {
                                   const isqValue = imp[period.field];
+                                  if (isqValue === null || isqValue === undefined) {
+                                    return <TableCell key={period.key} className="text-center py-1 px-1" />;
+                                  }
                                   return (
-                                    <TableCell key={period.key} className="text-center py-0.5 px-1">
-                                      <div className={`rounded px-2 py-0.5 text-xs font-medium ${getIsqColor(isqValue)}`}>
-                                        {isqValue ?? "-"}
+                                    <TableCell key={period.key} className="text-center py-1 px-1">
+                                      <div className={`rounded px-2 py-1 text-sm font-medium ${getIsqColor(isqValue)}`}>
+                                        {isqValue}
                                       </div>
                                     </TableCell>
                                   );

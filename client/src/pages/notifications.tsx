@@ -58,6 +58,9 @@ const KIND_ICONS: Record<string, typeof AlertCircle> = {
   SYSTEM: Bell,
 };
 
+// Types considered critical for special icon styling
+const CRITICAL_TYPES = ["ISQ_LOW", "ISQ_DECLINING", "UNSTABLE_ISQ_HISTORY"];
+
 const KIND_LABELS: Record<string, string> = {
   ALERT: "Alertes",
   REMINDER: "Rappels",
@@ -92,8 +95,12 @@ function NotificationRow({
   onMarkAsUnread: (id: string) => void;
 }) {
   const Icon = KIND_ICONS[notification.kind] || Bell;
-  const severityColor = SEVERITY_COLORS[notification.severity] || "text-muted-foreground";
-  const severityBg = notification.severity === "CRITICAL" ? SEVERITY_BG.CRITICAL : "";
+  // Force red for critical ISQ-related types
+  const isCriticalType = CRITICAL_TYPES.includes(notification.type);
+  const severityColor = isCriticalType || notification.severity === "CRITICAL" 
+    ? "text-red-500" 
+    : (SEVERITY_COLORS[notification.severity] || "text-muted-foreground");
+  const severityBg = isCriticalType || notification.severity === "CRITICAL" ? SEVERITY_BG.CRITICAL : "";
   const isUnread = !notification.readAt;
   
   const getEntityLink = () => {
