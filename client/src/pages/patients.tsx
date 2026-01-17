@@ -856,7 +856,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
             <TabsTrigger
               key={tab.value}
               value={tab.value}
-              className="relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
+              className="relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
               data-testid={`tab-${tab.value}`}
             >
               {tab.label}

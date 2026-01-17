@@ -488,7 +488,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
               <button
                 key={tab.value}
                 onClick={() => setImplantType(tab.value)}
-                className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
                   implantType === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
                 }`}
                 data-testid={tab.value === "implants" ? "tab-implants" : "tab-mini-implants"}

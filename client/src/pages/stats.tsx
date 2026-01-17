@@ -790,7 +790,7 @@ export default function StatsPage() {
                   <BarChart3 className="h-5 w-5" />
                   Activité par mois
                 </CardTitle>
-                <CardDescription>Nombre d'actes chirurgicaux réalisés</CardDescription>
+                <CardDescription className="text-xs">Nombre d'actes chirurgicaux réalisés</CardDescription>
               </div>
               <Link href={`/actes?from=${dateRange.from}&to=${dateRange.to}`}>
                 <Button variant="outline" size="sm" data-testid="button-view-operations">
@@ -803,15 +803,16 @@ export default function StatsPage() {
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={activityData}>
                   <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
-                  <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
-                  <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
+                  <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
                       border: `1px solid ${STATS_COLORS.border}`,
                       borderRadius: "6px",
+                      fontSize: "11px",
                     }}
-                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                    labelStyle={{ color: "hsl(var(--foreground))", fontSize: "11px" }}
                   />
                   <Bar dataKey="count" name="Actes" fill={STATS_COLORS.primarySoft} radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -828,7 +829,7 @@ export default function StatsPage() {
                   <BarChart3 className="h-5 w-5" />
                   Types d'interventions
                 </CardTitle>
-                <CardDescription>Répartition par type avec détails au survol</CardDescription>
+                <CardDescription className="text-xs">Répartition par type avec détails au survol</CardDescription>
               </CardHeader>
               <CardContent>
                 {typeData.length === 0 ? (
@@ -840,8 +841,8 @@ export default function StatsPage() {
                   <ResponsiveContainer width="100%" height={Math.max(200, typeData.length * 50)}>
                     <BarChart data={typeData} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
-                      <XAxis type="number" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} allowDecimals={false} />
-                      <YAxis type="category" dataKey="type" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 14 }} axisLine={false} tickLine={false} width={160} />
+                      <XAxis type="number" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} allowDecimals={false} />
+                      <YAxis type="category" dataKey="type" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 11 }} axisLine={false} tickLine={false} width={160} />
                       <Tooltip
                         position={{ x: 200, y: 0 }}
                         wrapperStyle={{ zIndex: 100 }}
@@ -898,7 +899,7 @@ export default function StatsPage() {
                   <TrendingUp className="h-5 w-5" />
                   Implants posés par mois
                 </CardTitle>
-                <CardDescription>Évolution du nombre d'implants</CardDescription>
+                <CardDescription className="text-xs">Évolution du nombre d'implants</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
@@ -910,15 +911,16 @@ export default function StatsPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
-                    <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
-                    <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
+                    <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: `1px solid ${STATS_COLORS.border}`,
                         borderRadius: "6px",
+                        fontSize: "11px",
                       }}
-                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                      labelStyle={{ color: "hsl(var(--foreground))", fontSize: "11px" }}
                     />
                     <Area
                       type="monotone"
@@ -943,7 +945,7 @@ export default function StatsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Résultats cliniques</CardTitle>
-                <CardDescription>Répartition des issues</CardDescription>
+                <CardDescription className="text-xs">Répartition des issues</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={200}>
@@ -993,7 +995,7 @@ export default function StatsPage() {
               <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
                 <div>
                   <CardTitle>Distribution ISQ</CardTitle>
-                  <CardDescription>Stabilité des implants à la pose</CardDescription>
+                  <CardDescription className="text-xs">Stabilité des implants à la pose</CardDescription>
                 </div>
                 <Select value={isqDistributionFilter} onValueChange={setIsqDistributionFilter}>
                   <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-model">
@@ -1044,7 +1046,7 @@ export default function StatsPage() {
                     <AlertTriangle className="h-5 w-5 text-stats-warning" />
                     Implants sans suivi
                   </CardTitle>
-                  <CardDescription>Plus de 3 mois sans visite</CardDescription>
+                  <CardDescription className="text-xs">Plus de 3 mois sans visite</CardDescription>
                 </div>
                 {stats?.implantsWithoutFollowup && stats.implantsWithoutFollowup.length > 0 && (
                   <Badge variant="outline" className="text-stats-warning border-stats-warning/30">
@@ -1101,7 +1103,7 @@ export default function StatsPage() {
                   <TrendingUp className="h-5 w-5" />
                   Évolution ISQ moyen
                 </CardTitle>
-                <CardDescription>Stabilité moyenne des implants par mois</CardDescription>
+                <CardDescription className="text-xs">Stabilité moyenne des implants par mois</CardDescription>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -1140,8 +1142,8 @@ export default function StatsPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
-                <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
-                <YAxis domain={[40, 90]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
+                <YAxis domain={[40, 90]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={false} tickLine={false} />
                 <ReferenceLine y={60} stroke={STATS_COLORS.grayMuted} strokeDasharray="5 5" strokeOpacity={0.7} />
                 <ReferenceLine y={70} stroke={STATS_COLORS.grayMuted} strokeDasharray="5 5" strokeOpacity={0.7} />
                 <Tooltip
@@ -1149,8 +1151,9 @@ export default function StatsPage() {
                     backgroundColor: "hsl(var(--card))",
                     border: `1px solid ${STATS_COLORS.border}`,
                     borderRadius: "6px",
+                    fontSize: "11px",
                   }}
-                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                  labelStyle={{ color: "hsl(var(--foreground))", fontSize: "11px" }}
                 />
                 <Area
                   type="monotone"
@@ -1174,7 +1177,7 @@ export default function StatsPage() {
                   <BarChart3 className="h-5 w-5" />
                   Taux de réussite et ISQ
                 </CardTitle>
-                <CardDescription>Analyse des implants par critère</CardDescription>
+                <CardDescription className="text-xs">Analyse des implants par critère</CardDescription>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -1214,15 +1217,16 @@ export default function StatsPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={successRateByDimension} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} tickFormatter={(v) => `${v}%`} />
-                    <YAxis type="category" dataKey="name" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} width={120} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} tickFormatter={(v) => `${v}%`} />
+                    <YAxis type="category" dataKey="name" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 11 }} axisLine={false} tickLine={false} width={120} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: `1px solid ${STATS_COLORS.border}`,
                         borderRadius: "6px",
+                        fontSize: "11px",
                       }}
-                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                      labelStyle={{ color: "hsl(var(--foreground))", fontSize: "11px" }}
                       content={({ active, payload, label }) => {
                         if (!active || !payload || payload.length === 0) return null;
                         const data = payload[0]?.payload;
@@ -1411,7 +1415,7 @@ export default function StatsPage() {
                   <AlertTriangle className="h-5 w-5" />
                   Flags actifs
                 </CardTitle>
-                <CardDescription>Alertes cliniques et points d'attention</CardDescription>
+                <CardDescription className="text-xs">Alertes cliniques et points d'attention</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 {criticalCount > 0 && (

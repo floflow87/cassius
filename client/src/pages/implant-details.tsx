@@ -660,7 +660,7 @@ export default function ImplantDetailsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-4">
-            <CardTitle className="text-base">Informations de l'implant</CardTitle>
+            <CardTitle className="text-sm">Informations de l'implant</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -700,17 +700,17 @@ export default function ImplantDetailsPage() {
 
         <Card className={getSuccessRateCardStyle()}>
           <CardHeader className="pb-2">
-            <CardTitle className={`text-base flex items-center gap-2 ${successRate >= 80 ? "text-emerald-700 dark:text-emerald-400" : successRate >= 60 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400"}`}>
+            <CardTitle className={`text-sm flex items-center gap-2 ${successRate >= 80 ? "text-emerald-700 dark:text-emerald-400" : successRate >= 60 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400"}`}>
               Taux de réussite
-              {successRate >= 80 && <CheckCircle2 className="h-5 w-5" />}
+              {successRate >= 80 && <CheckCircle2 className="h-4 w-4" />}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-center">
-              <span className={`text-5xl font-bold ${getSuccessRateColor()}`} data-testid="text-success-rate">
+              <span className={`text-4xl font-bold ${getSuccessRateColor()}`} data-testid="text-success-rate">
                 {successRate}%
               </span>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-[10px] text-muted-foreground mt-1">
                 {successRate === 100 ? "Aucune perte osseuse" : successRate >= 80 ? "Perte osseuse minimale" : successRate >= 60 ? "Perte osseuse modérée" : "Perte osseuse importante"}
               </p>
             </div>

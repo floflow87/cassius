@@ -434,16 +434,16 @@ function FileGridItem({
       {file.lastNote ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="text-sm text-center truncate w-full max-w-[140px] font-medium cursor-default" title={file.title}>
+            <span className="text-xs text-center truncate w-full max-w-[140px] font-medium cursor-default" title={file.title}>
               {file.title}
             </span>
           </TooltipTrigger>
           <TooltipContent side="top" className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg max-w-xs">
-            <p className="text-xs">{file.lastNote}</p>
+            <p className="text-[10px]">{file.lastNote}</p>
           </TooltipContent>
         </Tooltip>
       ) : (
-        <span className="text-sm text-center truncate w-full max-w-[140px] font-medium" title={file.title}>
+        <span className="text-xs text-center truncate w-full max-w-[140px] font-medium" title={file.title}>
           {file.title}
         </span>
       )}
