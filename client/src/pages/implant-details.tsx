@@ -504,6 +504,17 @@ export default function ImplantDetailsPage() {
   const getISQTimeline = (): ISQPoint[] => {
     const points: ISQPoint[] = [];
 
+    // Add ISQ at placement (isqPose)
+    if (implantData?.isqPose && implantData?.datePose) {
+      points.push({ 
+        label: "Pose", 
+        sublabel: "ISQ à la pose",
+        value: implantData.isqPose, 
+        date: implantData.datePose,
+        source: "isqPose"
+      });
+    }
+
     // Add legacy ISQ fields (isq2m, isq3m, isq6m)
     if (implantData?.isq2m && implantData?.datePose) {
       const date2m = new Date(implantData.datePose);
