@@ -533,6 +533,9 @@ export function ClinicalFollowUp({
   const measurementHistory = clinicalData?.measurementHistory || [];
   const statusHistory = clinicalData?.statusHistory || [];
 
+  // Get the currently selected implant info from patientImplants if available
+  const currentImplantInfo = patientImplants?.find(pi => pi.id === surgeryImplantId);
+
   return (
     <>
       <Card data-testid="card-clinical-followup">
@@ -548,6 +551,48 @@ export function ClinicalFollowUp({
             </Badge>
           )}
         </CardTitle>
+        {/* Show linked implant info and allow change if multiple implants available */}
+        {implant && patientImplants && patientImplants.length > 1 && (
+          <div className="flex items-center justify-between mt-2 p-2 bg-muted/50 rounded-md">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                  {implant.siteFdi}
+                </span>
+              </div>
+              <div className="text-xs">
+                <p className="font-medium">{currentImplantInfo?.marque || implant.implant?.marque}</p>
+                <p className="text-muted-foreground">{currentImplantInfo?.modele || ""}</p>
+              </div>
+            </div>
+            <Select value={surgeryImplantId || ""} onValueChange={setSelectedImplantId}>
+              <SelectTrigger className="h-7 w-auto text-xs" data-testid="select-change-implant">
+                <span className="text-xs">Changer</span>
+              </SelectTrigger>
+              <SelectContent>
+                {patientImplants.map((impl) => (
+                  <SelectItem key={impl.id} value={impl.id} data-testid={`select-implant-option-${impl.id}`}>
+                    Site {impl.siteFdi} - {impl.marque} {impl.modele || ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {/* Show implant info without change option if only one implant */}
+        {implant && (!patientImplants || patientImplants.length <= 1) && (
+          <div className="flex items-center gap-2 mt-2 p-2 bg-muted/50 rounded-md">
+            <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                {implant.siteFdi}
+              </span>
+            </div>
+            <div className="text-xs">
+              <p className="font-medium">{currentImplantInfo?.marque || implant.implant?.marque}</p>
+              <p className="text-muted-foreground">Implant lié à ce suivi</p>
+            </div>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {flags.length > 0 && (

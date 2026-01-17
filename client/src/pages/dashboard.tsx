@@ -630,11 +630,13 @@ export default function DashboardPage() {
                 const lastIsq = si.isq6m ?? si.isq3m ?? si.isq2m ?? si.isqPose;
                 const isqLabel = si.isq6m ? "6m" : si.isq3m ? "3m" : si.isq2m ? "2m" : si.isqPose ? "pose" : null;
                 const isLowIsq = lastIsq !== null && lastIsq <= 55;
+                const patientId = si.patient?.id;
+                const datePose = si.datePose ? new Date(si.datePose).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : null;
                 
                 return (
                   <Link 
                     key={si.id} 
-                    href={`/implants/${si.id}`}
+                    href={patientId ? `/patients/${patientId}/implants/${si.id}` : "#"}
                     className="block"
                   >
                     <div 
@@ -656,7 +658,7 @@ export default function DashboardPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex-shrink-0 text-right">
+                      <div className="flex-shrink-0 flex items-center gap-3">
                         {lastIsq !== null ? (
                           <div className="flex items-center gap-2">
                             <Badge 
@@ -676,6 +678,11 @@ export default function DashboardPage() {
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                        {datePose && (
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {datePose}
+                          </span>
                         )}
                       </div>
                     </div>
