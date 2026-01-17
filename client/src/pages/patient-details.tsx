@@ -1541,40 +1541,40 @@ export default function PatientDetailsPage() {
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4 text-sm">
+                <CardContent className="space-y-4 text-xs">
                   <div>
-                    <span className="text-muted-foreground text-xs">Nom complet</span>
+                    <span className="text-muted-foreground text-[10px]">Nom complet</span>
                     <p className="font-medium">{patient.prenom} {patient.nom}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground text-xs">Date de naissance</span>
+                    <span className="text-muted-foreground text-[10px]">Date de naissance</span>
                     <p>{formatDate(patient.dateNaissance)} ({calculateAge(patient.dateNaissance)} ans)</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground text-xs">Sexe</span>
+                    <span className="text-muted-foreground text-[10px]">Sexe</span>
                     <p>{patient.sexe === "HOMME" ? "Homme" : "Femme"}</p>
                   </div>
                   {patient.telephone && (
                     <div>
-                      <span className="text-muted-foreground text-xs">Téléphone</span>
+                      <span className="text-muted-foreground text-[10px]">Téléphone</span>
                       <p>{patient.telephone}</p>
                     </div>
                   )}
                   {patient.email && (
                     <div>
-                      <span className="text-muted-foreground text-xs">Email</span>
+                      <span className="text-muted-foreground text-[10px]">Email</span>
                       <p>{patient.email}</p>
                     </div>
                   )}
                   {patient.ssn && (
                     <div>
-                      <span className="text-muted-foreground text-xs">Numéro de sécurité sociale</span>
+                      <span className="text-muted-foreground text-[10px]">Numéro de sécurité sociale</span>
                       <p>{patient.ssn}</p>
                     </div>
                   )}
                   {(patient.adresse || patient.codePostal || patient.ville || patient.pays) && (
                     <div>
-                      <span className="text-muted-foreground text-xs">Adresse</span>
+                      <span className="text-muted-foreground text-[10px]">Adresse</span>
                       <p>
                         {patient.adresse && <span>{patient.adresse}<br /></span>}
                         {(patient.codePostal || patient.ville) && (
@@ -1585,7 +1585,7 @@ export default function PatientDetailsPage() {
                     </div>
                   )}
                   <div>
-                    <span className="text-muted-foreground text-xs">Patient depuis le</span>
+                    <span className="text-muted-foreground text-[10px]">Patient depuis le</span>
                     <p>{formatDate(patient.createdAt)}</p>
                   </div>
                 </CardContent>
@@ -1743,8 +1743,8 @@ export default function PatientDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/50 border-l-4 border-blue-400">
                     <ClipboardList className="h-4 w-4 text-blue-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Contexte médical</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-medium">Contexte médical</p>
+                      <p className="text-[10px] text-muted-foreground">
                         {patient.contexteMedical || "Aucun contexte renseigné"}
                       </p>
                     </div>
@@ -1752,8 +1752,8 @@ export default function PatientDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/50 border-l-4 border-red-400">
                     <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Allergies</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-medium">Allergies</p>
+                      <p className="text-[10px] text-muted-foreground">
                         {patient.allergies || "Aucune connue"}
                       </p>
                     </div>
@@ -1761,8 +1761,8 @@ export default function PatientDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/50 border-l-4 border-amber-400">
                     <Pill className="h-4 w-4 text-amber-600 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Traitement</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-medium">Traitement</p>
+                      <p className="text-[10px] text-muted-foreground">
                         {patient.traitement || "Aucun traitement en cours"}
                       </p>
                     </div>
@@ -1770,8 +1770,8 @@ export default function PatientDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-pink-50 dark:bg-pink-950/50 border-l-4 border-pink-400">
                     <Heart className="h-4 w-4 text-pink-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Conditions</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-medium">Conditions</p>
+                      <p className="text-[10px] text-muted-foreground">
                         {patient.conditions || "Aucune condition signalée"}
                       </p>
                     </div>
@@ -1957,7 +1957,7 @@ export default function PatientDetailsPage() {
                     <CardTitle className="text-base font-medium">Timeline clinique</CardTitle>
                     <Button 
                       variant="ghost" 
-                      className="text-primary text-sm p-0 h-auto"
+                      className="text-primary text-xs p-0 h-auto"
                       onClick={() => setActiveTab("operations")}
                     >
                       Voir tout
@@ -1966,7 +1966,7 @@ export default function PatientDetailsPage() {
                 </CardHeader>
                 <CardContent>
                   {timelineEvents.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">
+                    <p className="text-xs text-muted-foreground py-4 text-center">
                       Aucun événement enregistré
                     </p>
                   ) : (
@@ -2013,10 +2013,10 @@ export default function PatientDetailsPage() {
                             <div className="flex-1 pb-4">
                               <div className="flex items-start justify-between gap-2">
                                 <div>
-                                  <p className="font-medium text-sm">{event.title}</p>
+                                  <p className="font-medium text-xs">{event.title}</p>
                                   {event.description && event.radioId ? (
                                     <button 
-                                      className="text-xs text-primary hover:underline mt-0.5 text-left"
+                                      className="text-[10px] text-primary hover:underline mt-0.5 text-left"
                                       onClick={() => setTimelineRadioViewerId(event.radioId!)}
                                       data-testid={`button-view-radio-${event.radioId}`}
                                     >
@@ -2024,7 +2024,7 @@ export default function PatientDetailsPage() {
                                     </button>
                                   ) : event.description && event.documentId ? (
                                     <button 
-                                      className="text-xs text-primary hover:underline mt-0.5 text-left"
+                                      className="text-[10px] text-primary hover:underline mt-0.5 text-left"
                                       onClick={() => {
                                         setActiveTab("documents");
                                       }}
@@ -2033,7 +2033,7 @@ export default function PatientDetailsPage() {
                                       {event.description}
                                     </button>
                                   ) : event.description ? (
-                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">
                                       {event.description}
                                     </p>
                                   ) : null}
@@ -2043,7 +2043,7 @@ export default function PatientDetailsPage() {
                                         <Badge 
                                           key={i} 
                                           variant="outline" 
-                                          className={`text-xs ${event.badgeClassName || ""}`}
+                                          className={`text-[10px] ${event.badgeClassName || ""}`}
                                         >
                                           {badge}
                                         </Badge>
@@ -2051,7 +2051,7 @@ export default function PatientDetailsPage() {
                                     </div>
                                   )}
                                 </div>
-                                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                                   {formatDateShort(event.date)}
                                 </span>
                               </div>
@@ -2225,7 +2225,7 @@ export default function PatientDetailsPage() {
                 </CardHeader>
                 <CardContent>
                   {implantCount === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">
+                    <p className="text-xs text-muted-foreground py-4 text-center">
                       Aucun implant posé
                     </p>
                   ) : (
@@ -2233,31 +2233,31 @@ export default function PatientDetailsPage() {
                       {patient.surgeryImplants?.slice(0, 4).map((surgeryImplant) => (
                         <div key={surgeryImplant.id} className="border rounded-md p-4">
                           <div className="flex items-center justify-between mb-3">
-                            <span className="font-medium">Site {surgeryImplant.siteFdi}</span>
+                            <span className="font-medium text-xs">Site {surgeryImplant.siteFdi}</span>
                             {getStatusBadge(surgeryImplant.statut)}
                           </div>
-                          <div className="grid grid-cols-2 gap-y-2 text-sm">
+                          <div className="grid grid-cols-2 gap-y-2 text-xs">
                             <div>
-                              <span className="text-muted-foreground text-xs">Marque:</span>
+                              <span className="text-muted-foreground text-[10px]">Marque:</span>
                               <p>{surgeryImplant.implant.marque}</p>
                             </div>
                             <div>
-                              <span className="text-muted-foreground text-xs">Dimensions:</span>
+                              <span className="text-muted-foreground text-[10px]">Dimensions:</span>
                               <p>{surgeryImplant.implant.diametre} x {surgeryImplant.implant.longueur}mm</p>
                             </div>
                             <div>
-                              <span className="text-muted-foreground text-xs">Date pose:</span>
+                              <span className="text-muted-foreground text-[10px]">Date pose:</span>
                               <p>{formatDateShort(surgeryImplant.datePose)}</p>
                             </div>
                             <div>
-                              <span className="text-muted-foreground text-xs">ISQ actuel:</span>
+                              <span className="text-muted-foreground text-[10px]">ISQ actuel:</span>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <p className="text-primary font-medium cursor-help underline decoration-dotted">
                                     {surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose || "-"}
                                   </p>
                                 </TooltipTrigger>
-                                <TooltipContent side="top" className="text-xs">
+                                <TooltipContent side="top" className="text-[10px]">
                                   <div className="space-y-1">
                                     <p><span className="text-muted-foreground">Pose:</span> {surgeryImplant.isqPose ?? "-"}</p>
                                     {surgeryImplant.isq2m != null && <p><span className="text-muted-foreground">2 mois:</span> {surgeryImplant.isq2m}</p>}
@@ -2284,7 +2284,7 @@ export default function PatientDetailsPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Activity className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">Aucun implant</h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Les implants seront ajoutés lors de la création d'une opération
                 </p>
               </CardContent>
@@ -2302,7 +2302,7 @@ export default function PatientDetailsPage() {
                       <button
                         key={filter.value}
                         onClick={() => setImplantTypeFilter(filter.value)}
-                        className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                        className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
                           implantTypeFilter === filter.value ? "text-white" : "text-muted-foreground hover:text-foreground"
                         }`}
                         data-testid={`button-filter-${filter.value.toLowerCase()}`}
@@ -2318,7 +2318,7 @@ export default function PatientDetailsPage() {
                       </button>
                     ))}
                   </div>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
                   </span>
                 </div>
@@ -2441,7 +2441,7 @@ export default function PatientDetailsPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">Aucune opération</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-xs text-muted-foreground mb-4">
                   Ajoutez la première opération pour ce patient
                 </p>
               </CardContent>
@@ -2449,7 +2449,7 @@ export default function PatientDetailsPage() {
           ) : (
             <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border-gray bg-border-gray">
                       {operationColumns.map((column) => (
@@ -2531,7 +2531,7 @@ export default function PatientDetailsPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileImage className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">Aucune radio</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-xs text-muted-foreground mb-4">
                   Ajoutez des radiographies pour ce patient
                 </p>
               </CardContent>
@@ -2577,7 +2577,7 @@ export default function PatientDetailsPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">Aucun document</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-xs text-muted-foreground mb-4">
                   Ajoutez des documents PDF pour ce patient (devis, consentements, etc.)
                 </p>
               </CardContent>
@@ -2747,7 +2747,7 @@ export default function PatientDetailsPage() {
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
                       <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Aucune note ou alerte pour ce patient
                       </p>
                     </CardContent>
@@ -2777,17 +2777,17 @@ export default function PatientDetailsPage() {
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-sm">{authorName}</span>
+                                  <span className="font-medium text-xs">{authorName}</span>
                                   {tagConfig && (
-                                    <Badge variant="secondary" className={`text-xs ${tagConfig.className}`}>
+                                    <Badge variant="secondary" className={`text-[10px] ${tagConfig.className}`}>
                                       {tagConfig.label}
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-xs text-muted-foreground mb-3">
+                                <p className="text-[10px] text-muted-foreground mb-3">
                                   {formatNoteDatetime(note.createdAt)}
                                 </p>
-                                <p className="text-sm text-foreground whitespace-pre-wrap">
+                                <p className="text-xs text-foreground whitespace-pre-wrap">
                                   {note.contenu}
                                 </p>
                               </div>
