@@ -241,7 +241,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
         >
           <AccordionItem value="procedure" className="border border-primary/20 rounded-md px-4 mb-2">
             <AccordionTrigger className="text-base font-medium">
-              Procédure
+              Intervention
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">
               <div className="grid grid-cols-2 gap-4">

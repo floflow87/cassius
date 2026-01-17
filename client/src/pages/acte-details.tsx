@@ -200,9 +200,9 @@ export default function ActeDetailsPage() {
           <CardContent className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">Type</span>
-              <span className="text-xs font-medium">
+              <Badge className="text-[10px] rounded-full bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
                 {typeInterventionLabels[operation.typeIntervention] || operation.typeIntervention}
-              </span>
+              </Badge>
             </div>
             {operation.typeChirurgieApproche && (
               <div className="flex items-center justify-between">

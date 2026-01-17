@@ -380,7 +380,7 @@ export default function CatalogImplantDetailsPage() {
               <span className={`text-5xl font-bold ${getSuccessRateColor()}`} data-testid="text-success-rate">
                 {hasPoses && successRate !== null ? `${successRate}%` : "—"}
               </span>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {!hasPoses 
                   ? "Aucune pose enregistrée"
                   : successRate !== null && successRate >= 90 
@@ -392,8 +392,8 @@ export default function CatalogImplantDetailsPage() {
             </div>
             <div className="pt-2 border-t">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Nombre de poses</span>
-                <span className="text-sm font-medium">{implant.poseCount || 0}</span>
+                <span className="text-xs text-muted-foreground">Nombre de poses</span>
+                <span className="text-xs font-medium">{implant.poseCount || 0}</span>
               </div>
             </div>
           </CardContent>

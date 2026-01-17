@@ -666,25 +666,25 @@ export default function ImplantDetailsPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
                 <span className="text-[10px] text-muted-foreground">Marque</span>
-                <p className="text-xs font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
+                <p className="text-[10px] font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
               </div>
               <div>
                 <span className="text-[10px] text-muted-foreground">Type</span>
-                <p className="text-xs font-medium" data-testid="text-implant-type">{typeLabel}</p>
+                <p className="text-[10px] font-medium" data-testid="text-implant-type">{typeLabel}</p>
               </div>
               <div>
                 <span className="text-[10px] text-muted-foreground">Référence fabricant</span>
-                <p className="text-xs font-medium font-mono" data-testid="text-implant-reference">
+                <p className="text-[10px] font-medium font-mono" data-testid="text-implant-reference">
                   {implantData.implant.referenceFabricant || "-"}
                 </p>
               </div>
               <div>
                 <span className="text-[10px] text-muted-foreground">Diamètre</span>
-                <p className="text-xs font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
+                <p className="text-[10px] font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
               </div>
               <div>
                 <span className="text-[10px] text-muted-foreground">Longueur</span>
-                <p className="text-xs font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
+                <p className="text-[10px] font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
               </div>
             </div>
             <div className="flex justify-end mt-4 pt-4 border-t">
@@ -1373,7 +1373,7 @@ export default function ImplantDetailsPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={status.variant}>
+                    <Badge variant={status.variant} className="text-[10px]">
                       {status.label}
                     </Badge>
                   </TableCell>
