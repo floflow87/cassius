@@ -95,6 +95,17 @@
   --badge-pink: 335 94% 57%;       /* #f92a82 */
   --badge-dark: 240 7% 20%;        /* #303036 */
   
+  /* Clinical Flag Badge Colors */
+  /* CRITICAL: ISQ_LOW */
+  --flag-critical-bg: 350 33% 97%;       /* #FAF6F7 */
+  --flag-critical-foreground: 7 100% 29%; /* #961400 */
+  /* WARNING: ISQ_DECLINING, LOW_SUCCESS_RATE, NO_RECENT_ISQ, NO_POSTOP_FOLLOWUP, IMPLANT_NO_OPERATION */
+  --flag-warning-bg: 32 100% 92%;        /* #FFEDD5 */
+  --flag-warning-foreground: 21 90% 48%; /* #EA580C */
+  /* INFO: NO_RECENT_APPOINTMENT, MISSING_DOCUMENT, INCOMPLETE_DATA */
+  --flag-info-bg: 214 95% 93%;           /* #DBEAFE */
+  --flag-info-foreground: 217 91% 64%;   /* #4F8FF7 */
+  
   --radius: 0.8rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
@@ -201,6 +212,14 @@
   --badge-orange: 27 88% 65%;
   --badge-pink: 335 94% 62%;
   --badge-dark: 240 7% 35%;
+  
+  /* Clinical Flag Badge Colors - Dark Mode */
+  --flag-critical-bg: 0 30% 15%;
+  --flag-critical-foreground: 0 70% 65%;
+  --flag-warning-bg: 32 40% 15%;
+  --flag-warning-foreground: 32 90% 65%;
+  --flag-info-bg: 214 40% 18%;
+  --flag-info-foreground: 217 91% 70%;
   
   --accent: 25 45% 20%;
   --accent-foreground: 45 25% 85%;
