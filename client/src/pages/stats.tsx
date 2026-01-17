@@ -131,9 +131,8 @@ export default function StatsPage() {
   const [selectedFilters, setSelectedFilters] = useState<SearchSuggestion[]>([]);
   const [isqDistributionFilter, setIsqDistributionFilter] = useState<string>("all");
   const [isqEvolutionFilter, setIsqEvolutionFilter] = useState<string>("all");
-  const [isqViewMode, setIsqViewMode] = useState<"timeline" | "cohorte">("timeline");
-  const [isqCohorteStartDate, setIsqCohorteStartDate] = useState<string>("");
-  const [isqCohorteEndDate, setIsqCohorteEndDate] = useState<string>("");
+  const [cohorteStartDate, setCohorteStartDate] = useState<string>("");
+  const [cohorteEndDate, setCohorteEndDate] = useState<string>("");
   const [successRateDimension, setSuccessRateDimension] = useState<string>("marque");
   const [patientSearch, setPatientSearch] = useState("");
   const [patientAlertFilter, setPatientAlertFilter] = useState<string>("all");
@@ -995,17 +994,9 @@ export default function StatsPage() {
             {/* Distribution ISQ */}
             <Card>
               <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-                <div className="flex items-center gap-2">
-                  <div>
-                    <CardTitle>Distribution ISQ</CardTitle>
-                    <CardDescription className="text-xs">Stabilité des implants à la pose</CardDescription>
-                  </div>
-                  <Tabs value={isqViewMode} onValueChange={(v) => setIsqViewMode(v as "timeline" | "cohorte")} className="ml-2">
-                    <TabsList className="h-7">
-                      <TabsTrigger value="timeline" className="text-[10px] px-2 py-1" data-testid="tab-stats-isq-timeline">Timeline</TabsTrigger>
-                      <TabsTrigger value="cohorte" className="text-[10px] px-2 py-1" data-testid="tab-stats-isq-cohorte">Cohorte</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
+                <div>
+                  <CardTitle>Distribution ISQ</CardTitle>
+                  <CardDescription className="text-xs">Stabilité des implants à la pose</CardDescription>
                 </div>
                 <Select value={isqDistributionFilter} onValueChange={setIsqDistributionFilter}>
                   <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-model">
@@ -1022,140 +1013,29 @@ export default function StatsPage() {
                 </Select>
               </CardHeader>
               <CardContent>
-                {isqViewMode === "timeline" ? (
-                  <div className="space-y-4">
-                    {isqData.map((item) => {
-                      const total = isqData.reduce((sum, d) => sum + d.count, 0);
-                      const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
-                      return (
-                        <div key={item.category}>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span>{item.category}</span>
-                            <span className="font-medium">{item.count} ({percentage}%)</span>
-                          </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${percentage}%`,
-                                backgroundColor: ISQ_COLORS[item.category as keyof typeof ISQ_COLORS] || "hsl(var(--primary))",
-                              }}
-                            />
-                          </div>
+                <div className="space-y-4">
+                  {isqData.map((item) => {
+                    const total = isqData.reduce((sum, d) => sum + d.count, 0);
+                    const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
+                    return (
+                      <div key={item.category}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span>{item.category}</span>
+                          <span className="font-medium">{item.count} ({percentage}%)</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-3 pb-3 border-b">
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs text-muted-foreground">Du</Label>
-                        <Input 
-                          type="date" 
-                          value={isqCohorteStartDate}
-                          onChange={(e) => setIsqCohorteStartDate(e.target.value)}
-                          className="h-8 w-36 text-xs"
-                          data-testid="input-stats-isq-date-start"
-                        />
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${percentage}%`,
+                              backgroundColor: ISQ_COLORS[item.category as keyof typeof ISQ_COLORS] || "hsl(var(--primary))",
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs text-muted-foreground">Au</Label>
-                        <Input 
-                          type="date" 
-                          value={isqCohorteEndDate}
-                          onChange={(e) => setIsqCohorteEndDate(e.target.value)}
-                          className="h-8 w-36 text-xs"
-                          data-testid="input-stats-isq-date-end"
-                        />
-                      </div>
-                      {(isqCohorteStartDate || isqCohorteEndDate) && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => { setIsqCohorteStartDate(""); setIsqCohorteEndDate(""); }}
-                          className="h-7 text-[10px]"
-                          data-testid="button-clear-stats-date-filter"
-                        >
-                          Effacer
-                        </Button>
-                      )}
-                    </div>
-                    <ScrollArea className="h-64">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">Date pose</TableHead>
-                            <TableHead className="text-xs">Patient</TableHead>
-                            <TableHead className="text-xs">Type implant</TableHead>
-                            <TableHead className="text-xs">ISQ Pose</TableHead>
-                            <TableHead className="text-xs">Statut</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredSurgeryImplants
-                            .filter((imp) => imp.isqPose !== null)
-                            .filter((imp) => {
-                              if (!isqCohorteStartDate && !isqCohorteEndDate) return true;
-                              if (!imp.datePose) return false;
-                              const impDate = new Date(imp.datePose);
-                              if (isqCohorteStartDate && impDate < new Date(isqCohorteStartDate)) return false;
-                              if (isqCohorteEndDate && impDate > new Date(isqCohorteEndDate)) return false;
-                              return true;
-                            })
-                            .slice(0, 50)
-                            .map((imp, index) => {
-                              const isqClass = (imp.isqPose ?? 0) >= 70 
-                                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                                : (imp.isqPose ?? 0) >= 60 
-                                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
-                                  : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
-                              return (
-                                <TableRow key={imp.id} data-testid={`stats-cohorte-row-${index}`}>
-                                  <TableCell className="text-xs">
-                                    {imp.datePose ? format(new Date(imp.datePose), "dd/MM/yyyy") : "-"}
-                                  </TableCell>
-                                  <TableCell className="text-xs">Site {imp.siteFdi}</TableCell>
-                                  <TableCell className="text-xs">{imp.implant?.marque || "-"}</TableCell>
-                                  <TableCell>
-                                    <Badge className={`${isqClass} text-[10px]`}>{imp.isqPose}</Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant={
-                                      imp.statut === "SUCCES" ? "default" :
-                                      imp.statut === "COMPLICATION" ? "complication" :
-                                      imp.statut === "ECHEC" ? "echec" : "ensuivi"
-                                    } className="text-[10px]">
-                                      {imp.statut === "EN_SUIVI" ? "En suivi" : 
-                                       imp.statut === "SUCCES" ? "Succès" :
-                                       imp.statut === "COMPLICATION" ? "Complication" :
-                                       imp.statut === "ECHEC" ? "Échec" : imp.statut}
-                                    </Badge>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          {filteredSurgeryImplants
-                            .filter((imp) => imp.isqPose !== null)
-                            .filter((imp) => {
-                              if (!isqCohorteStartDate && !isqCohorteEndDate) return true;
-                              if (!imp.datePose) return false;
-                              const impDate = new Date(imp.datePose);
-                              if (isqCohorteStartDate && impDate < new Date(isqCohorteStartDate)) return false;
-                              if (isqCohorteEndDate && impDate > new Date(isqCohorteEndDate)) return false;
-                              return true;
-                            }).length === 0 && (
-                            <TableRow>
-                              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-xs">
-                                Aucun implant avec ISQ à la pose dans cette période
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
               </CardContent>
             </Card>
 
