@@ -391,6 +391,31 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     return grouped;
   }, [summaryData?.flagsByPatient, allFlags]);
 
+  // Build detailed flags by patient for tooltip display
+  const detailedFlagsByPatient = useMemo(() => {
+    const grouped: Record<string, { type: string; label: string; level: "CRITICAL" | "WARNING" | "INFO" }[]> = {};
+    allFlags.forEach((flag) => {
+      if (!flag.resolvedAt && flag.patientId) {
+        if (!grouped[flag.patientId]) {
+          grouped[flag.patientId] = [];
+        }
+        grouped[flag.patientId].push({
+          type: flag.type,
+          label: flag.label,
+          level: flag.level as "CRITICAL" | "WARNING" | "INFO",
+        });
+      }
+    });
+    // Sort each patient's flags by level priority
+    Object.keys(grouped).forEach((patientId) => {
+      grouped[patientId].sort((a, b) => {
+        const levelOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+        return (levelOrder[a.level] ?? 3) - (levelOrder[b.level] ?? 3);
+      });
+    });
+    return grouped;
+  }, [allFlags]);
+
   // Fetch all appointments with patient info for the Suivi tab
   const { data: allAppointments = [], isLoading: isAppointmentsLoading } = useQuery<AppointmentWithPatient[]>({
     queryKey: ["/api/appointments", "withPatient"],
@@ -760,7 +785,10 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         if (!patientFlagData || patientFlagData.activeFlagCount === 0) {
           return <span className="text-xs text-muted-foreground">—</span>;
         }
-        return <TopFlagSummary topFlag={patientFlagData.topFlag} activeFlagCount={patientFlagData.activeFlagCount} />;
+        // Get other flags (excluding top flag) for tooltip
+        const patientDetailedFlags = detailedFlagsByPatient[patient.id] || [];
+        const otherFlags = patientDetailedFlags.slice(1); // Skip the first (top) flag
+        return <TopFlagSummary topFlag={patientFlagData.topFlag} activeFlagCount={patientFlagData.activeFlagCount} otherFlags={otherFlags} />;
       case "statut":
         return (
           <CassiusBadge status={status}>

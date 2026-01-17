@@ -330,7 +330,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-2 font-semibold text-xs">
+            <CardTitle className="flex items-center gap-2 font-semibold text-sm">
               <User className="w-4 h-4" />
               Profil utilisateur
             </CardTitle>
@@ -424,7 +424,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-semibold text-xs">
+          <CardTitle className="flex items-center gap-2 font-semibold text-sm">
             <Lock className="w-4 h-4" />
             Sécurité du compte
           </CardTitle>
@@ -596,7 +596,7 @@ function OnboardingSettingsSection() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5" />
-            <CardTitle className="font-semibold text-xs">Configuration initiale</CardTitle>
+            <CardTitle className="font-semibold text-sm">Configuration initiale</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
@@ -660,7 +660,7 @@ function OnboardingSettingsSection() {
                 ) : (
                   <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 )}
-                <CardTitle className="flex items-center gap-2 font-semibold text-xs">
+                <CardTitle className="flex items-center gap-2 font-semibold text-sm">
                   <Sparkles className="w-4 h-4" />
                   Configuration initiale
                 </CardTitle>
@@ -824,7 +824,7 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={googleCalendarIcon} alt="Google Calendar" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-xs whitespace-nowrap">Google Calendar</CardTitle>
+                <CardTitle className="text-sm whitespace-nowrap">Google Calendar</CardTitle>
                 <CardDescription className="text-xs">Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
               </div>
             </div>
@@ -948,7 +948,7 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={gmailIcon} alt="Gmail" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-xs whitespace-nowrap">Gmail</CardTitle>
+                <CardTitle className="text-sm whitespace-nowrap">Gmail</CardTitle>
                 <CardDescription className="text-xs">Synchronisez vos emails avec Google Gmail</CardDescription>
               </div>
             </div>
@@ -965,7 +965,7 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={googleMeetIcon} alt="Google Meet" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-xs whitespace-nowrap">Google Meet</CardTitle>
+                <CardTitle className="text-sm whitespace-nowrap">Google Meet</CardTitle>
                 <CardDescription className="text-xs">Intégrez vos visioconférences avec Google Meet</CardDescription>
               </div>
             </div>
@@ -982,7 +982,7 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={outlookIcon} alt="Microsoft Outlook" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-xs whitespace-nowrap">Microsoft Outlook</CardTitle>
+                <CardTitle className="text-sm whitespace-nowrap">Microsoft Outlook</CardTitle>
                 <CardDescription className="text-xs">Synchronisez vos emails avec Microsoft Outlook</CardDescription>
               </div>
             </div>
@@ -1062,7 +1062,7 @@ function CollaboratorsSection() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-xs">Permissions par rôle</CardTitle>
+          <CardTitle className="text-sm">Permissions par rôle</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3 text-xs">
@@ -1092,7 +1092,7 @@ function CollaboratorsSection() {
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <CardTitle className="text-xs">Membres de l'organisation</CardTitle>
+              <CardTitle className="text-sm">Membres de l'organisation</CardTitle>
               <CardDescription className="text-xs">{collaborators.length} collaborateur(s)</CardDescription>
             </div>
             <Sheet open={showInviteSheet} onOpenChange={setShowInviteSheet}>
@@ -1353,7 +1353,7 @@ function OrganizationSection() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <CardTitle className="flex items-center gap-2 text-xs">
+            <CardTitle className="flex items-center gap-2 text-sm">
               <Building2 className="w-4 h-4" />
               Informations du cabinet
             </CardTitle>

@@ -204,9 +204,18 @@ export function CompactFlagList({ flags, maxVisible = 3 }: CompactFlagListProps)
 interface TopFlagSummaryProps {
   topFlag?: TopFlag;
   activeFlagCount?: number;
+  otherFlags?: { type: string; label: string; level: "CRITICAL" | "WARNING" | "INFO" }[];
 }
 
-export function TopFlagSummary({ topFlag, activeFlagCount = 0 }: TopFlagSummaryProps) {
+// Special color for ISQ_LOW - bordeaux/burgundy
+const getTypeClassName = (type: string, defaultClassName: string) => {
+  if (type === "ISQ_LOW") {
+    return "bg-rose-800 text-white dark:bg-rose-900";
+  }
+  return defaultClassName;
+};
+
+export function TopFlagSummary({ topFlag, activeFlagCount = 0, otherFlags = [] }: TopFlagSummaryProps) {
   if (!topFlag || activeFlagCount === 0) {
     return null;
   }
@@ -214,6 +223,7 @@ export function TopFlagSummary({ topFlag, activeFlagCount = 0 }: TopFlagSummaryP
   const config = levelConfig[topFlag.level];
   const Icon = config.icon;
   const typeLabel = typeLabels[topFlag.type] || topFlag.label;
+  const badgeClassName = getTypeClassName(topFlag.type, config.className);
 
   return (
     <div className="flex items-center gap-1" data-testid="top-flag-summary">
@@ -221,21 +231,50 @@ export function TopFlagSummary({ topFlag, activeFlagCount = 0 }: TopFlagSummaryP
         <TooltipTrigger asChild>
           <Badge
             variant="secondary"
-            className={`${config.className} gap-1 cursor-default`}
+            className={`${badgeClassName} gap-1 cursor-default`}
             data-testid="top-flag-badge"
           >
-            <Icon className="w-3 h-3" />
-            <span className="text-xs">{typeLabel}</span>
+            <Icon className="w-2.5 h-2.5" />
+            <span className="text-[10px]">{typeLabel}</span>
           </Badge>
         </TooltipTrigger>
         <TooltipContent className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg">
-          <p className="font-medium">{topFlag.label}</p>
+          <p className="font-medium text-xs">{topFlag.label}</p>
         </TooltipContent>
       </Tooltip>
       {activeFlagCount > 1 && (
-        <Badge variant="outline" className="text-xs">
-          +{activeFlagCount - 1}
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="outline" className="text-[10px] cursor-default">
+              +{activeFlagCount - 1}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg max-w-xs">
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground mb-1">Autres alertes :</p>
+              {otherFlags.length > 0 ? (
+                otherFlags.map((flag, idx) => {
+                  const flagConfig = levelConfig[flag.level];
+                  const FlagIcon = flagConfig.icon;
+                  const flagLabel = typeLabels[flag.type] || flag.label;
+                  const flagClassName = getTypeClassName(flag.type, flagConfig.className);
+                  return (
+                    <div key={idx} className="flex items-center gap-1">
+                      <Badge variant="secondary" className={`${flagClassName} gap-1 text-[10px]`}>
+                        <FlagIcon className="w-2 h-2" />
+                        {flagLabel}
+                      </Badge>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-[10px] text-muted-foreground">
+                  {activeFlagCount - 1} alerte{activeFlagCount > 2 ? "s" : ""} supplémentaire{activeFlagCount > 2 ? "s" : ""}
+                </p>
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );
