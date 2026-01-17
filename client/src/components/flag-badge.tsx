@@ -17,17 +17,17 @@ interface FlagBadgeProps {
 const levelConfig = {
   CRITICAL: {
     icon: AlertTriangle,
-    className: "bg-destructive text-destructive-foreground",
+    className: "bg-[hsl(var(--flag-critical-bg))] text-[hsl(var(--flag-critical-foreground))]",
     label: "Critique",
   },
   WARNING: {
     icon: AlertCircle,
-    className: "bg-orange-500 text-white dark:bg-orange-600",
+    className: "bg-[hsl(var(--flag-warning-bg))] text-[hsl(var(--flag-warning-foreground))]",
     label: "Attention",
   },
   INFO: {
     icon: Info,
-    className: "bg-blue-500 text-white dark:bg-blue-600",
+    className: "bg-[hsl(var(--flag-info-bg))] text-[hsl(var(--flag-info-foreground))]",
     label: "Information",
   },
 };
@@ -207,11 +207,8 @@ interface TopFlagSummaryProps {
   otherFlags?: { type: string; label: string; level: "CRITICAL" | "WARNING" | "INFO" }[];
 }
 
-// Special color for ISQ_LOW - bordeaux/burgundy
+// Get badge class based on flag level (using design system tokens)
 const getTypeClassName = (type: string, defaultClassName: string) => {
-  if (type === "ISQ_LOW") {
-    return "bg-rose-800 text-white dark:bg-rose-900";
-  }
   return defaultClassName;
 };
 
