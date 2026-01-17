@@ -81,7 +81,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   ECHEC: { label: "Échec", variant: "echec" },
 };
 
-type ISQSource = "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite";
+type ISQSource = "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite" | "measurement";
 
 interface ISQPoint {
   label: string; 
@@ -91,6 +91,7 @@ interface ISQPoint {
   delta?: number;
   source: ISQSource;
   visiteId?: string;
+  measurementId?: string;
   notes?: string;
 }
 
@@ -496,63 +497,85 @@ export default function ImplantDetailsPage() {
   const getISQTimeline = (): ISQPoint[] => {
     const points: ISQPoint[] = [];
 
-    // Skip Pose ISQ - show only follow-up measurements
+    // Add legacy ISQ fields (isq2m, isq3m, isq6m)
     if (implantData?.isq2m && implantData?.datePose) {
       const date2m = new Date(implantData.datePose);
       date2m.setMonth(date2m.getMonth() + 2);
-      const delta = implantData.isqPose ? implantData.isq2m - implantData.isqPose : undefined;
       points.push({ 
         label: "2 mois", 
         sublabel: "Contrôle à 2 mois",
         value: implantData.isq2m, 
         date: date2m.toISOString().split('T')[0],
-        delta,
         source: "isq2m"
       });
     }
     if (implantData?.isq3m && implantData?.datePose) {
       const date3m = new Date(implantData.datePose);
       date3m.setMonth(date3m.getMonth() + 3);
-      const delta = implantData.isq2m ? implantData.isq3m - implantData.isq2m : undefined;
       points.push({ 
         label: "3 mois", 
         sublabel: "Contrôle à 3 mois",
         value: implantData.isq3m, 
         date: date3m.toISOString().split('T')[0],
-        delta,
         source: "isq3m"
       });
     }
     if (implantData?.isq6m && implantData?.datePose) {
       const date6m = new Date(implantData.datePose);
       date6m.setMonth(date6m.getMonth() + 6);
-      const delta = implantData.isq3m ? implantData.isq6m - implantData.isq3m : undefined;
       points.push({ 
         label: "6 mois", 
         sublabel: "Contrôle à 6 mois",
         value: implantData.isq6m, 
         date: date6m.toISOString().split('T')[0],
-        delta,
         source: "isq6m"
       });
     }
 
+    // Add visites with ISQ
     implantData?.visites
       ?.filter(v => v.isq)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .forEach((visite, index, arr) => {
-        const prevValue = index > 0 ? arr[index - 1].isq : (points.length > 0 ? points[points.length - 1].value : undefined);
+      .forEach((visite) => {
         points.push({
           label: formatShortDate(visite.date),
           sublabel: visite.notes || "Visite de contrôle",
           value: visite.isq!,
           date: visite.date,
-          delta: prevValue ? visite.isq! - prevValue : undefined,
           source: "visite",
           visiteId: visite.id,
           notes: visite.notes || undefined,
         });
       });
+
+    // Add measurements from clinical follow-up (implant_measurements table)
+    implantData?.measurements
+      ?.filter(m => m.isqValue !== null && m.isqValue !== undefined)
+      .forEach((measurement) => {
+        const measurementTypeLabels: Record<string, string> = {
+          'POSE': 'Pose',
+          'FOLLOW_UP': 'Suivi clinique',
+          'CONTROL': 'Contrôle',
+          'EMERGENCY': 'Urgence',
+        };
+        const measuredAt = new Date(measurement.measuredAt);
+        points.push({
+          label: formatShortDate(measuredAt.toISOString().split('T')[0]),
+          sublabel: measurement.notes || measurementTypeLabels[measurement.type] || 'Mesure',
+          value: measurement.isqValue!,
+          date: measuredAt.toISOString().split('T')[0],
+          source: "measurement",
+          measurementId: measurement.id,
+          notes: measurement.notes || undefined,
+        });
+      });
+
+    // Sort by date (oldest first) to calculate deltas correctly
+    points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Calculate deltas based on chronological order
+    for (let i = 1; i < points.length; i++) {
+      points[i].delta = points[i].value - points[i - 1].value;
+    }
 
     // Reverse to show most recent first
     return points.reverse();
@@ -1030,28 +1053,30 @@ export default function ImplantDetailsPage() {
                             )}
                           </div>
                           
-                          {/* Edit/Delete buttons - visible on hover */}
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleEditIsq(point)}
-                              data-testid={`button-edit-isq-${index}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive"
-                              onClick={() => handleDeleteIsq(point)}
-                              disabled={deleteIsqMutation.isPending}
-                              data-testid={`button-delete-isq-${index}`}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                          {/* Edit/Delete buttons - visible on hover, hidden for measurement source (read-only) */}
+                          {point.source !== "measurement" && (
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handleEditIsq(point)}
+                                data-testid={`button-edit-isq-${index}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive"
+                                onClick={() => handleDeleteIsq(point)}
+                                disabled={deleteIsqMutation.isPending}
+                                data-testid={`button-delete-isq-${index}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

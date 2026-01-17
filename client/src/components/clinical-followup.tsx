@@ -83,6 +83,11 @@ interface SurgeryImplantBasic {
   marque: string;
   modele?: string;
   statut?: string;
+  datePose?: string;
+  implant?: {
+    marque: string;
+    referenceFabricant?: string | null;
+  };
 }
 
 interface ClinicalFollowUpProps {
@@ -472,11 +477,15 @@ export function ClinicalFollowUp({
               <SelectValue placeholder="Choisir un implant..." />
             </SelectTrigger>
             <SelectContent>
-              {patientImplants.map((impl) => (
-                <SelectItem key={impl.id} value={impl.id} data-testid={`select-implant-${impl.id}`}>
-                  Site {impl.siteFdi} - {impl.marque} {impl.modele || ""}
-                </SelectItem>
-              ))}
+              {patientImplants.map((impl) => {
+                const datePose = impl.datePose ? new Date(impl.datePose).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : null;
+                const marque = impl.implant?.marque || impl.marque;
+                return (
+                  <SelectItem key={impl.id} value={impl.id} data-testid={`select-implant-${impl.id}`}>
+                    Site {impl.siteFdi} - {marque} {impl.modele || ""} {datePose ? `(${datePose})` : ""}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </CardContent>
@@ -570,11 +579,15 @@ export function ClinicalFollowUp({
                 <span className="text-xs">Changer</span>
               </SelectTrigger>
               <SelectContent>
-                {patientImplants.map((impl) => (
-                  <SelectItem key={impl.id} value={impl.id} data-testid={`select-implant-option-${impl.id}`}>
-                    Site {impl.siteFdi} - {impl.marque} {impl.modele || ""}
-                  </SelectItem>
-                ))}
+                {patientImplants.map((impl) => {
+                  const datePose = impl.datePose ? new Date(impl.datePose).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : null;
+                  const marque = impl.implant?.marque || impl.marque;
+                  return (
+                    <SelectItem key={impl.id} value={impl.id} data-testid={`select-implant-option-${impl.id}`}>
+                      Site {impl.siteFdi} - {marque} {impl.modele || ""} {datePose ? `(${datePose})` : ""}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

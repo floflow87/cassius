@@ -1329,20 +1329,23 @@ export class DatabaseStorage implements IStorage {
 
     const { surgeryImplant, implant, surgery, patient } = joinedData[0];
 
-    // Parallel fetch for visites and radios (using catalog implant.id)
+    // Parallel fetch for visites, radios, and measurements (using catalog implant.id and surgeryImplant.id)
     const t2 = Date.now();
-    const [implantVisites, implantRadios] = await Promise.all([
+    const [implantVisites, implantRadios, implantMeasurementsData] = await Promise.all([
       db.select().from(visites)
         .where(and(eq(visites.implantId, implant.id), eq(visites.organisationId, organisationId)))
         .orderBy(desc(visites.date)),
       db.select().from(radios)
         .where(and(eq(radios.implantId, implant.id), eq(radios.organisationId, organisationId)))
         .orderBy(desc(radios.date)),
+      db.select().from(implantMeasurements)
+        .where(and(eq(implantMeasurements.surgeryImplantId, surgeryImplant.id), eq(implantMeasurements.organisationId, organisationId)))
+        .orderBy(desc(implantMeasurements.measuredAt)),
     ]);
     const d2 = Date.now() - t2;
 
     const total = Date.now() - start;
-    console.log(`[IMPLANT-DETAIL] id=${id} total=${total}ms join=${d1}ms visites+radios=${d2}ms visites=${implantVisites.length} radios=${implantRadios.length}`);
+    console.log(`[IMPLANT-DETAIL] id=${id} total=${total}ms join=${d1}ms visites+radios+measurements=${d2}ms visites=${implantVisites.length} radios=${implantRadios.length} measurements=${implantMeasurementsData.length}`);
 
     return {
       ...surgeryImplant,
@@ -1351,6 +1354,7 @@ export class DatabaseStorage implements IStorage {
       surgery,
       visites: implantVisites,
       radios: implantRadios,
+      measurements: implantMeasurementsData,
     };
   }
 

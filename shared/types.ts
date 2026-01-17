@@ -199,6 +199,7 @@ export interface ImplantDetail extends SurgeryImplant {
   surgery?: Operation;
   visites: Visite[];
   radios: Radio[];
+  measurements?: ImplantMeasurement[];
 }
 
 // Détails complets d'une opération (acte chirurgical)
