@@ -471,7 +471,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         );
       case "typeIntervention":
         return (
-          <Badge variant="secondary" className="text-xs">
+          <Badge className="text-xs rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border-0">
             {TYPE_INTERVENTION_LABELS[op.typeIntervention] || op.typeIntervention}
           </Badge>
         );

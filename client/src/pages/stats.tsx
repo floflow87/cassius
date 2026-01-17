@@ -1269,7 +1269,7 @@ export default function StatsPage() {
                   <Activity className="h-5 w-5" />
                   Cohorte ISQ
                 </CardTitle>
-                <CardDescription className="text-xs">Évolution de la stabilité par date de pose</CardDescription>
+                <CardDescription className="text-xs">Implants / date de pose</CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -1359,16 +1359,18 @@ export default function StatsPage() {
                           {cohorteImplants.map((imp, idx) => {
                             const poseDate = new Date(imp.datePose!);
                             return (
-                              <TableRow key={imp.id} data-testid={`cohorte-row-${idx}`}>
-                                <TableCell className="text-xs font-medium sticky left-0 bg-card z-10">
-                                  <div>{format(poseDate, "dd MMM yyyy", { locale: fr })}</div>
-                                  <div className="text-[10px] text-muted-foreground">{imp.implant?.marque || "N/A"}</div>
+                              <TableRow key={imp.id} className="h-8" data-testid={`cohorte-row-${idx}`}>
+                                <TableCell className="text-xs font-medium sticky left-0 bg-card z-10 py-1">
+                                  <div className="flex items-center gap-2">
+                                    <span>{format(poseDate, "dd MMM yyyy", { locale: fr })}</span>
+                                    <span className="text-[10px] text-muted-foreground">{imp.implant?.marque || "N/A"}</span>
+                                  </div>
                                 </TableCell>
                                 {cohortePeriods.map((period) => {
                                   const isqValue = imp[period.field];
                                   return (
-                                    <TableCell key={period.key} className="text-center p-1">
-                                      <div className={`rounded px-2 py-1 text-[10px] font-medium ${getIsqColor(isqValue)}`}>
+                                    <TableCell key={period.key} className="text-center py-1 px-1">
+                                      <div className={`rounded px-2 py-0.5 text-[10px] font-medium ${getIsqColor(isqValue)}`}>
                                         {isqValue ?? "-"}
                                       </div>
                                     </TableCell>

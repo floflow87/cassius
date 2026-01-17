@@ -97,8 +97,8 @@
   
   /* Clinical Flag Badge Colors */
   /* CRITICAL: ISQ_LOW */
-  --flag-critical-bg: 350 33% 97%;       /* #FAF6F7 */
-  --flag-critical-foreground: 7 100% 29%; /* #961400 */
+  --flag-critical-bg: 0 100% 94%;        /* #FEE2E2 */
+  --flag-critical-foreground: 4 77% 46%; /* #D0341C */
   /* WARNING: ISQ_DECLINING, LOW_SUCCESS_RATE, NO_RECENT_ISQ, NO_POSTOP_FOLLOWUP, IMPLANT_NO_OPERATION */
   --flag-warning-bg: 32 100% 92%;        /* #FFEDD5 */
   --flag-warning-foreground: 21 90% 48%; /* #EA580C */
