@@ -122,7 +122,13 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
       await apiRequest("POST", `/api/appointments/${appointment.id}/radios`, { radioId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments", appointment.id, "radios"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/appointments/${appointment.id}/radios`] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith(`/api/appointments/${appointment.id}/clinical`);
+        }
+      });
       toast({
         title: "Radio liée",
         description: "La radiographie a été associée au rendez-vous.",

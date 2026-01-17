@@ -134,11 +134,30 @@ function getIsqColor(value: number | null | undefined): string {
 }
 
 function getIsqLabel(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "Non mesure";
+  if (value === null || value === undefined) return "Non mesuré";
   if (value < 50) return "Critique";
   if (value < 60) return "Faible";
-  if (value < 70) return "Modere";
-  return "Eleve";
+  if (value < 70) return "Modéré";
+  return "Élevé";
+}
+
+function getISQBadge(value: number | null | undefined): { label: string; className: string } {
+  if (value === null || value === undefined) return { 
+    label: "Non mesuré", 
+    className: "bg-muted text-muted-foreground"
+  };
+  if (value >= 70) return { 
+    label: "Stabilité élevée", 
+    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+  };
+  if (value >= 60) return { 
+    label: "Stabilité modérée", 
+    className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+  };
+  return { 
+    label: "Stabilité faible", 
+    className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+  };
 }
 
 export function ClinicalFollowUp({ 
@@ -458,10 +477,22 @@ export function ClinicalFollowUp({
             Suivi clinique
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Aucun implant lié à ce rendez-vous. Liez un implant pour activer le suivi clinique.
-          </p>
+        <CardContent className="space-y-3">
+          <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-md border border-amber-200 dark:border-amber-800">
+            <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
+                Aucun implant disponible pour le suivi
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-500">
+                Le suivi clinique permet d'enregistrer les mesures ISQ et de suivre l'évolution d'un implant posé. 
+                Ce patient n'a pas encore d'implant enregistré ou aucun implant n'est associé à ce rendez-vous.
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Pour activer le suivi : créez d'abord un acte chirurgical avec un implant posé depuis la fiche patient.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
@@ -574,8 +605,8 @@ export function ClinicalFollowUp({
               <span className={`text-lg font-bold ${getIsqColor(lastMeasurement.isqValue)}`}>
                 {lastMeasurement.isqValue ?? "-"}
               </span>
-              <Badge variant="outline" className="text-xs">
-                {getIsqLabel(lastMeasurement.isqValue)}
+              <Badge className={`text-[10px] ${getISQBadge(lastMeasurement.isqValue).className}`}>
+                {getISQBadge(lastMeasurement.isqValue).label}
               </Badge>
             </div>
           </div>
