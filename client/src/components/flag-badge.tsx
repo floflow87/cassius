@@ -207,11 +207,6 @@ interface TopFlagSummaryProps {
   otherFlags?: { type: string; label: string; level: "CRITICAL" | "WARNING" | "INFO" }[];
 }
 
-// Get badge class based on flag level (using design system tokens)
-const getTypeClassName = (type: string, defaultClassName: string) => {
-  return defaultClassName;
-};
-
 export function TopFlagSummary({ topFlag, activeFlagCount = 0, otherFlags = [] }: TopFlagSummaryProps) {
   if (!topFlag || activeFlagCount === 0) {
     return null;
@@ -220,7 +215,6 @@ export function TopFlagSummary({ topFlag, activeFlagCount = 0, otherFlags = [] }
   const config = levelConfig[topFlag.level];
   const Icon = config.icon;
   const typeLabel = typeLabels[topFlag.type] || topFlag.label;
-  const badgeClassName = getTypeClassName(topFlag.type, config.className);
 
   return (
     <div className="flex items-center gap-1" data-testid="top-flag-summary">
@@ -228,7 +222,7 @@ export function TopFlagSummary({ topFlag, activeFlagCount = 0, otherFlags = [] }
         <TooltipTrigger asChild>
           <Badge
             variant="secondary"
-            className={`${badgeClassName} gap-1 cursor-default`}
+            className={`${config.className} gap-1 cursor-default`}
             data-testid="top-flag-badge"
           >
             <Icon className="w-2.5 h-2.5" />
@@ -254,10 +248,9 @@ export function TopFlagSummary({ topFlag, activeFlagCount = 0, otherFlags = [] }
                   const flagConfig = levelConfig[flag.level];
                   const FlagIcon = flagConfig.icon;
                   const flagLabel = typeLabels[flag.type] || flag.label;
-                  const flagClassName = getTypeClassName(flag.type, flagConfig.className);
                   return (
                     <div key={idx} className="flex items-center gap-1">
-                      <Badge variant="secondary" className={`${flagClassName} gap-1 text-[10px]`}>
+                      <Badge variant="secondary" className={`${flagConfig.className} gap-1 text-[10px]`}>
                         <FlagIcon className="w-2 h-2" />
                         {flagLabel}
                       </Badge>

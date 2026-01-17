@@ -327,6 +327,9 @@ export default function StatsPage() {
     typeChirurgieTemps: string | null;
     statut: string;
     isqPose: number | null;
+    isq2m: number | null;
+    isq3m: number | null;
+    isq6m: number | null;
     datePose: string | null;
     implant: {
       marque: string;
@@ -1255,6 +1258,131 @@ export default function StatsPage() {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Cohorte ISQ - Heatmap */}
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Cohorte ISQ
+                </CardTitle>
+                <CardDescription className="text-xs">Évolution de la stabilité par date de pose</CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Du</Label>
+                  <Input 
+                    type="date" 
+                    value={cohorteStartDate}
+                    onChange={(e) => setCohorteStartDate(e.target.value)}
+                    className="w-36 text-xs"
+                    data-testid="input-cohorte-date-start"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Au</Label>
+                  <Input 
+                    type="date" 
+                    value={cohorteEndDate}
+                    onChange={(e) => setCohorteEndDate(e.target.value)}
+                    className="w-36 text-xs"
+                    data-testid="input-cohorte-date-end"
+                  />
+                </div>
+                {(cohorteStartDate || cohorteEndDate) && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => { setCohorteStartDate(""); setCohorteEndDate(""); }}
+                    className="text-xs"
+                    data-testid="button-clear-cohorte-filter"
+                  >
+                    Effacer
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const cohortePeriods = [
+                  { key: "J0", label: "J0", field: "isqPose" as const },
+                  { key: "2M", label: "2M", field: "isq2m" as const },
+                  { key: "3M", label: "3M", field: "isq3m" as const },
+                  { key: "6M", label: "6M", field: "isq6m" as const },
+                ];
+                const cohorteImplants = filteredSurgeryImplants
+                  .filter((imp) => imp.datePose)
+                  .filter((imp) => {
+                    if (!cohorteStartDate && !cohorteEndDate) return true;
+                    const impDate = new Date(imp.datePose!);
+                    if (cohorteStartDate && impDate < new Date(cohorteStartDate)) return false;
+                    if (cohorteEndDate && impDate > new Date(cohorteEndDate)) return false;
+                    return true;
+                  })
+                  .sort((a, b) => new Date(b.datePose!).getTime() - new Date(a.datePose!).getTime())
+                  .slice(0, 30);
+
+                const getIsqColor = (isq: number | null) => {
+                  if (isq === null) return "bg-muted/30";
+                  if (isq >= 70) return "bg-violet-500/80 text-white";
+                  if (isq >= 65) return "bg-violet-400/70 text-white";
+                  if (isq >= 60) return "bg-violet-300/60 text-violet-900";
+                  if (isq >= 55) return "bg-violet-200/50 text-violet-900";
+                  return "bg-violet-100/40 text-violet-800";
+                };
+
+                if (cohorteImplants.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-xs">Aucun implant avec date de pose dans cette période</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <ScrollArea className="w-full">
+                    <div className="min-w-[600px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs w-36 sticky left-0 bg-card z-10">Date de pose</TableHead>
+                            {cohortePeriods.map((period) => (
+                              <TableHead key={period.key} className="text-xs text-center w-20">{period.label}</TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {cohorteImplants.map((imp, idx) => {
+                            const poseDate = new Date(imp.datePose!);
+                            return (
+                              <TableRow key={imp.id} data-testid={`cohorte-row-${idx}`}>
+                                <TableCell className="text-xs font-medium sticky left-0 bg-card z-10">
+                                  <div>{format(poseDate, "dd MMM yyyy", { locale: fr })}</div>
+                                  <div className="text-[10px] text-muted-foreground">{imp.implant?.marque || "N/A"}</div>
+                                </TableCell>
+                                {cohortePeriods.map((period) => {
+                                  const isqValue = imp[period.field];
+                                  return (
+                                    <TableCell key={period.key} className="text-center p-1">
+                                      <div className={`rounded px-2 py-1 text-[10px] font-medium ${getIsqColor(isqValue)}`}>
+                                        {isqValue ?? "-"}
+                                      </div>
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </ScrollArea>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
