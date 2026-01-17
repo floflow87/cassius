@@ -7,6 +7,7 @@ interface NotificationItem {
   severity: 'INFO' | 'WARNING' | 'CRITICAL';
   entityType?: string;
   createdAt: string;
+  patientName?: string;
 }
 
 export interface NotificationDigestData {
@@ -36,9 +37,13 @@ const SEVERITY_STYLES = {
 
 function notificationCard(item: NotificationItem): string {
   const style = SEVERITY_STYLES[item.severity];
+  const patientLine = item.patientName 
+    ? `<p style="margin: 0 0 4px 0; font-size: 13px; color: #6B7280;"><strong>Patient :</strong> ${item.patientName}</p>` 
+    : '';
   return `
     <div style="background-color: ${style.bg}; border-left: 4px solid ${style.border}; padding: 12px 16px; margin-bottom: 12px; border-radius: 0 6px 6px 0;">
       <p style="margin: 0 0 4px 0; font-weight: 600; color: ${style.text}; font-size: 14px;">${item.title}</p>
+      ${patientLine}
       ${item.body ? `<p style="margin: 0; color: #4B5563; font-size: 13px;">${item.body}</p>` : ''}
       <p style="margin: 8px 0 0 0; font-size: 11px; color: #9CA3AF;">${item.createdAt}</p>
     </div>
@@ -93,7 +98,10 @@ export function notificationDigestText(data: NotificationDigestData): string {
   
   const notificationsList = data.notifications
     .slice(0, 10)
-    .map((n, i) => `${i + 1}. [${n.severity}] ${n.title}${n.body ? '\n   ' + n.body : ''}`)
+    .map((n, i) => {
+      const patientLine = n.patientName ? `\n   Patient: ${n.patientName}` : '';
+      return `${i + 1}. [${n.severity}] ${n.title}${patientLine}${n.body ? '\n   ' + n.body : ''}\n   ${n.createdAt}`;
+    })
     .join('\n\n');
   
   const moreNotifications = data.notifications.length > 10
