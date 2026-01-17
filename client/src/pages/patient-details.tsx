@@ -1146,19 +1146,19 @@ export default function PatientDetailsPage() {
       case "marque":
         return (
           <div>
-            <div className="text-sm font-medium">{surgeryImplant.implant?.marque || "-"}</div>
-            <div className="text-xs text-muted-foreground">{surgeryImplant.implant?.referenceFabricant || "-"}</div>
+            <div className="text-xs font-medium">{surgeryImplant.implant?.marque || "-"}</div>
+            <div className="text-[10px] text-muted-foreground">{surgeryImplant.implant?.referenceFabricant || "-"}</div>
           </div>
         );
       case "dimensions":
         return (
-          <span className="text-sm">
+          <span className="text-xs">
             {surgeryImplant.implant?.diametre} x {surgeryImplant.implant?.longueur}mm
           </span>
         );
       case "datePose":
         return (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {surgeryImplant.datePose ? formatDateShort(surgeryImplant.datePose) : "-"}
           </span>
         );
@@ -2096,7 +2096,7 @@ export default function PatientDetailsPage() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-base font-medium">Implants posés</CardTitle>
+                    <CardTitle className="text-xs font-medium">Implants posés</CardTitle>
                     <div className="flex items-center gap-2">
                       <Button 
                         variant="ghost" 

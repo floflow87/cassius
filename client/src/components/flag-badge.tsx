@@ -90,7 +90,7 @@ export function FlagBadge({ flag, showResolve = false, compact = false, onResolv
         <Icon className="w-3 h-3" />
         <span>{typeLabels[flag.type] || flag.type}</span>
       </Badge>
-      <span className="text-sm text-muted-foreground flex-1">{flag.description || flag.label}</span>
+      <span className="text-xs text-muted-foreground flex-1">{flag.description || flag.label}</span>
       {showResolve && !flag.resolvedAt && (
         <Tooltip>
           <TooltipTrigger asChild>

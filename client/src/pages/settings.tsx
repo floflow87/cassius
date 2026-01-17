@@ -330,8 +330,8 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-2 font-semibold">
-              <User className="w-5 h-5" />
+            <CardTitle className="flex items-center gap-2 font-semibold text-xs">
+              <User className="w-4 h-4" />
               Profil utilisateur
             </CardTitle>
             {!isEditingProfile ? (
@@ -385,7 +385,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                   data-testid="input-user-nom"
                 />
               ) : (
-                <p className="font-light" data-testid="text-user-nom">{profile.nom || "—"}</p>
+                <p className="font-light text-xs" data-testid="text-user-nom">{profile.nom || "—"}</p>
               )}
             </div>
             <div>
@@ -397,12 +397,12 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                   data-testid="input-user-prenom"
                 />
               ) : (
-                <p className="font-light" data-testid="text-user-prenom">{profile.prenom || "—"}</p>
+                <p className="font-light text-xs" data-testid="text-user-prenom">{profile.prenom || "—"}</p>
               )}
             </div>
             <div>
               <Label className="text-muted-foreground text-xs font-light">Email / Identifiant</Label>
-              <p className="font-light" data-testid="text-user-username">{profile.username}</p>
+              <p className="font-light text-xs" data-testid="text-user-username">{profile.username}</p>
             </div>
             <div>
               <Label className="text-muted-foreground text-xs font-light">Rôle</Label>
@@ -416,7 +416,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
           {profile.organisationNom && (
             <div>
               <Label className="text-muted-foreground text-xs font-light">Organisation</Label>
-              <p className="font-light" data-testid="text-user-org">{profile.organisationNom}</p>
+              <p className="font-light text-xs" data-testid="text-user-org">{profile.organisationNom}</p>
             </div>
           )}
         </CardContent>
@@ -424,11 +424,11 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-semibold">
-            <Lock className="w-5 h-5" />
+          <CardTitle className="flex items-center gap-2 font-semibold text-xs">
+            <Lock className="w-4 h-4" />
             Sécurité du compte
           </CardTitle>
-          <CardDescription className="font-light">
+          <CardDescription className="font-light text-xs">
             Modifiez votre mot de passe pour sécuriser votre compte.
           </CardDescription>
         </CardHeader>
@@ -596,7 +596,7 @@ function OnboardingSettingsSection() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5" />
-            <CardTitle className="font-semibold">Configuration initiale</CardTitle>
+            <CardTitle className="font-semibold text-xs">Configuration initiale</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
@@ -660,8 +660,8 @@ function OnboardingSettingsSection() {
                 ) : (
                   <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 )}
-                <CardTitle className="flex items-center gap-2 font-semibold">
-                  <Sparkles className="w-5 h-5" />
+                <CardTitle className="flex items-center gap-2 font-semibold text-xs">
+                  <Sparkles className="w-4 h-4" />
                   Configuration initiale
                 </CardTitle>
               </button>
@@ -675,7 +675,7 @@ function OnboardingSettingsSection() {
               )}
             </div>
           </div>
-          <CardDescription className="font-light">
+          <CardDescription className="font-light text-xs">
             Suivez les étapes pour configurer complètement votre espace Cassius.
           </CardDescription>
         </CardHeader>
@@ -824,8 +824,8 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={googleCalendarIcon} alt="Google Calendar" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-base whitespace-nowrap">Google Calendar</CardTitle>
-                <CardDescription>Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
+                <CardTitle className="text-xs whitespace-nowrap">Google Calendar</CardTitle>
+                <CardDescription className="text-xs">Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -932,7 +932,7 @@ function IntegrationsSection() {
                   ) : (
                     <img src={googleLogo} alt="Google" className="w-4 h-4 mr-2" />
                   )}
-                  Connecter Google Calendar
+                  <span className="text-xs">Connecter Google Calendar</span>
                 </Button>
               </div>
             )}
@@ -948,8 +948,8 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={gmailIcon} alt="Gmail" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-base whitespace-nowrap">Gmail</CardTitle>
-                <CardDescription>Synchronisez vos emails avec Google Gmail</CardDescription>
+                <CardTitle className="text-xs whitespace-nowrap">Gmail</CardTitle>
+                <CardDescription className="text-xs">Synchronisez vos emails avec Google Gmail</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -965,8 +965,8 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={googleMeetIcon} alt="Google Meet" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-base whitespace-nowrap">Google Meet</CardTitle>
-                <CardDescription>Intégrez vos visioconférences avec Google Meet</CardDescription>
+                <CardTitle className="text-xs whitespace-nowrap">Google Meet</CardTitle>
+                <CardDescription className="text-xs">Intégrez vos visioconférences avec Google Meet</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -982,8 +982,8 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={outlookIcon} alt="Microsoft Outlook" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-base whitespace-nowrap">Microsoft Outlook</CardTitle>
-                <CardDescription>Synchronisez vos emails avec Microsoft Outlook</CardDescription>
+                <CardTitle className="text-xs whitespace-nowrap">Microsoft Outlook</CardTitle>
+                <CardDescription className="text-xs">Synchronisez vos emails avec Microsoft Outlook</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -1062,7 +1062,7 @@ function CollaboratorsSection() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Permissions par rôle</CardTitle>
+          <CardTitle className="text-xs">Permissions par rôle</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3 text-xs">
@@ -1092,8 +1092,8 @@ function CollaboratorsSection() {
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <CardTitle>Membres de l'organisation</CardTitle>
-              <CardDescription>{collaborators.length} collaborateur(s)</CardDescription>
+              <CardTitle className="text-xs">Membres de l'organisation</CardTitle>
+              <CardDescription className="text-xs">{collaborators.length} collaborateur(s)</CardDescription>
             </div>
             <Sheet open={showInviteSheet} onOpenChange={setShowInviteSheet}>
               <SheetTrigger asChild>
@@ -1353,8 +1353,8 @@ function OrganizationSection() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
+            <CardTitle className="flex items-center gap-2 text-xs">
+              <Building2 className="w-4 h-4" />
               Informations du cabinet
             </CardTitle>
             {!isEditing && (
@@ -1421,15 +1421,15 @@ function OrganizationSection() {
             <div className="space-y-4">
               <div>
                 <Label className="text-muted-foreground text-xs font-light">Nom du cabinet</Label>
-                <p className="font-medium" data-testid="text-org-nom">{organisation?.nom || "—"}</p>
+                <p className="font-medium text-xs" data-testid="text-org-nom">{organisation?.nom || "—"}</p>
               </div>
               <div>
                 <Label className="text-muted-foreground text-xs font-light">Adresse</Label>
-                <p className="font-medium" data-testid="text-org-adresse">{organisation?.adresse || "—"}</p>
+                <p className="font-medium text-xs" data-testid="text-org-adresse">{organisation?.adresse || "—"}</p>
               </div>
               <div>
                 <Label className="text-muted-foreground text-xs font-light">Fuseau horaire</Label>
-                <p className="font-medium" data-testid="text-org-timezone">{organisation?.timezone || "Europe/Paris"}</p>
+                <p className="font-medium text-xs" data-testid="text-org-timezone">{organisation?.timezone || "Europe/Paris"}</p>
               </div>
               <div>
                 <Label className="text-muted-foreground text-xs font-light">Date de création</Label>
