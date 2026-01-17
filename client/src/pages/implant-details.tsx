@@ -440,6 +440,9 @@ export default function ImplantDetailsPage() {
   };
 
   const handleEditIsq = (point: ISQPoint) => {
+    // Guard: measurement source is read-only
+    if (point.source === "measurement") return;
+    
     setEditingIsqPoint({
       source: point.source,
       visiteId: point.visiteId,
@@ -473,7 +476,8 @@ export default function ImplantDetailsPage() {
   };
   
   const confirmDeleteIsq = () => {
-    if (isqPointToDelete) {
+    // Guard: measurement source is read-only
+    if (isqPointToDelete && isqPointToDelete.source !== "measurement") {
       deleteIsqMutation.mutate({
         source: isqPointToDelete.source,
         visiteId: isqPointToDelete.visiteId,
