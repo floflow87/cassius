@@ -1850,7 +1850,7 @@ export default function PatientDetailsPage() {
                     <SheetTrigger asChild>
                       <Button variant="ghost" className="w-full justify-start gap-3" data-testid="button-add-implant">
                         <Activity className="h-4 w-4 text-primary" />
-                        Ajouter un implant
+                        Nouvel acte
                       </Button>
                     </SheetTrigger>
                     <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
@@ -1865,19 +1865,29 @@ export default function PatientDetailsPage() {
                       </div>
                     </SheetContent>
                   </Sheet>
-                  <Button variant="ghost" className="w-full justify-start gap-3">
-                    <ClipboardList className="h-4 w-4 text-primary" />
-                    Enregistrer un acte
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start gap-3"
-                    onClick={() => setAppointmentDialogOpen(true)}
-                    data-testid="button-plan-visit"
-                  >
-                    <Calendar className="h-4 w-4 text-primary" />
-                    Planifier une visite
-                  </Button>
+                  <Sheet open={appointmentDialogOpen} onOpenChange={setAppointmentDialogOpen}>
+                    <SheetTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start gap-3"
+                        data-testid="button-plan-visit"
+                      >
+                        <Calendar className="h-4 w-4 text-primary" />
+                        Planifier une visite
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                      <SheetHeader>
+                        <SheetTitle>Nouveau rendez-vous</SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-6">
+                        <AppointmentForm
+                          patientId={patient.id}
+                          onSuccess={() => setAppointmentDialogOpen(false)}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
                   <Sheet open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
                     <SheetTrigger asChild>
                       <Button variant="ghost" className="w-full justify-start gap-3" data-testid="button-add-radio">
@@ -1895,6 +1905,25 @@ export default function PatientDetailsPage() {
                           operations={patient.operations || []}
                           surgeryImplants={patient.surgeryImplants || []}
                           onSuccess={() => setRadioDialogOpen(false)}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                  <Sheet open={docDialogOpen} onOpenChange={setDocDialogOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" className="w-full justify-start gap-3" data-testid="button-add-document-quick">
+                        <FileText className="h-4 w-4 text-primary" />
+                        Ajouter un document
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                      <SheetHeader>
+                        <SheetTitle>Ajouter un document</SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-6">
+                        <DocumentUploadForm
+                          patientId={patient.id}
+                          onSuccess={() => setDocDialogOpen(false)}
                         />
                       </div>
                     </SheetContent>

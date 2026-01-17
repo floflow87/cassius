@@ -263,7 +263,7 @@ function CalendarSidebar({
               className="flex items-center justify-between w-full px-3 py-3 hover-elevate"
               data-testid="button-toggle-sources"
             >
-              <div className="flex items-center gap-2 text-sm font-medium">
+              <div className="flex items-center gap-2 text-xs font-medium">
                 <CalendarIcon className="h-4 w-4" />
                 Sources
               </div>
@@ -329,7 +329,7 @@ function CalendarSidebar({
                       data-testid="checkbox-show-google"
                     />
                     <SiGoogle className="h-3.5 w-3.5" />
-                    <span className="text-sm">Afficher Google</span>
+                    <span className="text-xs">Afficher Google</span>
                   </label>
                 </div>
               )}
@@ -345,7 +345,7 @@ function CalendarSidebar({
               className="flex items-center justify-between w-full px-3 py-3 hover-elevate"
               data-testid="button-toggle-filters"
             >
-              <div className="flex items-center gap-2 text-sm font-medium">
+              <div className="flex items-center gap-2 text-xs font-medium">
                 <Filter className="h-4 w-4" />
                 Filtres
                 {filterCount > 0 && (
@@ -389,7 +389,7 @@ function CalendarSidebar({
                           onCheckedChange={() => toggleType(type.value)}
                         />
                         <span className={`w-2 h-2 rounded-full ${type.color}`} />
-                        <span className="text-sm">{type.label}</span>
+                        <span className="text-xs">{type.label}</span>
                       </label>
                     ))}
                   </div>
@@ -408,7 +408,7 @@ function CalendarSidebar({
                           checked={filters.statuses.includes(status.value)}
                           onCheckedChange={() => toggleStatus(status.value)}
                         />
-                        <span className="text-sm">{status.label}</span>
+                        <span className="text-xs">{status.label}</span>
                       </label>
                     ))}
                   </div>
@@ -425,7 +425,7 @@ function CalendarSidebar({
                       onCheckedChange={toggleAtRisk}
                     />
                     <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
-                    <span className="text-sm">RDV à risque</span>
+                    <span className="text-xs">RDV à risque</span>
                   </label>
                 </div>
               </div>

@@ -149,7 +149,7 @@ function NotificationRow({
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className={`text-sm ${isUnread ? 'font-semibold' : ''}`}>
+              <span className={`text-xs ${isUnread ? 'font-semibold' : ''}`}>
                 {notification.title}
               </span>
               {isUnread && (
@@ -159,12 +159,12 @@ function NotificationRow({
               )}
             </div>
             {notification.body && (
-              <p className="text-sm text-muted-foreground mt-1">{notification.body}</p>
+              <p className="text-xs text-muted-foreground mt-1">{notification.body}</p>
             )}
             {patientInfo && (
               <Link 
                 href={`/patients/${patientInfo.id}`}
-                className="text-sm text-primary hover:underline mt-1 inline-block"
+                className="text-xs text-primary hover:underline mt-1 inline-block"
                 data-testid={`link-notification-patient-${patientInfo.id}`}
               >
                 {patientInfo.name}
@@ -355,7 +355,7 @@ export default function NotificationsPage() {
                   <button
                     key={tab.value}
                     onClick={() => setActiveTab(tab.value)}
-                    className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                    className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
                       activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
                     }`}
                     data-testid={`tab-${tab.value}`}
@@ -401,7 +401,7 @@ export default function NotificationsPage() {
           <CardContent className="pt-4">
             {selectedIds.size > 0 && (
               <div className="flex items-center gap-4 p-3 bg-muted rounded-md mb-4">
-                <span className="text-sm">
+                <span className="text-xs">
                   {selectedIds.size} notification{selectedIds.size > 1 ? 's' : ''} sélectionnée{selectedIds.size > 1 ? 's' : ''}
                 </span>
                 <Button 
@@ -455,7 +455,7 @@ export default function NotificationsPage() {
                   onCheckedChange={selectAll}
                   data-testid="checkbox-select-all"
                 />
-                <span className="text-sm text-muted-foreground">Tout sélectionner</span>
+                <span className="text-xs text-muted-foreground">Tout sélectionner</span>
               </div>
             )}
             
@@ -474,8 +474,8 @@ export default function NotificationsPage() {
             ) : filteredNotifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Bell className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-medium mb-1">Aucune notification</h3>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="text-base font-medium mb-1">Aucune notification</h3>
+                <p className="text-xs text-muted-foreground">
                   {activeTab !== "all" 
                     ? `Aucune notification de type "${KIND_LABELS[activeTab.toUpperCase()] || activeTab}"`
                     : filterUnread !== "all"

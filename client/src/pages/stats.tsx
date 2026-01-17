@@ -539,7 +539,7 @@ export default function StatsPage() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">Actes chirurgicaux</p>
+                <p className="text-xs text-muted-foreground mb-1">Actes chirurgicaux</p>
                 <p className="text-3xl font-bold">{stats?.activityByPeriod.reduce((sum, d) => sum + d.count, 0) || 0}</p>
                 <p className="text-xs text-muted-foreground mt-1">sur la période</p>
               </div>
@@ -554,7 +554,7 @@ export default function StatsPage() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">Implants posés</p>
+                <p className="text-xs text-muted-foreground mb-1">Implants posés</p>
                 <p className="text-3xl font-bold">{stats?.totalImplantsInPeriod || 0}</p>
                 <p className="text-xs text-muted-foreground mt-1">sur la période</p>
               </div>
@@ -569,7 +569,7 @@ export default function StatsPage() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">Taux de succès</p>
+                <p className="text-xs text-muted-foreground mb-1">Taux de succès</p>
                 <p className="text-3xl font-bold">{stats?.successRate || 0}%</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {stats?.complicationRate || 0}% complications
@@ -586,7 +586,7 @@ export default function StatsPage() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">Délai 1ère visite</p>
+                <p className="text-xs text-muted-foreground mb-1">Délai 1ère visite</p>
                 <p className="text-3xl font-bold">
                   {stats?.avgDelayToFirstVisit != null ? `${stats.avgDelayToFirstVisit}j` : "-"}
                 </p>
@@ -611,7 +611,7 @@ export default function StatsPage() {
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
-              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+              className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
                 activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
               }`}
               data-testid={`tab-${tab.value}`}
@@ -657,7 +657,7 @@ export default function StatsPage() {
               <PopoverContent className="w-80 p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                 <div className="p-2">
                   {searchSuggestions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground p-2">Aucun résultat</p>
+                    <p className="text-xs text-muted-foreground p-2">Aucun résultat</p>
                   ) : (
                     <div className="space-y-1">
                       {searchSuggestions.map((suggestion) => (
@@ -674,7 +674,7 @@ export default function StatsPage() {
                           data-testid={`suggestion-${suggestion.type}-${suggestion.id}`}
                         >
                           <div>
-                            <p className="text-sm font-medium">{suggestion.label}</p>
+                            <p className="text-xs font-medium">{suggestion.label}</p>
                             {suggestion.sublabel && (
                               <p className="text-xs text-muted-foreground">{suggestion.sublabel}</p>
                             )}
@@ -859,8 +859,8 @@ export default function StatsPage() {
                           const uniquePatients = Array.from(new Map(implants.map((i: {patientNom: string; patientPrenom: string}) => [`${i.patientNom}-${i.patientPrenom}`, i])).values());
                           return (
                             <div className="p-3 bg-card border rounded-md shadow-lg max-w-xs">
-                              <p className="font-semibold text-sm mb-2">{data.type}</p>
-                              <p className="text-sm text-muted-foreground mb-2">{data.count} intervention{data.count > 1 ? "s" : ""}</p>
+                              <p className="font-semibold text-xs mb-2">{data.type}</p>
+                              <p className="text-xs text-muted-foreground mb-2">{data.count} intervention{data.count > 1 ? "s" : ""}</p>
                               {implants.length > 0 && (
                                 <>
                                   <p className="text-xs font-medium text-muted-foreground mb-1">Implants posés ({implants.length}):</p>
@@ -1016,7 +1016,7 @@ export default function StatsPage() {
                     const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
                     return (
                       <div key={item.category}>
-                        <div className="flex justify-between text-sm mb-1">
+                        <div className="flex justify-between text-xs mb-1">
                           <span>{item.category}</span>
                           <span className="font-medium">{item.count} ({percentage}%)</span>
                         </div>
@@ -1064,7 +1064,7 @@ export default function StatsPage() {
                       {stats.implantsWithoutFollowup.slice(0, 20).map((item) => (
                         <div
                           key={item.implantId}
-                          className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-sm"
+                          className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-xs"
                           data-testid={`row-followup-${item.implantId}`}
                         >
                           <div>
@@ -1228,11 +1228,11 @@ export default function StatsPage() {
                         const data = payload[0]?.payload;
                         return (
                           <div className="p-2 bg-card border rounded-md shadow-lg">
-                            <p className="font-medium text-sm">{label}</p>
-                            <p className="text-sm text-muted-foreground">{data.total} implants</p>
-                            <p className="text-sm text-stats-success">Taux de réussite: {data.successRate}%</p>
+                            <p className="font-medium text-xs">{label}</p>
+                            <p className="text-xs text-muted-foreground">{data.total} implants</p>
+                            <p className="text-xs text-stats-success">Taux de réussite: {data.successRate}%</p>
                             {data.avgIsq > 0 && (
-                              <p className="text-sm text-stats-primary">ISQ moyen: {data.avgIsq}</p>
+                              <p className="text-xs text-stats-primary">ISQ moyen: {data.avgIsq}</p>
                             )}
                           </div>
                         );
@@ -1246,7 +1246,7 @@ export default function StatsPage() {
                 {successRateByDimension.map((item) => (
                   <div key={item.name} className="p-2 rounded-lg bg-muted/50 text-center">
                     <p className="text-xs text-muted-foreground truncate" title={item.name}>{item.name}</p>
-                    <p className="text-sm font-semibold">{item.total} implants</p>
+                    <p className="text-xs font-semibold">{item.total} implants</p>
                   </div>
                 ))}
               </div>
@@ -1353,11 +1353,11 @@ export default function StatsPage() {
                               </HoverCardTrigger>
                               <HoverCardContent className="w-72 z-[100]" align="center" side="top" sideOffset={5}>
                                 <div className="space-y-2">
-                                  <h4 className="font-semibold text-sm">Implants ({p.totalImplants})</h4>
+                                  <h4 className="font-semibold text-xs">Implants ({p.totalImplants})</h4>
                                   <ScrollArea className="h-32">
                                     <div className="space-y-1">
                                       {p.implants.map((imp) => (
-                                        <div key={imp.id} className="flex items-center justify-between text-sm p-1 rounded bg-muted/50">
+                                        <div key={imp.id} className="flex items-center justify-between text-xs p-1 rounded bg-muted/50">
                                           <span>Site {imp.siteFdi} - {imp.marque}</span>
                                           <Badge variant={
                                             imp.statut === "SUCCES" ? "default" :
@@ -1394,7 +1394,7 @@ export default function StatsPage() {
                     </TableBody>
                   </Table>
                   {filteredPatientStats.length > 50 && (
-                    <p className="text-center text-sm text-muted-foreground mt-4">
+                    <p className="text-center text-xs text-muted-foreground mt-4">
                       Affichage des 50 premiers patients sur {filteredPatientStats.length}
                     </p>
                   )}
@@ -1433,7 +1433,7 @@ export default function StatsPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-2 px-3 font-medium">Niveau</th>
@@ -1468,7 +1468,7 @@ export default function StatsPage() {
                     </tbody>
                   </table>
                   {sortedFlags.length > 20 && (
-                    <p className="text-center text-sm text-muted-foreground mt-4">
+                    <p className="text-center text-xs text-muted-foreground mt-4">
                       Affichage des 20 premiers flags sur {sortedFlags.length} au total
                     </p>
                   )}

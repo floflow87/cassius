@@ -169,7 +169,7 @@ function FolderTreeItem({
         if (hasChildren && onToggle) onToggle();
         onSelect();
       }}
-      className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover-elevate ${
+      className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover-elevate ${
         isSelected ? "bg-accent" : ""
       }`}
       data-testid={`folder-${node.type}-${node.id || 'root'}`}
@@ -240,14 +240,14 @@ function FileRow({
           {file.lastNote ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="text-sm truncate cursor-default">{file.title}</span>
+                <span className="text-xs truncate cursor-default">{file.title}</span>
               </TooltipTrigger>
               <TooltipContent side="top" className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg max-w-xs">
-                <p className="text-xs">{file.lastNote}</p>
+                <p className="text-[10px]">{file.lastNote}</p>
               </TooltipContent>
             </Tooltip>
           ) : (
-            <span className="text-sm truncate">{file.title}</span>
+            <span className="text-xs truncate">{file.title}</span>
           )}
           {isRadio && (
             <Badge variant="secondary" className={`text-xs ${RADIO_BADGE_COLOR}`}>
