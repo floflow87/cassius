@@ -959,7 +959,6 @@ export default function StatsPage() {
                       paddingAngle={2}
                       dataKey="value"
                       nameKey="name"
-                      label={({ name, value }) => `${name}: ${value}%`}
                       labelLine={false}
                     >
                       {outcomeData.map((entry, index) => (
