@@ -1469,10 +1469,9 @@ export default function ImplantDetailsPage() {
                     ) : "-"}
                   </TableCell>
                   <TableCell>
-                    <div>
-                      <p className="font-medium">Pose d'implants</p>
-                      <p className="text-xs text-muted-foreground">Mise en charge différée</p>
-                    </div>
+                    <Badge className="rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 text-[10px]">
+                      Pose d'implants
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <span className="font-medium">1</span>

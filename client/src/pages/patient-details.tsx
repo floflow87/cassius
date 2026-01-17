@@ -1141,7 +1141,7 @@ export default function PatientDetailsPage() {
     switch (columnId) {
       case "site":
         return (
-          <span className="font-mono font-medium">{surgeryImplant.siteFdi || "-"}</span>
+          <span className="font-mono font-medium text-xs">{surgeryImplant.siteFdi || "-"}</span>
         );
       case "marque":
         return (
@@ -1152,13 +1152,13 @@ export default function PatientDetailsPage() {
         );
       case "dimensions":
         return (
-          <span className="text-xs">
+          <span className="text-[10px]">
             {surgeryImplant.implant?.diametre} x {surgeryImplant.implant?.longueur}mm
           </span>
         );
       case "datePose":
         return (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-[10px] text-muted-foreground">
             {surgeryImplant.datePose ? formatDateShort(surgeryImplant.datePose) : "-"}
           </span>
         );
@@ -1190,24 +1190,24 @@ export default function PatientDetailsPage() {
           />
         );
       case "position":
-        return <span className="text-sm">{getPositionLabel(surgeryImplant.positionImplant)}</span>;
+        return <span className="text-[10px]">{getPositionLabel(surgeryImplant.positionImplant)}</span>;
       case "typeOs":
-        return <span className="text-sm font-mono">{surgeryImplant.typeOs || "-"}</span>;
+        return <span className="text-[10px] font-mono">{surgeryImplant.typeOs || "-"}</span>;
       case "greffe":
         return surgeryImplant.greffeOsseuse ? (
-          <Check className="h-4 w-4 text-green-600" />
+          <Check className="h-3.5 w-3.5 text-green-600" />
         ) : (
-          <span className="text-muted-foreground">-</span>
+          <span className="text-muted-foreground text-[10px]">-</span>
         );
       case "chirurgie":
-        return <span className="text-sm">{getChirurgieTempsLabel(surgeryImplant.typeChirurgieTemps)}</span>;
+        return <span className="text-[10px]">{getChirurgieTempsLabel(surgeryImplant.typeChirurgieTemps)}</span>;
       case "miseEnCharge":
-        return <span className="text-sm">{getMiseEnChargeLabel(surgeryImplant.miseEnCharge)}</span>;
+        return <span className="text-[10px]">{getMiseEnChargeLabel(surgeryImplant.miseEnCharge)}</span>;
       case "situation":
-        return <span className="text-sm">{getSituationFromSiteFdi(surgeryImplant.siteFdi)}</span>;
+        return <span className="text-[10px]">{getSituationFromSiteFdi(surgeryImplant.siteFdi)}</span>;
       case "operation":
         return (
-          <div className="text-sm">
+          <div className="text-[10px]">
             <div>{formatDateShort(surgeryImplant.datePose)}</div>
           </div>
         );

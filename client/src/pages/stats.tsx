@@ -1364,10 +1364,13 @@ export default function StatsPage() {
                                           <span>Site {imp.siteFdi} - {imp.marque}</span>
                                           <Badge variant={
                                             imp.statut === "SUCCES" ? "default" :
-                                            imp.statut === "COMPLICATION" ? "outline" :
-                                            imp.statut === "ECHEC" ? "destructive" : "secondary"
-                                          } className="text-xs">
-                                            {imp.statut}
+                                            imp.statut === "COMPLICATION" ? "complication" :
+                                            imp.statut === "ECHEC" ? "echec" : "ensuivi"
+                                          } className="text-[10px]">
+                                            {imp.statut === "EN_SUIVI" ? "En suivi" : 
+                                             imp.statut === "SUCCES" ? "Succès" :
+                                             imp.statut === "COMPLICATION" ? "Complication" :
+                                             imp.statut === "ECHEC" ? "Échec" : imp.statut}
                                           </Badge>
                                         </div>
                                       ))}
