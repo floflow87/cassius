@@ -402,13 +402,15 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
     enabled: activeTab === "suivi",
   });
 
-  // Separate appointments into upcoming and past based on status only
+  // Separate appointments into upcoming and past based on actual date (not status)
   const { upcomingAppointments, pastAppointments } = useMemo(() => {
     const upcoming: AppointmentWithPatient[] = [];
     const past: AppointmentWithPatient[] = [];
+    const now = new Date();
     
     allAppointments.forEach(apt => {
-      if (apt.status === "UPCOMING") {
+      const appointmentDate = new Date(apt.dateStart);
+      if (appointmentDate > now) {
         upcoming.push(apt);
       } else {
         past.push(apt);
@@ -792,6 +794,8 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   // Render appointment card for Suivi tab
   const renderAppointmentItem = (apt: AppointmentWithPatient) => {
     const TypeIcon = appointmentTypeIcons[apt.type] || Calendar;
+    const isPast = new Date(apt.dateStart) <= new Date();
+    const displayStatus = isPast ? "COMPLETED" : "UPCOMING";
     return (
       <Card key={apt.id} className="group hover-elevate" data-testid={`card-suivi-${apt.id}`}>
         <CardContent className="p-4">
@@ -802,8 +806,8 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium truncate">{apt.title}</span>
-                <Badge className={`text-[10px] ${appointmentStatusClasses[apt.status]}`}>
-                  {appointmentStatusLabels[apt.status]}
+                <Badge className={`text-[10px] ${appointmentStatusClasses[displayStatus]}`}>
+                  {appointmentStatusLabels[displayStatus]}
                 </Badge>
                 <Badge className={`text-[10px] ${appointmentTypeClasses[apt.type]}`}>
                   {appointmentTypeLabels[apt.type]}

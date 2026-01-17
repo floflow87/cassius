@@ -731,8 +731,10 @@ export default function PatientDetailsPage() {
     queryKey: ["/api/patients", patientId, "appointments"],
     enabled: !!patientId,
   });
-  const upcomingAppointments = appointments.filter((a) => a.status === "UPCOMING").sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
-  const completedAppointments = appointments.filter((a) => a.status === "COMPLETED" || a.status === "CANCELLED").sort((a, b) => new Date(b.dateStart).getTime() - new Date(a.dateStart).getTime());
+  // Filter appointments by actual date (not status) - future dates are upcoming, past dates are completed
+  const now = new Date();
+  const upcomingAppointments = appointments.filter((a) => new Date(a.dateStart) > now).sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
+  const completedAppointments = appointments.filter((a) => new Date(a.dateStart) <= now).sort((a, b) => new Date(b.dateStart).getTime() - new Date(a.dateStart).getTime());
 
   const createRdvMutation = useMutation({
     mutationFn: async (data: typeof rdvForm) => {

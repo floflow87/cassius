@@ -243,6 +243,10 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
            radio.type?.toLowerCase().includes(search);
   }) || [];
 
+  // Calculate display status based on actual date (not database status)
+  const isPast = new Date(appointment.dateStart) <= new Date();
+  const displayStatus = isPast ? "COMPLETED" : "UPCOMING";
+
   return (
     <>
       <Card className="group" data-testid={`card-appointment-${appointment.id}`}>
@@ -257,8 +261,8 @@ export function AppointmentCard({ appointment, patientId }: AppointmentCardProps
                   <span className="text-sm font-medium truncate" data-testid="text-appointment-title">
                     {appointment.title}
                   </span>
-                  <Badge className={`text-[10px] ${statusClasses[appointment.status]}`} data-testid="badge-appointment-status">
-                    {statusLabels[appointment.status]}
+                  <Badge className={`text-[10px] ${statusClasses[displayStatus]}`} data-testid="badge-appointment-status">
+                    {statusLabels[displayStatus]}
                   </Badge>
                   <Badge className={`text-[10px] ${typeClasses[appointment.type]}`} data-testid="badge-appointment-type">
                     {typeLabels[appointment.type]}
