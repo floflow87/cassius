@@ -331,9 +331,11 @@ export default function StatsPage() {
     isq3m: number | null;
     isq6m: number | null;
     datePose: string | null;
+    referenceFabricant: string | null;
     implant: {
       marque: string;
       diametre: number;
+      referenceFabricant?: string | null;
       typeImplant?: "IMPLANT" | "MINI_IMPLANT" | "PROTHESE";
     };
   }
@@ -1355,22 +1357,23 @@ export default function StatsPage() {
                             ))}
                           </TableRow>
                         </TableHeader>
-                        <TableBody>
+                        <TableBody className="[&_tr]:border-0">
                           {cohorteImplants.map((imp, idx) => {
                             const poseDate = new Date(imp.datePose!);
+                            const modele = imp.referenceFabricant || imp.implant?.referenceFabricant || "";
                             return (
-                              <TableRow key={imp.id} className="h-8" data-testid={`cohorte-row-${idx}`}>
-                                <TableCell className="text-xs font-medium sticky left-0 bg-card z-10 py-1">
+                              <TableRow key={imp.id} data-testid={`cohorte-row-${idx}`}>
+                                <TableCell className="text-sm font-medium sticky left-0 bg-card z-10 py-0.5">
                                   <div className="flex items-center gap-2">
                                     <span>{format(poseDate, "dd MMM yyyy", { locale: fr })}</span>
-                                    <span className="text-[10px] text-muted-foreground">{imp.implant?.marque || "N/A"}</span>
+                                    <span className="text-xs text-muted-foreground">{imp.implant?.marque}{modele ? ` - ${modele}` : ""}</span>
                                   </div>
                                 </TableCell>
                                 {cohortePeriods.map((period) => {
                                   const isqValue = imp[period.field];
                                   return (
-                                    <TableCell key={period.key} className="text-center py-1 px-1">
-                                      <div className={`rounded px-2 py-0.5 text-[10px] font-medium ${getIsqColor(isqValue)}`}>
+                                    <TableCell key={period.key} className="text-center py-0.5 px-1">
+                                      <div className={`rounded px-2 py-0.5 text-xs font-medium ${getIsqColor(isqValue)}`}>
                                         {isqValue ?? "-"}
                                       </div>
                                     </TableCell>
