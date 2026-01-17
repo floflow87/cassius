@@ -651,7 +651,7 @@ export default function ImplantDetailsPage() {
               {status.label}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Ø {implantData.implant.diametre}mm × {implantData.implant.longueur}mm
           </p>
         </div>
@@ -665,26 +665,26 @@ export default function ImplantDetailsPage() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
-                <span className="text-xs text-muted-foreground">Marque</span>
-                <p className="text-sm font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
+                <span className="text-[10px] text-muted-foreground">Marque</span>
+                <p className="text-xs font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
               </div>
               <div>
-                <span className="text-xs text-muted-foreground">Type</span>
-                <p className="text-sm font-medium" data-testid="text-implant-type">{typeLabel}</p>
+                <span className="text-[10px] text-muted-foreground">Type</span>
+                <p className="text-xs font-medium" data-testid="text-implant-type">{typeLabel}</p>
               </div>
               <div>
-                <span className="text-xs text-muted-foreground">Référence fabricant</span>
-                <p className="text-sm font-medium font-mono" data-testid="text-implant-reference">
+                <span className="text-[10px] text-muted-foreground">Référence fabricant</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-implant-reference">
                   {implantData.implant.referenceFabricant || "-"}
                 </p>
               </div>
               <div>
-                <span className="text-xs text-muted-foreground">Diamètre</span>
-                <p className="text-sm font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
+                <span className="text-[10px] text-muted-foreground">Diamètre</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
               </div>
               <div>
-                <span className="text-xs text-muted-foreground">Longueur</span>
-                <p className="text-sm font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
+                <span className="text-[10px] text-muted-foreground">Longueur</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
               </div>
             </div>
             <div className="flex justify-end mt-4 pt-4 border-t">
@@ -842,22 +842,22 @@ export default function ImplantDetailsPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="text-xs text-muted-foreground">Position</span>
-                <p className="text-sm font-medium" data-testid="text-position">
+                <span className="text-[10px] text-muted-foreground">Position</span>
+                <p className="text-xs font-medium" data-testid="text-position">
                   {implantData.positionImplant?.replace(/_/g, " ") || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-xs text-muted-foreground">Site FDI</span>
-                <p className="text-sm font-medium font-mono" data-testid="text-site-fdi">{implantData.siteFdi}</p>
+                <span className="text-[10px] text-muted-foreground">Site FDI</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-site-fdi">{implantData.siteFdi}</p>
               </div>
               <div>
-                <span className="text-xs text-muted-foreground">Type d'os</span>
-                <p className="text-sm font-medium" data-testid="text-type-os">{implantData.typeOs || "—"}</p>
+                <span className="text-[10px] text-muted-foreground">Type d'os</span>
+                <p className="text-xs font-medium" data-testid="text-type-os">{implantData.typeOs || "—"}</p>
               </div>
               <div>
-                <span className="text-xs text-muted-foreground">Greffe</span>
-                <p className="text-sm font-medium" data-testid="text-greffe">
+                <span className="text-[10px] text-muted-foreground">Greffe</span>
+                <p className="text-xs font-medium" data-testid="text-greffe">
                   {implantData.greffeOsseuse ? (implantData.typeGreffe || "Oui") : "Non"}
                 </p>
               </div>
@@ -884,7 +884,7 @@ export default function ImplantDetailsPage() {
                   value={notesContent}
                   onChange={(e) => setNotesContent(e.target.value)}
                   placeholder="Ajouter des notes cliniques..."
-                  className="min-h-[120px]"
+                  className="min-h-[120px] text-xs"
                   data-testid="textarea-notes"
                 />
                 <div className="flex justify-end gap-2">
@@ -897,10 +897,10 @@ export default function ImplantDetailsPage() {
                 </div>
               </div>
             ) : (
-              <div className="text-sm">
+              <div className="text-xs">
                 {notesContent ? (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-2">{formatDate(new Date().toISOString())}</p>
+                    <p className="text-[10px] text-muted-foreground mb-2">{formatDate(new Date().toISOString())}</p>
                     <p>{notesContent}</p>
                   </div>
                 ) : (
@@ -1001,7 +1001,7 @@ export default function ImplantDetailsPage() {
           {isqTimeline.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
               <TrendingUp className="h-8 w-8 mb-2" />
-              <p className="text-sm">Aucune mesure ISQ enregistrée</p>
+              <p className="text-xs">Aucune mesure ISQ enregistrée</p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -1042,14 +1042,14 @@ export default function ImplantDetailsPage() {
                             
                             {/* Date - only show if source is not visite (visite label already shows date) */}
                             {point.source !== "visite" && (
-                              <div className="text-xs text-muted-foreground mt-1">
+                              <div className="text-[10px] text-muted-foreground mt-1">
                                 {formatShortDate(point.date)}
                               </div>
                             )}
                             
                             {/* Notes if any */}
                             {point.notes && (
-                              <p className="text-xs text-muted-foreground mt-1">{point.notes}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">{point.notes}</p>
                             )}
                           </div>
                           
@@ -1124,7 +1124,7 @@ export default function ImplantDetailsPage() {
                 <Collapsible open={statusHistoryOpen} onOpenChange={setStatusHistoryOpen} className="mt-4 pt-4 border-t">
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm" className="w-full justify-between">
-                      <span className="flex items-center gap-2 text-sm">
+                      <span className="flex items-center gap-2 text-xs">
                         <History className="h-4 w-4" />
                         Historique des statuts ({statusHistory.length})
                       </span>
@@ -1136,7 +1136,7 @@ export default function ImplantDetailsPage() {
                       {statusHistory.map((entry) => (
                         <div 
                           key={entry.id}
-                          className="p-2 bg-muted/30 rounded border text-sm space-y-1"
+                          className="p-2 bg-muted/30 rounded border text-xs space-y-1"
                           data-testid={`status-history-${entry.id}`}
                         >
                           <div className="flex items-center justify-between gap-2">

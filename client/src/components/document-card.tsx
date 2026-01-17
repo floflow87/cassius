@@ -240,10 +240,10 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
         <CardContent className="p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm truncate" title={document.title}>
+              <p className="font-medium text-xs truncate" title={document.title}>
                 {document.title}
               </p>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1">
                 <Calendar className="h-3 w-3" />
                 <span>{formatDate(document.createdAt)}</span>
                 {document.sizeBytes && (

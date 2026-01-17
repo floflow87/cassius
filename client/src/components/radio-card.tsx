@@ -163,20 +163,20 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
               {radio.lastNote ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <p className="font-medium text-sm truncate cursor-default" data-testid={`text-radio-title-${radio.id}`}>
+                    <p className="font-medium text-xs truncate cursor-default" data-testid={`text-radio-title-${radio.id}`}>
                       {radio.title || "Sans titre"}
                     </p>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg max-w-xs">
-                    <p className="text-xs">{radio.lastNote}</p>
+                    <p className="text-[10px]">{radio.lastNote}</p>
                   </TooltipContent>
                 </Tooltip>
               ) : (
-                <p className="font-medium text-sm truncate" data-testid={`text-radio-title-${radio.id}`}>
+                <p className="font-medium text-xs truncate" data-testid={`text-radio-title-${radio.id}`}>
                   {radio.title || "Sans titre"}
                 </p>
               )}
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1">
                 <Calendar className="h-3 w-3" />
                 <span>{formatDate(radio.date)}</span>
               </div>

@@ -166,14 +166,14 @@ export default function ActeDetailsPage() {
           <CardContent>
             <Link href={`/patients/${operation.patient.id}`}>
               <div className="hover-elevate p-3 rounded-md -m-3 cursor-pointer">
-                <p className="font-medium" data-testid="text-patient-name">
+                <p className="font-medium text-xs" data-testid="text-patient-name">
                   {operation.patient.prenom} {operation.patient.nom}
                 </p>
-                <p className="text-xs text-muted-foreground" data-testid="text-patient-dob">
+                <p className="text-[10px] text-muted-foreground" data-testid="text-patient-dob">
                   Né(e) le {formatDate(operation.patient.dateNaissance)}
                 </p>
                 {operation.patient.telephone && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[10px] text-muted-foreground">
                     {operation.patient.telephone}
                   </p>
                 )}
