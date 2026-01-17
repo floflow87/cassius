@@ -377,7 +377,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label className="text-muted-foreground text-sm font-light">Nom</Label>
+              <Label className="text-muted-foreground text-xs font-light">Nom</Label>
               {isEditingProfile ? (
                 <Input
                   value={profileFormData.nom}
@@ -389,7 +389,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground text-sm font-light">Prénom</Label>
+              <Label className="text-muted-foreground text-xs font-light">Prénom</Label>
               {isEditingProfile ? (
                 <Input
                   value={profileFormData.prenom}
@@ -401,11 +401,11 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground text-sm font-light">Email / Identifiant</Label>
+              <Label className="text-muted-foreground text-xs font-light">Email / Identifiant</Label>
               <p className="font-light" data-testid="text-user-username">{profile.username}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground text-sm font-light">Rôle</Label>
+              <Label className="text-muted-foreground text-xs font-light">Rôle</Label>
               <div className="mt-1">
                 <Badge variant={getRoleBadgeVariant(profile.role)} data-testid="badge-user-role">
                   {getRoleLabel(profile.role)}
@@ -415,7 +415,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
           </div>
           {profile.organisationNom && (
             <div>
-              <Label className="text-muted-foreground text-sm font-light">Organisation</Label>
+              <Label className="text-muted-foreground text-xs font-light">Organisation</Label>
               <p className="font-light" data-testid="text-user-org">{profile.organisationNom}</p>
             </div>
           )}
@@ -544,7 +544,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
 
 function OnboardingSettingsSection() {
   const [, setLocation] = useLocation();
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpenOverride, setIsOpenOverride] = useState<boolean | null>(null);
   const { toast } = useToast();
   const { 
     state, 
@@ -610,6 +610,8 @@ function OnboardingSettingsSection() {
 
   const progress = checklist ? Math.round((checklist.completedCount / checklist.totalCount) * 100) : 0;
   const allCompleted = checklist?.completedCount === checklist?.totalCount;
+  const isOpen = isOpenOverride !== null ? isOpenOverride : !allCompleted;
+  const setIsOpen = setIsOpenOverride;
   const statusBadge = allCompleted ? (
     <Badge variant="default" className="bg-green-500 hover:bg-green-600">Terminé</Badge>
   ) : (
@@ -680,7 +682,7 @@ function OnboardingSettingsSection() {
         <CollapsibleContent>
           <CardContent className="space-y-4 pt-0">
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Progression globale</span>
                 <span className="font-medium">{checklist?.completedCount || 0}/{checklist?.totalCount || 0}</span>
               </div>
@@ -691,7 +693,7 @@ function OnboardingSettingsSection() {
               {checklist?.items.map((item) => (
                 <div 
                   key={item.id}
-                  className="flex items-center justify-between gap-2 text-sm py-2 px-2 -mx-2 rounded hover-elevate"
+                  className="flex items-center justify-between gap-2 text-xs py-2 px-2 -mx-2 rounded hover-elevate"
                   data-testid={`settings-onboarding-step-${item.id}`}
                 >
                   <div 
@@ -837,14 +839,14 @@ function IntegrationsSection() {
               <>
                 {googleStatus.email && (
                   <div>
-                    <Label className="text-muted-foreground text-sm">Compte connecté</Label>
-                    <p className="font-medium text-sm">{googleStatus.email}</p>
+                    <Label className="text-muted-foreground text-xs">Compte connecté</Label>
+                    <p className="font-medium text-xs">{googleStatus.email}</p>
                   </div>
                 )}
                 
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <Label className="text-sm">Synchronisation automatique</Label>
+                    <Label className="text-xs">Synchronisation automatique</Label>
                     <p className="text-xs text-muted-foreground">
                       Les rendez-vous sont synchronisés automatiquement
                     </p>
@@ -859,8 +861,8 @@ function IntegrationsSection() {
 
                 {googleStatus.integration?.targetCalendarName && (
                   <div>
-                    <Label className="text-muted-foreground text-sm">Calendrier cible</Label>
-                    <p className="font-medium text-sm flex items-center gap-2">
+                    <Label className="text-muted-foreground text-xs">Calendrier cible</Label>
+                    <p className="font-medium text-xs flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
                       {googleStatus.integration.targetCalendarName}
                     </p>
@@ -869,8 +871,8 @@ function IntegrationsSection() {
 
                 {googleStatus.integration?.lastSyncAt && (
                   <div>
-                    <Label className="text-muted-foreground text-sm">Dernière synchronisation</Label>
-                    <p className="text-sm">
+                    <Label className="text-muted-foreground text-xs">Dernière synchronisation</Label>
+                    <p className="text-xs">
                       {new Date(googleStatus.integration.lastSyncAt).toLocaleString("fr-FR")}
                     </p>
                   </div>
@@ -879,7 +881,7 @@ function IntegrationsSection() {
                 {googleStatus.integration?.syncErrorCount && googleStatus.integration.syncErrorCount > 0 && (
                   <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
                     <AlertCircle className="w-4 h-4" />
-                    <span className="text-sm">{googleStatus.integration.syncErrorCount} erreurs de synchronisation</span>
+                    <span className="text-xs">{googleStatus.integration.syncErrorCount} erreurs de synchronisation</span>
                   </div>
                 )}
 
@@ -917,7 +919,7 @@ function IntegrationsSection() {
                 {!googleStatus?.configured && (
                   <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm">L'intégration Google n'est pas configurée. Contactez l'administrateur.</span>
+                    <span className="text-xs">L'intégration Google n'est pas configurée. Contactez l'administrateur.</span>
                   </div>
                 )}
                 <Button
@@ -1063,7 +1065,7 @@ function CollaboratorsSection() {
           <CardTitle>Permissions par rôle</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3 text-sm">
+          <div className="space-y-3 text-xs">
             <div className="flex items-start gap-3">
               <Badge variant="default">Administrateur</Badge>
               <p className="text-muted-foreground">
@@ -1228,7 +1230,7 @@ function CollaboratorsSection() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{collab.email || collab.username}</p>
+                      <p className="text-xs text-muted-foreground">{collab.email || collab.username}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1418,20 +1420,20 @@ function OrganizationSection() {
           ) : (
             <div className="space-y-4">
               <div>
-                <Label className="text-muted-foreground text-sm font-light">Nom du cabinet</Label>
+                <Label className="text-muted-foreground text-xs font-light">Nom du cabinet</Label>
                 <p className="font-medium" data-testid="text-org-nom">{organisation?.nom || "—"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground text-sm font-light">Adresse</Label>
+                <Label className="text-muted-foreground text-xs font-light">Adresse</Label>
                 <p className="font-medium" data-testid="text-org-adresse">{organisation?.adresse || "—"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground text-sm font-light">Fuseau horaire</Label>
+                <Label className="text-muted-foreground text-xs font-light">Fuseau horaire</Label>
                 <p className="font-medium" data-testid="text-org-timezone">{organisation?.timezone || "Europe/Paris"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground text-sm font-light">Date de création</Label>
-                <p className="text-sm text-muted-foreground">
+                <Label className="text-muted-foreground text-xs font-light">Date de création</Label>
+                <p className="text-xs text-muted-foreground">
                   {organisation?.createdAt
                     ? new Date(organisation.createdAt).toLocaleDateString("fr-FR")
                     : "—"}
@@ -1722,7 +1724,7 @@ function NotificationsSection() {
                           className={`grid grid-cols-12 gap-2 px-4 py-3 items-center ${isDisabled ? "opacity-50" : ""}`}
                         >
                           <div className="col-span-3">
-                            <span className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : ""}`}>
+                            <span className={`text-xs font-medium ${isDisabled ? "text-muted-foreground" : ""}`}>
                               {notifType.label}
                             </span>
                           </div>

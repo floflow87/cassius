@@ -2539,13 +2539,14 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const { from, to, implantModelId, patientIds, operationIds } = req.query;
+      const { from, to, implantModelId, patientIds, operationIds, implantType } = req.query;
       const dateFrom = from ? String(from) : undefined;
       const dateTo = to ? String(to) : undefined;
       const implantModel = implantModelId ? String(implantModelId) : undefined;
       const patientIdList = patientIds ? String(patientIds).split(",").filter(Boolean) : undefined;
       const operationIdList = operationIds ? String(operationIds).split(",").filter(Boolean) : undefined;
-      const stats = await storage.getClinicalStats(organisationId, dateFrom, dateTo, implantModel, patientIdList, operationIdList);
+      const implantTypeFilter = implantType ? String(implantType) as "IMPLANT" | "MINI_IMPLANT" : undefined;
+      const stats = await storage.getClinicalStats(organisationId, dateFrom, dateTo, implantModel, patientIdList, operationIdList, implantTypeFilter);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching clinical stats:", error);

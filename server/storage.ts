@@ -199,7 +199,7 @@ export interface IStorage {
   // Stats methods
   getStats(organisationId: string): Promise<DashboardStats>;
   getAdvancedStats(organisationId: string): Promise<AdvancedStats>;
-  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[]): Promise<ClinicalStats>;
+  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[], implantType?: "IMPLANT" | "MINI_IMPLANT"): Promise<ClinicalStats>;
   getPatientStats(organisationId: string): Promise<import("@shared/types").PatientStats[]>;
 
   // User methods (not tenant-filtered, users are global)
@@ -1840,7 +1840,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[]): Promise<ClinicalStats> {
+  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[], implantType?: "IMPLANT" | "MINI_IMPLANT"): Promise<ClinicalStats> {
     const now = new Date();
     const defaultFrom = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().split('T')[0];
     const defaultTo = now.toISOString().split('T')[0];
@@ -1900,6 +1900,7 @@ export class DatabaseStorage implements IStorage {
       boneLossScore: surgeryImplants.boneLossScore,
       marque: implants.marque,
       referenceFabricant: implants.referenceFabricant,
+      typeImplant: implants.typeImplant,
     }).from(surgeryImplants)
       .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
       .where(and(...siConditions));
@@ -1990,10 +1991,14 @@ export class DatabaseStorage implements IStorage {
     const complicationRate = total > 0 ? Math.round((statusCounts.COMPLICATION / total) * 100) : 0;
     const failureRate = total > 0 ? Math.round((statusCounts.ECHEC / total) * 100) : 0;
 
-    // Filter surgery implants for ISQ data if implantModelId is provided
-    const isqFilteredImplants = implantModelId 
-      ? allSurgeryImplants.filter(si => si.implantId === implantModelId)
-      : allSurgeryImplants;
+    // Filter surgery implants for ISQ data based on implantModelId and/or implantType
+    let isqFilteredImplants = allSurgeryImplants;
+    if (implantModelId) {
+      isqFilteredImplants = isqFilteredImplants.filter(si => si.implantId === implantModelId);
+    }
+    if (implantType) {
+      isqFilteredImplants = isqFilteredImplants.filter(si => si.typeImplant === implantType);
+    }
 
     const filteredIsqValues: number[] = [];
     isqFilteredImplants.forEach(si => {

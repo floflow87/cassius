@@ -53,6 +53,8 @@ import type { FlagWithEntity } from "@shared/schema";
 import { FlagBadge } from "@/components/flag-badge";
 import { formatDistanceToNow } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const PERIOD_OPTIONS = [
   { value: "1m", label: "Ce mois" },
@@ -134,6 +136,8 @@ export default function StatsPage() {
   const [patientAlertFilter, setPatientAlertFilter] = useState<string>("all");
   const [patientSuccessFilter, setPatientSuccessFilter] = useState<string>("all");
   const [patientAgeFilter, setPatientAgeFilter] = useState<string>("all");
+  const [isqEvolutionImplantType, setIsqEvolutionImplantType] = useState<"IMPLANT" | "MINI_IMPLANT">("IMPLANT");
+  const [successRateImplantType, setSuccessRateImplantType] = useState<"IMPLANT" | "MINI_IMPLANT">("IMPLANT");
 
   const getDateRange = () => {
     const now = new Date();
@@ -258,7 +262,7 @@ export default function StatsPage() {
 
   // Separate query for ISQ Evolution (filtered by model + patient/operation filters)
   const { data: isqEvolutionStats } = useQuery<ClinicalStats>({
-    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-evolution", isqEvolutionFilter, selectedPatientIds, selectedOperationIds],
+    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-evolution", isqEvolutionFilter, isqEvolutionImplantType, selectedPatientIds, selectedOperationIds],
     queryFn: async () => {
       const params = new URLSearchParams({
         from: dateRange.from,
@@ -267,6 +271,7 @@ export default function StatsPage() {
       if (isqEvolutionFilter && isqEvolutionFilter !== "all") {
         params.append("implantModelId", isqEvolutionFilter);
       }
+      params.append("implantType", isqEvolutionImplantType);
       if (selectedPatientIds.length > 0) {
         params.append("patientIds", selectedPatientIds.join(","));
       }
@@ -279,7 +284,7 @@ export default function StatsPage() {
       if (!res.ok) throw new Error("Failed to fetch ISQ evolution stats");
       return res.json();
     },
-    enabled: (period !== "custom" || (!!customFrom && !!customTo)) && isqEvolutionFilter !== "all",
+    enabled: period !== "custom" || (!!customFrom && !!customTo),
   });
 
   // Use filtered data when filter is applied, otherwise use main stats
@@ -287,9 +292,8 @@ export default function StatsPage() {
     ? (isqDistributionStats?.isqDistribution || [])
     : (stats?.isqDistribution || []);
   
-  const isqEvolutionData = isqEvolutionFilter !== "all"
-    ? (isqEvolutionStats?.isqEvolution || [])
-    : (stats?.isqEvolution || []);
+  // Always use isqEvolutionStats for ISQ evolution (respects implant type switch)
+  const isqEvolutionData = isqEvolutionStats?.isqEvolution || [];
 
   // Fetch all active flags with entity info
   const { data: flagsData = [] } = useQuery<FlagWithEntity[]>({
@@ -325,6 +329,7 @@ export default function StatsPage() {
     implant: {
       marque: string;
       diametre: number;
+      typeImplant?: "IMPLANT" | "MINI_IMPLANT" | "PROTHESE";
     };
   }
   const { data: surgeryImplantsData = [] } = useQuery<SurgeryImplantForStats[]>({
@@ -350,16 +355,24 @@ export default function StatsPage() {
     });
   }, [surgeryImplantsData, dateRange.from, dateRange.to]);
 
-  // Calculate success rate by dimension
+  // Filter surgery implants by implant type for success rate card
+  const filteredSurgeryImplantsForSuccessRate = useMemo(() => {
+    return filteredSurgeryImplants.filter((implant) => {
+      const type = implant.implant?.typeImplant || "IMPLANT";
+      return type === successRateImplantType;
+    });
+  }, [filteredSurgeryImplants, successRateImplantType]);
+
+  // Calculate success rate by dimension (filtered by implant type)
   // Success is defined as: SUCCES or EN_SUIVI (healthy implants in follow-up)
   // Failure is: ECHEC or COMPLICATION
   const successRateByDimension = useMemo(() => {
-    if (!filteredSurgeryImplants || filteredSurgeryImplants.length === 0) return [];
+    if (!filteredSurgeryImplantsForSuccessRate || filteredSurgeryImplantsForSuccessRate.length === 0) return [];
 
     const groupBy = (key: string): Map<string, { total: number; success: number; avgIsq: number; isqCount: number }> => {
       const groups = new Map<string, { total: number; success: number; avgIsq: number; isqCount: number }>();
       
-      filteredSurgeryImplants.forEach((implant) => {
+      filteredSurgeryImplantsForSuccessRate.forEach((implant) => {
         let groupValue: string;
         switch (key) {
           case "marque":
@@ -417,7 +430,7 @@ export default function StatsPage() {
       }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 10);
-  }, [filteredSurgeryImplants, successRateDimension]);
+  }, [filteredSurgeryImplantsForSuccessRate, successRateDimension]);
 
   // Filter patient stats - only show patients with at least one implant
   // Also filter by selected patient IDs from the search bar
@@ -965,10 +978,10 @@ export default function StatsPage() {
                   {outcomeData.map((item) => (
                     <div key={item.name} className="flex items-center gap-2">
                       <div
-                        className="w-3 h-3 rounded-full"
+                        className="w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: item.color }}
                       />
-                      <span className="text-sm text-muted-foreground">{item.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{item.name}: {item.value}%</span>
                     </div>
                   ))}
                 </div>
@@ -1090,19 +1103,32 @@ export default function StatsPage() {
                 </CardTitle>
                 <CardDescription>Stabilité moyenne des implants par mois</CardDescription>
               </div>
-              <Select value={isqEvolutionFilter} onValueChange={setIsqEvolutionFilter}>
-              <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-evolution-model">
-                <SelectValue placeholder="Tous les implants" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les implants</SelectItem>
-                {stats?.availableImplantModels.map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="isq-evolution-implant-type" className="text-xs text-muted-foreground whitespace-nowrap">
+                    {isqEvolutionImplantType === "IMPLANT" ? "Implant" : "Mini implant"}
+                  </Label>
+                  <Switch
+                    id="isq-evolution-implant-type"
+                    checked={isqEvolutionImplantType === "MINI_IMPLANT"}
+                    onCheckedChange={(checked) => setIsqEvolutionImplantType(checked ? "MINI_IMPLANT" : "IMPLANT")}
+                    data-testid="switch-isq-evolution-implant-type"
+                  />
+                </div>
+                <Select value={isqEvolutionFilter} onValueChange={setIsqEvolutionFilter}>
+                  <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-evolution-model">
+                    <SelectValue placeholder="Tous les implants" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les implants</SelectItem>
+                    {stats?.availableImplantModels.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -1150,20 +1176,33 @@ export default function StatsPage() {
                 </CardTitle>
                 <CardDescription>Analyse des implants par critère</CardDescription>
               </div>
-              <Select value={successRateDimension} onValueChange={setSuccessRateDimension}>
-                <SelectTrigger className="w-56 bg-white dark:bg-zinc-900" data-testid="select-success-dimension">
-                  <SelectValue placeholder="Afficher par" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="marque">Marque d'implant</SelectItem>
-                  <SelectItem value="diametre">Diamètre</SelectItem>
-                  <SelectItem value="localisation">Localisation (site FDI)</SelectItem>
-                  <SelectItem value="greffe">Greffe ou non</SelectItem>
-                  <SelectItem value="miseEnCharge">Mise en charge</SelectItem>
-                  <SelectItem value="chirurgie">Type de chirurgie</SelectItem>
-                  <SelectItem value="typeOs">Type d'os (D1-D4)</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="success-rate-implant-type" className="text-xs text-muted-foreground whitespace-nowrap">
+                    {successRateImplantType === "IMPLANT" ? "Implant" : "Mini implant"}
+                  </Label>
+                  <Switch
+                    id="success-rate-implant-type"
+                    checked={successRateImplantType === "MINI_IMPLANT"}
+                    onCheckedChange={(checked) => setSuccessRateImplantType(checked ? "MINI_IMPLANT" : "IMPLANT")}
+                    data-testid="switch-success-rate-implant-type"
+                  />
+                </div>
+                <Select value={successRateDimension} onValueChange={setSuccessRateDimension}>
+                  <SelectTrigger className="w-56 bg-white dark:bg-zinc-900" data-testid="select-success-dimension">
+                    <SelectValue placeholder="Afficher par" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="marque">Marque d'implant</SelectItem>
+                    <SelectItem value="diametre">Diamètre</SelectItem>
+                    <SelectItem value="localisation">Localisation (site FDI)</SelectItem>
+                    <SelectItem value="greffe">Greffe ou non</SelectItem>
+                    <SelectItem value="miseEnCharge">Mise en charge</SelectItem>
+                    <SelectItem value="chirurgie">Type de chirurgie</SelectItem>
+                    <SelectItem value="typeOs">Type d'os (D1-D4)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               {successRateByDimension.length === 0 ? (
