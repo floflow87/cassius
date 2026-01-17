@@ -678,31 +678,31 @@ export default function ImplantDetailsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xs">Informations de l'implant</CardTitle>
+            <CardTitle className="text-sm">Informations de l'implant</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
-                <span className="text-[10px] text-muted-foreground">Marque</span>
-                <p className="text-[10px] font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
+                <span className="text-xs text-muted-foreground">Marque</span>
+                <p className="text-xs font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
               </div>
               <div>
-                <span className="text-[10px] text-muted-foreground">Type</span>
-                <p className="text-[10px] font-medium" data-testid="text-implant-type">{typeLabel}</p>
+                <span className="text-xs text-muted-foreground">Type</span>
+                <p className="text-xs font-medium" data-testid="text-implant-type">{typeLabel}</p>
               </div>
               <div>
-                <span className="text-[10px] text-muted-foreground">Référence fabricant</span>
-                <p className="text-[10px] font-medium font-mono" data-testid="text-implant-reference">
+                <span className="text-xs text-muted-foreground">Référence fabricant</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-implant-reference">
                   {implantData.implant.referenceFabricant || "-"}
                 </p>
               </div>
               <div>
-                <span className="text-[10px] text-muted-foreground">Diamètre</span>
-                <p className="text-[10px] font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
+                <span className="text-xs text-muted-foreground">Diamètre</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
               </div>
               <div>
-                <span className="text-[10px] text-muted-foreground">Longueur</span>
-                <p className="text-[10px] font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
+                <span className="text-xs text-muted-foreground">Longueur</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
               </div>
             </div>
             <div className="flex justify-end mt-4 pt-4 border-t">
@@ -718,7 +718,7 @@ export default function ImplantDetailsPage() {
 
         <Card className={getSuccessRateCardStyle()}>
           <CardHeader className="pb-2">
-            <CardTitle className={`text-xs flex items-center gap-2 ${successRate >= 80 ? "text-emerald-700 dark:text-emerald-400" : successRate >= 60 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400"}`}>
+            <CardTitle className={`text-sm flex items-center gap-2 ${successRate >= 80 ? "text-emerald-700 dark:text-emerald-400" : successRate >= 60 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400"}`}>
               Taux de réussite
               {successRate >= 80 && <CheckCircle2 className="h-3.5 w-3.5" />}
             </CardTitle>
