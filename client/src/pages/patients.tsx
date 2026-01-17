@@ -719,25 +719,25 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
       case "patient":
         return (
           <div>
-            <div className="text-sm font-medium text-foreground">
+            <div className="text-xs font-medium text-foreground">
               {patient.prenom} {patient.nom}
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-[10px] text-muted-foreground">
               ID: {displayId}
             </div>
           </div>
         );
       case "dateNaissance":
         return (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {formatDateWithAge(patient.dateNaissance)}
           </span>
         );
       case "contact":
         return (
           <div>
-            <div className="text-sm text-foreground">{formatPhoneNumber(patient.telephone)}</div>
-            <div className="text-xs text-muted-foreground">{patient.email || '-'}</div>
+            <div className="text-xs text-foreground">{formatPhoneNumber(patient.telephone)}</div>
+            <div className="text-[10px] text-muted-foreground">{patient.email || '-'}</div>
           </div>
         );
       case "implants":
@@ -749,16 +749,16 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         const lastVisit = lastVisits?.[patient.id];
         if (lastVisit) {
           return (
-            <span className="text-sm text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {new Date(lastVisit.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
             </span>
           );
         }
-        return <span className="text-sm text-muted-foreground">—</span>;
+        return <span className="text-xs text-muted-foreground">—</span>;
       case "flags":
         const patientFlagData = flagsByPatient[patient.id];
         if (!patientFlagData || patientFlagData.activeFlagCount === 0) {
-          return <span className="text-sm text-muted-foreground">—</span>;
+          return <span className="text-xs text-muted-foreground">—</span>;
         }
         return <TopFlagSummary topFlag={patientFlagData.topFlag} activeFlagCount={patientFlagData.activeFlagCount} />;
       case "statut":

@@ -1268,7 +1268,7 @@ export default function StatsPage() {
                   <Users className="h-5 w-5" />
                   Patients avec implants
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs">
                   {filteredPatientStats.length} patient{filteredPatientStats.length > 1 ? "s" : ""} sur {totalPatientsWithImplants} au total
                 </CardDescription>
               </div>

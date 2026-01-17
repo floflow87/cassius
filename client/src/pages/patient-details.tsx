@@ -1512,7 +1512,7 @@ export default function PatientDetailsPage() {
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
-              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+              className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
                 activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
               }`}
               data-testid={`tab-${tab.value}`}
