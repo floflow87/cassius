@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { differenceInDays } from "date-fns";
 
-export type IsqTimingLabel = "+0" | "+2M" | "+4M" | "+6M" | "+12M" | "+18M" | "+24M" | "+36M" | "+48M";
+export type IsqTimingLabel = "+0" | "+2M" | "+3M" | "+4M" | "+6M" | "+12M" | "+18M" | "+24M" | "+36M" | "+48M";
 
 interface IsqTimingThreshold {
   label: IsqTimingLabel;
@@ -18,6 +18,7 @@ const ISQ_TIMING_THRESHOLDS: IsqTimingThreshold[] = [
   { label: "+12M", minDays: 365, cssVar: "--isq-timing-12m", useLightText: true },
   { label: "+6M", minDays: 180, cssVar: "--isq-timing-6m", useLightText: false },
   { label: "+4M", minDays: 120, cssVar: "--isq-timing-4m", useLightText: false },
+  { label: "+3M", minDays: 90, cssVar: "--isq-timing-3m", useLightText: false },
   { label: "+2M", minDays: 60, cssVar: "--isq-timing-2m", useLightText: false },
   { label: "+0", minDays: 0, cssVar: "--isq-timing-0", useLightText: false },
 ];

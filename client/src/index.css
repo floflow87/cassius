@@ -108,8 +108,9 @@
   
   /* ISQ Timing Badge Colors - Turquoise Gradient (light to dark) */
   --isq-timing-0: 180 76% 90%;           /* +0 - très clair */
-  --isq-timing-2m: 178 70% 82%;          /* +2M */
-  --isq-timing-4m: 176 65% 74%;          /* +4M */
+  --isq-timing-2m: 178 70% 84%;          /* +2M */
+  --isq-timing-3m: 177 68% 78%;          /* +3M */
+  --isq-timing-4m: 176 65% 72%;          /* +4M */
   --isq-timing-6m: 174 60% 66%;          /* +6M */
   --isq-timing-12m: 172 55% 58%;         /* +12M */
   --isq-timing-18m: 170 50% 50%;         /* +18M */
@@ -237,13 +238,14 @@
   /* ISQ Timing Badge Colors - Dark Mode (Turquoise Gradient) */
   --isq-timing-0: 180 50% 25%;           /* +0 - clair */
   --isq-timing-2m: 178 50% 28%;          /* +2M */
-  --isq-timing-4m: 176 50% 31%;          /* +4M */
-  --isq-timing-6m: 174 50% 34%;          /* +6M */
-  --isq-timing-12m: 172 50% 37%;         /* +12M */
-  --isq-timing-18m: 170 50% 40%;         /* +18M */
-  --isq-timing-24m: 168 55% 43%;         /* +24M */
-  --isq-timing-36m: 166 55% 46%;         /* +36M */
-  --isq-timing-48m: 164 55% 49%;         /* +48M - foncé */
+  --isq-timing-3m: 177 50% 30%;          /* +3M */
+  --isq-timing-4m: 176 50% 32%;          /* +4M */
+  --isq-timing-6m: 174 50% 35%;          /* +6M */
+  --isq-timing-12m: 172 50% 38%;         /* +12M */
+  --isq-timing-18m: 170 50% 41%;         /* +18M */
+  --isq-timing-24m: 168 55% 44%;         /* +24M */
+  --isq-timing-36m: 166 55% 47%;         /* +36M */
+  --isq-timing-48m: 164 55% 50%;         /* +48M - foncé */
   --isq-timing-foreground: 180 20% 90%;  /* Texte clair */
   --isq-timing-foreground-light: 180 20% 95%; /* Texte très clair */
   

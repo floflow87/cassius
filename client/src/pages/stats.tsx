@@ -55,6 +55,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { IsqTimingBadge } from "@/components/isq-timing-badge";
 
 const PERIOD_OPTIONS = [
   { value: "1m", label: "Ce mois" },
@@ -1310,10 +1311,10 @@ export default function StatsPage() {
             <CardContent>
               {(() => {
                 const cohortePeriods = [
-                  { key: "J0", label: "J0", field: "isqPose" as const },
-                  { key: "2M", label: "2M", field: "isq2m" as const },
-                  { key: "3M", label: "3M", field: "isq3m" as const },
-                  { key: "6M", label: "6M", field: "isq6m" as const },
+                  { key: "J0", field: "isqPose" as const, daysOffset: 0 },
+                  { key: "2M", field: "isq2m" as const, daysOffset: 60 },
+                  { key: "3M", field: "isq3m" as const, daysOffset: 90 },
+                  { key: "6M", field: "isq6m" as const, daysOffset: 180 },
                 ];
                 const cohorteImplants = filteredSurgeryImplants
                   .filter((imp) => imp.datePose)
@@ -1353,7 +1354,12 @@ export default function StatsPage() {
                           <TableRow>
                             <TableHead className="text-xs w-36 sticky left-0 bg-card z-10">Date de pose</TableHead>
                             {cohortePeriods.map((period) => (
-                              <TableHead key={period.key} className="text-xs text-center w-20">{period.label}</TableHead>
+                              <TableHead key={period.key} className="text-center w-20 px-1">
+                                <IsqTimingBadge
+                                  poseDate={new Date(0)}
+                                  measurementDate={new Date(period.daysOffset * 24 * 60 * 60 * 1000)}
+                                />
+                              </TableHead>
                             ))}
                           </TableRow>
                         </TableHeader>
