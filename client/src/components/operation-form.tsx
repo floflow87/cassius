@@ -240,7 +240,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
           className="w-full"
         >
           <AccordionItem value="procedure" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-base font-medium">
+            <AccordionTrigger className="text-sm font-medium">
               Intervention
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">
@@ -356,7 +356,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
           </AccordionItem>
 
           <AccordionItem value="implants" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-base font-medium">
+            <AccordionTrigger className="text-sm font-medium">
               Implants ({fields.length})
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">
@@ -612,7 +612,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
           </AccordionItem>
 
           <AccordionItem value="greffe" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-base font-medium">
+            <AccordionTrigger className="text-sm font-medium">
               Greffe osseuse
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">
@@ -700,7 +700,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
           </AccordionItem>
 
           <AccordionItem value="prothese" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-base font-medium">
+            <AccordionTrigger className="text-sm font-medium">
               Prothèse
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">
@@ -822,7 +822,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
           </AccordionItem>
 
           <AccordionItem value="notes" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-base font-medium">
+            <AccordionTrigger className="text-sm font-medium">
               Notes cliniques
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">

@@ -877,7 +877,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "patients" | "suivi")} className="w-full">
-        <TabsList className="mb-4 bg-white dark:bg-zinc-900 p-1 h-auto rounded-full w-fit" data-testid="tabs-patients-page">
+        <TabsList className="mb-4 bg-muted p-1 h-auto rounded-md w-fit" data-testid="tabs-patients-page">
           {[
             { value: "patients", label: "Patients" },
             { value: "suivi", label: "Suivi" },
@@ -885,17 +885,10 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
             <TabsTrigger
               key={tab.value}
               value={tab.value}
-              className="relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 data-[state=inactive]:text-muted-foreground data-[state=inactive]:bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:shadow-none"
+              className="px-4 py-1.5 text-xs font-medium rounded-sm"
               data-testid={`tab-${tab.value}`}
             >
-              {activeTab === tab.value && (
-                <motion.div
-                  layoutId="patients-tab-indicator"
-                  className="absolute inset-0 bg-primary rounded-full -z-10"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
-                />
-              )}
-              <span className="relative z-10">{tab.label}</span>
+              {tab.label}
             </TabsTrigger>
           ))}
         </TabsList>
