@@ -2588,6 +2588,47 @@ export async function registerRoutes(
     }
   });
 
+  // PATCH /api/visites/:id - Update a visite (e.g., to set ISQ to null)
+  app.patch("/api/visites/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const visiteId = req.params.id;
+      const updates = req.body;
+      
+      const updated = await storage.updateVisite(organisationId, visiteId, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "Visite not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating visite:", error);
+      res.status(500).json({ error: "Failed to update visite" });
+    }
+  });
+
+  // DELETE /api/visites/:id - Delete a visite
+  app.delete("/api/visites/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const visiteId = req.params.id;
+      
+      const deleted = await storage.deleteVisite(organisationId, visiteId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Visite not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting visite:", error);
+      res.status(500).json({ error: "Failed to delete visite" });
+    }
+  });
+
   // ========== PROTHESES ==========
   app.post("/api/protheses", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

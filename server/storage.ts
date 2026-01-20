@@ -188,6 +188,8 @@ export interface IStorage {
   getVisite(organisationId: string, id: string): Promise<Visite | undefined>;
   getImplantVisites(organisationId: string, implantId: string): Promise<Visite[]>;
   createVisite(organisationId: string, visite: InsertVisite): Promise<Visite>;
+  updateVisite(organisationId: string, id: string, updates: Partial<InsertVisite>): Promise<Visite | undefined>;
+  deleteVisite(organisationId: string, id: string): Promise<boolean>;
   getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; titre: string | null }>>;
   findSurgeryImplantForVisite(organisationId: string, catalogImplantId: string, patientId: string): Promise<string | null>;
   syncVisiteIsqToSurgeryImplant(organisationId: string, surgeryImplantId: string, isqValue: number, visiteDate: string): Promise<void>;
@@ -1629,6 +1631,27 @@ export class DatabaseStorage implements IStorage {
       organisationId,
     }).returning();
     return newVisite;
+  }
+
+  async updateVisite(organisationId: string, id: string, updates: Partial<InsertVisite>): Promise<Visite | undefined> {
+    const [updated] = await db.update(visites)
+      .set(updates)
+      .where(and(
+        eq(visites.id, id),
+        eq(visites.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteVisite(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(visites)
+      .where(and(
+        eq(visites.id, id),
+        eq(visites.organisationId, organisationId)
+      ))
+      .returning({ id: visites.id });
+    return result.length > 0;
   }
 
   async getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; titre: string | null }>> {
