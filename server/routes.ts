@@ -1894,64 +1894,66 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const implantId = req.params.implantId;
+      const surgeryImplantId = req.params.implantId;
       // Fetch surgery implant with ISQ data
-      const implant = await storage.getSurgeryImplant(organisationId, implantId);
+      const implant = await storage.getSurgeryImplant(organisationId, surgeryImplantId);
       if (!implant) {
         return res.status(404).json({ error: "Implant not found" });
       }
 
-      // Fetch status history and measurements to check for applied suggestions
-      const [statusHistory, measurements] = await Promise.all([
-        storage.getImplantStatusHistory(organisationId, implantId),
-        storage.getImplantMeasurements(organisationId, implantId),
+      // Fetch status history, measurements, and visites to check for applied suggestions
+      // Note: visites are linked to catalog implant.id, not surgeryImplant.id
+      const [statusHistory, measurements, visites] = await Promise.all([
+        storage.getImplantStatusHistory(organisationId, surgeryImplantId),
+        storage.getImplantMeasurements(organisationId, surgeryImplantId),
+        storage.getImplantVisites(organisationId, implant.implantId), // Use catalog implant ID for visites
       ]);
 
       // Get last status change date
       const lastStatusChange = statusHistory.length > 0 ? new Date(statusHistory[0].changedAt) : null;
       
-      // Get last ISQ measurement date - check both measurements table AND implant fields
-      // Implant fields use datePose as the reference date for isqPose, and we estimate dates for 2m/3m/6m
-      let lastMeasurementDate: Date | null = null;
+      // Collect ALL ISQ dates from all sources for lastMeasurementDate calculation
+      const allIsqDates: Date[] = [];
       
-      // Check implantMeasurements table first (visit measurements)
-      if (measurements.length > 0) {
-        lastMeasurementDate = new Date(measurements[0].measuredAt);
+      // 1. Check implantMeasurements table
+      for (const m of measurements) {
+        if (m.isqValue !== null) {
+          allIsqDates.push(new Date(m.measuredAt));
+        }
       }
       
-      // Also check implant ISQ fields (pose/2m/3m/6m) - use datePose as base
-      if (implant.datePose) {
-        const datePose = new Date(implant.datePose);
-        // Check which ISQ fields exist and estimate their dates
-        const isqDates: Date[] = [];
-        if (implant.isqPose !== null && implant.isqPose !== undefined) {
-          isqDates.push(datePose);
-        }
-        if (implant.isq2m !== null && implant.isq2m !== undefined) {
-          const date2m = new Date(datePose);
-          date2m.setMonth(date2m.getMonth() + 2);
-          isqDates.push(date2m);
-        }
-        if (implant.isq3m !== null && implant.isq3m !== undefined) {
-          const date3m = new Date(datePose);
-          date3m.setMonth(date3m.getMonth() + 3);
-          isqDates.push(date3m);
-        }
-        if (implant.isq6m !== null && implant.isq6m !== undefined) {
-          const date6m = new Date(datePose);
-          date6m.setMonth(date6m.getMonth() + 6);
-          isqDates.push(date6m);
-        }
-        
-        // Get the most recent ISQ date from implant fields
-        if (isqDates.length > 0) {
-          const maxImplantIsqDate = new Date(Math.max(...isqDates.map(d => d.getTime())));
-          // Use the most recent date between measurements and implant fields
-          if (!lastMeasurementDate || maxImplantIsqDate > lastMeasurementDate) {
-            lastMeasurementDate = maxImplantIsqDate;
-          }
+      // 2. Check visites table (linked to catalog implant)
+      for (const v of visites) {
+        if (v.isq !== null && v.isq !== undefined) {
+          allIsqDates.push(new Date(v.date));
         }
       }
+      
+      // 3. Check implant ISQ fields (pose/2m/3m/6m)
+      const datePoseForCalc = implant.datePose ? new Date(implant.datePose) : new Date();
+      if (implant.isqPose !== null && implant.isqPose !== undefined) {
+        allIsqDates.push(datePoseForCalc);
+      }
+      if (implant.isq2m !== null && implant.isq2m !== undefined) {
+        const date2m = new Date(datePoseForCalc);
+        date2m.setMonth(date2m.getMonth() + 2);
+        allIsqDates.push(date2m);
+      }
+      if (implant.isq3m !== null && implant.isq3m !== undefined) {
+        const date3m = new Date(datePoseForCalc);
+        date3m.setMonth(date3m.getMonth() + 3);
+        allIsqDates.push(date3m);
+      }
+      if (implant.isq6m !== null && implant.isq6m !== undefined) {
+        const date6m = new Date(datePoseForCalc);
+        date6m.setMonth(date6m.getMonth() + 6);
+        allIsqDates.push(date6m);
+      }
+      
+      // Get the most recent ISQ date from all sources
+      const lastMeasurementDate = allIsqDates.length > 0 
+        ? new Date(Math.max(...allIsqDates.map(d => d.getTime()))) 
+        : null;
 
       // Check if suggestion should be hidden (applied after last ISQ)
       const isSuggestionApplied = (suggestedStatus: string): boolean => {
@@ -1996,13 +1998,24 @@ export async function registerRoutes(
         allIsqEntries.push({ value: implant.isq6m, date: date6m, source: '6m' });
       }
       
-      // Add visit/measurement ISQs with their actual dates
+      // Add visit/measurement ISQs with their actual dates (from implant_measurements table)
       for (const m of measurements) {
         if (m.isqValue !== null && m.isqValue !== undefined) {
           allIsqEntries.push({ 
             value: m.isqValue, 
             date: new Date(m.measuredAt), 
-            source: 'visit' 
+            source: 'measurement' 
+          });
+        }
+      }
+      
+      // Add visites ISQs with their actual dates (from visites table - linked to catalog implant)
+      for (const v of visites) {
+        if (v.isq !== null && v.isq !== undefined) {
+          allIsqEntries.push({ 
+            value: v.isq, 
+            date: new Date(v.date), 
+            source: 'visite' 
           });
         }
       }
