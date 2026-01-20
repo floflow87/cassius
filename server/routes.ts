@@ -1900,6 +1900,9 @@ export async function registerRoutes(
       if (!implant) {
         return res.status(404).json({ error: "Implant not found" });
       }
+      
+      // DEBUG: Log the actual status from DB
+      console.log(`[SUGGESTIONS] implant.statut='${implant.statut}' for id=${surgeryImplantId}`);
 
       // Fetch status history, measurements, and visites to check for applied suggestions
       // Note: visites are linked to catalog implant.id, not surgeryImplant.id
