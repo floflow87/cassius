@@ -250,17 +250,17 @@ function FileRow({
             <span className="text-xs truncate">{file.title}</span>
           )}
           {isRadio && (
-            <Badge variant="secondary" className={`text-xs ${RADIO_BADGE_COLOR}`}>
+            <Badge variant="secondary" className={`text-[10px] ${RADIO_BADGE_COLOR}`}>
               Radio
             </Badge>
           )}
           {isRadio && file.radioType && (
-            <Badge variant="secondary" className={`text-xs ${RADIO_TYPE_COLORS[file.radioType] || ''}`}>
+            <Badge variant="secondary" className={`text-[10px] ${RADIO_TYPE_COLORS[file.radioType] || ''}`}>
               {RADIO_TYPE_LABELS[file.radioType] || file.radioType}
             </Badge>
           )}
           {!isRadio && file.tags?.map(tag => (
-            <Badge key={tag} variant="secondary" className={`text-xs ${TAG_COLORS[tag] || ''}`}>
+            <Badge key={tag} variant="secondary" className={`text-[10px] ${TAG_COLORS[tag] || ''}`}>
               {TAG_LABELS[tag] || tag}
             </Badge>
           ))}

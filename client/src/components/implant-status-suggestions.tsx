@@ -183,7 +183,7 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
   return (
     <>
       {/* Inline section - no Card wrapper for embedding in ISQ section */}
-      <div className="mt-4 pt-4 border-t space-y-3" data-testid="status-suggestions-section">
+      <div className="mt-4 pt-4 border-t space-y-3 p-3 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="status-suggestions-section">
         <div className="flex items-center gap-2">
           <Lightbulb className="h-4 w-4 text-amber-500" />
           <span className="text-sm font-medium">Suggestions de statut</span>
