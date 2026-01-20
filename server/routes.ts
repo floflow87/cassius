@@ -2110,7 +2110,7 @@ export async function registerRoutes(
       const filteredSuggestions = suggestions.filter(s => !isSuggestionApplied(s.status));
 
       res.json({
-        implantId,
+        implantId: surgeryImplantId,
         currentStatus: implant.statut,
         latestIsq,
         isqHistory: { pose: poseIsq, m2: implant.isq2m, m3: implant.isq3m, m6: isq6m },
