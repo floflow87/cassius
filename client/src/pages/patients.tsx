@@ -877,21 +877,30 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "patients" | "suivi")} className="w-full">
-        <TabsList className="mb-4 bg-muted p-1 h-auto rounded-md w-fit" data-testid="tabs-patients-page">
+        <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit mb-4" data-testid="tabs-patients-page">
           {[
-            { value: "patients", label: "Patients" },
-            { value: "suivi", label: "Suivi" },
+            { value: "patients" as const, label: "Patients" },
+            { value: "suivi" as const, label: "Suivi" },
           ].map((tab) => (
-            <TabsTrigger
+            <button
               key={tab.value}
-              value={tab.value}
-              className="px-4 py-1.5 text-xs font-medium rounded-sm"
+              onClick={() => setActiveTab(tab.value)}
+              className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
+                activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+              }`}
               data-testid={`tab-${tab.value}`}
             >
-              {tab.label}
-            </TabsTrigger>
+              {activeTab === tab.value && (
+                <motion.div
+                  layoutId="patients-tab-indicator"
+                  className="absolute inset-0 bg-primary rounded-full"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                />
+              )}
+              <span className="relative z-10">{tab.label}</span>
+            </button>
           ))}
-        </TabsList>
+        </div>
 
         <TabsContent value="patients" className="mt-0">
           <div className="flex items-center gap-4 mb-5">
