@@ -863,7 +863,7 @@ export default function DocumentsPage() {
                 placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-48"
+                className="pl-9 w-48 placeholder-xs"
                 data-testid="input-search-documents"
               />
             </div>

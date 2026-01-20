@@ -1422,7 +1422,7 @@ export default function StatsPage() {
                     placeholder="Rechercher..."
                     value={patientSearch}
                     onChange={(e) => setPatientSearch(e.target.value)}
-                    className="pl-9 w-48 bg-white dark:bg-zinc-900"
+                    className="pl-9 w-48 bg-white dark:bg-zinc-900 placeholder-xs"
                     data-testid="input-patient-search"
                   />
                 </div>

@@ -622,3 +622,20 @@
 .scrollbar-track-transparent::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Smaller placeholder text for search inputs */
+.placeholder-xs::placeholder {
+  font-size: 0.6875rem; /* 11px - 2px smaller than text-xs (12px) */
+}
+
+.placeholder-xs::-webkit-input-placeholder {
+  font-size: 0.6875rem;
+}
+
+.placeholder-xs::-moz-placeholder {
+  font-size: 0.6875rem;
+}
+
+.placeholder-xs:-ms-input-placeholder {
+  font-size: 0.6875rem;
+}

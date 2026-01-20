@@ -375,6 +375,8 @@ export default function ImplantDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId, "status-suggestions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId, "status-history"] });
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });

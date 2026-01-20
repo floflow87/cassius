@@ -540,7 +540,7 @@ function CalendarSearch({ appointments, onSelectAppointment, onSelectDate, onSel
           }}
           onFocus={() => setIsOpen(true)}
           onBlur={() => setTimeout(() => setIsOpen(false), 200)}
-          className="pl-9 w-64 bg-white dark:bg-zinc-900"
+          className="pl-9 w-64 bg-white dark:bg-zinc-900 placeholder-xs"
           data-testid="input-calendar-search"
         />
       </div>

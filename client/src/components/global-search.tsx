@@ -238,7 +238,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
           onFocus={() => setIsFocused(true)}
           onKeyDown={handleKeyDown}
           placeholder="Rechercher..."
-          className="pl-9 w-80 rounded-[50px] bg-[#F7FAFC] dark:bg-[#1a1a2e]"
+          className="pl-9 w-80 rounded-[50px] bg-[#F7FAFC] dark:bg-[#1a1a2e] placeholder-xs"
           data-testid="input-global-search"
         />
       </div>
