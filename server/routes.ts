@@ -1972,23 +1972,49 @@ export async function registerRoutes(
       }> = [];
 
       // MVP Rules based on ISQ values - include measurements from visits
-      const isqValues: number[] = [];
-      if (implant.isqPose !== null && implant.isqPose !== undefined) isqValues.push(implant.isqPose);
-      if (implant.isq2m !== null && implant.isq2m !== undefined) isqValues.push(implant.isq2m);
-      if (implant.isq3m !== null && implant.isq3m !== undefined) isqValues.push(implant.isq3m);
-      if (implant.isq6m !== null && implant.isq6m !== undefined) isqValues.push(implant.isq6m);
+      // Collect all ISQ entries with their dates for proper chronological sorting
+      const datePose = implant.datePose ? new Date(implant.datePose) : new Date();
+      const allIsqEntries: Array<{ value: number; date: Date; source: string }> = [];
       
-      // Also include ISQ from visits/measurements (sorted by date)
-      const visitIsqValues = measurements
-        .filter(m => m.isqValue !== null && m.isqValue !== undefined)
-        .sort((a, b) => new Date(a.measuredAt).getTime() - new Date(b.measuredAt).getTime())
-        .map(m => m.isqValue as number);
+      // Add implant field ISQs with estimated dates
+      if (implant.isqPose !== null && implant.isqPose !== undefined) {
+        allIsqEntries.push({ value: implant.isqPose, date: datePose, source: 'pose' });
+      }
+      if (implant.isq2m !== null && implant.isq2m !== undefined) {
+        const date2m = new Date(datePose);
+        date2m.setMonth(date2m.getMonth() + 2);
+        allIsqEntries.push({ value: implant.isq2m, date: date2m, source: '2m' });
+      }
+      if (implant.isq3m !== null && implant.isq3m !== undefined) {
+        const date3m = new Date(datePose);
+        date3m.setMonth(date3m.getMonth() + 3);
+        allIsqEntries.push({ value: implant.isq3m, date: date3m, source: '3m' });
+      }
+      if (implant.isq6m !== null && implant.isq6m !== undefined) {
+        const date6m = new Date(datePose);
+        date6m.setMonth(date6m.getMonth() + 6);
+        allIsqEntries.push({ value: implant.isq6m, date: date6m, source: '6m' });
+      }
       
-      // Combine all ISQ values for analysis
-      const allIsqValues = [...isqValues, ...visitIsqValues];
+      // Add visit/measurement ISQs with their actual dates
+      for (const m of measurements) {
+        if (m.isqValue !== null && m.isqValue !== undefined) {
+          allIsqEntries.push({ 
+            value: m.isqValue, 
+            date: new Date(m.measuredAt), 
+            source: 'visit' 
+          });
+        }
+      }
       
-      // Latest ISQ is the most recent from either source
-      const latestIsq = allIsqValues.length > 0 ? allIsqValues[allIsqValues.length - 1] : null;
+      // Sort all entries chronologically
+      allIsqEntries.sort((a, b) => a.date.getTime() - b.date.getTime());
+      
+      // Get ISQ values in chronological order for rules
+      const allIsqValues = allIsqEntries.map(e => e.value);
+      
+      // Latest ISQ is the most recent (last in sorted array)
+      const latestIsq = allIsqEntries.length > 0 ? allIsqEntries[allIsqEntries.length - 1].value : null;
       const poseIsq = implant.isqPose;
       const isq6m = implant.isq6m;
 
@@ -2015,8 +2041,8 @@ export async function registerRoutes(
       }
 
       // Rule 3: ISQ drop > 15 points -> COMPLICATION (HIGH confidence)
-      if (isqValues.length >= 2) {
-        const maxDrop = Math.max(...isqValues.slice(0, -1)) - (latestIsq ?? 0);
+      if (allIsqValues.length >= 2) {
+        const maxDrop = Math.max(...allIsqValues.slice(0, -1)) - (latestIsq ?? 0);
         if (maxDrop > 15) {
           suggestions.push({
             status: 'COMPLICATION',
