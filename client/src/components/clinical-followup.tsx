@@ -72,9 +72,9 @@ interface StatusReason {
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   EN_SUIVI: { label: "En suivi", variant: "secondary" },
-  SUCCES: { label: "Succes", variant: "default" },
+  SUCCES: { label: "Succès", variant: "default" },
   COMPLICATION: { label: "Complication", variant: "destructive" },
-  ECHEC: { label: "Echec", variant: "destructive" },
+  ECHEC: { label: "Échec", variant: "destructive" },
 };
 
 interface SurgeryImplantBasic {

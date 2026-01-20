@@ -944,18 +944,22 @@ export default function ImplantDetailsPage() {
               </TooltipTrigger>
               <TooltipContent side="right" className="max-w-xs">
                 <div className="space-y-1 text-xs">
-                  <p className="font-medium">Seuils de stabilité ISQ</p>
+                  <p className="font-medium">Statuts possibles</p>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    <span>En suivi</span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>70+ : Stabilité élevée</span>
+                    <span>Succès</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    <span>60-69 : Stabilité modérée</span>
+                    <span>Complication</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                    <span>&lt;60 : Stabilité faible</span>
+                    <span>Échec</span>
                   </div>
                 </div>
               </TooltipContent>
