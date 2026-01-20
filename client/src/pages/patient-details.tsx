@@ -2871,9 +2871,9 @@ export default function PatientDetailsPage() {
                                 <p className="text-xs text-muted-foreground mb-2">
                                   {formatNoteDatetime(flag.createdAt)}
                                 </p>
-                                <p className="font-medium text-sm">{flag.label}</p>
+                                <p className="font-medium text-xs">{flag.label}</p>
                                 {flag.description && (
-                                  <p className="text-sm text-muted-foreground mt-1">{flag.description}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">{flag.description}</p>
                                 )}
                               </div>
                             </div>

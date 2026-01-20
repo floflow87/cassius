@@ -1215,7 +1215,7 @@ function CollaboratorsSection() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium">
+                        <p className="font-medium text-sm">
                           {collab.prenom && collab.nom
                             ? `${collab.prenom} ${collab.nom}`
                             : collab.username}

@@ -57,19 +57,19 @@ export function ImplantCard({ surgeryImplant, patientId }: ImplantCardProps) {
         <CardHeader className="pb-1.5 pt-3 px-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted font-mono text-xs font-medium">
+              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted font-mono text-sm font-medium">
                 {surgeryImplant.siteFdi}
               </div>
               <div>
                 <div className="flex items-center gap-1">
-                  <CardTitle className="text-xs">{surgeryImplant.implant.marque}</CardTitle>
+                  <CardTitle className="text-sm">{surgeryImplant.implant.marque}</CardTitle>
                   {surgeryImplant.implant.typeImplant === "MINI_IMPLANT" && (
                     <Badge variant="outline" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                       Mini
                     </Badge>
                   )}
                 </div>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {surgeryImplant.implant.diametre}mm x {surgeryImplant.implant.longueur}mm
                 </p>
               </div>
@@ -78,9 +78,9 @@ export function ImplantCard({ surgeryImplant, patientId }: ImplantCardProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-2 px-3 pb-3 pt-1">
-          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <Calendar className="h-2.5 w-2.5" />
+              <Calendar className="h-3 w-3" />
               {formatDate(surgeryImplant.datePose)}
             </span>
             {surgeryImplant.typeOs && (
@@ -94,14 +94,14 @@ export function ImplantCard({ surgeryImplant, patientId }: ImplantCardProps) {
           {latestISQ && (
             <div className="flex items-center gap-1.5">
               <Activity className="h-3 w-3 text-muted-foreground" />
-              <span className="text-[10px]">
+              <span className="text-xs">
                 ISQ {latestISQ.label}: <span className="font-mono font-medium">{latestISQ.value}</span>
               </span>
             </div>
           )}
 
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {surgeryImplant.visites?.length || 0} visite{(surgeryImplant.visites?.length || 0) !== 1 ? "s" : ""} de contrôle
             </span>
           </div>
@@ -132,7 +132,7 @@ export function ImplantCard({ surgeryImplant, patientId }: ImplantCardProps) {
           </SheetHeader>
           <div className="mt-6">
             <VisiteForm
-              implantId={surgeryImplant.id}
+              implantId={surgeryImplant.implant.id}
               patientId={patientId}
               onSuccess={() => setVisiteDialogOpen(false)}
             />

@@ -211,7 +211,7 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
               return (
                 <div
                   key={index}
-                  className="flex flex-col gap-3 p-3 rounded-lg border bg-card shadow-sm"
+                  className="flex flex-col gap-3 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-card shadow-sm"
                   data-testid={`suggestion-${suggestion.status}-${index}`}
                 >
                   <div className="flex items-center gap-2 flex-wrap">
