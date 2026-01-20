@@ -249,7 +249,7 @@ export default function CatalogImplantDetailsPage() {
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Ø {implant.diametre}mm × {implant.longueur}mm
           </p>
         </div>
@@ -337,32 +337,32 @@ export default function CatalogImplantDetailsPage() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
-                <span className="text-sm text-muted-foreground">Marque</span>
-                <p className="font-medium" data-testid="text-implant-marque">{implant.marque}</p>
+                <span className="text-xs text-muted-foreground">Marque</span>
+                <p className="text-sm font-medium" data-testid="text-implant-marque">{implant.marque}</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Type</span>
-                <p className="font-medium" data-testid="text-implant-type">
+                <span className="text-xs text-muted-foreground">Type</span>
+                <p className="text-sm font-medium" data-testid="text-implant-type">
                   {implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"}
                 </p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Référence fabricant</span>
-                <p className="font-medium font-mono" data-testid="text-implant-reference">
+                <span className="text-xs text-muted-foreground">Référence fabricant</span>
+                <p className="text-sm font-medium font-mono" data-testid="text-implant-reference">
                   {implant.referenceFabricant || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Diamètre</span>
-                <p className="font-medium font-mono" data-testid="text-implant-diametre">{implant.diametre} mm</p>
+                <span className="text-xs text-muted-foreground">Diamètre</span>
+                <p className="text-sm font-medium font-mono" data-testid="text-implant-diametre">{implant.diametre} mm</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Longueur</span>
-                <p className="font-medium font-mono" data-testid="text-implant-longueur">{implant.longueur} mm</p>
+                <span className="text-xs text-muted-foreground">Longueur</span>
+                <p className="text-sm font-medium font-mono" data-testid="text-implant-longueur">{implant.longueur} mm</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Numéro de lot</span>
-                <p className="font-medium font-mono">{implant.lot || "—"}</p>
+                <span className="text-xs text-muted-foreground">Numéro de lot</span>
+                <p className="text-sm font-medium font-mono">{implant.lot || "—"}</p>
               </div>
             </div>
           </CardContent>
@@ -380,7 +380,7 @@ export default function CatalogImplantDetailsPage() {
               <span className={`text-5xl font-bold ${getSuccessRateColor()}`} data-testid="text-success-rate">
                 {hasPoses && successRate !== null ? `${successRate}%` : "—"}
               </span>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {!hasPoses 
                   ? "Aucune pose enregistrée"
                   : successRate !== null && successRate >= 90 
@@ -392,8 +392,8 @@ export default function CatalogImplantDetailsPage() {
             </div>
             <div className="pt-2 border-t">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Nombre de poses</span>
-                <span className="text-sm font-medium">{implant.poseCount || 0}</span>
+                <span className="text-xs text-muted-foreground">Nombre de poses</span>
+                <span className="text-xs font-medium">{implant.poseCount || 0}</span>
               </div>
             </div>
           </CardContent>

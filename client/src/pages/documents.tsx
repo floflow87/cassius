@@ -67,8 +67,10 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DocumentUploadForm } from "@/components/document-upload-form";
-import type { DocumentWithDetails, Patient } from "@shared/schema";
+import { RadioDrawer } from "@/components/radio-drawer";
+import type { DocumentWithDetails, Patient, Radio } from "@shared/schema";
 import type { DocumentTree, DocumentTreeNode, DocumentFilters, UnifiedFile, TypeRadio } from "@shared/types";
 
 type FolderPath = {
@@ -167,7 +169,7 @@ function FolderTreeItem({
         if (hasChildren && onToggle) onToggle();
         onSelect();
       }}
-      className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover-elevate ${
+      className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover-elevate ${
         isSelected ? "bg-accent" : ""
       }`}
       data-testid={`folder-${node.type}-${node.id || 'root'}`}
@@ -235,19 +237,30 @@ function FileRow({
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm truncate">{file.title}</span>
+          {file.lastNote ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-xs truncate cursor-default">{file.title}</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg max-w-xs">
+                <p className="text-[10px]">{file.lastNote}</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <span className="text-xs truncate">{file.title}</span>
+          )}
           {isRadio && (
-            <Badge variant="secondary" className={`text-xs ${RADIO_BADGE_COLOR}`}>
+            <Badge variant="secondary" className={`text-[10px] ${RADIO_BADGE_COLOR}`}>
               Radio
             </Badge>
           )}
           {isRadio && file.radioType && (
-            <Badge variant="secondary" className={`text-xs ${RADIO_TYPE_COLORS[file.radioType] || ''}`}>
+            <Badge variant="secondary" className={`text-[10px] ${RADIO_TYPE_COLORS[file.radioType] || ''}`}>
               {RADIO_TYPE_LABELS[file.radioType] || file.radioType}
             </Badge>
           )}
           {!isRadio && file.tags?.map(tag => (
-            <Badge key={tag} variant="secondary" className={`text-xs ${TAG_COLORS[tag] || ''}`}>
+            <Badge key={tag} variant="secondary" className={`text-[10px] ${TAG_COLORS[tag] || ''}`}>
               {TAG_LABELS[tag] || tag}
             </Badge>
           ))}
@@ -291,21 +304,19 @@ function FileRow({
               Voir le patient
             </DropdownMenuItem>
           )}
-          {onNavigateToOperation && (
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onNavigateToOperation(); }}>
-              <Stethoscope className="h-4 w-4 mr-2" />
-              Voir l'acte
-            </DropdownMenuItem>
-          )}
-          {!isRadio && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                <Edit2 className="h-4 w-4 mr-2" />
-                Renommer
-              </DropdownMenuItem>
-            </>
-          )}
+          <DropdownMenuItem 
+            onClick={(e) => { e.stopPropagation(); onNavigateToOperation?.(); }}
+            disabled={!onNavigateToOperation}
+            className={!onNavigateToOperation ? "text-muted-foreground cursor-not-allowed" : ""}
+          >
+            <Stethoscope className="h-4 w-4 mr-2" />
+            Voir l'acte
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+            <Edit2 className="h-4 w-4 mr-2" />
+            {isRadio ? "Modifier" : "Renommer"}
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem 
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -383,21 +394,19 @@ function FileGridItem({
                 Voir le patient
               </DropdownMenuItem>
             )}
-            {onNavigateToOperation && (
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onNavigateToOperation(); }}>
-                <Stethoscope className="h-4 w-4 mr-2" />
-                Voir l'acte
-              </DropdownMenuItem>
-            )}
-            {!isRadio && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Renommer
-                </DropdownMenuItem>
-              </>
-            )}
+            <DropdownMenuItem 
+              onClick={(e) => { e.stopPropagation(); onNavigateToOperation?.(); }}
+              disabled={!onNavigateToOperation}
+              className={!onNavigateToOperation ? "text-muted-foreground cursor-not-allowed" : ""}
+            >
+              <Stethoscope className="h-4 w-4 mr-2" />
+              Voir l'acte
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+              <Edit2 className="h-4 w-4 mr-2" />
+              {isRadio ? "Modifier" : "Renommer"}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -422,9 +431,22 @@ function FileGridItem({
         )}
       </div>
       
-      <span className="text-sm text-center truncate w-full max-w-[140px] font-medium" title={file.title}>
-        {file.title}
-      </span>
+      {file.lastNote ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-xs text-center truncate w-full max-w-[140px] font-medium cursor-default" title={file.title}>
+              {file.title}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg max-w-xs">
+            <p className="text-[10px]">{file.lastNote}</p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <span className="text-xs text-center truncate w-full max-w-[140px] font-medium" title={file.title}>
+          {file.title}
+        </span>
+      )}
       <span className="text-xs text-muted-foreground mt-1">
         {format(new Date(file.createdAt), "dd/MM/yy", { locale: fr })}
       </span>
@@ -463,6 +485,7 @@ export default function DocumentsPage() {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
   const [uploadPatientId, setUploadPatientId] = useState<string>("");
+  const [selectedRadioForEdit, setSelectedRadioForEdit] = useState<{ radio: Radio & { signedUrl?: string | null }; patientId: string } | null>(null);
 
   const currentFolder = currentPath[currentPath.length - 1];
 
@@ -671,9 +694,13 @@ export default function DocumentsPage() {
       if (!response.ok) throw new Error('Failed to get URL');
       const { signedUrl } = await response.json();
       
-      const isViewable = file.mimeType?.startsWith('image/') || file.mimeType === 'application/pdf';
-      if (isViewable) {
+      const isImage = file.mimeType?.startsWith('image/');
+      const isPdf = file.mimeType === 'application/pdf';
+      
+      if (isImage) {
         setViewingFile({ file, url: signedUrl });
+      } else if (isPdf) {
+        window.open(signedUrl, '_blank');
       } else {
         window.open(signedUrl, '_blank');
       }
@@ -708,6 +735,27 @@ export default function DocumentsPage() {
     if (file.sourceType === 'document') {
       setEditingDoc(file);
       setEditTitle(file.title);
+    } else if (file.sourceType === 'radio') {
+      // Convert UnifiedFile to Radio for RadioDrawer
+      const radioData: Radio & { signedUrl?: string | null } = {
+        id: file.id,
+        organisationId: '',
+        patientId: file.patientId || '',
+        operationId: file.operationId || null,
+        implantId: file.implantId || null,
+        title: file.title,
+        type: file.radioType || 'RETROALVEOLAIRE',
+        date: file.radioDate || new Date(file.createdAt).toISOString().split('T')[0],
+        filePath: file.filePath || null,
+        url: null,
+        mimeType: file.mimeType || null,
+        sizeBytes: file.sizeBytes || null,
+        fileName: file.fileName || null,
+        createdBy: file.createdBy || null,
+        createdAt: new Date(file.createdAt),
+        signedUrl: file.signedUrl || null,
+      };
+      setSelectedRadioForEdit({ radio: radioData, patientId: file.patientId || '' });
     }
   };
 
@@ -815,7 +863,7 @@ export default function DocumentsPage() {
                 placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-48"
+                className="pl-9 w-48 placeholder-xs"
                 data-testid="input-search-documents"
               />
             </div>
@@ -913,7 +961,7 @@ export default function DocumentsPage() {
                   isSelected={selectedFiles.has(`${file.sourceType}-${file.id}`)}
                   onToggleSelect={() => toggleFileSelection(`${file.sourceType}-${file.id}`)}
                   onNavigateToPatient={file.patientId ? () => setLocation(`/patients/${file.patientId}`) : undefined}
-                  onNavigateToOperation={file.operationId ? () => setLocation(`/operations/${file.operationId}`) : undefined}
+                  onNavigateToOperation={file.operationId && file.operationId.trim() !== '' ? () => setLocation(`/actes/${file.operationId}`) : undefined}
                 />
               ))}
             </div>
@@ -939,7 +987,7 @@ export default function DocumentsPage() {
                     isSelected={selectedFiles.has(`${file.sourceType}-${file.id}`)}
                     onToggleSelect={() => toggleFileSelection(`${file.sourceType}-${file.id}`)}
                     onNavigateToPatient={file.patientId ? () => setLocation(`/patients/${file.patientId}`) : undefined}
-                    onNavigateToOperation={file.operationId ? () => setLocation(`/operations/${file.operationId}`) : undefined}
+                    onNavigateToOperation={file.operationId && file.operationId.trim() !== '' ? () => setLocation(`/actes/${file.operationId}`) : undefined}
                   />
                 ))}
               </div>
@@ -1116,6 +1164,22 @@ export default function DocumentsPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {selectedRadioForEdit && (
+        <RadioDrawer
+          radio={selectedRadioForEdit.radio}
+          patientId={selectedRadioForEdit.patientId}
+          open={!!selectedRadioForEdit}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedRadioForEdit(null);
+              // Refresh file list after editing
+              queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/documents/tree"] });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

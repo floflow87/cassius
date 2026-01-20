@@ -55,6 +55,7 @@ export interface Patient {
 export interface Operation {
   id: string;
   patientId: string;
+  organisationId: string;
   dateOperation: string;
   typeIntervention: TypeIntervention;
   typeChirurgieTemps: TypeChirurgieTemps | null;
@@ -69,7 +70,7 @@ export interface Operation {
   observationsPostop: string | null;
 }
 
-export type TypeImplant = "IMPLANT" | "MINI_IMPLANT";
+export type TypeImplant = "IMPLANT" | "MINI_IMPLANT" | "PROTHESE";
 
 // Implant = informations produit uniquement (catalogue/référentiel)
 export interface Implant {
@@ -82,6 +83,10 @@ export interface Implant {
   longueur: number;
   lot: string | null;
   notes: string | null;
+  typeProthese: "VISSEE" | "SCELLEE" | null;
+  quantite: "UNITAIRE" | "PLURALE" | null;
+  mobilite: "AMOVIBLE" | "FIXE" | null;
+  typePilier: "DROIT" | "ANGULE" | "MULTI_UNIT" | null;
 }
 
 // SurgeryImplant = implant posé lors d'une chirurgie (avec contexte de pose)
@@ -131,6 +136,7 @@ export interface Radio {
   createdBy: string | null;
   createdAt: Date;
   signedUrl?: string | null;
+  lastNote?: string | null; // Last note from radio_notes table
 }
 
 export interface Visite {
@@ -193,6 +199,7 @@ export interface ImplantDetail extends SurgeryImplant {
   surgery?: Operation;
   visites: Visite[];
   radios: Radio[];
+  measurements?: ImplantMeasurement[];
 }
 
 // Détails complets d'une opération (acte chirurgical)
@@ -745,4 +752,111 @@ export interface UnifiedFile {
   patient?: Patient;
   operation?: Operation;
   signedUrl?: string | null;
+  // Last note (for radios)
+  lastNote?: string | null;
+}
+
+// ============================================
+// CLINICAL FOLLOW-UP TYPES (Appointment-driven)
+// ============================================
+
+export type MeasurementType = "POSE" | "FOLLOW_UP" | "CONTROL" | "EMERGENCY";
+
+export interface ImplantMeasurement {
+  id: string;
+  organisationId: string;
+  surgeryImplantId: string;
+  appointmentId: string | null;
+  type: MeasurementType;
+  isqValue: number | null;
+  isqStability: string | null;
+  boneLossScore: number | null;
+  notes: string | null;
+  measuredAt: Date;
+  measuredByUserId: string;
+  createdAt: Date;
+  updatedAt: Date | null;
+}
+
+export { type ImplantStatusHistoryWithDetails } from "@shared/schema";
+
+export interface AppointmentClinicalData {
+  appointment: {
+    id: string;
+    type: string;
+    status: string;
+    title: string;
+    dateStart: Date;
+    patientId: string;
+    surgeryImplantId: string | null;
+    operationId: string | null;
+  };
+  implant: SurgeryImplantWithDetails | null;
+  lastMeasurement: ImplantMeasurement | null;
+  measurementHistory: ImplantMeasurement[];
+  statusHistory: ImplantStatusHistoryWithDetails[];
+  flags: ClinicalFlag[];
+  suggestions: StatusSuggestion[];
+  linkedRadios: Radio[];
+}
+
+export type RecommendedActionType = 
+  | "plan_control_14d"
+  | "add_or_link_radio"
+  | "add_radio_note"
+  | "open_status_modal"
+  | "review_isq_history"
+  | "schedule_followup";
+
+export interface RecommendedAction {
+  type: RecommendedActionType;
+  label: string;
+  priority: "PRIMARY" | "SECONDARY";
+  params?: Record<string, unknown>;
+}
+
+export interface ClinicalFlag {
+  id: string;
+  type: "ISQ_LOW" | "ISQ_DECLINING" | "NO_RECENT_ISQ" | "UNSTABLE_ISQ_HISTORY";
+  level: "CRITICAL" | "WARNING" | "INFO";
+  label: string;
+  value?: number;
+  delta?: number;
+  createdAt: Date;
+  recommendedActions: RecommendedAction[];
+}
+
+export interface StatusSuggestion {
+  id: string;
+  suggestedStatus: StatutImplant;
+  reasonCode: string;
+  reasonLabel: string;
+  evidence: {
+    measurementId?: string;
+    appointmentId?: string;
+    isqValue?: number;
+    isqDelta?: number;
+    radioId?: string;
+  };
+  priority: "HIGH" | "MEDIUM" | "LOW";
+  recommendedActions: RecommendedAction[];
+}
+
+export interface UpsertIsqRequest {
+  surgeryImplantId: string;
+  isqValue: number;
+  notes?: string;
+}
+
+export interface ApplyStatusSuggestionRequest {
+  surgeryImplantId: string;
+  newStatus: StatutImplant;
+  reasonId?: string;
+  reasonFreeText?: string;
+  evidence: {
+    appointmentId?: string;
+    measurementId?: string;
+    isqValue?: number;
+    radioId?: string;
+  };
 }

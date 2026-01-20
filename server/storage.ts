@@ -63,6 +63,19 @@ import {
   type EmailToken,
   type Invitation,
   type EmailOutbox,
+  radioNotes,
+  implantStatusReasons,
+  implantStatusHistory,
+  implantMeasurements,
+  appointmentRadios,
+  type RadioNote,
+  type RadioNoteWithAuthor,
+  type ImplantStatusReason,
+  type ImplantStatusHistory,
+  type ImplantStatusHistoryWithDetails,
+  type ImplantMeasurement,
+  type AppointmentRadio,
+  SYSTEM_STATUS_REASONS,
 } from "@shared/schema";
 import type {
   PatientDetail,
@@ -88,6 +101,9 @@ import type {
   DocumentTreeNode,
   DocumentFilters,
   UnifiedFile,
+  AppointmentClinicalData,
+  ClinicalFlag,
+  StatusSuggestion,
 } from "@shared/types";
 import { db, pool } from "./db";
 import { eq, desc, ilike, or, and, lte, inArray, sql, gte, lt, gt, like, ne, SQL, isNull, not } from "drizzle-orm";
@@ -183,7 +199,7 @@ export interface IStorage {
   // Stats methods
   getStats(organisationId: string): Promise<DashboardStats>;
   getAdvancedStats(organisationId: string): Promise<AdvancedStats>;
-  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[]): Promise<ClinicalStats>;
+  getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[], implantType?: "IMPLANT" | "MINI_IMPLANT"): Promise<ClinicalStats>;
   getPatientStats(organisationId: string): Promise<import("@shared/types").PatientStats[]>;
 
   // User methods (not tenant-filtered, users are global)
@@ -313,6 +329,42 @@ export interface IStorage {
   // Email outbox methods
   logEmail(data: { organisationId?: string | null; toEmail: string; template: string; subject: string; payload?: string | null; status: 'PENDING' | 'SENT' | 'FAILED'; sentAt?: Date | null; errorMessage?: string | null }): Promise<EmailOutbox>;
   updateEmailStatus(id: string, status: 'PENDING' | 'SENT' | 'FAILED', errorMessage?: string | null): Promise<void>;
+
+  // Radio notes methods
+  getRadioNotes(organisationId: string, radioId: string): Promise<import("@shared/schema").RadioNoteWithAuthor[]>;
+  createRadioNote(organisationId: string, authorId: string, radioId: string, body: string): Promise<import("@shared/schema").RadioNote>;
+  updateRadioNote(organisationId: string, id: string, body: string): Promise<import("@shared/schema").RadioNote | undefined>;
+  deleteRadioNote(organisationId: string, id: string): Promise<boolean>;
+
+  // Implant status reasons methods
+  getStatusReasons(organisationId: string, status?: 'SUCCES' | 'COMPLICATION' | 'ECHEC'): Promise<import("@shared/schema").ImplantStatusReason[]>;
+  createStatusReason(organisationId: string, data: { status: 'SUCCES' | 'COMPLICATION' | 'ECHEC'; code: string; label: string }): Promise<import("@shared/schema").ImplantStatusReason>;
+  seedSystemStatusReasons(): Promise<void>;
+
+  // Implant status history methods
+  getImplantStatusHistory(organisationId: string, implantId: string): Promise<import("@shared/schema").ImplantStatusHistoryWithDetails[]>;
+  changeImplantStatus(organisationId: string, data: { implantId: string; fromStatus?: 'EN_SUIVI' | 'SUCCES' | 'COMPLICATION' | 'ECHEC' | null; toStatus: 'EN_SUIVI' | 'SUCCES' | 'COMPLICATION' | 'ECHEC'; reasonId?: string | null; reasonFreeText?: string | null; evidence?: string | null; changedByUserId: string }): Promise<import("@shared/schema").ImplantStatusHistory>;
+
+  // Implant measurements methods (source of truth for ISQ)
+  upsertImplantMeasurement(organisationId: string, data: {
+    surgeryImplantId: string;
+    appointmentId: string;
+    type: 'POSE' | 'FOLLOW_UP' | 'CONTROL' | 'EMERGENCY';
+    isqValue: number | null;
+    notes?: string | null;
+    measuredByUserId: string;
+    measuredAt: Date;
+  }): Promise<import("@shared/schema").ImplantMeasurement>;
+  getImplantMeasurements(organisationId: string, surgeryImplantId: string): Promise<import("@shared/schema").ImplantMeasurement[]>;
+  getAppointmentMeasurement(organisationId: string, appointmentId: string): Promise<import("@shared/schema").ImplantMeasurement | undefined>;
+  getAppointmentClinicalData(organisationId: string, appointmentId: string, overrideSurgeryImplantId?: string): Promise<import("@shared/types").AppointmentClinicalData | undefined>;
+  calculateIsqFlags(organisationId: string, surgeryImplantId: string): Promise<import("@shared/types").ClinicalFlag[]>;
+  generateStatusSuggestions(organisationId: string, surgeryImplantId: string, flags: import("@shared/types").ClinicalFlag[]): Promise<import("@shared/types").StatusSuggestion[]>;
+  
+  // Appointment radio linking methods
+  getAppointmentRadios(organisationId: string, appointmentId: string): Promise<import("@shared/schema").AppointmentRadio[]>;
+  linkRadioToAppointment(organisationId: string, appointmentId: string, radioId: string, linkedBy: string, notes?: string): Promise<import("@shared/schema").AppointmentRadio>;
+  unlinkRadioFromAppointment(organisationId: string, appointmentId: string, radioId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -403,15 +455,8 @@ export class DatabaseStorage implements IStorage {
       surgeryImplants: surgeryImplantsMap.get(op.id) || [],
     }));
 
-    // Query 4: Get all radios for patient
-    const patientRadios = await db
-      .select()
-      .from(radios)
-      .where(and(
-        eq(radios.patientId, id),
-        eq(radios.organisationId, organisationId)
-      ))
-      .orderBy(desc(radios.date));
+    // Query 4: Get all radios for patient with lastNote
+    const patientRadios = await this.getPatientRadios(organisationId, id);
 
     return {
       ...patient,
@@ -1284,20 +1329,23 @@ export class DatabaseStorage implements IStorage {
 
     const { surgeryImplant, implant, surgery, patient } = joinedData[0];
 
-    // Parallel fetch for visites and radios (using catalog implant.id)
+    // Parallel fetch for visites, radios, and measurements (using catalog implant.id and surgeryImplant.id)
     const t2 = Date.now();
-    const [implantVisites, implantRadios] = await Promise.all([
+    const [implantVisites, implantRadios, implantMeasurementsData] = await Promise.all([
       db.select().from(visites)
         .where(and(eq(visites.implantId, implant.id), eq(visites.organisationId, organisationId)))
         .orderBy(desc(visites.date)),
       db.select().from(radios)
         .where(and(eq(radios.implantId, implant.id), eq(radios.organisationId, organisationId)))
         .orderBy(desc(radios.date)),
+      db.select().from(implantMeasurements)
+        .where(and(eq(implantMeasurements.surgeryImplantId, surgeryImplant.id), eq(implantMeasurements.organisationId, organisationId)))
+        .orderBy(desc(implantMeasurements.measuredAt)),
     ]);
     const d2 = Date.now() - t2;
 
     const total = Date.now() - start;
-    console.log(`[IMPLANT-DETAIL] id=${id} total=${total}ms join=${d1}ms visites+radios=${d2}ms visites=${implantVisites.length} radios=${implantRadios.length}`);
+    console.log(`[IMPLANT-DETAIL] id=${id} total=${total}ms join=${d1}ms visites+radios+measurements=${d2}ms visites=${implantVisites.length} radios=${implantRadios.length} measurements=${implantMeasurementsData.length}`);
 
     return {
       ...surgeryImplant,
@@ -1306,6 +1354,7 @@ export class DatabaseStorage implements IStorage {
       surgery,
       visites: implantVisites,
       radios: implantRadios,
+      measurements: implantMeasurementsData,
     };
   }
 
@@ -1495,12 +1544,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPatientRadios(organisationId: string, patientId: string): Promise<Radio[]> {
-    return db.select().from(radios)
-      .where(and(
-        eq(radios.patientId, patientId),
-        eq(radios.organisationId, organisationId)
-      ))
-      .orderBy(desc(radios.createdAt));
+    const result = await pool.query(`
+      SELECT 
+        r.*,
+        (SELECT rn.body FROM radio_notes rn WHERE rn.radio_id = r.id ORDER BY rn.created_at DESC LIMIT 1) as last_note
+      FROM radios r
+      WHERE r.patient_id = $1 AND r.organisation_id = $2
+      ORDER BY r.created_at DESC
+    `, [patientId, organisationId]);
+    
+    return result.rows.map(row => ({
+      id: row.id,
+      organisationId: row.organisation_id,
+      patientId: row.patient_id,
+      operationId: row.operation_id,
+      implantId: row.implant_id,
+      type: row.type,
+      title: row.title,
+      filePath: row.file_path,
+      url: row.url,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes ? Number(row.size_bytes) : null,
+      fileName: row.file_name,
+      date: row.date,
+      createdBy: row.created_by,
+      createdAt: new Date(row.created_at),
+      lastNote: row.last_note || null,
+    }));
   }
 
   async createRadio(organisationId: string, radio: InsertRadio & { createdBy?: string | null }): Promise<Radio> {
@@ -1770,7 +1840,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[]): Promise<ClinicalStats> {
+  async getClinicalStats(organisationId: string, dateFrom?: string, dateTo?: string, implantModelId?: string, patientIds?: string[], operationIds?: string[], implantType?: "IMPLANT" | "MINI_IMPLANT"): Promise<ClinicalStats> {
     const now = new Date();
     const defaultFrom = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().split('T')[0];
     const defaultTo = now.toISOString().split('T')[0];
@@ -1830,6 +1900,7 @@ export class DatabaseStorage implements IStorage {
       boneLossScore: surgeryImplants.boneLossScore,
       marque: implants.marque,
       referenceFabricant: implants.referenceFabricant,
+      typeImplant: implants.typeImplant,
     }).from(surgeryImplants)
       .leftJoin(implants, eq(surgeryImplants.implantId, implants.id))
       .where(and(...siConditions));
@@ -1920,10 +1991,14 @@ export class DatabaseStorage implements IStorage {
     const complicationRate = total > 0 ? Math.round((statusCounts.COMPLICATION / total) * 100) : 0;
     const failureRate = total > 0 ? Math.round((statusCounts.ECHEC / total) * 100) : 0;
 
-    // Filter surgery implants for ISQ data if implantModelId is provided
-    const isqFilteredImplants = implantModelId 
-      ? allSurgeryImplants.filter(si => si.implantId === implantModelId)
-      : allSurgeryImplants;
+    // Filter surgery implants for ISQ data based on implantModelId and/or implantType
+    let isqFilteredImplants = allSurgeryImplants;
+    if (implantModelId) {
+      isqFilteredImplants = isqFilteredImplants.filter(si => si.implantId === implantModelId);
+    }
+    if (implantType) {
+      isqFilteredImplants = isqFilteredImplants.filter(si => si.typeImplant === implantType);
+    }
 
     const filteredIsqValues: number[] = [];
     isqFilteredImplants.forEach(si => {
@@ -2913,7 +2988,8 @@ export class DatabaseStorage implements IStorage {
       SELECT 
         u.*,
         p.id as p_id, p.nom as p_nom, p.prenom as p_prenom, p.date_naissance as p_date_naissance, p.sexe as p_sexe,
-        o.id as o_id, o.date_operation as o_date_operation, o.type_intervention as o_type_intervention, o.patient_id as o_patient_id
+        o.id as o_id, o.date_operation as o_date_operation, o.type_intervention as o_type_intervention, o.patient_id as o_patient_id,
+        (SELECT rn.body FROM radio_notes rn WHERE rn.radio_id = u.id AND u.source_type = 'radio' ORDER BY rn.created_at DESC LIMIT 1) as last_note
       FROM unified u
       LEFT JOIN patients p ON u.patient_id = p.id
       LEFT JOIN operations o ON u.operation_id = o.id
@@ -2951,6 +3027,7 @@ export class DatabaseStorage implements IStorage {
       radioType: row.radio_type,
       radioDate: row.radio_date,
       implantId: row.implant_id,
+      lastNote: row.last_note || null,
       patient: row.p_id ? {
         id: row.p_id,
         organisationId,
@@ -4199,6 +4276,587 @@ export class DatabaseStorage implements IStorage {
         errorMessage: errorMessage || null,
       })
       .where(eq(emailOutbox.id, id));
+  }
+
+  // ========== RADIO NOTES ==========
+  async getRadioNotes(organisationId: string, radioId: string): Promise<RadioNoteWithAuthor[]> {
+    const notes = await db.select({
+      id: radioNotes.id,
+      organisationId: radioNotes.organisationId,
+      radioId: radioNotes.radioId,
+      authorId: radioNotes.authorId,
+      body: radioNotes.body,
+      createdAt: radioNotes.createdAt,
+      updatedAt: radioNotes.updatedAt,
+      authorNom: users.nom,
+      authorPrenom: users.prenom,
+    })
+      .from(radioNotes)
+      .leftJoin(users, eq(radioNotes.authorId, users.id))
+      .where(and(
+        eq(radioNotes.organisationId, organisationId),
+        eq(radioNotes.radioId, radioId)
+      ))
+      .orderBy(desc(radioNotes.createdAt));
+    return notes;
+  }
+
+  async createRadioNote(organisationId: string, authorId: string, radioId: string, body: string): Promise<RadioNote> {
+    const [note] = await db.insert(radioNotes)
+      .values({
+        organisationId,
+        radioId,
+        authorId,
+        body,
+      })
+      .returning();
+    return note;
+  }
+
+  async updateRadioNote(organisationId: string, id: string, body: string): Promise<RadioNote | undefined> {
+    const [note] = await db.update(radioNotes)
+      .set({ body, updatedAt: new Date() })
+      .where(and(
+        eq(radioNotes.id, id),
+        eq(radioNotes.organisationId, organisationId)
+      ))
+      .returning();
+    return note || undefined;
+  }
+
+  async deleteRadioNote(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(radioNotes)
+      .where(and(
+        eq(radioNotes.id, id),
+        eq(radioNotes.organisationId, organisationId)
+      ));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // ========== IMPLANT STATUS REASONS ==========
+  async getStatusReasons(organisationId: string, status?: 'SUCCES' | 'COMPLICATION' | 'ECHEC'): Promise<ImplantStatusReason[]> {
+    const conditions = [
+      or(
+        isNull(implantStatusReasons.organisationId), // System reasons
+        eq(implantStatusReasons.organisationId, organisationId) // Org-specific
+      ),
+      eq(implantStatusReasons.isActive, true),
+    ];
+    if (status) {
+      conditions.push(eq(implantStatusReasons.status, status));
+    }
+    return db.select().from(implantStatusReasons)
+      .where(and(...conditions))
+      .orderBy(desc(implantStatusReasons.isSystem), implantStatusReasons.label);
+  }
+
+  async createStatusReason(organisationId: string, data: { status: 'SUCCES' | 'COMPLICATION' | 'ECHEC'; code: string; label: string }): Promise<ImplantStatusReason> {
+    const [reason] = await db.insert(implantStatusReasons)
+      .values({
+        organisationId,
+        status: data.status,
+        code: data.code,
+        label: data.label,
+        isSystem: false,
+        isActive: true,
+      })
+      .returning();
+    return reason;
+  }
+
+  async seedSystemStatusReasons(): Promise<void> {
+    // Check if system reasons already exist
+    const existingReasons = await db.select({ id: implantStatusReasons.id })
+      .from(implantStatusReasons)
+      .where(eq(implantStatusReasons.isSystem, true))
+      .limit(1);
+    
+    if (existingReasons.length > 0) {
+      return; // Already seeded
+    }
+
+    // Seed all system reasons
+    const allReasons: { status: 'SUCCES' | 'COMPLICATION' | 'ECHEC'; code: string; label: string }[] = [];
+    
+    for (const reason of SYSTEM_STATUS_REASONS.SUCCES) {
+      allReasons.push({ status: 'SUCCES', code: reason.code, label: reason.label });
+    }
+    for (const reason of SYSTEM_STATUS_REASONS.COMPLICATION) {
+      allReasons.push({ status: 'COMPLICATION', code: reason.code, label: reason.label });
+    }
+    for (const reason of SYSTEM_STATUS_REASONS.ECHEC) {
+      allReasons.push({ status: 'ECHEC', code: reason.code, label: reason.label });
+    }
+
+    await db.insert(implantStatusReasons)
+      .values(allReasons.map(r => ({
+        organisationId: null,
+        status: r.status,
+        code: r.code,
+        label: r.label,
+        isSystem: true,
+        isActive: true,
+      })));
+  }
+
+  // ========== IMPLANT STATUS HISTORY ==========
+  async getImplantStatusHistory(organisationId: string, implantId: string): Promise<ImplantStatusHistoryWithDetails[]> {
+    const history = await db.select({
+      id: implantStatusHistory.id,
+      organisationId: implantStatusHistory.organisationId,
+      implantId: implantStatusHistory.implantId,
+      fromStatus: implantStatusHistory.fromStatus,
+      toStatus: implantStatusHistory.toStatus,
+      reasonId: implantStatusHistory.reasonId,
+      reasonFreeText: implantStatusHistory.reasonFreeText,
+      evidence: implantStatusHistory.evidence,
+      changedByUserId: implantStatusHistory.changedByUserId,
+      changedAt: implantStatusHistory.changedAt,
+      reasonLabel: implantStatusReasons.label,
+      reasonCode: implantStatusReasons.code,
+      changedByNom: users.nom,
+      changedByPrenom: users.prenom,
+    })
+      .from(implantStatusHistory)
+      .leftJoin(implantStatusReasons, eq(implantStatusHistory.reasonId, implantStatusReasons.id))
+      .leftJoin(users, eq(implantStatusHistory.changedByUserId, users.id))
+      .where(and(
+        eq(implantStatusHistory.organisationId, organisationId),
+        eq(implantStatusHistory.implantId, implantId)
+      ))
+      .orderBy(desc(implantStatusHistory.changedAt));
+    return history;
+  }
+
+  async changeImplantStatus(organisationId: string, data: { 
+    implantId: string; 
+    fromStatus?: 'EN_SUIVI' | 'SUCCES' | 'COMPLICATION' | 'ECHEC' | null; 
+    toStatus: 'EN_SUIVI' | 'SUCCES' | 'COMPLICATION' | 'ECHEC'; 
+    reasonId?: string | null; 
+    reasonFreeText?: string | null; 
+    evidence?: string | null; 
+    changedByUserId: string 
+  }): Promise<ImplantStatusHistory> {
+    // Update the surgery implant status
+    await db.update(surgeryImplants)
+      .set({ statut: data.toStatus })
+      .where(and(
+        eq(surgeryImplants.id, data.implantId),
+        eq(surgeryImplants.organisationId, organisationId)
+      ));
+
+    // Record in history
+    const [historyEntry] = await db.insert(implantStatusHistory)
+      .values({
+        organisationId,
+        implantId: data.implantId,
+        fromStatus: data.fromStatus || null,
+        toStatus: data.toStatus,
+        reasonId: data.reasonId || null,
+        reasonFreeText: data.reasonFreeText || null,
+        evidence: data.evidence || null,
+        changedByUserId: data.changedByUserId,
+      })
+      .returning();
+    return historyEntry;
+  }
+
+  // ========== IMPLANT MEASUREMENTS ==========
+  async upsertImplantMeasurement(organisationId: string, data: {
+    surgeryImplantId: string;
+    appointmentId: string;
+    type: 'POSE' | 'FOLLOW_UP' | 'CONTROL' | 'EMERGENCY';
+    isqValue: number | null;
+    notes?: string | null;
+    measuredByUserId: string;
+    measuredAt: Date;
+  }): Promise<ImplantMeasurement> {
+    // Check if measurement already exists for this appointment + implant
+    const existing = await db.select()
+      .from(implantMeasurements)
+      .where(and(
+        eq(implantMeasurements.organisationId, organisationId),
+        eq(implantMeasurements.appointmentId, data.appointmentId),
+        eq(implantMeasurements.surgeryImplantId, data.surgeryImplantId)
+      ))
+      .limit(1);
+
+    // Determine ISQ stability
+    let isqStability: string | null = null;
+    if (data.isqValue !== null) {
+      if (data.isqValue < 60) isqStability = 'low';
+      else if (data.isqValue < 70) isqStability = 'moderate';
+      else isqStability = 'high';
+    }
+
+    if (existing.length > 0) {
+      // Update existing measurement
+      const [updated] = await db.update(implantMeasurements)
+        .set({
+          isqValue: data.isqValue,
+          isqStability,
+          notes: data.notes || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(implantMeasurements.id, existing[0].id))
+        .returning();
+      return updated;
+    } else {
+      // Create new measurement
+      const [created] = await db.insert(implantMeasurements)
+        .values({
+          organisationId,
+          surgeryImplantId: data.surgeryImplantId,
+          appointmentId: data.appointmentId,
+          type: data.type,
+          isqValue: data.isqValue,
+          isqStability,
+          notes: data.notes || null,
+          measuredAt: data.measuredAt,
+          measuredByUserId: data.measuredByUserId,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async getImplantMeasurements(organisationId: string, surgeryImplantId: string): Promise<ImplantMeasurement[]> {
+    return db.select()
+      .from(implantMeasurements)
+      .where(and(
+        eq(implantMeasurements.organisationId, organisationId),
+        eq(implantMeasurements.surgeryImplantId, surgeryImplantId)
+      ))
+      .orderBy(desc(implantMeasurements.measuredAt));
+  }
+
+  async getAppointmentMeasurement(organisationId: string, appointmentId: string): Promise<ImplantMeasurement | undefined> {
+    const [measurement] = await db.select()
+      .from(implantMeasurements)
+      .where(and(
+        eq(implantMeasurements.organisationId, organisationId),
+        eq(implantMeasurements.appointmentId, appointmentId)
+      ))
+      .limit(1);
+    return measurement || undefined;
+  }
+
+  async getAppointmentClinicalData(organisationId: string, appointmentId: string, overrideSurgeryImplantId?: string): Promise<AppointmentClinicalData | undefined> {
+    // Get the appointment
+    const [appointment] = await db.select()
+      .from(appointments)
+      .where(and(
+        eq(appointments.id, appointmentId),
+        eq(appointments.organisationId, organisationId)
+      ))
+      .limit(1);
+
+    if (!appointment) return undefined;
+
+    let implant: SurgeryImplantWithDetails | null = null;
+    let lastMeasurement: ImplantMeasurement | null = null;
+    let measurementHistory: ImplantMeasurement[] = [];
+    let statusHistory: ImplantStatusHistoryWithDetails[] = [];
+    let clinicalFlags: ClinicalFlag[] = [];
+    let suggestions: StatusSuggestion[] = [];
+    let linkedRadios: Radio[] = [];
+
+    // Use override surgeryImplantId if provided, otherwise use appointment's linked implant
+    const targetSurgeryImplantId = overrideSurgeryImplantId || appointment.surgeryImplantId;
+
+    // Get the linked implant if any
+    if (targetSurgeryImplantId) {
+      const implantData = await this.getSurgeryImplantWithDetails(organisationId, targetSurgeryImplantId);
+      if (implantData) {
+        implant = {
+          ...implantData,
+          implant: implantData.implant,
+        };
+      }
+
+      // Get measurement history for this implant
+      measurementHistory = await this.getImplantMeasurements(organisationId, targetSurgeryImplantId);
+      lastMeasurement = measurementHistory.length > 0 ? measurementHistory[0] : null;
+
+      // Calculate flags for this implant
+      clinicalFlags = await this.calculateIsqFlags(organisationId, targetSurgeryImplantId);
+
+      // Generate suggestions based on flags
+      suggestions = await this.generateStatusSuggestions(organisationId, targetSurgeryImplantId, clinicalFlags);
+
+      // Get status history for this implant
+      statusHistory = await this.getImplantStatusHistory(organisationId, targetSurgeryImplantId);
+    }
+
+    // Get linked radios (via operationId or appointmentId)
+    if (appointment.operationId) {
+      linkedRadios = await db.select()
+        .from(radios)
+        .where(and(
+          eq(radios.organisationId, organisationId),
+          eq(radios.operationId, appointment.operationId)
+        ))
+        .orderBy(desc(radios.createdAt));
+    }
+
+    return {
+      appointment: {
+        id: appointment.id,
+        type: appointment.type,
+        status: appointment.status,
+        title: appointment.title,
+        dateStart: appointment.dateStart,
+        patientId: appointment.patientId,
+        surgeryImplantId: appointment.surgeryImplantId,
+        operationId: appointment.operationId,
+      },
+      implant,
+      lastMeasurement,
+      measurementHistory,
+      statusHistory,
+      flags: clinicalFlags,
+      suggestions,
+      linkedRadios,
+    };
+  }
+
+  async calculateIsqFlags(organisationId: string, surgeryImplantId: string): Promise<ClinicalFlag[]> {
+    const flags: ClinicalFlag[] = [];
+    const now = new Date();
+
+    // Get all measurements for this implant
+    const measurements = await this.getImplantMeasurements(organisationId, surgeryImplantId);
+
+    if (measurements.length === 0) {
+      // No measurements yet
+      return flags;
+    }
+
+    const latestMeasurement = measurements[0];
+    const latestIsq = latestMeasurement.isqValue;
+
+    // ISQ_LOW: Latest ISQ < 60
+    if (latestIsq !== null && latestIsq < 60) {
+      const isCritical = latestIsq < 50;
+      flags.push({
+        id: `flag_isq_low_${surgeryImplantId}`,
+        type: 'ISQ_LOW',
+        level: isCritical ? 'CRITICAL' : 'WARNING',
+        label: isCritical ? 'ISQ critique' : 'ISQ faible',
+        value: latestIsq,
+        createdAt: now,
+        recommendedActions: [
+          { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'PRIMARY' },
+          { type: 'plan_control_14d', label: 'Planifier controle (14j)', priority: 'PRIMARY' },
+          { type: 'open_status_modal', label: 'Changer le statut', priority: 'SECONDARY' },
+        ],
+      });
+    }
+
+    // ISQ_DECLINING: ISQ dropped by 10+ points from previous
+    if (measurements.length >= 2 && latestIsq !== null) {
+      const previousMeasurement = measurements[1];
+      const previousIsq = previousMeasurement.isqValue;
+      if (previousIsq !== null) {
+        const delta = latestIsq - previousIsq;
+        if (delta <= -10) {
+          const isCritical = delta <= -15;
+          flags.push({
+            id: `flag_isq_declining_${surgeryImplantId}`,
+            type: 'ISQ_DECLINING',
+            level: isCritical ? 'CRITICAL' : 'WARNING',
+            label: 'ISQ en déclin',
+            value: latestIsq,
+            delta: delta,
+            createdAt: now,
+            recommendedActions: [
+              { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'PRIMARY' },
+              { type: 'plan_control_14d', label: 'Planifier controle (14j)', priority: 'PRIMARY' },
+              { type: 'review_isq_history', label: 'Voir historique ISQ', priority: 'SECONDARY' },
+            ],
+          });
+        }
+      }
+    }
+
+    // UNSTABLE_ISQ_HISTORY: 3+ consecutive low ISQs (most recent consecutive run)
+    let consecutiveLowCount = 0;
+    // Walk from most recent to oldest, count consecutive lows
+    for (const m of measurements) {
+      if (m.isqValue !== null && m.isqValue < 60) {
+        consecutiveLowCount++;
+      } else {
+        break; // Stop at first non-low reading
+      }
+    }
+    if (consecutiveLowCount >= 3) {
+      flags.push({
+        id: `flag_unstable_${surgeryImplantId}`,
+        type: 'UNSTABLE_ISQ_HISTORY',
+        level: 'WARNING',
+        label: 'Historique ISQ instable',
+        createdAt: now,
+        recommendedActions: [
+          { type: 'open_status_modal', label: 'Evaluer statut', priority: 'PRIMARY' },
+          { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'SECONDARY' },
+        ],
+      });
+    }
+
+    // NO_RECENT_ISQ: No measurement in last 3 months (for implants older than 2 months)
+    const lastMeasurementDate = new Date(latestMeasurement.measuredAt);
+    const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    if (lastMeasurementDate < threeMonthsAgo) {
+      flags.push({
+        id: `flag_no_recent_${surgeryImplantId}`,
+        type: 'NO_RECENT_ISQ',
+        level: 'INFO',
+        label: 'Pas de mesure ISQ récente',
+        createdAt: now,
+        recommendedActions: [
+          { type: 'plan_control_14d', label: 'Planifier un controle', priority: 'PRIMARY' },
+          { type: 'schedule_followup', label: 'Planifier suivi', priority: 'SECONDARY' },
+        ],
+      });
+    }
+
+    return flags;
+  }
+
+  async generateStatusSuggestions(organisationId: string, surgeryImplantId: string, flags: ClinicalFlag[]): Promise<StatusSuggestion[]> {
+    const suggestions: StatusSuggestion[] = [];
+
+    // Get the implant's current status
+    const implant = await this.getSurgeryImplant(organisationId, surgeryImplantId);
+    if (!implant || implant.statut !== 'EN_SUIVI') {
+      // Only generate suggestions for implants in EN_SUIVI status
+      return suggestions;
+    }
+
+    // Find the latest measurement for evidence
+    const measurements = await this.getImplantMeasurements(organisationId, surgeryImplantId);
+    const latestMeasurement = measurements.length > 0 ? measurements[0] : null;
+
+    // ISQ_LOW or DECLINING suggests COMPLICATION
+    const lowFlag = flags.find(f => f.type === 'ISQ_LOW');
+    const decliningFlag = flags.find(f => f.type === 'ISQ_DECLINING');
+
+    if (lowFlag && lowFlag.level === 'CRITICAL') {
+      suggestions.push({
+        id: `suggestion_complication_critical_${surgeryImplantId}`,
+        suggestedStatus: 'COMPLICATION',
+        reasonCode: 'ISQ_CRITICAL',
+        reasonLabel: 'ISQ critique (< 50)',
+        evidence: {
+          measurementId: latestMeasurement?.id,
+          isqValue: lowFlag.value,
+        },
+        priority: 'HIGH',
+        recommendedActions: [
+          { type: 'open_status_modal', label: 'Appliquer ce statut', priority: 'PRIMARY' },
+          { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'SECONDARY' },
+        ],
+      });
+    } else if (lowFlag) {
+      suggestions.push({
+        id: `suggestion_complication_low_${surgeryImplantId}`,
+        suggestedStatus: 'COMPLICATION',
+        reasonCode: 'ISQ_LOW',
+        reasonLabel: 'ISQ faible (< 60)',
+        evidence: {
+          measurementId: latestMeasurement?.id,
+          isqValue: lowFlag.value,
+        },
+        priority: 'MEDIUM',
+        recommendedActions: [
+          { type: 'open_status_modal', label: 'Appliquer ce statut', priority: 'PRIMARY' },
+          { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'SECONDARY' },
+        ],
+      });
+    }
+
+    if (decliningFlag && decliningFlag.level === 'CRITICAL') {
+      suggestions.push({
+        id: `suggestion_complication_declining_${surgeryImplantId}`,
+        suggestedStatus: 'COMPLICATION',
+        reasonCode: 'ISQ_DECLINING',
+        reasonLabel: 'Chute ISQ importante',
+        evidence: {
+          measurementId: latestMeasurement?.id,
+          isqValue: decliningFlag.value,
+          isqDelta: decliningFlag.delta,
+        },
+        priority: 'HIGH',
+        recommendedActions: [
+          { type: 'open_status_modal', label: 'Appliquer ce statut', priority: 'PRIMARY' },
+          { type: 'add_or_link_radio', label: 'Lier une radio', priority: 'SECONDARY' },
+          { type: 'review_isq_history', label: 'Voir historique', priority: 'SECONDARY' },
+        ],
+      });
+    }
+
+    // If no issues and good ISQ history, suggest SUCCES
+    const hasIssues = flags.some(f => f.type === 'ISQ_LOW' || f.type === 'ISQ_DECLINING' || f.type === 'UNSTABLE_ISQ_HISTORY');
+    if (!hasIssues && measurements.length >= 3) {
+      const allGood = measurements.slice(0, 3).every(m => m.isqValue !== null && m.isqValue >= 70);
+      if (allGood && latestMeasurement) {
+        suggestions.push({
+          id: `suggestion_success_${surgeryImplantId}`,
+          suggestedStatus: 'SUCCES',
+          reasonCode: 'STABLE_HIGH_ISQ',
+          reasonLabel: 'ISQ stable et eleve (3+ mesures > 70)',
+          evidence: {
+            measurementId: latestMeasurement.id,
+            isqValue: latestMeasurement.isqValue ?? undefined,
+          },
+          priority: 'LOW',
+          recommendedActions: [
+            { type: 'open_status_modal', label: 'Valider le succes', priority: 'PRIMARY' },
+          ],
+        });
+      }
+    }
+
+    return suggestions;
+  }
+
+  // ========== APPOINTMENT RADIOS ==========
+  async getAppointmentRadios(organisationId: string, appointmentId: string): Promise<AppointmentRadio[]> {
+    return db.select().from(appointmentRadios)
+      .where(and(
+        eq(appointmentRadios.organisationId, organisationId),
+        eq(appointmentRadios.appointmentId, appointmentId)
+      ))
+      .orderBy(desc(appointmentRadios.createdAt));
+  }
+
+  async linkRadioToAppointment(
+    organisationId: string, 
+    appointmentId: string, 
+    radioId: string, 
+    linkedBy: string, 
+    notes?: string
+  ): Promise<AppointmentRadio> {
+    const [link] = await db.insert(appointmentRadios)
+      .values({
+        organisationId,
+        appointmentId,
+        radioId,
+        linkedBy,
+        notes: notes || null,
+      })
+      .returning();
+    return link;
+  }
+
+  async unlinkRadioFromAppointment(organisationId: string, appointmentId: string, radioId: string): Promise<boolean> {
+    const result = await db.delete(appointmentRadios)
+      .where(and(
+        eq(appointmentRadios.organisationId, organisationId),
+        eq(appointmentRadios.appointmentId, appointmentId),
+        eq(appointmentRadios.radioId, radioId)
+      ));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 

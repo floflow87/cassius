@@ -14,6 +14,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useOnboarding, ONBOARDING_STEPS } from "@/hooks/use-onboarding";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -177,7 +178,7 @@ export default function SettingsPage() {
           <TabsList className="bg-white dark:bg-zinc-900 p-1 h-auto gap-1 border-b-0 rounded-full mb-6">
             <TabsTrigger 
               value="security" 
-              className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
+              className="text-xs px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
               data-testid="nav-security"
             >
               <Shield className="w-4 h-4" />
@@ -185,7 +186,7 @@ export default function SettingsPage() {
             </TabsTrigger>
             <TabsTrigger 
               value="notifications" 
-              className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
+              className="text-xs px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
               data-testid="nav-notifications"
             >
               <Bell className="w-4 h-4" />
@@ -194,7 +195,7 @@ export default function SettingsPage() {
             {userIsAdmin && (
               <TabsTrigger 
                 value="collaborators" 
-                className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
+                className="text-xs px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
                 data-testid="nav-collaborators"
               >
                 <Users className="w-4 h-4" />
@@ -204,7 +205,7 @@ export default function SettingsPage() {
             {userIsAdmin && (
               <TabsTrigger 
                 value="organization" 
-                className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
+                className="text-xs px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
                 data-testid="nav-organization"
               >
                 <Building2 className="w-4 h-4" />
@@ -213,7 +214,7 @@ export default function SettingsPage() {
             )}
             <TabsTrigger 
               value="integrations" 
-              className="text-sm px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
+              className="text-xs px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
               data-testid="nav-integrations"
             >
               <Link2 className="w-4 h-4" />
@@ -329,8 +330,8 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-2 font-semibold">
-              <User className="w-5 h-5" />
+            <CardTitle className="flex items-center gap-2 font-semibold text-sm">
+              <User className="w-4 h-4" />
               Profil utilisateur
             </CardTitle>
             {!isEditingProfile ? (
@@ -376,7 +377,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label className="text-muted-foreground text-sm font-light">Nom</Label>
+              <Label className="text-muted-foreground text-xs font-light">Nom</Label>
               {isEditingProfile ? (
                 <Input
                   value={profileFormData.nom}
@@ -384,11 +385,11 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                   data-testid="input-user-nom"
                 />
               ) : (
-                <p className="font-light" data-testid="text-user-nom">{profile.nom || "—"}</p>
+                <p className="font-light text-xs" data-testid="text-user-nom">{profile.nom || "—"}</p>
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground text-sm font-light">Prénom</Label>
+              <Label className="text-muted-foreground text-xs font-light">Prénom</Label>
               {isEditingProfile ? (
                 <Input
                   value={profileFormData.prenom}
@@ -396,15 +397,15 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
                   data-testid="input-user-prenom"
                 />
               ) : (
-                <p className="font-light" data-testid="text-user-prenom">{profile.prenom || "—"}</p>
+                <p className="font-light text-xs" data-testid="text-user-prenom">{profile.prenom || "—"}</p>
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground text-sm font-light">Email / Identifiant</Label>
-              <p className="font-light" data-testid="text-user-username">{profile.username}</p>
+              <Label className="text-muted-foreground text-xs font-light">Email / Identifiant</Label>
+              <p className="font-light text-xs" data-testid="text-user-username">{profile.username}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground text-sm font-light">Rôle</Label>
+              <Label className="text-muted-foreground text-xs font-light">Rôle</Label>
               <div className="mt-1">
                 <Badge variant={getRoleBadgeVariant(profile.role)} data-testid="badge-user-role">
                   {getRoleLabel(profile.role)}
@@ -414,8 +415,8 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
           </div>
           {profile.organisationNom && (
             <div>
-              <Label className="text-muted-foreground text-sm font-light">Organisation</Label>
-              <p className="font-light" data-testid="text-user-org">{profile.organisationNom}</p>
+              <Label className="text-muted-foreground text-xs font-light">Organisation</Label>
+              <p className="font-light text-xs" data-testid="text-user-org">{profile.organisationNom}</p>
             </div>
           )}
         </CardContent>
@@ -423,11 +424,11 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-semibold">
-            <Lock className="w-5 h-5" />
+          <CardTitle className="flex items-center gap-2 font-semibold text-sm">
+            <Lock className="w-4 h-4" />
             Sécurité du compte
           </CardTitle>
-          <CardDescription className="font-light">
+          <CardDescription className="font-light text-xs">
             Modifiez votre mot de passe pour sécuriser votre compte.
           </CardDescription>
         </CardHeader>
@@ -543,7 +544,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
 
 function OnboardingSettingsSection() {
   const [, setLocation] = useLocation();
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpenOverride, setIsOpenOverride] = useState<boolean | null>(null);
   const { toast } = useToast();
   const { 
     state, 
@@ -563,6 +564,30 @@ function OnboardingSettingsSection() {
     refetchInterval: 30000,
   });
 
+  const markDoneMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      const response = await apiRequest("POST", `/api/onboarding/checklist/${itemId}/mark-done`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/onboarding/checklist"] });
+      if (data.allCompleted) {
+        toast({
+          title: "Félicitations !",
+          description: "Vous avez terminé la configuration de Cassius.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de marquer comme fait",
+        variant: "destructive",
+      });
+    },
+  });
+
   const isLoading = onboardingLoading || checklistLoading;
 
   if (isLoading) {
@@ -571,7 +596,7 @@ function OnboardingSettingsSection() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5" />
-            <CardTitle className="font-semibold">Configuration initiale</CardTitle>
+            <CardTitle className="font-semibold text-sm">Configuration initiale</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
@@ -585,15 +610,13 @@ function OnboardingSettingsSection() {
 
   const progress = checklist ? Math.round((checklist.completedCount / checklist.totalCount) * 100) : 0;
   const allCompleted = checklist?.completedCount === checklist?.totalCount;
+  const isOpen = isOpenOverride !== null ? isOpenOverride : !allCompleted;
+  const setIsOpen = setIsOpenOverride;
   const statusBadge = allCompleted ? (
     <Badge variant="default" className="bg-green-500 hover:bg-green-600">Terminé</Badge>
   ) : (
     <Badge variant="secondary">En cours</Badge>
   );
-
-  const handleNavigate = (url: string) => {
-    setLocation(url);
-  };
 
   const handleResumeFirstIncomplete = () => {
     // Find first incomplete item with a wizard step
@@ -637,8 +660,8 @@ function OnboardingSettingsSection() {
                 ) : (
                   <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 )}
-                <CardTitle className="flex items-center gap-2 font-semibold">
-                  <Sparkles className="w-5 h-5" />
+                <CardTitle className="flex items-center gap-2 font-semibold text-sm">
+                  <Sparkles className="w-4 h-4" />
                   Configuration initiale
                 </CardTitle>
               </button>
@@ -652,14 +675,14 @@ function OnboardingSettingsSection() {
               )}
             </div>
           </div>
-          <CardDescription className="font-light">
+          <CardDescription className="font-light text-xs">
             Suivez les étapes pour configurer complètement votre espace Cassius.
           </CardDescription>
         </CardHeader>
         <CollapsibleContent>
           <CardContent className="space-y-4 pt-0">
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Progression globale</span>
                 <span className="font-medium">{checklist?.completedCount || 0}/{checklist?.totalCount || 0}</span>
               </div>
@@ -670,23 +693,35 @@ function OnboardingSettingsSection() {
               {checklist?.items.map((item) => (
                 <div 
                   key={item.id}
-                  className="flex items-center justify-between gap-2 text-sm py-2 px-2 -mx-2 rounded cursor-pointer hover-elevate"
-                  onClick={() => handleNavigate(item.actionUrl)}
+                  className="flex items-center justify-between gap-2 text-xs py-2 px-2 -mx-2 rounded hover-elevate"
                   data-testid={`settings-onboarding-step-${item.id}`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div 
+                    className="flex items-center gap-2 flex-1 cursor-pointer"
+                    onClick={() => item.wizardStep !== null ? setLocation(`/onboarding?step=${item.wizardStep}`) : setLocation(item.actionUrl)}
+                  >
                     {item.completed ? (
                       <Check className="w-4 h-4 text-green-500" />
                     ) : (
                       <Circle className="w-4 h-4 text-muted-foreground" />
                     )}
-                    <span className={item.completed ? "text-muted-foreground" : ""}>
+                    <span className={item.completed ? "text-muted-foreground line-through" : ""}>
                       {item.label}
                     </span>
                   </div>
-                  <Badge variant={item.completed ? "default" : "outline"} className={item.completed ? "bg-green-500 hover:bg-green-600" : ""}>
-                    {item.completed ? "Validé" : "À faire"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {!item.completed && (
+                      <Checkbox 
+                        checked={false}
+                        onCheckedChange={() => markDoneMutation.mutate(item.id)}
+                        disabled={markDoneMutation.isPending}
+                        data-testid={`settings-checkbox-${item.id}`}
+                      />
+                    )}
+                    <Badge variant={item.completed ? "default" : "outline"} className={item.completed ? "bg-green-500 hover:bg-green-600" : ""}>
+                      {item.completed ? "Validé" : "À faire"}
+                    </Badge>
+                  </div>
                 </div>
               ))}
             </div>
@@ -789,8 +824,8 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={googleCalendarIcon} alt="Google Calendar" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-base whitespace-nowrap">Google Calendar</CardTitle>
-                <CardDescription>Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
+                <CardTitle className="text-sm whitespace-nowrap">Google Calendar</CardTitle>
+                <CardDescription className="text-xs">Synchronisez vos rendez-vous avec Google Calendar</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -804,14 +839,14 @@ function IntegrationsSection() {
               <>
                 {googleStatus.email && (
                   <div>
-                    <Label className="text-muted-foreground text-sm">Compte connecté</Label>
-                    <p className="font-medium text-sm">{googleStatus.email}</p>
+                    <Label className="text-muted-foreground text-xs">Compte connecté</Label>
+                    <p className="font-medium text-xs">{googleStatus.email}</p>
                   </div>
                 )}
                 
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <Label className="text-sm">Synchronisation automatique</Label>
+                    <Label className="text-xs">Synchronisation automatique</Label>
                     <p className="text-xs text-muted-foreground">
                       Les rendez-vous sont synchronisés automatiquement
                     </p>
@@ -826,8 +861,8 @@ function IntegrationsSection() {
 
                 {googleStatus.integration?.targetCalendarName && (
                   <div>
-                    <Label className="text-muted-foreground text-sm">Calendrier cible</Label>
-                    <p className="font-medium text-sm flex items-center gap-2">
+                    <Label className="text-muted-foreground text-xs">Calendrier cible</Label>
+                    <p className="font-medium text-xs flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
                       {googleStatus.integration.targetCalendarName}
                     </p>
@@ -836,8 +871,8 @@ function IntegrationsSection() {
 
                 {googleStatus.integration?.lastSyncAt && (
                   <div>
-                    <Label className="text-muted-foreground text-sm">Dernière synchronisation</Label>
-                    <p className="text-sm">
+                    <Label className="text-muted-foreground text-xs">Dernière synchronisation</Label>
+                    <p className="text-xs">
                       {new Date(googleStatus.integration.lastSyncAt).toLocaleString("fr-FR")}
                     </p>
                   </div>
@@ -846,7 +881,7 @@ function IntegrationsSection() {
                 {googleStatus.integration?.syncErrorCount && googleStatus.integration.syncErrorCount > 0 && (
                   <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
                     <AlertCircle className="w-4 h-4" />
-                    <span className="text-sm">{googleStatus.integration.syncErrorCount} erreurs de synchronisation</span>
+                    <span className="text-xs">{googleStatus.integration.syncErrorCount} erreurs de synchronisation</span>
                   </div>
                 )}
 
@@ -884,7 +919,7 @@ function IntegrationsSection() {
                 {!googleStatus?.configured && (
                   <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm">L'intégration Google n'est pas configurée. Contactez l'administrateur.</span>
+                    <span className="text-xs">L'intégration Google n'est pas configurée. Contactez l'administrateur.</span>
                   </div>
                 )}
                 <Button
@@ -897,7 +932,7 @@ function IntegrationsSection() {
                   ) : (
                     <img src={googleLogo} alt="Google" className="w-4 h-4 mr-2" />
                   )}
-                  Connecter Google Calendar
+                  <span className="text-xs">Connecter Google Calendar</span>
                 </Button>
               </div>
             )}
@@ -913,8 +948,8 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={gmailIcon} alt="Gmail" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-base whitespace-nowrap">Gmail</CardTitle>
-                <CardDescription>Synchronisez vos emails avec Google Gmail</CardDescription>
+                <CardTitle className="text-sm whitespace-nowrap">Gmail</CardTitle>
+                <CardDescription className="text-xs">Synchronisez vos emails avec Google Gmail</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -930,8 +965,8 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={googleMeetIcon} alt="Google Meet" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-base whitespace-nowrap">Google Meet</CardTitle>
-                <CardDescription>Intégrez vos visioconférences avec Google Meet</CardDescription>
+                <CardTitle className="text-sm whitespace-nowrap">Google Meet</CardTitle>
+                <CardDescription className="text-xs">Intégrez vos visioconférences avec Google Meet</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -947,8 +982,8 @@ function IntegrationsSection() {
             <div className="flex items-start gap-3">
               <img src={outlookIcon} alt="Microsoft Outlook" className="w-10 h-10 flex-shrink-0" />
               <div>
-                <CardTitle className="text-base whitespace-nowrap">Microsoft Outlook</CardTitle>
-                <CardDescription>Synchronisez vos emails avec Microsoft Outlook</CardDescription>
+                <CardTitle className="text-sm whitespace-nowrap">Microsoft Outlook</CardTitle>
+                <CardDescription className="text-xs">Synchronisez vos emails avec Microsoft Outlook</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -1027,10 +1062,10 @@ function CollaboratorsSection() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Permissions par rôle</CardTitle>
+          <CardTitle className="text-sm">Permissions par rôle</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3 text-sm">
+          <div className="space-y-3 text-xs">
             <div className="flex items-start gap-3">
               <Badge variant="default">Administrateur</Badge>
               <p className="text-muted-foreground">
@@ -1057,8 +1092,8 @@ function CollaboratorsSection() {
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <CardTitle>Membres de l'organisation</CardTitle>
-              <CardDescription>{collaborators.length} collaborateur(s)</CardDescription>
+              <CardTitle className="text-sm">Membres de l'organisation</CardTitle>
+              <CardDescription className="text-xs">{collaborators.length} collaborateur(s)</CardDescription>
             </div>
             <Sheet open={showInviteSheet} onOpenChange={setShowInviteSheet}>
               <SheetTrigger asChild>
@@ -1180,7 +1215,7 @@ function CollaboratorsSection() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium">
+                        <p className="font-medium text-sm">
                           {collab.prenom && collab.nom
                             ? `${collab.prenom} ${collab.nom}`
                             : collab.username}
@@ -1195,7 +1230,7 @@ function CollaboratorsSection() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{collab.email || collab.username}</p>
+                      <p className="text-xs text-muted-foreground">{collab.email || collab.username}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1318,8 +1353,8 @@ function OrganizationSection() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Building2 className="w-4 h-4" />
               Informations du cabinet
             </CardTitle>
             {!isEditing && (
@@ -1385,20 +1420,20 @@ function OrganizationSection() {
           ) : (
             <div className="space-y-4">
               <div>
-                <Label className="text-muted-foreground text-sm font-light">Nom du cabinet</Label>
-                <p className="font-medium" data-testid="text-org-nom">{organisation?.nom || "—"}</p>
+                <Label className="text-muted-foreground text-xs font-light">Nom du cabinet</Label>
+                <p className="font-medium text-xs" data-testid="text-org-nom">{organisation?.nom || "—"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground text-sm font-light">Adresse</Label>
-                <p className="font-medium" data-testid="text-org-adresse">{organisation?.adresse || "—"}</p>
+                <Label className="text-muted-foreground text-xs font-light">Adresse</Label>
+                <p className="font-medium text-xs" data-testid="text-org-adresse">{organisation?.adresse || "—"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground text-sm font-light">Fuseau horaire</Label>
-                <p className="font-medium" data-testid="text-org-timezone">{organisation?.timezone || "Europe/Paris"}</p>
+                <Label className="text-muted-foreground text-xs font-light">Fuseau horaire</Label>
+                <p className="font-medium text-xs" data-testid="text-org-timezone">{organisation?.timezone || "Europe/Paris"}</p>
               </div>
               <div>
-                <Label className="text-muted-foreground text-sm font-light">Date de création</Label>
-                <p className="text-sm text-muted-foreground">
+                <Label className="text-muted-foreground text-xs font-light">Date de création</Label>
+                <p className="text-xs text-muted-foreground">
                   {organisation?.createdAt
                     ? new Date(organisation.createdAt).toLocaleDateString("fr-FR")
                     : "—"}
@@ -1689,7 +1724,7 @@ function NotificationsSection() {
                           className={`grid grid-cols-12 gap-2 px-4 py-3 items-center ${isDisabled ? "opacity-50" : ""}`}
                         >
                           <div className="col-span-3">
-                            <span className={`text-sm font-medium ${isDisabled ? "text-muted-foreground" : ""}`}>
+                            <span className={`text-xs font-medium ${isDisabled ? "text-muted-foreground" : ""}`}>
                               {notifType.label}
                             </span>
                           </div>

@@ -120,13 +120,13 @@ function SecondaryStatCard({ title, icon, iconBgColor, stats }: SecondaryStatCar
           <div className={`p-2 rounded-lg ${iconBgColor}`}>
             {icon}
           </div>
-          <h3 className="font-semibold">{title}</h3>
+          <h3 className="font-semibold text-sm">{title}</h3>
         </div>
         <div className="space-y-3">
           {stats.map((stat) => (
             <div key={stat.label} className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{stat.label}</span>
-              <span className="font-semibold">{stat.value}</span>
+              <span className="text-xs text-muted-foreground">{stat.label}</span>
+              <span className="font-semibold text-xs">{stat.value}</span>
             </div>
           ))}
         </div>
@@ -138,12 +138,13 @@ function SecondaryStatCard({ title, icon, iconBgColor, stats }: SecondaryStatCar
 interface AppointmentItemProps {
   date: Date;
   title: string;
-  description: string;
+  patientName: string;
+  patientId: string;
   type: "consultation" | "suivi" | "action";
   time?: string;
 }
 
-function AppointmentItem({ date, title, description, type, time }: AppointmentItemProps) {
+function AppointmentItem({ date, title, patientName, patientId, type, time }: AppointmentItemProps) {
   const day = date.getDate();
   const month = date.toLocaleDateString("fr-FR", { month: "short" }).toUpperCase();
   
@@ -166,22 +167,24 @@ function AppointmentItem({ date, title, description, type, time }: AppointmentIt
     : "Action";
 
   return (
-    <div className={`flex items-center gap-4 p-3 border-l-4 ${borderColor} bg-muted/30 rounded-r-md`}>
-      <div className="flex flex-col items-center justify-center min-w-[48px]">
-        <span className="text-2xl font-bold">{day}</span>
-        <span className="text-xs text-muted-foreground">{month}</span>
+    <Link href={`/patients/${patientId}`} className="block" data-testid={`link-appointment-patient-${patientId}`}>
+      <div className={`flex items-center gap-4 p-3 border-l-4 ${borderColor} bg-muted/30 rounded-r-md hover-elevate cursor-pointer`}>
+        <div className="flex flex-col items-center justify-center min-w-[48px]">
+          <span className="text-2xl font-bold">{day}</span>
+          <span className="text-xs text-muted-foreground">{month}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{title}</p>
+          <p className="text-sm text-primary hover:underline truncate">{patientName}</p>
+        </div>
+        <Badge className={`${badgeVariant} no-default-hover-elevate no-default-active-elevate`}>
+          {badgeLabel}
+        </Badge>
+        {time && (
+          <span className="text-sm text-muted-foreground whitespace-nowrap">{time}</span>
+        )}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{title}</p>
-        <p className="text-sm text-muted-foreground truncate">{description}</p>
-      </div>
-      <Badge className={`${badgeVariant} no-default-hover-elevate no-default-active-elevate`}>
-        {badgeLabel}
-      </Badge>
-      {time && (
-        <span className="text-sm text-muted-foreground whitespace-nowrap">{time}</span>
-      )}
-    </div>
+    </Link>
   );
 }
 
@@ -280,9 +283,12 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const upcomingVisites = upcomingAppointments?.filter(apt => 
-    apt.status === 'UPCOMING'
-  ).slice(0, 4) || [];
+  const now = new Date();
+  const upcomingVisites = upcomingAppointments?.filter(apt => {
+    const aptDate = new Date(apt.dateStart);
+    return apt.status === 'UPCOMING' && aptDate >= now;
+  }).sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime())
+    .slice(0, 4) || [];
 
   const isqStats = {
     success: stats?.implantsByStatus?.["SUCCES"] || 0,
@@ -374,7 +380,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-base">Rendez-vous à venir</CardTitle>
+            <CardTitle className="text-sm">Rendez-vous à venir</CardTitle>
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <Button size="sm" data-testid="button-new-rdv">
@@ -552,21 +558,22 @@ export default function DashboardPage() {
                   key={apt.id}
                   date={new Date(apt.dateStart)}
                   title={apt.title}
-                  description={`${apt.patientPrenom} ${apt.patientNom}${apt.description ? ` - ${apt.description}` : ""}`}
+                  patientName={`${apt.patientPrenom || ""} ${apt.patientNom || ""}`.trim() || "Patient"}
+                  patientId={apt.patientId}
                   type={apt.type.toLowerCase() === "chirurgie" ? "action" : apt.type.toLowerCase() as "consultation" | "suivi" | "action"}
                   time={new Date(apt.dateStart).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 />
               ))
             ) : (
-              <p className="text-sm text-muted-foreground py-2">Aucun rendez-vous à venir</p>
+              <p className="text-xs text-muted-foreground py-2">Aucun rendez-vous à venir</p>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <CardTitle className="text-sm flex items-center gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
               À surveiller
             </CardTitle>
             <Badge variant="secondary" className="text-xs">
@@ -584,8 +591,8 @@ export default function DashboardPage() {
                   <div className="flex items-start gap-3 p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer" data-testid={`flag-dashboard-${flag.id}`}>
                     <FlagBadge flag={flag} compact />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{flag.label}</p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="text-xs font-medium truncate">{flag.label}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">
                         {flag.patientPrenom} {flag.patientNom} {flag.entityName ? `- ${flag.entityName}` : ""}
                       </p>
                     </div>
@@ -606,8 +613,8 @@ export default function DashboardPage() {
       {surgeryImplants && surgeryImplants.length > 0 && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-base flex items-center gap-2">
-              <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <svg className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
               </svg>
               Implants récents
@@ -623,11 +630,13 @@ export default function DashboardPage() {
                 const lastIsq = si.isq6m ?? si.isq3m ?? si.isq2m ?? si.isqPose;
                 const isqLabel = si.isq6m ? "6m" : si.isq3m ? "3m" : si.isq2m ? "2m" : si.isqPose ? "pose" : null;
                 const isLowIsq = lastIsq !== null && lastIsq <= 55;
+                const patientId = si.patient?.id;
+                const datePose = si.datePose ? new Date(si.datePose).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : null;
                 
                 return (
                   <Link 
                     key={si.id} 
-                    href={`/implants/${si.id}`}
+                    href={patientId ? `/patients/${patientId}/implants/${si.id}` : "#"}
                     className="block"
                   >
                     <div 
@@ -641,15 +650,15 @@ export default function DashboardPage() {
                           </span>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">
+                          <p className="text-xs font-medium truncate">
                             {si.patient?.prenom} {si.patient?.nom}
                           </p>
-                          <p className="text-xs text-muted-foreground truncate">
+                          <p className="text-[10px] text-muted-foreground truncate">
                             {si.implant?.marque} {si.implant?.diametre}x{si.implant?.longueur}mm
                           </p>
                         </div>
                       </div>
-                      <div className="flex-shrink-0 text-right">
+                      <div className="flex-shrink-0 flex items-center gap-3">
                         {lastIsq !== null ? (
                           <div className="flex items-center gap-2">
                             <Badge 
@@ -669,6 +678,11 @@ export default function DashboardPage() {
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                        {datePose && (
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {datePose}
+                          </span>
                         )}
                       </div>
                     </div>

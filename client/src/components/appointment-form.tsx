@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import {
   Select,
@@ -23,20 +24,21 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Appointment, AppointmentType, AppointmentStatus } from "@shared/schema";
+import { AlertCircle, Info } from "lucide-react";
 
 const appointmentTypes: { value: AppointmentType; label: string }[] = [
   { value: "CONSULTATION", label: "Consultation" },
   { value: "SUIVI", label: "Suivi" },
   { value: "CHIRURGIE", label: "Chirurgie" },
-  { value: "CONTROLE", label: "Controle" },
+  { value: "CONTROLE", label: "Contrôle" },
   { value: "URGENCE", label: "Urgence" },
   { value: "AUTRE", label: "Autre" },
 ];
 
 const appointmentStatuses: { value: AppointmentStatus; label: string }[] = [
-  { value: "UPCOMING", label: "A venir" },
-  { value: "COMPLETED", label: "Termine" },
-  { value: "CANCELLED", label: "Annule" },
+  { value: "UPCOMING", label: "À venir" },
+  { value: "COMPLETED", label: "Terminé" },
+  { value: "CANCELLED", label: "Annulé" },
 ];
 
 const formSchema = z.object({
@@ -47,9 +49,21 @@ const formSchema = z.object({
   timeStart: z.string().min(1, "L'heure est requise"),
   description: z.string().optional(),
   isq: z.number().min(0).max(100).nullable().optional(),
+  surgeryImplantId: z.string().nullable().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
+
+interface SurgeryImplant {
+  id: string;
+  siteFdi: string;
+  implant?: {
+    marque?: string;
+    referenceFabricant?: string;
+    diametre?: number | null;
+    longueur?: number | null;
+  };
+}
 
 interface AppointmentFormProps {
   patientId: string;
@@ -71,6 +85,10 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
   const { toast } = useToast();
   const isEditing = !!appointment;
 
+  const { data: surgeryImplants = [], isLoading: implantsLoading } = useQuery<SurgeryImplant[]>({
+    queryKey: [`/api/patients/${patientId}/surgery-implants`],
+  });
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -81,8 +99,12 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
       timeStart: appointment?.dateStart ? formatTimeForInput(appointment.dateStart) : "09:00",
       description: appointment?.description || "",
       isq: appointment?.isq ?? null,
+      surgeryImplantId: appointment?.surgeryImplantId || null,
     },
   });
+
+  const watchType = form.watch("type");
+  const showImplantSelector = ["SUIVI", "CONTROLE"].includes(watchType);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -94,14 +116,15 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
         dateStart,
         description: data.description || null,
         isq: data.isq,
+        surgeryImplantId: data.surgeryImplantId || null,
       });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "appointments"] });
       toast({
-        title: "RDV cree",
-        description: "Le rendez-vous a ete ajoute.",
+        title: "RDV créé",
+        description: "Le rendez-vous a été ajouté.",
         variant: "success",
       });
       onSuccess?.();
@@ -125,14 +148,15 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
         dateStart,
         description: data.description || null,
         isq: data.isq,
+        surgeryImplantId: data.surgeryImplantId || null,
       });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "appointments"] });
       toast({
-        title: "RDV mis a jour",
-        description: "Le rendez-vous a ete modifie.",
+        title: "RDV mis à jour",
+        description: "Le rendez-vous a été modifié.",
         variant: "success",
       });
       onSuccess?.();
@@ -156,6 +180,16 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  const getImplantLabel = (implant: SurgeryImplant) => {
+    const parts = [`Site ${implant.siteFdi}`];
+    if (implant.implant?.marque) parts.push(implant.implant.marque);
+    if (implant.implant?.diametre && implant.implant?.longueur) {
+      parts.push(`${implant.implant.diametre}x${implant.implant.longueur}mm`);
+    }
+    if (implant.implant?.referenceFabricant) parts.push(`(${implant.implant.referenceFabricant})`);
+    return parts.join(" - ");
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -166,7 +200,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
             <FormItem>
               <FormLabel>Titre</FormLabel>
               <FormControl>
-                <Input placeholder="Ex: Controle post-operatoire" {...field} data-testid="input-appointment-title" />
+                <Input placeholder="Ex: Contrôle post-opératoire" {...field} data-testid="input-appointment-title" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -182,7 +216,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
                 <FormLabel>Type</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger data-testid="select-appointment-type">
+                    <SelectTrigger className="text-xs" data-testid="select-appointment-type">
                       <SelectValue placeholder="Type de RDV" />
                     </SelectTrigger>
                   </FormControl>
@@ -207,7 +241,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
                 <FormLabel>Statut</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger data-testid="select-appointment-status">
+                    <SelectTrigger className="text-xs" data-testid="select-appointment-status">
                       <SelectValue placeholder="Statut" />
                     </SelectTrigger>
                   </FormControl>
@@ -224,6 +258,53 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
             )}
           />
         </div>
+
+        {showImplantSelector && (
+          <FormField
+            control={form.control}
+            name="surgeryImplantId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2">
+                  Implant lié
+                  <span className="text-xs text-muted-foreground">(recommandé pour le suivi ISQ)</span>
+                </FormLabel>
+                <Select 
+                  onValueChange={(value) => field.onChange(value === "none" ? null : value)} 
+                  value={field.value || "none"}
+                  disabled={implantsLoading}
+                >
+                  <FormControl>
+                    <SelectTrigger className="text-xs" data-testid="select-surgery-implant">
+                      <SelectValue placeholder={implantsLoading ? "Chargement..." : "Sélectionner un implant"} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Aucun implant</SelectItem>
+                    {surgeryImplants.map((implant) => (
+                      <SelectItem key={implant.id} value={implant.id}>
+                        {getImplantLabel(implant)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {surgeryImplants.length === 0 && !implantsLoading && (
+                  <FormDescription className="flex items-center gap-1 text-amber-600">
+                    <AlertCircle className="h-3 w-3" />
+                    Aucun implant posé pour ce patient
+                  </FormDescription>
+                )}
+                {!field.value && surgeryImplants.length > 0 && (
+                  <FormDescription className="flex items-center gap-1 text-blue-600">
+                    <Info className="h-3 w-3" />
+                    Lier un implant permet le suivi ISQ et les suggestions cliniques
+                  </FormDescription>
+                )}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <FormField
@@ -276,7 +357,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
 
         <div className="flex justify-end gap-2">
           <Button type="submit" disabled={isPending} data-testid="button-submit-appointment">
-            {isPending ? "Enregistrement..." : isEditing ? "Modifier" : "Creer"}
+            {isPending ? "Enregistrement..." : isEditing ? "Modifier" : "Créer"}
           </Button>
         </div>
       </form>

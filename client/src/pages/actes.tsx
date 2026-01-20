@@ -462,16 +462,16 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   const renderCellContent = (columnId: ColumnId, op: OperationWithDetails) => {
     switch (columnId) {
       case "dateOperation":
-        return <span className="text-muted-foreground">{formatDate(op.dateOperation)}</span>;
+        return <span className="text-muted-foreground text-xs">{formatDate(op.dateOperation)}</span>;
       case "patient":
         return (
-          <span className="font-medium">
+          <span className="font-medium text-xs">
             {op.patientPrenom} {op.patientNom}
           </span>
         );
       case "typeIntervention":
         return (
-          <Badge variant="secondary" className="text-xs">
+          <Badge className="text-[10px] rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border-0">
             {TYPE_INTERVENTION_LABELS[op.typeIntervention] || op.typeIntervention}
           </Badge>
         );
@@ -479,17 +479,17 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         const temps = op.typeChirurgieTemps ? CHIRURGIE_TEMPS_LABELS[op.typeChirurgieTemps] : null;
         const approche = op.typeChirurgieApproche ? CHIRURGIE_APPROCHE_LABELS[op.typeChirurgieApproche] : null;
         if (!temps && !approche) {
-          return <span className="text-muted-foreground/50">-</span>;
+          return <span className="text-muted-foreground/50 text-xs">-</span>;
         }
         return (
           <div className="flex flex-wrap gap-1">
             {temps && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-[10px]">
                 {temps}
               </Badge>
             )}
             {approche && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-[10px]">
                 {approche}
               </Badge>
             )}
@@ -498,22 +498,22 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
       }
       case "implantCount":
         return op.implantCount > 0 ? (
-          <span className="text-muted-foreground">{op.implantCount} implant{op.implantCount > 1 ? "s" : ""}</span>
+          <span className="text-muted-foreground text-xs">{op.implantCount} implant{op.implantCount > 1 ? "s" : ""}</span>
         ) : (
-          <span className="text-muted-foreground/50">-</span>
+          <span className="text-muted-foreground/50 text-xs">-</span>
         );
       case "greffe":
         return op.greffeOsseuse ? (
-          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+          <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
             Oui
           </Badge>
         ) : (
-          <span className="text-muted-foreground/50">-</span>
+          <span className="text-muted-foreground/50 text-xs">-</span>
         );
       case "reussite": {
         const badge = getSuccessRateBadge(op.successRate);
         return (
-          <Badge variant="outline" className={`text-xs border-0 ${badge.className}`}>
+          <Badge variant="outline" className={`text-[10px] border-0 ${badge.className}`}>
             {badge.label}
           </Badge>
         );
@@ -751,7 +751,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                       />
                     </td>
                     {columns.map((column) => (
-                      <td key={column.id} className={`px-4 py-2 text-sm ${columnWidths[column.id]}`}>
+                      <td key={column.id} className={`px-4 py-2 text-xs ${columnWidths[column.id]}`}>
                         {renderCellContent(column.id, op)}
                       </td>
                     ))}

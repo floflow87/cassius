@@ -23,6 +23,8 @@ interface Notification {
   body?: string;
   entityType?: string;
   entityId?: string;
+  patientName?: string;
+  patientId?: string;
   createdAt: string;
   readAt?: string;
 }
@@ -81,15 +83,24 @@ function NotificationItem({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className={`text-sm ${isUnread ? 'font-medium' : ''}`}>{notification.title}</p>
+          <p className={`text-xs ${isUnread ? 'font-medium' : ''}`}>{notification.title}</p>
           {isUnread && (
             <div className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1" />
           )}
         </div>
-        {notification.body && (
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notification.body}</p>
+        {notification.patientName && (
+          <Link 
+            href={notification.patientId ? `/patients/${notification.patientId}` : "#"}
+            className="text-xs text-primary hover:underline mt-0.5 block"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {notification.patientName}
+          </Link>
         )}
-        <p className="text-xs text-muted-foreground mt-1">
+        {notification.body && (
+          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{notification.body}</p>
+        )}
+        <p className="text-[10px] text-muted-foreground mt-1">
           {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true, locale: fr })}
         </p>
       </div>
@@ -127,9 +138,13 @@ export function NotificationBell() {
   
   const markAllAsReadMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/notifications/mark-all-read"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+    onSuccess: async () => {
+      // Invalidate and refetch to ensure UI is updated immediately
+      await queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+      // Force immediate refetch
+      queryClient.refetchQueries({ queryKey: ['/api/notifications'] });
+      queryClient.refetchQueries({ queryKey: ['/api/notifications/unread-count'] });
     },
   });
   
@@ -165,7 +180,7 @@ export function NotificationBell() {
           <h4 className="font-medium text-sm">Notifications</h4>
           {unreadCount > 0 && (
             <Button 
-              variant="ghost" 
+              variant="default" 
               size="sm" 
               className="h-7 text-xs"
               onClick={() => markAllAsReadMutation.mutate()}
@@ -208,7 +223,7 @@ export function NotificationBell() {
         <div className="border-t p-2">
           <Button 
             variant="ghost" 
-            className="w-full text-xs h-8"
+            className="w-full text-xs h-8 text-primary hover:text-primary"
             asChild
             onClick={() => setOpen(false)}
             data-testid="link-view-all-notifications"

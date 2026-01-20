@@ -120,7 +120,7 @@ function MiniCalendar({ selectedDate, onDateSelect, appointments }: MiniCalendar
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="text-sm font-medium">
+        <span className="text-xs font-medium">
           {format(viewMonth, "MMMM yyyy", { locale: fr })}
         </span>
         <Button 
@@ -152,7 +152,7 @@ function MiniCalendar({ selectedDate, onDateSelect, appointments }: MiniCalendar
               key={i}
               onClick={() => onDateSelect(d)}
               className={`
-                relative py-1.5 text-xs rounded-md transition-colors
+                relative py-1.5 text-[10px] rounded-md transition-colors cursor-pointer
                 ${!isCurrentMonth ? "text-muted-foreground/50" : ""}
                 ${isSelected ? "bg-primary text-primary-foreground" : "hover-elevate"}
                 ${isToday && !isSelected ? "font-bold text-primary" : ""}
@@ -263,7 +263,7 @@ function CalendarSidebar({
               className="flex items-center justify-between w-full px-3 py-3 hover-elevate"
               data-testid="button-toggle-sources"
             >
-              <div className="flex items-center gap-2 text-sm font-medium">
+              <div className="flex items-center gap-2 text-xs font-medium">
                 <CalendarIcon className="h-4 w-4" />
                 Sources
               </div>
@@ -329,7 +329,7 @@ function CalendarSidebar({
                       data-testid="checkbox-show-google"
                     />
                     <SiGoogle className="h-3.5 w-3.5" />
-                    <span className="text-sm">Afficher Google</span>
+                    <span className="text-xs">Afficher Google</span>
                   </label>
                 </div>
               )}
@@ -345,7 +345,7 @@ function CalendarSidebar({
               className="flex items-center justify-between w-full px-3 py-3 hover-elevate"
               data-testid="button-toggle-filters"
             >
-              <div className="flex items-center gap-2 text-sm font-medium">
+              <div className="flex items-center gap-2 text-xs font-medium">
                 <Filter className="h-4 w-4" />
                 Filtres
                 {filterCount > 0 && (
@@ -389,7 +389,7 @@ function CalendarSidebar({
                           onCheckedChange={() => toggleType(type.value)}
                         />
                         <span className={`w-2 h-2 rounded-full ${type.color}`} />
-                        <span className="text-sm">{type.label}</span>
+                        <span className="text-xs">{type.label}</span>
                       </label>
                     ))}
                   </div>
@@ -408,7 +408,7 @@ function CalendarSidebar({
                           checked={filters.statuses.includes(status.value)}
                           onCheckedChange={() => toggleStatus(status.value)}
                         />
-                        <span className="text-sm">{status.label}</span>
+                        <span className="text-xs">{status.label}</span>
                       </label>
                     ))}
                   </div>
@@ -425,7 +425,7 @@ function CalendarSidebar({
                       onCheckedChange={toggleAtRisk}
                     />
                     <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
-                    <span className="text-sm">RDV à risque</span>
+                    <span className="text-xs">RDV à risque</span>
                   </label>
                 </div>
               </div>
@@ -540,7 +540,7 @@ function CalendarSearch({ appointments, onSelectAppointment, onSelectDate, onSel
           }}
           onFocus={() => setIsOpen(true)}
           onBlur={() => setTimeout(() => setIsOpen(false), 200)}
-          className="pl-9 w-64 bg-white dark:bg-zinc-900"
+          className="pl-9 w-64 bg-white dark:bg-zinc-900 placeholder-xs"
           data-testid="input-calendar-search"
         />
       </div>
@@ -1897,7 +1897,7 @@ export default function CalendarPage() {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <span className="text-lg font-medium" data-testid="text-calendar-title">
+            <span className="text-base font-medium" data-testid="text-calendar-title">
               {format(selectedDate, "MMMM yyyy", { locale: fr })}
             </span>
           </div>
@@ -1924,7 +1924,7 @@ export default function CalendarPage() {
               ].map(v => (
                 <button
                   key={v.key}
-                  className="relative px-3 py-1.5 text-sm font-medium rounded-full transition-colors"
+                  className="relative px-3 py-1.5 text-xs font-medium rounded-full transition-colors"
                   onClick={() => changeView(v.key as typeof currentView)}
                   data-testid={`button-view-${v.key}`}
                 >

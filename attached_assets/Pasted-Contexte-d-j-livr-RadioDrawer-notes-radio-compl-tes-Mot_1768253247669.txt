@@ -1,0 +1,105 @@
+Contexte (déjà livré)
+- RadioDrawer + notes radio complètes
+- Motifs de statut (system + custom) + API
+- Historique de statut implant (audit + evidence)
+- Suggestions de statut basées sur ISQ avec règles MVP (actuellement basées sur isq3m/isq6m)
+
+Objectif de cette suite
+1) Faire du RDV (Appointment) le point d’entrée du suivi clinique.
+2) Unifier l’enregistrement des ISQ pour éviter la duplication (appointments / visites / champs isq3m/isq6m).
+3) Mettre à jour automatiquement les flags/alertes après un RDV (sans auto-changer le statut).
+4) Rendre les suggestions “contextuelles” : elles doivent apparaître dans le RDV et être pré-remplies avec evidence (ISQ, radio, RDV).
+
+A) Source de vérité des mesures ISQ (à implémenter maintenant)
+Créer une table unique `implant_measurements` si elle n’existe pas :
+- id
+- organisation_id
+- implant_id
+- patient_id
+- measured_at timestamptz
+- type enum ('ISQ') extensible
+- value numeric
+- source enum ('APPOINTMENT','VISIT','MANUAL')
+- appointment_id uuid nullable
+- visit_id uuid nullable
+- created_by
+- created_at
+
+Règles :
+- Toute saisie ISQ depuis un RDV DOIT créer/mettre à jour une ligne implant_measurements (source='APPOINTMENT').
+- Si un RDV est édité et ISQ modifié, on upsert la mesure correspondante (unique appointment_id + implant_id + type).
+- Les anciens champs isqPose/isq2m/isq3m/isq6m peuvent rester pour compat, MAIS les suggestions doivent progressivement utiliser implant_measurements.
+
+B) API ISQ depuis un RDV
+Ajouter endpoint :
+POST /api/appointments/:id/isq
+Body: { implantId, value, measuredAt? }
+- Upsert implant_measurements (appointment_id=:id)
+- Recalculer flags cliniques ISQ pour l’implant (ISQ_LOW, ISQ_DECLINING, NO_RECENT_ISQ)
+- Retourner { measurement, flags, suggestions }
+
+Ajouter endpoint :
+GET /api/appointments/:id/clinical
+- Retourne : implant lié (si déjà), dernière mesure ISQ, flags actifs, suggestions de statut, radios liées (si existant)
+
+C) UX RDV : panneau “Suivi clinique” conditionné par type
+Dans le drawer ou la page détail RDV, ajouter un bloc “Suivi clinique” :
+1) Select Implant (si patient a plusieurs implants)
+2) Champ ISQ (avec aide contextuelle)
+3) Bouton lier/ajouter radio (ouvre picker documents puis RadioDrawer)
+4) Bloc “Suggestions” (réutiliser ImplantStatusSuggestions) avec CTA “Appliquer”
+5) Bloc “Alertes/Flags” (liste active)
+
+Comportement selon type de RDV (IMPORTANT)
+- CONTROLE : ISQ fortement recommandé (warning si vide), radio recommandée
+- SUIVI : ISQ recommandé si implant EN_SUIVI
+- CHIRURGIE : proposer ISQ à la pose (si implant associé), radio post-op optionnelle
+- URGENCE : afficher suggestion “passer en complication” si flags critiques ou symptômes (pas automatique)
+- CONSULTATION/AUTRE : rien d’obligatoire, mais proposer “lier un implant”
+
+Ces règles doivent être codées dans une matrice simple côté front (ou renvoyées par API).
+
+D) Flags/alertes : recalcul automatique après chaque saisie ISQ
+Si déjà existant, s’assurer que :
+- les flags sont recalculés à chaque upsert implant_measurements
+- les flags sont stockés et récupérables par implant + statut
+- les flags contiennent severity + suggested_action (optionnel)
+
+E) Suggestions : les rendre robustes (ne plus dépendre uniquement de isq3m/isq6m)
+Actuellement règles basées sur isq3m/isq6m.
+Modifier l’engine de suggestions pour utiliser :
+- last ISQ (dernière mesure)
+- trend (diff entre les 2-3 dernières mesures)
+- “nearest measurement around +90d / +180d” pour simuler 3m/6m si besoin
+- “age implant” (jours depuis pose si dispo)
+
+Règles MVP ajustées (exemples)
+- last ISQ < 50 => ECHEC (high)
+- last ISQ 50-60 => COMPLICATION (medium)
+- drop >= 15 points entre deux mesures récentes => COMPLICATION (high)
+- stable >= 70 et implant age >= 180 jours => SUCCES (high)
+- stable >= 60 et implant age >= 90 jours => SUCCES (medium)
+IMPORTANT : toujours fournir evidence (valeurs + dates) + defaultReasonCode.
+
+F) Action “Appliquer suggestion” depuis RDV
+Quand on applique une suggestion depuis un RDV :
+- ouvrir le modal changement statut
+- pré-remplir :
+  - toStatus
+  - reason (reasonCode default)
+  - evidence = { appointmentId, measurementId, lastIsq, measuredAt, threshold }
+- option : proposer d’ajouter une note radio (si radio liée)
+
+G) Tests (obligatoires)
+1) Ouvrir RDV CONTROLE -> saisir ISQ -> compteur flags se met à jour + suggestions recalculées
+2) Appliquer suggestion -> history créé + statut implant change + reason attaché + evidence
+3) Lier une radio depuis RDV -> notes accessibles depuis patient et documents
+4) Revenir sur le RDV -> l’ISQ est bien retrouvé (upsert by appointment_id)
+5) Aucun statut ne change automatiquement sans action utilisateur
+
+Livrables
+- implant_measurements + migrations + upsert
+- panneau “Suivi clinique” sur RDV avec règles par type
+- flags recalculés après ISQ
+- suggestions basées sur implant_measurements (robustes)
+- intégration complète RDV → ISQ → flags → suggestions → statut (manuel)

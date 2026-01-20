@@ -18,6 +18,7 @@ import {
   Pill,
   Heart,
   CheckCircle,
+  CheckCircle2,
   Check,
   Image as ImageIcon,
   Stethoscope,
@@ -35,6 +36,7 @@ import {
   Copy,
   ExternalLink,
   Link2,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -729,8 +731,10 @@ export default function PatientDetailsPage() {
     queryKey: ["/api/patients", patientId, "appointments"],
     enabled: !!patientId,
   });
-  const upcomingAppointments = appointments.filter((a) => a.status === "UPCOMING").sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
-  const completedAppointments = appointments.filter((a) => a.status === "COMPLETED" || a.status === "CANCELLED").sort((a, b) => new Date(b.dateStart).getTime() - new Date(a.dateStart).getTime());
+  // Filter appointments by actual date (not status) - future dates are upcoming, past dates are completed
+  const now = new Date();
+  const upcomingAppointments = appointments.filter((a) => new Date(a.dateStart) > now).sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
+  const completedAppointments = appointments.filter((a) => new Date(a.dateStart) <= now).sort((a, b) => new Date(b.dateStart).getTime() - new Date(a.dateStart).getTime());
 
   const createRdvMutation = useMutation({
     mutationFn: async (data: typeof rdvForm) => {
@@ -1023,14 +1027,14 @@ export default function PatientDetailsPage() {
   };
 
   const getStatusBadge = (statut: string) => {
-    const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+    const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" }> = {
       SUCCES: { label: "Succès", variant: "default" },
-      EN_SUIVI: { label: "En suivi", variant: "secondary" },
-      COMPLICATION: { label: "Complication", variant: "outline" },
-      ECHEC: { label: "Echec", variant: "destructive" },
+      EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
+      COMPLICATION: { label: "Complication", variant: "complication" },
+      ECHEC: { label: "Échec", variant: "echec" },
     };
     const config = statusConfig[statut] || statusConfig.EN_SUIVI;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    return <Badge variant={config.variant} className="text-[10px]">{config.label}</Badge>;
   };
 
   const getRadioLabel = (type: string) => {
@@ -1137,24 +1141,24 @@ export default function PatientDetailsPage() {
     switch (columnId) {
       case "site":
         return (
-          <span className="font-mono font-medium">{surgeryImplant.siteFdi || "-"}</span>
+          <span className="font-mono font-medium text-xs">{surgeryImplant.siteFdi || "-"}</span>
         );
       case "marque":
         return (
           <div>
-            <div className="text-sm font-medium">{surgeryImplant.implant?.marque || "-"}</div>
-            <div className="text-xs text-muted-foreground">{surgeryImplant.implant?.referenceFabricant || "-"}</div>
+            <div className="text-xs font-medium">{surgeryImplant.implant?.marque || "-"}</div>
+            <div className="text-[10px] text-muted-foreground">{surgeryImplant.implant?.referenceFabricant || "-"}</div>
           </div>
         );
       case "dimensions":
         return (
-          <span className="text-sm">
+          <span className="text-xs">
             {surgeryImplant.implant?.diametre} x {surgeryImplant.implant?.longueur}mm
           </span>
         );
       case "datePose":
         return (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {surgeryImplant.datePose ? formatDateShort(surgeryImplant.datePose) : "-"}
           </span>
         );
@@ -1186,24 +1190,24 @@ export default function PatientDetailsPage() {
           />
         );
       case "position":
-        return <span className="text-sm">{getPositionLabel(surgeryImplant.positionImplant)}</span>;
+        return <span className="text-xs">{getPositionLabel(surgeryImplant.positionImplant)}</span>;
       case "typeOs":
-        return <span className="text-sm font-mono">{surgeryImplant.typeOs || "-"}</span>;
+        return <span className="text-xs font-mono">{surgeryImplant.typeOs || "-"}</span>;
       case "greffe":
         return surgeryImplant.greffeOsseuse ? (
           <Check className="h-4 w-4 text-green-600" />
         ) : (
-          <span className="text-muted-foreground">-</span>
+          <span className="text-muted-foreground text-xs">-</span>
         );
       case "chirurgie":
-        return <span className="text-sm">{getChirurgieTempsLabel(surgeryImplant.typeChirurgieTemps)}</span>;
+        return <span className="text-xs">{getChirurgieTempsLabel(surgeryImplant.typeChirurgieTemps)}</span>;
       case "miseEnCharge":
-        return <span className="text-sm">{getMiseEnChargeLabel(surgeryImplant.miseEnCharge)}</span>;
+        return <span className="text-xs">{getMiseEnChargeLabel(surgeryImplant.miseEnCharge)}</span>;
       case "situation":
-        return <span className="text-sm">{getSituationFromSiteFdi(surgeryImplant.siteFdi)}</span>;
+        return <span className="text-xs">{getSituationFromSiteFdi(surgeryImplant.siteFdi)}</span>;
       case "operation":
         return (
-          <div className="text-sm">
+          <div className="text-xs">
             <div>{formatDateShort(surgeryImplant.datePose)}</div>
           </div>
         );
@@ -1455,8 +1459,40 @@ export default function PatientDetailsPage() {
                 </TooltipContent>
               </Tooltip>
             )}
+            {/* Follow-up status badge */}
+            {!appointmentsLoading && (() => {
+              // Determine follow-up status: upcoming takes priority, then most recent completed/cancelled
+              if (upcomingAppointments.length > 0) {
+                return (
+                  <Badge className="bg-[#EFF6FF] text-blue-700 text-[10px] gap-1" data-testid="badge-followup-status">
+                    <Calendar className="w-3 h-3" />
+                    À venir
+                  </Badge>
+                );
+              }
+              if (completedAppointments.length > 0) {
+                const lastAppointment = completedAppointments[0];
+                if (lastAppointment.status === "COMPLETED") {
+                  return (
+                    <Badge className="bg-[#DCFCE7] text-green-700 text-[10px] gap-1" data-testid="badge-followup-status">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Terminé
+                    </Badge>
+                  );
+                }
+                if (lastAppointment.status === "CANCELLED") {
+                  return (
+                    <Badge className="bg-[#FEF2F2] text-red-700 text-[10px] gap-1" data-testid="badge-followup-status">
+                      <XCircle className="w-3 h-3" />
+                      Annulé
+                    </Badge>
+                  );
+                }
+              }
+              return null;
+            })()}
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {calculateAge(patient.dateNaissance)} ans - Depuis {new Date(patient.createdAt).getFullYear()}
           </p>
         </div>
@@ -1476,7 +1512,7 @@ export default function PatientDetailsPage() {
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
-              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+              className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
                 activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
               }`}
               data-testid={`tab-${tab.value}`}
@@ -1505,40 +1541,40 @@ export default function PatientDetailsPage() {
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4 text-sm">
+                <CardContent className="space-y-4 text-xs">
                   <div>
-                    <span className="text-muted-foreground text-xs">Nom complet</span>
+                    <span className="text-muted-foreground text-[10px]">Nom complet</span>
                     <p className="font-medium">{patient.prenom} {patient.nom}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground text-xs">Date de naissance</span>
+                    <span className="text-muted-foreground text-[10px]">Date de naissance</span>
                     <p>{formatDate(patient.dateNaissance)} ({calculateAge(patient.dateNaissance)} ans)</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground text-xs">Sexe</span>
+                    <span className="text-muted-foreground text-[10px]">Sexe</span>
                     <p>{patient.sexe === "HOMME" ? "Homme" : "Femme"}</p>
                   </div>
                   {patient.telephone && (
                     <div>
-                      <span className="text-muted-foreground text-xs">Téléphone</span>
+                      <span className="text-muted-foreground text-[10px]">Téléphone</span>
                       <p>{patient.telephone}</p>
                     </div>
                   )}
                   {patient.email && (
                     <div>
-                      <span className="text-muted-foreground text-xs">Email</span>
+                      <span className="text-muted-foreground text-[10px]">Email</span>
                       <p>{patient.email}</p>
                     </div>
                   )}
                   {patient.ssn && (
                     <div>
-                      <span className="text-muted-foreground text-xs">Numéro de sécurité sociale</span>
+                      <span className="text-muted-foreground text-[10px]">Numéro de sécurité sociale</span>
                       <p>{patient.ssn}</p>
                     </div>
                   )}
                   {(patient.adresse || patient.codePostal || patient.ville || patient.pays) && (
                     <div>
-                      <span className="text-muted-foreground text-xs">Adresse</span>
+                      <span className="text-muted-foreground text-[10px]">Adresse</span>
                       <p>
                         {patient.adresse && <span>{patient.adresse}<br /></span>}
                         {(patient.codePostal || patient.ville) && (
@@ -1549,7 +1585,7 @@ export default function PatientDetailsPage() {
                     </div>
                   )}
                   <div>
-                    <span className="text-muted-foreground text-xs">Patient depuis le</span>
+                    <span className="text-muted-foreground text-[10px]">Patient depuis le</span>
                     <p>{formatDate(patient.createdAt)}</p>
                   </div>
                 </CardContent>
@@ -1707,8 +1743,8 @@ export default function PatientDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/50 border-l-4 border-blue-400">
                     <ClipboardList className="h-4 w-4 text-blue-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Contexte médical</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-medium">Contexte médical</p>
+                      <p className="text-[10px] text-muted-foreground">
                         {patient.contexteMedical || "Aucun contexte renseigné"}
                       </p>
                     </div>
@@ -1716,8 +1752,8 @@ export default function PatientDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/50 border-l-4 border-red-400">
                     <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Allergies</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-medium">Allergies</p>
+                      <p className="text-[10px] text-muted-foreground">
                         {patient.allergies || "Aucune connue"}
                       </p>
                     </div>
@@ -1725,8 +1761,8 @@ export default function PatientDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/50 border-l-4 border-amber-400">
                     <Pill className="h-4 w-4 text-amber-600 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Traitement</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-medium">Traitement</p>
+                      <p className="text-[10px] text-muted-foreground">
                         {patient.traitement || "Aucun traitement en cours"}
                       </p>
                     </div>
@@ -1734,8 +1770,8 @@ export default function PatientDetailsPage() {
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-pink-50 dark:bg-pink-950/50 border-l-4 border-pink-400">
                     <Heart className="h-4 w-4 text-pink-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Conditions</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-medium">Conditions</p>
+                      <p className="text-[10px] text-muted-foreground">
                         {patient.conditions || "Aucune condition signalée"}
                       </p>
                     </div>
@@ -1814,7 +1850,7 @@ export default function PatientDetailsPage() {
                     <SheetTrigger asChild>
                       <Button variant="ghost" className="w-full justify-start gap-3" data-testid="button-add-implant">
                         <Activity className="h-4 w-4 text-primary" />
-                        Ajouter un implant
+                        Nouvel acte
                       </Button>
                     </SheetTrigger>
                     <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
@@ -1829,19 +1865,29 @@ export default function PatientDetailsPage() {
                       </div>
                     </SheetContent>
                   </Sheet>
-                  <Button variant="ghost" className="w-full justify-start gap-3">
-                    <ClipboardList className="h-4 w-4 text-primary" />
-                    Enregistrer un acte
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start gap-3"
-                    onClick={() => setAppointmentDialogOpen(true)}
-                    data-testid="button-plan-visit"
-                  >
-                    <Calendar className="h-4 w-4 text-primary" />
-                    Planifier une visite
-                  </Button>
+                  <Sheet open={appointmentDialogOpen} onOpenChange={setAppointmentDialogOpen}>
+                    <SheetTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start gap-3"
+                        data-testid="button-plan-visit"
+                      >
+                        <Calendar className="h-4 w-4 text-primary" />
+                        Planifier une visite
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                      <SheetHeader>
+                        <SheetTitle>Nouveau rendez-vous</SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-6">
+                        <AppointmentForm
+                          patientId={patient.id}
+                          onSuccess={() => setAppointmentDialogOpen(false)}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
                   <Sheet open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
                     <SheetTrigger asChild>
                       <Button variant="ghost" className="w-full justify-start gap-3" data-testid="button-add-radio">
@@ -1859,6 +1905,25 @@ export default function PatientDetailsPage() {
                           operations={patient.operations || []}
                           surgeryImplants={patient.surgeryImplants || []}
                           onSuccess={() => setRadioDialogOpen(false)}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                  <Sheet open={docDialogOpen} onOpenChange={setDocDialogOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" className="w-full justify-start gap-3" data-testid="button-add-document-quick">
+                        <FileText className="h-4 w-4 text-primary" />
+                        Ajouter un document
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                      <SheetHeader>
+                        <SheetTitle>Ajouter un document</SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-6">
+                        <DocumentUploadForm
+                          patientId={patient.id}
+                          onSuccess={() => setDocDialogOpen(false)}
                         />
                       </div>
                     </SheetContent>
@@ -1921,7 +1986,7 @@ export default function PatientDetailsPage() {
                     <CardTitle className="text-base font-medium">Timeline clinique</CardTitle>
                     <Button 
                       variant="ghost" 
-                      className="text-primary text-sm p-0 h-auto"
+                      className="text-primary text-xs p-0 h-auto"
                       onClick={() => setActiveTab("operations")}
                     >
                       Voir tout
@@ -1930,7 +1995,7 @@ export default function PatientDetailsPage() {
                 </CardHeader>
                 <CardContent>
                   {timelineEvents.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">
+                    <p className="text-xs text-muted-foreground py-4 text-center">
                       Aucun événement enregistré
                     </p>
                   ) : (
@@ -1977,10 +2042,10 @@ export default function PatientDetailsPage() {
                             <div className="flex-1 pb-4">
                               <div className="flex items-start justify-between gap-2">
                                 <div>
-                                  <p className="font-medium text-sm">{event.title}</p>
+                                  <p className="font-medium text-xs">{event.title}</p>
                                   {event.description && event.radioId ? (
                                     <button 
-                                      className="text-xs text-primary hover:underline mt-0.5 text-left"
+                                      className="text-[10px] text-primary hover:underline mt-0.5 text-left"
                                       onClick={() => setTimelineRadioViewerId(event.radioId!)}
                                       data-testid={`button-view-radio-${event.radioId}`}
                                     >
@@ -1988,7 +2053,7 @@ export default function PatientDetailsPage() {
                                     </button>
                                   ) : event.description && event.documentId ? (
                                     <button 
-                                      className="text-xs text-primary hover:underline mt-0.5 text-left"
+                                      className="text-[10px] text-primary hover:underline mt-0.5 text-left"
                                       onClick={() => {
                                         setActiveTab("documents");
                                       }}
@@ -1997,7 +2062,7 @@ export default function PatientDetailsPage() {
                                       {event.description}
                                     </button>
                                   ) : event.description ? (
-                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">
                                       {event.description}
                                     </p>
                                   ) : null}
@@ -2007,7 +2072,7 @@ export default function PatientDetailsPage() {
                                         <Badge 
                                           key={i} 
                                           variant="outline" 
-                                          className={`text-xs ${event.badgeClassName || ""}`}
+                                          className={`text-[10px] ${event.badgeClassName || ""}`}
                                         >
                                           {badge}
                                         </Badge>
@@ -2015,7 +2080,7 @@ export default function PatientDetailsPage() {
                                     </div>
                                   )}
                                 </div>
-                                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                                   {formatDateShort(event.date)}
                                 </span>
                               </div>
@@ -2031,11 +2096,11 @@ export default function PatientDetailsPage() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-base font-medium">Implants posés</CardTitle>
+                    <CardTitle className="text-xs font-medium">Implants posés</CardTitle>
                     <div className="flex items-center gap-2">
                       <Button 
                         variant="ghost" 
-                        className="text-primary text-sm p-0 h-auto"
+                        className="text-primary text-[12px] p-0 h-auto"
                         onClick={() => setActiveTab("implants")}
                       >
                         Voir détails
@@ -2189,7 +2254,7 @@ export default function PatientDetailsPage() {
                 </CardHeader>
                 <CardContent>
                   {implantCount === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">
+                    <p className="text-xs text-muted-foreground py-4 text-center">
                       Aucun implant posé
                     </p>
                   ) : (
@@ -2197,31 +2262,31 @@ export default function PatientDetailsPage() {
                       {patient.surgeryImplants?.slice(0, 4).map((surgeryImplant) => (
                         <div key={surgeryImplant.id} className="border rounded-md p-4">
                           <div className="flex items-center justify-between mb-3">
-                            <span className="font-medium">Site {surgeryImplant.siteFdi}</span>
+                            <span className="font-medium text-xs">Site {surgeryImplant.siteFdi}</span>
                             {getStatusBadge(surgeryImplant.statut)}
                           </div>
-                          <div className="grid grid-cols-2 gap-y-2 text-sm">
+                          <div className="grid grid-cols-2 gap-y-2 text-xs">
                             <div>
-                              <span className="text-muted-foreground text-xs">Marque:</span>
+                              <span className="text-muted-foreground text-[10px]">Marque:</span>
                               <p>{surgeryImplant.implant.marque}</p>
                             </div>
                             <div>
-                              <span className="text-muted-foreground text-xs">Dimensions:</span>
+                              <span className="text-muted-foreground text-[10px]">Dimensions:</span>
                               <p>{surgeryImplant.implant.diametre} x {surgeryImplant.implant.longueur}mm</p>
                             </div>
                             <div>
-                              <span className="text-muted-foreground text-xs">Date pose:</span>
+                              <span className="text-muted-foreground text-[10px]">Date pose:</span>
                               <p>{formatDateShort(surgeryImplant.datePose)}</p>
                             </div>
                             <div>
-                              <span className="text-muted-foreground text-xs">ISQ actuel:</span>
+                              <span className="text-muted-foreground text-[10px]">ISQ actuel:</span>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <p className="text-primary font-medium cursor-help underline decoration-dotted">
                                     {surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose || "-"}
                                   </p>
                                 </TooltipTrigger>
-                                <TooltipContent side="top" className="text-xs">
+                                <TooltipContent side="top" className="text-[10px]">
                                   <div className="space-y-1">
                                     <p><span className="text-muted-foreground">Pose:</span> {surgeryImplant.isqPose ?? "-"}</p>
                                     {surgeryImplant.isq2m != null && <p><span className="text-muted-foreground">2 mois:</span> {surgeryImplant.isq2m}</p>}
@@ -2248,7 +2313,7 @@ export default function PatientDetailsPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Activity className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">Aucun implant</h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Les implants seront ajoutés lors de la création d'une opération
                 </p>
               </CardContent>
@@ -2266,7 +2331,7 @@ export default function PatientDetailsPage() {
                       <button
                         key={filter.value}
                         onClick={() => setImplantTypeFilter(filter.value)}
-                        className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                        className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
                           implantTypeFilter === filter.value ? "text-white" : "text-muted-foreground hover:text-foreground"
                         }`}
                         data-testid={`button-filter-${filter.value.toLowerCase()}`}
@@ -2282,7 +2347,7 @@ export default function PatientDetailsPage() {
                       </button>
                     ))}
                   </div>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {filteredSurgeryImplants.length} implant{filteredSurgeryImplants.length !== 1 ? "s" : ""}
                   </span>
                 </div>
@@ -2405,7 +2470,7 @@ export default function PatientDetailsPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">Aucune opération</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-xs text-muted-foreground mb-4">
                   Ajoutez la première opération pour ce patient
                 </p>
               </CardContent>
@@ -2413,7 +2478,7 @@ export default function PatientDetailsPage() {
           ) : (
             <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border-gray bg-border-gray">
                       {operationColumns.map((column) => (
@@ -2495,7 +2560,7 @@ export default function PatientDetailsPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileImage className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">Aucune radio</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-xs text-muted-foreground mb-4">
                   Ajoutez des radiographies pour ce patient
                 </p>
               </CardContent>
@@ -2541,7 +2606,7 @@ export default function PatientDetailsPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">Aucun document</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-xs text-muted-foreground mb-4">
                   Ajoutez des documents PDF pour ce patient (devis, consentements, etc.)
                 </p>
               </CardContent>
@@ -2661,6 +2726,7 @@ export default function PatientDetailsPage() {
                   onChange={(e) => setNoteContent(e.target.value)}
                   placeholder="Saisissez votre note ici..."
                   rows={4}
+                  className="text-xs placeholder:text-[10px]"
                   data-testid="input-note-content"
                 />
               </div>
@@ -2678,7 +2744,7 @@ export default function PatientDetailsPage() {
           </Card>
 
           <div className="space-y-4">
-            <h3 className="text-base font-semibold">Historique</h3>
+            <h3 className="text-sm font-semibold">Historique</h3>
             {notesLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
@@ -2711,7 +2777,7 @@ export default function PatientDetailsPage() {
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
                       <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Aucune note ou alerte pour ce patient
                       </p>
                     </CardContent>
@@ -2741,17 +2807,17 @@ export default function PatientDetailsPage() {
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-sm">{authorName}</span>
+                                  <span className="font-medium text-[10px]">{authorName}</span>
                                   {tagConfig && (
-                                    <Badge variant="secondary" className={`text-xs ${tagConfig.className}`}>
+                                    <Badge variant="secondary" className={`text-[9px] ${tagConfig.className}`}>
                                       {tagConfig.label}
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-xs text-muted-foreground mb-3">
+                                <p className="text-[9px] text-muted-foreground mb-2">
                                   {formatNoteDatetime(note.createdAt)}
                                 </p>
-                                <p className="text-sm text-foreground whitespace-pre-wrap">
+                                <p className="text-[10px] text-foreground whitespace-pre-wrap">
                                   {note.contenu}
                                 </p>
                               </div>
@@ -2805,9 +2871,9 @@ export default function PatientDetailsPage() {
                                 <p className="text-xs text-muted-foreground mb-2">
                                   {formatNoteDatetime(flag.createdAt)}
                                 </p>
-                                <p className="font-medium text-sm">{flag.label}</p>
+                                <p className="font-medium text-xs">{flag.label}</p>
                                 {flag.description && (
-                                  <p className="text-sm text-muted-foreground mt-1">{flag.description}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">{flag.description}</p>
                                 )}
                               </div>
                             </div>

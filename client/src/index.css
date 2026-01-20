@@ -95,6 +95,31 @@
   --badge-pink: 335 94% 57%;       /* #f92a82 */
   --badge-dark: 240 7% 20%;        /* #303036 */
   
+  /* Clinical Flag Badge Colors */
+  /* CRITICAL: ISQ_LOW */
+  --flag-critical-bg: 0 100% 94%;        /* #FEE2E2 */
+  --flag-critical-foreground: 4 77% 46%; /* #D0341C */
+  /* WARNING: ISQ_DECLINING, LOW_SUCCESS_RATE, NO_RECENT_ISQ, NO_POSTOP_FOLLOWUP, IMPLANT_NO_OPERATION */
+  --flag-warning-bg: 32 100% 92%;        /* #FFEDD5 */
+  --flag-warning-foreground: 21 90% 48%; /* #EA580C */
+  /* INFO: NO_RECENT_APPOINTMENT, MISSING_DOCUMENT, INCOMPLETE_DATA */
+  --flag-info-bg: 214 95% 93%;           /* #DBEAFE */
+  --flag-info-foreground: 217 91% 64%;   /* #4F8FF7 */
+  
+  /* ISQ Timing Badge Colors - Turquoise Gradient (light to dark) */
+  --isq-timing-0: 180 76% 90%;           /* +0 - très clair */
+  --isq-timing-2m: 178 70% 84%;          /* +2M */
+  --isq-timing-3m: 177 68% 78%;          /* +3M */
+  --isq-timing-4m: 176 65% 72%;          /* +4M */
+  --isq-timing-6m: 174 60% 66%;          /* +6M */
+  --isq-timing-12m: 172 55% 58%;         /* +12M */
+  --isq-timing-18m: 170 50% 50%;         /* +18M */
+  --isq-timing-24m: 168 55% 42%;         /* +24M */
+  --isq-timing-36m: 166 60% 34%;         /* +36M */
+  --isq-timing-48m: 164 65% 26%;         /* +48M - très foncé */
+  --isq-timing-foreground: 180 50% 20%;  /* Texte pour badges clairs */
+  --isq-timing-foreground-light: 180 20% 95%; /* Texte pour badges foncés */
+  
   --radius: 0.8rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
@@ -201,6 +226,28 @@
   --badge-orange: 27 88% 65%;
   --badge-pink: 335 94% 62%;
   --badge-dark: 240 7% 35%;
+  
+  /* Clinical Flag Badge Colors - Dark Mode */
+  --flag-critical-bg: 0 30% 15%;
+  --flag-critical-foreground: 0 70% 65%;
+  --flag-warning-bg: 32 40% 15%;
+  --flag-warning-foreground: 32 90% 65%;
+  --flag-info-bg: 214 40% 18%;
+  --flag-info-foreground: 217 91% 70%;
+  
+  /* ISQ Timing Badge Colors - Dark Mode (Turquoise Gradient) */
+  --isq-timing-0: 180 50% 25%;           /* +0 - clair */
+  --isq-timing-2m: 178 50% 28%;          /* +2M */
+  --isq-timing-3m: 177 50% 30%;          /* +3M */
+  --isq-timing-4m: 176 50% 32%;          /* +4M */
+  --isq-timing-6m: 174 50% 35%;          /* +6M */
+  --isq-timing-12m: 172 50% 38%;         /* +12M */
+  --isq-timing-18m: 170 50% 41%;         /* +18M */
+  --isq-timing-24m: 168 55% 44%;         /* +24M */
+  --isq-timing-36m: 166 55% 47%;         /* +36M */
+  --isq-timing-48m: 164 55% 50%;         /* +48M - foncé */
+  --isq-timing-foreground: 180 20% 90%;  /* Texte clair */
+  --isq-timing-foreground-light: 180 20% 95%; /* Texte très clair */
   
   --accent: 25 45% 20%;
   --accent-foreground: 45 25% 85%;
@@ -443,6 +490,15 @@
 .fc .fc-col-header-cell-cushion {
   color: hsl(var(--foreground));
   text-decoration: none;
+  font-size: 0.75rem;
+}
+
+.fc .fc-daygrid-day {
+  cursor: pointer;
+}
+
+.fc .fc-timegrid-slot {
+  cursor: pointer;
 }
 
 .fc .fc-timegrid-slot-label {
@@ -565,4 +621,21 @@
 
 .scrollbar-track-transparent::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Smaller placeholder text for search inputs */
+.placeholder-xs::placeholder {
+  font-size: 0.6875rem; /* 11px - 2px smaller than text-xs (12px) */
+}
+
+.placeholder-xs::-webkit-input-placeholder {
+  font-size: 0.6875rem;
+}
+
+.placeholder-xs::-moz-placeholder {
+  font-size: 0.6875rem;
+}
+
+.placeholder-xs:-ms-input-placeholder {
+  font-size: 0.6875rem;
 }

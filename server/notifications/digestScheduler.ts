@@ -166,16 +166,26 @@ async function runDigestForFrequency(
             firstName: user.firstName || undefined,
             periodLabel,
             dashboardUrl: `${baseUrl}/notifications`,
-            notifications: userNotifications.map((n) => ({
-              title: n.title,
-              body: n.body || undefined,
-              severity: n.severity,
-              entityType: n.entityType || undefined,
-              createdAt: n.createdAt.toLocaleString('fr-FR', { 
-                dateStyle: 'short', 
-                timeStyle: 'short' 
-              }),
-            })),
+            notifications: userNotifications.map((n) => {
+              let patientName: string | undefined;
+              if (n.metadata) {
+                try {
+                  const meta = typeof n.metadata === 'string' ? JSON.parse(n.metadata) : n.metadata;
+                  patientName = meta.patientName || meta.patientNom || undefined;
+                } catch {}
+              }
+              return {
+                title: n.title,
+                body: n.body || undefined,
+                severity: n.severity,
+                entityType: n.entityType || undefined,
+                patientName,
+                createdAt: n.createdAt.toLocaleString('fr-FR', { 
+                  dateStyle: 'short', 
+                  timeStyle: 'short' 
+                }),
+              };
+            }),
           };
 
           const emailResult = await sendEmail(user.email, "notificationDigest", digestData);

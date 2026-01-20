@@ -9,10 +9,14 @@ import {
   CheckCircle2,
   TrendingUp,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   FileText,
   Trash2,
   Plus,
   Info,
+  History,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -59,19 +64,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { OperationForm } from "@/components/operation-form";
+import { ImplantStatusSuggestions } from "@/components/implant-status-suggestions";
 import type { ImplantDetail } from "@shared/types";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  EN_SUIVI: { label: "En suivi", variant: "secondary" },
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" }> = {
+  EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
   SUCCES: { label: "Succès", variant: "default" },
-  COMPLICATION: { label: "Complication", variant: "outline" },
-  ECHEC: { label: "Échec", variant: "destructive" },
+  COMPLICATION: { label: "Complication", variant: "complication" },
+  ECHEC: { label: "Échec", variant: "echec" },
 };
 
-type ISQSource = "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite";
+type ISQSource = "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite" | "measurement";
 
 interface ISQPoint {
   label: string; 
@@ -81,7 +92,22 @@ interface ISQPoint {
   delta?: number;
   source: ISQSource;
   visiteId?: string;
+  measurementId?: string;
   notes?: string;
+}
+
+interface StatusHistoryEntry {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  reasonId: string | null;
+  reasonFreeText: string | null;
+  evidence: string | null;
+  changedAt: string;
+  reasonLabel: string | null;
+  reasonCode: string | null;
+  changedByNom: string | null;
+  changedByPrenom: string | null;
 }
 
 function getISQBadge(value: number): { label: string; className: string; pointColor: string } {
@@ -141,9 +167,22 @@ export default function ImplantDetailsPage() {
   const [editIsqSheetOpen, setEditIsqSheetOpen] = useState(false);
   const [deleteIsqDialogOpen, setDeleteIsqDialogOpen] = useState(false);
   const [isqPointToDelete, setIsqPointToDelete] = useState<ISQPoint | null>(null);
+  const [statusHistoryOpen, setStatusHistoryOpen] = useState(false);
+  const [isqViewMode, setIsqViewMode] = useState<"timeline" | "cohorte">("timeline");
+  const [isqDateRange, setIsqDateRange] = useState({ start: "", end: "" });
 
   const { data: implantData, isLoading, isFetching } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
+    enabled: !!implantId,
+  });
+
+  const { data: statusHistory = [] } = useQuery<StatusHistoryEntry[]>({
+    queryKey: ["/api/surgery-implants", implantId, "status-history"],
+    queryFn: async () => {
+      const res = await fetch(`/api/surgery-implants/${implantId}/status-history`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch history");
+      return res.json();
+    },
     enabled: !!implantId,
   });
 
@@ -275,9 +314,10 @@ export default function ImplantDetailsPage() {
       source: "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite";
       visiteId?: string;
       value: number;
+      notes?: string;
     }) => {
       if (data.source === "visite" && data.visiteId) {
-        return apiRequest("PATCH", `/api/visites/${data.visiteId}`, { isq: data.value });
+        return apiRequest("PATCH", `/api/visites/${data.visiteId}`, { isq: data.value, notes: data.notes });
       } else {
         const fieldMap = {
           isqPose: "isqPose",
@@ -291,6 +331,8 @@ export default function ImplantDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId, "status-suggestions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId, "status-history"] });
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
@@ -333,6 +375,8 @@ export default function ImplantDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId, "status-suggestions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants", implantId, "status-history"] });
       queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
@@ -400,6 +444,9 @@ export default function ImplantDetailsPage() {
   };
 
   const handleEditIsq = (point: ISQPoint) => {
+    // Guard: measurement source is read-only
+    if (point.source === "measurement") return;
+    
     setEditingIsqPoint({
       source: point.source,
       visiteId: point.visiteId,
@@ -423,6 +470,7 @@ export default function ImplantDetailsPage() {
       source: editingIsqPoint.source,
       visiteId: editingIsqPoint.visiteId,
       value: parseInt(editingIsqPoint.value),
+      notes: editingIsqPoint.notes,
     });
   };
 
@@ -432,7 +480,8 @@ export default function ImplantDetailsPage() {
   };
   
   const confirmDeleteIsq = () => {
-    if (isqPointToDelete) {
+    // Guard: measurement source is read-only
+    if (isqPointToDelete && isqPointToDelete.source !== "measurement") {
       deleteIsqMutation.mutate({
         source: isqPointToDelete.source,
         visiteId: isqPointToDelete.visiteId,
@@ -459,73 +508,99 @@ export default function ImplantDetailsPage() {
   const getISQTimeline = (): ISQPoint[] => {
     const points: ISQPoint[] = [];
 
+    // Add ISQ at placement (isqPose)
     if (implantData?.isqPose && implantData?.datePose) {
       points.push({ 
         label: "Pose", 
-        sublabel: "Jour de la pose",
+        sublabel: "ISQ à la pose",
         value: implantData.isqPose, 
         date: implantData.datePose,
         source: "isqPose"
       });
     }
+
+    // Add legacy ISQ fields (isq2m, isq3m, isq6m)
     if (implantData?.isq2m && implantData?.datePose) {
       const date2m = new Date(implantData.datePose);
       date2m.setMonth(date2m.getMonth() + 2);
-      const delta = implantData.isqPose ? implantData.isq2m - implantData.isqPose : undefined;
       points.push({ 
         label: "2 mois", 
         sublabel: "Contrôle à 2 mois",
         value: implantData.isq2m, 
         date: date2m.toISOString().split('T')[0],
-        delta,
         source: "isq2m"
       });
     }
     if (implantData?.isq3m && implantData?.datePose) {
       const date3m = new Date(implantData.datePose);
       date3m.setMonth(date3m.getMonth() + 3);
-      const delta = implantData.isq2m ? implantData.isq3m - implantData.isq2m : undefined;
       points.push({ 
         label: "3 mois", 
         sublabel: "Contrôle à 3 mois",
         value: implantData.isq3m, 
         date: date3m.toISOString().split('T')[0],
-        delta,
         source: "isq3m"
       });
     }
     if (implantData?.isq6m && implantData?.datePose) {
       const date6m = new Date(implantData.datePose);
       date6m.setMonth(date6m.getMonth() + 6);
-      const delta = implantData.isq3m ? implantData.isq6m - implantData.isq3m : undefined;
       points.push({ 
         label: "6 mois", 
         sublabel: "Contrôle à 6 mois",
         value: implantData.isq6m, 
         date: date6m.toISOString().split('T')[0],
-        delta,
         source: "isq6m"
       });
     }
 
+    // Add visites with ISQ
     implantData?.visites
       ?.filter(v => v.isq)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .forEach((visite, index, arr) => {
-        const prevValue = index > 0 ? arr[index - 1].isq : (points.length > 0 ? points[points.length - 1].value : undefined);
+      .forEach((visite) => {
         points.push({
           label: formatShortDate(visite.date),
           sublabel: visite.notes || "Visite de contrôle",
           value: visite.isq!,
           date: visite.date,
-          delta: prevValue ? visite.isq! - prevValue : undefined,
           source: "visite",
           visiteId: visite.id,
           notes: visite.notes || undefined,
         });
       });
 
-    return points;
+    // Add measurements from clinical follow-up (implant_measurements table)
+    implantData?.measurements
+      ?.filter(m => m.isqValue !== null && m.isqValue !== undefined)
+      .forEach((measurement) => {
+        const measurementTypeLabels: Record<string, string> = {
+          'POSE': 'Pose',
+          'FOLLOW_UP': 'Suivi clinique',
+          'CONTROL': 'Contrôle',
+          'EMERGENCY': 'Urgence',
+        };
+        const measuredAt = new Date(measurement.measuredAt);
+        points.push({
+          label: formatShortDate(measuredAt.toISOString().split('T')[0]),
+          sublabel: measurement.notes || measurementTypeLabels[measurement.type] || 'Mesure',
+          value: measurement.isqValue!,
+          date: measuredAt.toISOString().split('T')[0],
+          source: "measurement",
+          measurementId: measurement.id,
+          notes: measurement.notes || undefined,
+        });
+      });
+
+    // Sort by date (oldest first) to calculate deltas correctly
+    points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Calculate deltas based on chronological order
+    for (let i = 1; i < points.length; i++) {
+      points[i].delta = points[i].value - points[i - 1].value;
+    }
+
+    // Reverse to show most recent first
+    return points.reverse();
   };
 
   const getSuccessRateFromBoneLoss = (score: number): number => {
@@ -590,55 +665,55 @@ export default function ImplantDetailsPage() {
               {implantType} {implantData.implant.marque} {typeLabel}
             </h1>
             {implantData.implant.typeImplant === "MINI_IMPLANT" && (
-              <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+              <Badge variant="outline" className="text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                 Mini
               </Badge>
             )}
+            <Badge variant={status.variant} className="text-[10px]" data-testid="badge-implant-status">
+              {status.label}
+            </Badge>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Ø {implantData.implant.diametre}mm × {implantData.implant.longueur}mm
           </p>
         </div>
-        <Badge variant={status.variant} className="text-sm" data-testid="badge-implant-status">
-          {status.label}
-        </Badge>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-4">
-            <CardTitle className="text-base">Informations de l'implant</CardTitle>
+            <CardTitle className="text-sm">Informations de l'implant</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
-                <span className="text-sm text-muted-foreground">Marque</span>
-                <p className="font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
+                <span className="text-xs text-muted-foreground">Marque</span>
+                <p className="text-xs font-medium" data-testid="text-implant-marque">{implantData.implant.marque}</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Type</span>
-                <p className="font-medium" data-testid="text-implant-type">{typeLabel}</p>
+                <span className="text-xs text-muted-foreground">Type</span>
+                <p className="text-xs font-medium" data-testid="text-implant-type">{typeLabel}</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Référence fabricant</span>
-                <p className="font-medium font-mono" data-testid="text-implant-reference">
+                <span className="text-xs text-muted-foreground">Référence fabricant</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-implant-reference">
                   {implantData.implant.referenceFabricant || "-"}
                 </p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Diamètre</span>
-                <p className="font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
+                <span className="text-xs text-muted-foreground">Diamètre</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Longueur</span>
-                <p className="font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
+                <span className="text-xs text-muted-foreground">Longueur</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
               </div>
             </div>
             <div className="flex justify-end mt-4 pt-4 border-t">
               <Link href={`/implants/${implantData.implant.id}`}>
-                <span className="text-sm text-primary flex items-center cursor-pointer hover:underline" data-testid="link-view-catalog-implant">
+                <span className="text-xs text-primary flex items-center cursor-pointer hover:underline" data-testid="link-view-catalog-implant">
                   Voir l'implant catalogue
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
                 </span>
               </Link>
             </div>
@@ -647,40 +722,40 @@ export default function ImplantDetailsPage() {
 
         <Card className={getSuccessRateCardStyle()}>
           <CardHeader className="pb-2">
-            <CardTitle className={`text-base flex items-center gap-2 ${successRate >= 80 ? "text-emerald-700 dark:text-emerald-400" : successRate >= 60 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400"}`}>
+            <CardTitle className={`text-sm flex items-center gap-2 ${successRate >= 80 ? "text-emerald-700 dark:text-emerald-400" : successRate >= 60 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400"}`}>
               Taux de réussite
-              {successRate >= 80 && <CheckCircle2 className="h-5 w-5" />}
+              {successRate >= 80 && <CheckCircle2 className="h-3.5 w-3.5" />}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-center">
-              <span className={`text-5xl font-bold ${getSuccessRateColor()}`} data-testid="text-success-rate">
+              <span className={`text-4xl font-bold ${getSuccessRateColor()}`} data-testid="text-success-rate">
                 {successRate}%
               </span>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-[10px] text-muted-foreground mt-1">
                 {successRate === 100 ? "Aucune perte osseuse" : successRate >= 80 ? "Perte osseuse minimale" : successRate >= 60 ? "Perte osseuse modérée" : "Perte osseuse importante"}
               </p>
             </div>
             <div className="pt-2 border-t">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm text-muted-foreground">Score de perte osseuse</Label>
+                  <Label className="text-xs text-muted-foreground">Score de perte osseuse</Label>
                 </div>
                 <Select 
                   value={boneLossScore.toString()} 
                   onValueChange={handleBoneLossChange}
                   disabled={updatePoseInfoMutation.isPending}
                 >
-                  <SelectTrigger data-testid="select-bone-loss" className="bg-white dark:bg-white dark:text-black">
+                  <SelectTrigger data-testid="select-bone-loss" className="bg-white dark:bg-white dark:text-black text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white dark:bg-white">
-                    <SelectItem value="0" className="cursor-pointer dark:text-black">0 - Excellente (100%)</SelectItem>
-                    <SelectItem value="1" className="cursor-pointer dark:text-black">1 - Très bonne (80%)</SelectItem>
-                    <SelectItem value="2" className="cursor-pointer dark:text-black">2 - Bonne (60%)</SelectItem>
-                    <SelectItem value="3" className="cursor-pointer dark:text-black">3 - Modérée (40%)</SelectItem>
-                    <SelectItem value="4" className="cursor-pointer dark:text-black">4 - Faible (20%)</SelectItem>
-                    <SelectItem value="5" className="cursor-pointer dark:text-black">5 - Critique (0%)</SelectItem>
+                    <SelectItem value="0" className="cursor-pointer dark:text-black text-xs">0 - Excellente (100%)</SelectItem>
+                    <SelectItem value="1" className="cursor-pointer dark:text-black text-xs">1 - Très bonne (80%)</SelectItem>
+                    <SelectItem value="2" className="cursor-pointer dark:text-black text-xs">2 - Bonne (60%)</SelectItem>
+                    <SelectItem value="3" className="cursor-pointer dark:text-black text-xs">3 - Modérée (40%)</SelectItem>
+                    <SelectItem value="4" className="cursor-pointer dark:text-black text-xs">4 - Faible (20%)</SelectItem>
+                    <SelectItem value="5" className="cursor-pointer dark:text-black text-xs">5 - Critique (0%)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground text-center">
@@ -717,10 +792,9 @@ export default function ImplantDetailsPage() {
                         <SelectValue placeholder="Sélectionner" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ANTERIEUR">Antérieur</SelectItem>
-                        <SelectItem value="POSTERIEUR">Postérieur</SelectItem>
-                        <SelectItem value="MAXILLAIRE">Maxillaire</SelectItem>
-                        <SelectItem value="MANDIBULAIRE">Mandibulaire</SelectItem>
+                        <SelectItem value="CRESTAL">Crestal</SelectItem>
+                        <SelectItem value="SOUS_CRESTAL">Sous-crestal</SelectItem>
+                        <SelectItem value="SUPRA_CRESTAL">Supra-crestal</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -790,22 +864,22 @@ export default function ImplantDetailsPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="text-sm text-muted-foreground">Position</span>
-                <p className="font-medium" data-testid="text-position">
+                <span className="text-[10px] text-muted-foreground">Position</span>
+                <p className="text-xs font-medium" data-testid="text-position">
                   {implantData.positionImplant?.replace(/_/g, " ") || "—"}
                 </p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Site FDI</span>
-                <p className="font-medium font-mono" data-testid="text-site-fdi">{implantData.siteFdi}</p>
+                <span className="text-[10px] text-muted-foreground">Site FDI</span>
+                <p className="text-xs font-medium font-mono" data-testid="text-site-fdi">{implantData.siteFdi}</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Type d'os</span>
-                <p className="font-medium" data-testid="text-type-os">{implantData.typeOs || "—"}</p>
+                <span className="text-[10px] text-muted-foreground">Type d'os</span>
+                <p className="text-xs font-medium" data-testid="text-type-os">{implantData.typeOs || "—"}</p>
               </div>
               <div>
-                <span className="text-sm text-muted-foreground">Greffe</span>
-                <p className="font-medium" data-testid="text-greffe">
+                <span className="text-[10px] text-muted-foreground">Greffe</span>
+                <p className="text-xs font-medium" data-testid="text-greffe">
                   {implantData.greffeOsseuse ? (implantData.typeGreffe || "Oui") : "Non"}
                 </p>
               </div>
@@ -832,7 +906,7 @@ export default function ImplantDetailsPage() {
                   value={notesContent}
                   onChange={(e) => setNotesContent(e.target.value)}
                   placeholder="Ajouter des notes cliniques..."
-                  className="min-h-[120px]"
+                  className="min-h-[120px] text-xs"
                   data-testid="textarea-notes"
                 />
                 <div className="flex justify-end gap-2">
@@ -845,10 +919,10 @@ export default function ImplantDetailsPage() {
                 </div>
               </div>
             ) : (
-              <div className="text-sm">
+              <div className="text-xs">
                 {notesContent ? (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-2">{formatDate(new Date().toISOString())}</p>
+                    <p className="text-[10px] text-muted-foreground mb-2">{formatDate(new Date().toISOString())}</p>
                     <p>{notesContent}</p>
                   </div>
                 ) : (
@@ -862,7 +936,7 @@ export default function ImplantDetailsPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <CardTitle className="text-base">Suivi ISQ (Stabilité)</CardTitle>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -888,6 +962,12 @@ export default function ImplantDetailsPage() {
                 </div>
               </TooltipContent>
             </Tooltip>
+            <Tabs value={isqViewMode} onValueChange={(v) => setIsqViewMode(v as "timeline" | "cohorte")} className="ml-2">
+              <TabsList className="h-7">
+                <TabsTrigger value="timeline" className="text-[10px] px-2 py-1" data-testid="tab-isq-timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="cohorte" className="text-[10px] px-2 py-1" data-testid="tab-isq-cohorte">Cohorte</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
           <Sheet open={addISQSheetOpen} onOpenChange={setAddISQSheetOpen}>
             <SheetTrigger asChild>
@@ -946,15 +1026,16 @@ export default function ImplantDetailsPage() {
           </Sheet>
         </CardHeader>
         <CardContent>
-          {isqTimeline.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-              <TrendingUp className="h-8 w-8 mb-2" />
-              <p className="text-sm">Aucune mesure ISQ enregistrée</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Vertical ISQ Timeline */}
-              <div className="relative pl-6">
+          {isqViewMode === "timeline" ? (
+            isqTimeline.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <TrendingUp className="h-8 w-8 mb-2" />
+                <p className="text-xs">Aucune mesure ISQ enregistrée</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Vertical ISQ Timeline */}
+                <div className="relative pl-6">
                 {/* Vertical line connecting dots */}
                 <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-blue-200" />
                 
@@ -977,56 +1058,63 @@ export default function ImplantDetailsPage() {
                           <div className="flex-1 min-w-0">
                             {/* Label and ISQ value */}
                             <div className="flex items-center gap-3 flex-wrap">
-                              <span className="text-sm font-semibold text-blue-600 uppercase">{point.label}</span>
+                              <span className="text-xs font-semibold text-blue-600 uppercase">{point.label}</span>
                               <span className="text-2xl font-bold">{point.value}</span>
                               {point.delta !== undefined && point.delta !== 0 && (
-                                <span className={`text-sm font-medium flex items-center ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                                  <TrendingUp className={`h-4 w-4 ${point.delta < 0 ? "rotate-180" : ""}`} />
+                                <span className={`text-xs font-medium flex items-center ${point.delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                  <TrendingUp className={`h-3.5 w-3.5 ${point.delta < 0 ? "rotate-180" : ""}`} />
                                   {point.delta > 0 ? "+" : ""}{point.delta}
                                 </span>
                               )}
-                              <Badge className={`${badge.className} text-xs`}>{badge.label}</Badge>
+                              <Badge className={`${badge.className} text-[10px]`}>{badge.label}</Badge>
                             </div>
                             
-                            {/* Date */}
-                            <div className="text-sm text-muted-foreground mt-1">
-                              {formatShortDate(point.date)}
-                            </div>
+                            {/* Date - only show if source is not visite (visite label already shows date) */}
+                            {point.source !== "visite" && (
+                              <div className="text-[10px] text-muted-foreground mt-1">
+                                {formatShortDate(point.date)}
+                              </div>
+                            )}
                             
                             {/* Notes if any */}
                             {point.notes && (
-                              <p className="text-sm text-muted-foreground mt-1">{point.notes}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">{point.notes}</p>
                             )}
                           </div>
                           
-                          {/* Edit/Delete buttons - visible on hover */}
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleEditIsq(point)}
-                              data-testid={`button-edit-isq-${index}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive"
-                              onClick={() => handleDeleteIsq(point)}
-                              disabled={deleteIsqMutation.isPending}
-                              data-testid={`button-delete-isq-${index}`}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                          {/* Edit/Delete buttons - visible on hover, hidden for measurement source (read-only) */}
+                          {point.source !== "measurement" && (
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handleEditIsq(point)}
+                                data-testid={`button-edit-isq-${index}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive"
+                                onClick={() => handleDeleteIsq(point)}
+                                disabled={deleteIsqMutation.isPending}
+                                data-testid={`button-delete-isq-${index}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               </div>
+
+              {/* Status Suggestions - between timeline and scale */}
+              <ImplantStatusSuggestions implantId={implantId || ""} currentStatus={implantData.statut} />
 
               {/* ISQ Gradient Scale/Frise */}
               <div className="mt-6 pt-4 border-t">
@@ -1059,6 +1147,165 @@ export default function ImplantDetailsPage() {
                   <span className="text-xs text-muted-foreground">100</span>
                 </div>
               </div>
+
+              {/* Status History Section */}
+              {statusHistory.length > 0 && (
+                <Collapsible open={statusHistoryOpen} onOpenChange={setStatusHistoryOpen} className="mt-4 pt-4 border-t">
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full justify-between">
+                      <span className="flex items-center gap-2 text-xs">
+                        <History className="h-4 w-4" />
+                        Historique des statuts ({statusHistory.length})
+                      </span>
+                      {statusHistoryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {statusHistory.map((entry) => (
+                        <div 
+                          key={entry.id}
+                          className="p-2 bg-muted/30 rounded border text-xs space-y-1"
+                          data-testid={`status-history-${entry.id}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {entry.fromStatus && (
+                                <>
+                                  <Badge 
+                                    variant={statusConfig[entry.fromStatus]?.variant || "secondary"}
+                                  >
+                                    {statusConfig[entry.fromStatus]?.label || entry.fromStatus}
+                                  </Badge>
+                                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                </>
+                              )}
+                              <Badge 
+                                variant={statusConfig[entry.toStatus]?.variant || "secondary"}
+                              >
+                                {statusConfig[entry.toStatus]?.label || entry.toStatus}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(entry.changedAt).toLocaleDateString("fr-FR")}
+                            </span>
+                          </div>
+                          {(entry.reasonLabel || entry.reasonFreeText) && (
+                            <p className="text-xs text-muted-foreground">
+                              {entry.reasonLabel || entry.reasonFreeText}
+                            </p>
+                          )}
+                          {entry.evidence && (
+                            <p className="text-xs text-muted-foreground italic">
+                              Evidence: {entry.evidence}
+                            </p>
+                          )}
+                          {(entry.changedByPrenom || entry.changedByNom) && (
+                            <p className="text-xs text-muted-foreground">
+                              Par {entry.changedByPrenom} {entry.changedByNom}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </div>
+            )
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3 pb-4 border-b">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Du</Label>
+                  <Input 
+                    type="date" 
+                    value={isqDateRange.start}
+                    onChange={(e) => setIsqDateRange(prev => ({ ...prev, start: e.target.value }))}
+                    className="h-8 w-36 text-xs"
+                    data-testid="input-isq-date-start"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Au</Label>
+                  <Input 
+                    type="date" 
+                    value={isqDateRange.end}
+                    onChange={(e) => setIsqDateRange(prev => ({ ...prev, end: e.target.value }))}
+                    className="h-8 w-36 text-xs"
+                    data-testid="input-isq-date-end"
+                  />
+                </div>
+                {(isqDateRange.start || isqDateRange.end) && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setIsqDateRange({ start: "", end: "" })}
+                    className="h-7 text-[10px]"
+                    data-testid="button-clear-date-filter"
+                  >
+                    Effacer
+                  </Button>
+                )}
+              </div>
+              
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Date</TableHead>
+                    <TableHead className="text-xs">Type d'implant</TableHead>
+                    <TableHead className="text-xs">ISQ</TableHead>
+                    <TableHead className="text-xs">Statut</TableHead>
+                    <TableHead className="text-xs">Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isqTimeline
+                    .filter((point) => {
+                      if (!isqDateRange.start && !isqDateRange.end) return true;
+                      const pointDate = new Date(point.date);
+                      if (isqDateRange.start && pointDate < new Date(isqDateRange.start)) return false;
+                      if (isqDateRange.end && pointDate > new Date(isqDateRange.end)) return false;
+                      return true;
+                    })
+                    .map((point, index) => {
+                      const badge = getISQBadge(point.value);
+                      return (
+                        <TableRow key={index} data-testid={`cohorte-row-${index}`}>
+                          <TableCell className="text-xs">{formatShortDate(point.date)}</TableCell>
+                          <TableCell className="text-xs">
+                            {implantData?.implant?.marque || "-"}
+                            {implantData?.implant?.referenceFabricant && (
+                              <span className="text-muted-foreground ml-1">({implantData.implant.referenceFabricant})</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm font-bold">{point.value}</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`${badge.className} text-[10px]`}>{badge.label}</Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                            {point.notes || "-"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  {isqTimeline.filter((point) => {
+                    if (!isqDateRange.start && !isqDateRange.end) return true;
+                    const pointDate = new Date(point.date);
+                    if (isqDateRange.start && pointDate < new Date(isqDateRange.start)) return false;
+                    if (isqDateRange.end && pointDate > new Date(isqDateRange.end)) return false;
+                    return true;
+                  }).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-xs">
+                        Aucune mesure ISQ dans cette période
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
@@ -1094,6 +1341,17 @@ export default function ImplantDetailsPage() {
                 data-testid="input-edit-isq-value" 
               />
             </div>
+            {editingIsqPoint?.source === "visite" && (
+              <div className="space-y-2">
+                <Label>Notes (optionnel)</Label>
+                <Input 
+                  placeholder="Ex: Bonne stabilité" 
+                  value={editingIsqPoint?.notes || ""}
+                  onChange={(e) => setEditingIsqPoint(prev => prev ? { ...prev, notes: e.target.value } : null)}
+                  data-testid="input-edit-isq-notes" 
+                />
+              </div>
+            )}
             <div className="pt-4">
               <Button 
                 className="w-full" 
@@ -1215,10 +1473,9 @@ export default function ImplantDetailsPage() {
                     ) : "-"}
                   </TableCell>
                   <TableCell>
-                    <div>
-                      <p className="font-medium">Pose d'implants</p>
-                      <p className="text-xs text-muted-foreground">Mise en charge différée</p>
-                    </div>
+                    <Badge className="rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 text-[10px]">
+                      Pose d'implants
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <span className="font-medium">1</span>
@@ -1239,14 +1496,16 @@ export default function ImplantDetailsPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={status.variant}>
+                    <Badge variant={status.variant} className="text-[10px]">
                       {status.label}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon">
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                    <Link href={`/actes/${implantData.surgeryId}`}>
+                      <Button variant="ghost" size="icon" data-testid="button-view-operation">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ) : (

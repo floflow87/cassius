@@ -53,6 +53,9 @@ import type { FlagWithEntity } from "@shared/schema";
 import { FlagBadge } from "@/components/flag-badge";
 import { formatDistanceToNow } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { IsqTimingBadge } from "@/components/isq-timing-badge";
 
 const PERIOD_OPTIONS = [
   { value: "1m", label: "Ce mois" },
@@ -129,11 +132,15 @@ export default function StatsPage() {
   const [selectedFilters, setSelectedFilters] = useState<SearchSuggestion[]>([]);
   const [isqDistributionFilter, setIsqDistributionFilter] = useState<string>("all");
   const [isqEvolutionFilter, setIsqEvolutionFilter] = useState<string>("all");
+  const [cohorteStartDate, setCohorteStartDate] = useState<string>("");
+  const [cohorteEndDate, setCohorteEndDate] = useState<string>("");
   const [successRateDimension, setSuccessRateDimension] = useState<string>("marque");
   const [patientSearch, setPatientSearch] = useState("");
   const [patientAlertFilter, setPatientAlertFilter] = useState<string>("all");
   const [patientSuccessFilter, setPatientSuccessFilter] = useState<string>("all");
   const [patientAgeFilter, setPatientAgeFilter] = useState<string>("all");
+  const [isqEvolutionImplantType, setIsqEvolutionImplantType] = useState<"IMPLANT" | "MINI_IMPLANT">("IMPLANT");
+  const [successRateImplantType, setSuccessRateImplantType] = useState<"IMPLANT" | "MINI_IMPLANT">("IMPLANT");
 
   const getDateRange = () => {
     const now = new Date();
@@ -258,7 +265,7 @@ export default function StatsPage() {
 
   // Separate query for ISQ Evolution (filtered by model + patient/operation filters)
   const { data: isqEvolutionStats } = useQuery<ClinicalStats>({
-    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-evolution", isqEvolutionFilter, selectedPatientIds, selectedOperationIds],
+    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-evolution", isqEvolutionFilter, isqEvolutionImplantType, selectedPatientIds, selectedOperationIds],
     queryFn: async () => {
       const params = new URLSearchParams({
         from: dateRange.from,
@@ -267,6 +274,7 @@ export default function StatsPage() {
       if (isqEvolutionFilter && isqEvolutionFilter !== "all") {
         params.append("implantModelId", isqEvolutionFilter);
       }
+      params.append("implantType", isqEvolutionImplantType);
       if (selectedPatientIds.length > 0) {
         params.append("patientIds", selectedPatientIds.join(","));
       }
@@ -279,7 +287,7 @@ export default function StatsPage() {
       if (!res.ok) throw new Error("Failed to fetch ISQ evolution stats");
       return res.json();
     },
-    enabled: (period !== "custom" || (!!customFrom && !!customTo)) && isqEvolutionFilter !== "all",
+    enabled: period !== "custom" || (!!customFrom && !!customTo),
   });
 
   // Use filtered data when filter is applied, otherwise use main stats
@@ -287,9 +295,8 @@ export default function StatsPage() {
     ? (isqDistributionStats?.isqDistribution || [])
     : (stats?.isqDistribution || []);
   
-  const isqEvolutionData = isqEvolutionFilter !== "all"
-    ? (isqEvolutionStats?.isqEvolution || [])
-    : (stats?.isqEvolution || []);
+  // Always use isqEvolutionStats for ISQ evolution (respects implant type switch)
+  const isqEvolutionData = isqEvolutionStats?.isqEvolution || [];
 
   // Fetch all active flags with entity info
   const { data: flagsData = [] } = useQuery<FlagWithEntity[]>({
@@ -321,10 +328,16 @@ export default function StatsPage() {
     typeChirurgieTemps: string | null;
     statut: string;
     isqPose: number | null;
+    isq2m: number | null;
+    isq3m: number | null;
+    isq6m: number | null;
     datePose: string | null;
+    referenceFabricant: string | null;
     implant: {
       marque: string;
       diametre: number;
+      referenceFabricant?: string | null;
+      typeImplant?: "IMPLANT" | "MINI_IMPLANT" | "PROTHESE";
     };
   }
   const { data: surgeryImplantsData = [] } = useQuery<SurgeryImplantForStats[]>({
@@ -350,16 +363,24 @@ export default function StatsPage() {
     });
   }, [surgeryImplantsData, dateRange.from, dateRange.to]);
 
-  // Calculate success rate by dimension
+  // Filter surgery implants by implant type for success rate card
+  const filteredSurgeryImplantsForSuccessRate = useMemo(() => {
+    return filteredSurgeryImplants.filter((implant) => {
+      const type = implant.implant?.typeImplant || "IMPLANT";
+      return type === successRateImplantType;
+    });
+  }, [filteredSurgeryImplants, successRateImplantType]);
+
+  // Calculate success rate by dimension (filtered by implant type)
   // Success is defined as: SUCCES or EN_SUIVI (healthy implants in follow-up)
   // Failure is: ECHEC or COMPLICATION
   const successRateByDimension = useMemo(() => {
-    if (!filteredSurgeryImplants || filteredSurgeryImplants.length === 0) return [];
+    if (!filteredSurgeryImplantsForSuccessRate || filteredSurgeryImplantsForSuccessRate.length === 0) return [];
 
     const groupBy = (key: string): Map<string, { total: number; success: number; avgIsq: number; isqCount: number }> => {
       const groups = new Map<string, { total: number; success: number; avgIsq: number; isqCount: number }>();
       
-      filteredSurgeryImplants.forEach((implant) => {
+      filteredSurgeryImplantsForSuccessRate.forEach((implant) => {
         let groupValue: string;
         switch (key) {
           case "marque":
@@ -417,7 +438,7 @@ export default function StatsPage() {
       }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 10);
-  }, [filteredSurgeryImplants, successRateDimension]);
+  }, [filteredSurgeryImplantsForSuccessRate, successRateDimension]);
 
   // Filter patient stats - only show patients with at least one implant
   // Also filter by selected patient IDs from the search bar
@@ -526,7 +547,7 @@ export default function StatsPage() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">Actes chirurgicaux</p>
+                <p className="text-xs text-muted-foreground mb-1">Actes chirurgicaux</p>
                 <p className="text-3xl font-bold">{stats?.activityByPeriod.reduce((sum, d) => sum + d.count, 0) || 0}</p>
                 <p className="text-xs text-muted-foreground mt-1">sur la période</p>
               </div>
@@ -541,7 +562,7 @@ export default function StatsPage() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">Implants posés</p>
+                <p className="text-xs text-muted-foreground mb-1">Implants posés</p>
                 <p className="text-3xl font-bold">{stats?.totalImplantsInPeriod || 0}</p>
                 <p className="text-xs text-muted-foreground mt-1">sur la période</p>
               </div>
@@ -556,7 +577,7 @@ export default function StatsPage() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">Taux de succès</p>
+                <p className="text-xs text-muted-foreground mb-1">Taux de succès</p>
                 <p className="text-3xl font-bold">{stats?.successRate || 0}%</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {stats?.complicationRate || 0}% complications
@@ -573,7 +594,7 @@ export default function StatsPage() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">Délai 1ère visite</p>
+                <p className="text-xs text-muted-foreground mb-1">Délai 1ère visite</p>
                 <p className="text-3xl font-bold">
                   {stats?.avgDelayToFirstVisit != null ? `${stats.avgDelayToFirstVisit}j` : "-"}
                 </p>
@@ -598,7 +619,7 @@ export default function StatsPage() {
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
-              className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+              className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
                 activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
               }`}
               data-testid={`tab-${tab.value}`}
@@ -644,7 +665,7 @@ export default function StatsPage() {
               <PopoverContent className="w-80 p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                 <div className="p-2">
                   {searchSuggestions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground p-2">Aucun résultat</p>
+                    <p className="text-xs text-muted-foreground p-2">Aucun résultat</p>
                   ) : (
                     <div className="space-y-1">
                       {searchSuggestions.map((suggestion) => (
@@ -661,7 +682,7 @@ export default function StatsPage() {
                           data-testid={`suggestion-${suggestion.type}-${suggestion.id}`}
                         >
                           <div>
-                            <p className="text-sm font-medium">{suggestion.label}</p>
+                            <p className="text-xs font-medium">{suggestion.label}</p>
                             {suggestion.sublabel && (
                               <p className="text-xs text-muted-foreground">{suggestion.sublabel}</p>
                             )}
@@ -777,7 +798,7 @@ export default function StatsPage() {
                   <BarChart3 className="h-5 w-5" />
                   Activité par mois
                 </CardTitle>
-                <CardDescription>Nombre d'actes chirurgicaux réalisés</CardDescription>
+                <CardDescription className="text-xs">Nombre d'actes chirurgicaux réalisés</CardDescription>
               </div>
               <Link href={`/actes?from=${dateRange.from}&to=${dateRange.to}`}>
                 <Button variant="outline" size="sm" data-testid="button-view-operations">
@@ -790,15 +811,16 @@ export default function StatsPage() {
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={activityData}>
                   <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
-                  <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
-                  <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
+                  <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
                       border: `1px solid ${STATS_COLORS.border}`,
                       borderRadius: "6px",
+                      fontSize: "11px",
                     }}
-                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                    labelStyle={{ color: "hsl(var(--foreground))", fontSize: "11px" }}
                   />
                   <Bar dataKey="count" name="Actes" fill={STATS_COLORS.primarySoft} radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -815,7 +837,7 @@ export default function StatsPage() {
                   <BarChart3 className="h-5 w-5" />
                   Types d'interventions
                 </CardTitle>
-                <CardDescription>Répartition par type avec détails au survol</CardDescription>
+                <CardDescription className="text-xs">Répartition par type avec détails au survol</CardDescription>
               </CardHeader>
               <CardContent>
                 {typeData.length === 0 ? (
@@ -827,8 +849,8 @@ export default function StatsPage() {
                   <ResponsiveContainer width="100%" height={Math.max(200, typeData.length * 50)}>
                     <BarChart data={typeData} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
-                      <XAxis type="number" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} allowDecimals={false} />
-                      <YAxis type="category" dataKey="type" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 14 }} axisLine={false} tickLine={false} width={160} />
+                      <XAxis type="number" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} allowDecimals={false} />
+                      <YAxis type="category" dataKey="type" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 11 }} axisLine={false} tickLine={false} width={160} />
                       <Tooltip
                         position={{ x: 200, y: 0 }}
                         wrapperStyle={{ zIndex: 100 }}
@@ -846,8 +868,8 @@ export default function StatsPage() {
                           const uniquePatients = Array.from(new Map(implants.map((i: {patientNom: string; patientPrenom: string}) => [`${i.patientNom}-${i.patientPrenom}`, i])).values());
                           return (
                             <div className="p-3 bg-card border rounded-md shadow-lg max-w-xs">
-                              <p className="font-semibold text-sm mb-2">{data.type}</p>
-                              <p className="text-sm text-muted-foreground mb-2">{data.count} intervention{data.count > 1 ? "s" : ""}</p>
+                              <p className="font-semibold text-xs mb-2">{data.type}</p>
+                              <p className="text-xs text-muted-foreground mb-2">{data.count} intervention{data.count > 1 ? "s" : ""}</p>
                               {implants.length > 0 && (
                                 <>
                                   <p className="text-xs font-medium text-muted-foreground mb-1">Implants posés ({implants.length}):</p>
@@ -885,7 +907,7 @@ export default function StatsPage() {
                   <TrendingUp className="h-5 w-5" />
                   Implants posés par mois
                 </CardTitle>
-                <CardDescription>Évolution du nombre d'implants</CardDescription>
+                <CardDescription className="text-xs">Évolution du nombre d'implants</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
@@ -897,15 +919,16 @@ export default function StatsPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
-                    <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
-                    <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
+                    <YAxis tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: `1px solid ${STATS_COLORS.border}`,
                         borderRadius: "6px",
+                        fontSize: "11px",
                       }}
-                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                      labelStyle={{ color: "hsl(var(--foreground))", fontSize: "11px" }}
                     />
                     <Area
                       type="monotone"
@@ -930,7 +953,7 @@ export default function StatsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Résultats cliniques</CardTitle>
-                <CardDescription>Répartition des issues</CardDescription>
+                <CardDescription className="text-xs">Répartition des issues</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={200}>
@@ -944,7 +967,6 @@ export default function StatsPage() {
                       paddingAngle={2}
                       dataKey="value"
                       nameKey="name"
-                      label={({ name, value }) => `${name}: ${value}%`}
                       labelLine={false}
                     >
                       {outcomeData.map((entry, index) => (
@@ -965,10 +987,10 @@ export default function StatsPage() {
                   {outcomeData.map((item) => (
                     <div key={item.name} className="flex items-center gap-2">
                       <div
-                        className="w-3 h-3 rounded-full"
+                        className="w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: item.color }}
                       />
-                      <span className="text-sm text-muted-foreground">{item.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{item.name}: {item.value}%</span>
                     </div>
                   ))}
                 </div>
@@ -980,7 +1002,7 @@ export default function StatsPage() {
               <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
                 <div>
                   <CardTitle>Distribution ISQ</CardTitle>
-                  <CardDescription>Stabilité des implants à la pose</CardDescription>
+                  <CardDescription className="text-xs">Stabilité des implants à la pose</CardDescription>
                 </div>
                 <Select value={isqDistributionFilter} onValueChange={setIsqDistributionFilter}>
                   <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-model">
@@ -1003,7 +1025,7 @@ export default function StatsPage() {
                     const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
                     return (
                       <div key={item.category}>
-                        <div className="flex justify-between text-sm mb-1">
+                        <div className="flex justify-between text-xs mb-1">
                           <span>{item.category}</span>
                           <span className="font-medium">{item.count} ({percentage}%)</span>
                         </div>
@@ -1031,7 +1053,7 @@ export default function StatsPage() {
                     <AlertTriangle className="h-5 w-5 text-stats-warning" />
                     Implants sans suivi
                   </CardTitle>
-                  <CardDescription>Plus de 3 mois sans visite</CardDescription>
+                  <CardDescription className="text-xs">Plus de 3 mois sans visite</CardDescription>
                 </div>
                 {stats?.implantsWithoutFollowup && stats.implantsWithoutFollowup.length > 0 && (
                   <Badge variant="outline" className="text-stats-warning border-stats-warning/30">
@@ -1051,7 +1073,7 @@ export default function StatsPage() {
                       {stats.implantsWithoutFollowup.slice(0, 20).map((item) => (
                         <div
                           key={item.implantId}
-                          className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-sm"
+                          className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-xs"
                           data-testid={`row-followup-${item.implantId}`}
                         >
                           <div>
@@ -1088,21 +1110,34 @@ export default function StatsPage() {
                   <TrendingUp className="h-5 w-5" />
                   Évolution ISQ moyen
                 </CardTitle>
-                <CardDescription>Stabilité moyenne des implants par mois</CardDescription>
+                <CardDescription className="text-xs">Stabilité moyenne des implants par mois</CardDescription>
               </div>
-              <Select value={isqEvolutionFilter} onValueChange={setIsqEvolutionFilter}>
-              <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-evolution-model">
-                <SelectValue placeholder="Tous les implants" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les implants</SelectItem>
-                {stats?.availableImplantModels.map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="isq-evolution-implant-type" className="text-xs text-muted-foreground whitespace-nowrap">
+                    {isqEvolutionImplantType === "IMPLANT" ? "Implant" : "Mini implant"}
+                  </Label>
+                  <Switch
+                    id="isq-evolution-implant-type"
+                    checked={isqEvolutionImplantType === "MINI_IMPLANT"}
+                    onCheckedChange={(checked) => setIsqEvolutionImplantType(checked ? "MINI_IMPLANT" : "IMPLANT")}
+                    data-testid="switch-isq-evolution-implant-type"
+                  />
+                </div>
+                <Select value={isqEvolutionFilter} onValueChange={setIsqEvolutionFilter}>
+                  <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-evolution-model">
+                    <SelectValue placeholder="Tous les implants" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les implants</SelectItem>
+                    {stats?.availableImplantModels.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -1114,8 +1149,8 @@ export default function StatsPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
-                <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
-                <YAxis domain={[40, 90]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="month" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} />
+                <YAxis domain={[40, 90]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={false} tickLine={false} />
                 <ReferenceLine y={60} stroke={STATS_COLORS.grayMuted} strokeDasharray="5 5" strokeOpacity={0.7} />
                 <ReferenceLine y={70} stroke={STATS_COLORS.grayMuted} strokeDasharray="5 5" strokeOpacity={0.7} />
                 <Tooltip
@@ -1123,8 +1158,9 @@ export default function StatsPage() {
                     backgroundColor: "hsl(var(--card))",
                     border: `1px solid ${STATS_COLORS.border}`,
                     borderRadius: "6px",
+                    fontSize: "11px",
                   }}
-                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                  labelStyle={{ color: "hsl(var(--foreground))", fontSize: "11px" }}
                 />
                 <Area
                   type="monotone"
@@ -1148,22 +1184,35 @@ export default function StatsPage() {
                   <BarChart3 className="h-5 w-5" />
                   Taux de réussite et ISQ
                 </CardTitle>
-                <CardDescription>Analyse des implants par critère</CardDescription>
+                <CardDescription className="text-xs">Analyse des implants par critère</CardDescription>
               </div>
-              <Select value={successRateDimension} onValueChange={setSuccessRateDimension}>
-                <SelectTrigger className="w-56 bg-white dark:bg-zinc-900" data-testid="select-success-dimension">
-                  <SelectValue placeholder="Afficher par" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="marque">Marque d'implant</SelectItem>
-                  <SelectItem value="diametre">Diamètre</SelectItem>
-                  <SelectItem value="localisation">Localisation (site FDI)</SelectItem>
-                  <SelectItem value="greffe">Greffe ou non</SelectItem>
-                  <SelectItem value="miseEnCharge">Mise en charge</SelectItem>
-                  <SelectItem value="chirurgie">Type de chirurgie</SelectItem>
-                  <SelectItem value="typeOs">Type d'os (D1-D4)</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="success-rate-implant-type" className="text-xs text-muted-foreground whitespace-nowrap">
+                    {successRateImplantType === "IMPLANT" ? "Implant" : "Mini implant"}
+                  </Label>
+                  <Switch
+                    id="success-rate-implant-type"
+                    checked={successRateImplantType === "MINI_IMPLANT"}
+                    onCheckedChange={(checked) => setSuccessRateImplantType(checked ? "MINI_IMPLANT" : "IMPLANT")}
+                    data-testid="switch-success-rate-implant-type"
+                  />
+                </div>
+                <Select value={successRateDimension} onValueChange={setSuccessRateDimension}>
+                  <SelectTrigger className="w-56 bg-white dark:bg-zinc-900" data-testid="select-success-dimension">
+                    <SelectValue placeholder="Afficher par" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="marque">Marque d'implant</SelectItem>
+                    <SelectItem value="diametre">Diamètre</SelectItem>
+                    <SelectItem value="localisation">Localisation (site FDI)</SelectItem>
+                    <SelectItem value="greffe">Greffe ou non</SelectItem>
+                    <SelectItem value="miseEnCharge">Mise en charge</SelectItem>
+                    <SelectItem value="chirurgie">Type de chirurgie</SelectItem>
+                    <SelectItem value="typeOs">Type d'os (D1-D4)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               {successRateByDimension.length === 0 ? (
@@ -1175,25 +1224,26 @@ export default function StatsPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={successRateByDimension} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke={STATS_COLORS.border} strokeOpacity={0.5} />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} tickFormatter={(v) => `${v}%`} />
-                    <YAxis type="category" dataKey="name" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 12 }} axisLine={false} tickLine={false} width={120} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fill: STATS_COLORS.textSecondary, fontSize: 10 }} axisLine={{ stroke: STATS_COLORS.border }} tickLine={false} tickFormatter={(v) => `${v}%`} />
+                    <YAxis type="category" dataKey="name" tick={{ fill: STATS_COLORS.textSecondary, fontSize: 11 }} axisLine={false} tickLine={false} width={120} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: `1px solid ${STATS_COLORS.border}`,
                         borderRadius: "6px",
+                        fontSize: "11px",
                       }}
-                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                      labelStyle={{ color: "hsl(var(--foreground))", fontSize: "11px" }}
                       content={({ active, payload, label }) => {
                         if (!active || !payload || payload.length === 0) return null;
                         const data = payload[0]?.payload;
                         return (
                           <div className="p-2 bg-card border rounded-md shadow-lg">
-                            <p className="font-medium text-sm">{label}</p>
-                            <p className="text-sm text-muted-foreground">{data.total} implants</p>
-                            <p className="text-sm text-stats-success">Taux de réussite: {data.successRate}%</p>
+                            <p className="font-medium text-xs">{label}</p>
+                            <p className="text-xs text-muted-foreground">{data.total} implants</p>
+                            <p className="text-xs text-stats-success">Taux de réussite: {data.successRate}%</p>
                             {data.avgIsq > 0 && (
-                              <p className="text-sm text-stats-primary">ISQ moyen: {data.avgIsq}</p>
+                              <p className="text-xs text-stats-primary">ISQ moyen: {data.avgIsq}</p>
                             )}
                           </div>
                         );
@@ -1207,10 +1257,146 @@ export default function StatsPage() {
                 {successRateByDimension.map((item) => (
                   <div key={item.name} className="p-2 rounded-lg bg-muted/50 text-center">
                     <p className="text-xs text-muted-foreground truncate" title={item.name}>{item.name}</p>
-                    <p className="text-sm font-semibold">{item.total} implants</p>
+                    <p className="text-xs font-semibold">{item.total} implants</p>
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Cohorte ISQ - Heatmap */}
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Cohorte ISQ
+                </CardTitle>
+                <CardDescription className="text-xs">Implants / date de pose</CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Du</Label>
+                  <Input 
+                    type="date" 
+                    value={cohorteStartDate}
+                    onChange={(e) => setCohorteStartDate(e.target.value)}
+                    className="w-36 text-xs"
+                    data-testid="input-cohorte-date-start"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Au</Label>
+                  <Input 
+                    type="date" 
+                    value={cohorteEndDate}
+                    onChange={(e) => setCohorteEndDate(e.target.value)}
+                    className="w-36 text-xs"
+                    data-testid="input-cohorte-date-end"
+                  />
+                </div>
+                {(cohorteStartDate || cohorteEndDate) && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => { setCohorteStartDate(""); setCohorteEndDate(""); }}
+                    className="text-xs"
+                    data-testid="button-clear-cohorte-filter"
+                  >
+                    Effacer
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const cohortePeriods = [
+                  { key: "J0", field: "isqPose" as const, daysOffset: 0 },
+                  { key: "2M", field: "isq2m" as const, daysOffset: 60 },
+                  { key: "3M", field: "isq3m" as const, daysOffset: 90 },
+                  { key: "6M", field: "isq6m" as const, daysOffset: 180 },
+                ];
+                const cohorteImplants = filteredSurgeryImplants
+                  .filter((imp) => imp.datePose)
+                  .filter((imp) => {
+                    if (!cohorteStartDate && !cohorteEndDate) return true;
+                    const impDate = new Date(imp.datePose!);
+                    if (cohorteStartDate && impDate < new Date(cohorteStartDate)) return false;
+                    if (cohorteEndDate && impDate > new Date(cohorteEndDate)) return false;
+                    return true;
+                  })
+                  .sort((a, b) => new Date(b.datePose!).getTime() - new Date(a.datePose!).getTime())
+                  .slice(0, 30);
+
+                const getIsqColor = (isq: number | null) => {
+                  if (isq === null) return "bg-muted/30";
+                  if (isq >= 70) return "bg-violet-500/80 text-white";
+                  if (isq >= 65) return "bg-violet-400/70 text-white";
+                  if (isq >= 60) return "bg-violet-300/60 text-violet-900";
+                  if (isq >= 55) return "bg-violet-200/50 text-violet-900";
+                  return "bg-violet-100/40 text-violet-800";
+                };
+
+                if (cohorteImplants.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-xs">Aucun implant avec date de pose dans cette période</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <ScrollArea className="w-full">
+                    <div className="min-w-[600px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs w-36 sticky left-0 bg-card z-10">Date de pose</TableHead>
+                            {cohortePeriods.map((period) => (
+                              <TableHead key={period.key} className="text-center w-20 px-1">
+                                <IsqTimingBadge
+                                  poseDate={new Date(0)}
+                                  measurementDate={new Date(period.daysOffset * 24 * 60 * 60 * 1000)}
+                                />
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody className="[&_tr]:border-0">
+                          {cohorteImplants.map((imp, idx) => {
+                            const poseDate = new Date(imp.datePose!);
+                            const modele = imp.referenceFabricant || imp.implant?.referenceFabricant || "";
+                            return (
+                              <TableRow key={imp.id} data-testid={`cohorte-row-${idx}`}>
+                                <TableCell className="text-sm font-medium sticky left-0 bg-card z-10 py-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs">{format(poseDate, "dd MMM yyyy", { locale: fr })}</span>
+                                    <span className="text-sm text-muted-foreground">{imp.implant?.marque}{modele ? ` - ${modele}` : ""}</span>
+                                  </div>
+                                </TableCell>
+                                {cohortePeriods.map((period) => {
+                                  const isqValue = imp[period.field];
+                                  if (isqValue === null || isqValue === undefined) {
+                                    return <TableCell key={period.key} className="text-center py-1 px-1" />;
+                                  }
+                                  return (
+                                    <TableCell key={period.key} className="text-center py-1 px-1">
+                                      <div className={`rounded px-2 py-1 text-sm font-medium ${getIsqColor(isqValue)}`}>
+                                        {isqValue}
+                                      </div>
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </ScrollArea>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1225,7 +1411,7 @@ export default function StatsPage() {
                   <Users className="h-5 w-5" />
                   Patients avec implants
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs">
                   {filteredPatientStats.length} patient{filteredPatientStats.length > 1 ? "s" : ""} sur {totalPatientsWithImplants} au total
                 </CardDescription>
               </div>
@@ -1236,7 +1422,7 @@ export default function StatsPage() {
                     placeholder="Rechercher..."
                     value={patientSearch}
                     onChange={(e) => setPatientSearch(e.target.value)}
-                    className="pl-9 w-48 bg-white dark:bg-zinc-900"
+                    className="pl-9 w-48 bg-white dark:bg-zinc-900 placeholder-xs"
                     data-testid="input-patient-search"
                   />
                 </div>
@@ -1314,18 +1500,21 @@ export default function StatsPage() {
                               </HoverCardTrigger>
                               <HoverCardContent className="w-72 z-[100]" align="center" side="top" sideOffset={5}>
                                 <div className="space-y-2">
-                                  <h4 className="font-semibold text-sm">Implants ({p.totalImplants})</h4>
+                                  <h4 className="font-semibold text-xs">Implants ({p.totalImplants})</h4>
                                   <ScrollArea className="h-32">
                                     <div className="space-y-1">
                                       {p.implants.map((imp) => (
-                                        <div key={imp.id} className="flex items-center justify-between text-sm p-1 rounded bg-muted/50">
+                                        <div key={imp.id} className="flex items-center justify-between text-xs p-1 rounded bg-muted/50">
                                           <span>Site {imp.siteFdi} - {imp.marque}</span>
                                           <Badge variant={
                                             imp.statut === "SUCCES" ? "default" :
-                                            imp.statut === "COMPLICATION" ? "outline" :
-                                            imp.statut === "ECHEC" ? "destructive" : "secondary"
-                                          } className="text-xs">
-                                            {imp.statut}
+                                            imp.statut === "COMPLICATION" ? "complication" :
+                                            imp.statut === "ECHEC" ? "echec" : "ensuivi"
+                                          } className="text-[10px]">
+                                            {imp.statut === "EN_SUIVI" ? "En suivi" : 
+                                             imp.statut === "SUCCES" ? "Succès" :
+                                             imp.statut === "COMPLICATION" ? "Complication" :
+                                             imp.statut === "ECHEC" ? "Échec" : imp.statut}
                                           </Badge>
                                         </div>
                                       ))}
@@ -1355,7 +1544,7 @@ export default function StatsPage() {
                     </TableBody>
                   </Table>
                   {filteredPatientStats.length > 50 && (
-                    <p className="text-center text-sm text-muted-foreground mt-4">
+                    <p className="text-center text-xs text-muted-foreground mt-4">
                       Affichage des 50 premiers patients sur {filteredPatientStats.length}
                     </p>
                   )}
@@ -1372,7 +1561,7 @@ export default function StatsPage() {
                   <AlertTriangle className="h-5 w-5" />
                   Flags actifs
                 </CardTitle>
-                <CardDescription>Alertes cliniques et points d'attention</CardDescription>
+                <CardDescription className="text-xs">Alertes cliniques et points d'attention</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 {criticalCount > 0 && (
@@ -1394,7 +1583,7 @@ export default function StatsPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-2 px-3 font-medium">Niveau</th>
@@ -1429,7 +1618,7 @@ export default function StatsPage() {
                     </tbody>
                   </table>
                   {sortedFlags.length > 20 && (
-                    <p className="text-center text-sm text-muted-foreground mt-4">
+                    <p className="text-center text-xs text-muted-foreground mt-4">
                       Affichage des 20 premiers flags sur {sortedFlags.length} au total
                     </p>
                   )}

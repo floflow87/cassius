@@ -5,6 +5,9 @@ import { createServer } from "http";
 import { setupAuth } from "./auth";
 import { logSchemaCheck } from "./schemaCheck";
 import { startDigestScheduler } from "./notifications/digestScheduler";
+import { registerJob } from "./jobs";
+import { appointmentAutoCompleteJob } from "./jobs/appointmentAutoComplete";
+import { storage } from "./storage";
 import { 
   createRequestContext, 
   runWithContext, 
@@ -95,6 +98,13 @@ app.use((req, res, next) => {
   // Schema sanity check on startup
   await logSchemaCheck();
   
+  // Seed system status reasons if not already done
+  try {
+    await storage.seedSystemStatusReasons();
+  } catch (error) {
+    console.error("[Seed] Failed to seed system status reasons:", error);
+  }
+  
   await registerRoutes(httpServer, app);
 
   // Gestionnaire d'erreurs global - robuste pour contexte SaaS médical
@@ -151,6 +161,9 @@ app.use((req, res, next) => {
       
       // Start the notification digest scheduler
       startDigestScheduler();
+      
+      // Start the appointment auto-complete job
+      registerJob(appointmentAutoCompleteJob);
     },
   );
 })();

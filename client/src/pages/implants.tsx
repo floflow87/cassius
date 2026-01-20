@@ -360,10 +360,10 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
               <Activity className="h-4 w-4 text-primary" />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-foreground">
+              <span className="text-xs font-medium text-foreground">
                 {implant.marque}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[10px] text-muted-foreground">
                 Réf: {implant.referenceFabricant || "-"}
               </span>
             </div>
@@ -371,7 +371,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
         );
       case "dimensions":
         return (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {implant.diametre} × {implant.longueur} mm
           </span>
         );
@@ -393,7 +393,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
         );
       case "successRate":
         if (implant.successRate === null) {
-          return <span className="text-sm text-muted-foreground">-</span>;
+          return <span className="text-xs text-muted-foreground">-</span>;
         }
         const rate = implant.successRate;
         const colorClass = rate >= 90 ? "text-green-600" : rate >= 70 ? "text-yellow-600" : "text-red-600";
@@ -488,7 +488,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
               <button
                 key={tab.value}
                 onClick={() => setImplantType(tab.value)}
-                className={`relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
                   implantType === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
                 }`}
                 data-testid={tab.value === "implants" ? "tab-implants" : "tab-mini-implants"}

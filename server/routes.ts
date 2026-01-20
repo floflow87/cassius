@@ -332,7 +332,7 @@ export async function registerRoutes(
   setDocumentsStorageProvider({
     isStorageConfigured: supabaseStorage.isStorageConfigured,
     createSignedUploadUrl: supabaseStorage.createSignedUploadUrl,
-    getSignedDownloadUrl: supabaseStorage.getSignedDownloadUrl,
+    getSignedDownloadUrl: supabaseStorage.getSignedUrl,
     deleteFile: supabaseStorage.deleteFile,
   });
   
@@ -619,6 +619,7 @@ export async function registerRoutes(
       if (userId) {
         const orgUsers = await storage.getUsersByOrganisation(organisationId);
         const changedFields = Object.keys(data);
+        const patientName = `${patient.prenom || ''} ${patient.nom || ''}`.trim();
         
         for (const user of orgUsers) {
           if (user.id !== userId) {
@@ -627,6 +628,7 @@ export async function registerRoutes(
               recipientUserId: user.id,
               actorUserId: userId,
               patientId: patient.id,
+              patientName,
               changes: changedFields,
             }).catch(err => console.error("[Notification] Patient updated notification failed:", err));
           }
@@ -1736,6 +1738,278 @@ export async function registerRoutes(
     }
   });
 
+  // ========== RADIO NOTES ==========
+  app.get("/api/radios/:radioId/notes", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const notes = await storage.getRadioNotes(organisationId, req.params.radioId);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching radio notes:", error);
+      res.status(500).json({ error: "Failed to fetch radio notes" });
+    }
+  });
+
+  app.post("/api/radios/:radioId/notes", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.jwtUser?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    try {
+      const { body } = req.body;
+      if (!body || typeof body !== "string" || body.trim().length === 0) {
+        return res.status(400).json({ error: "body is required" });
+      }
+      const note = await storage.createRadioNote(organisationId, userId, req.params.radioId, body.trim());
+      res.status(201).json(note);
+    } catch (error) {
+      console.error("Error creating radio note:", error);
+      res.status(500).json({ error: "Failed to create radio note" });
+    }
+  });
+
+  app.patch("/api/radios/:radioId/notes/:noteId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { body } = req.body;
+      if (!body || typeof body !== "string" || body.trim().length === 0) {
+        return res.status(400).json({ error: "body is required" });
+      }
+      const note = await storage.updateRadioNote(organisationId, req.params.noteId, body.trim());
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error("Error updating radio note:", error);
+      res.status(500).json({ error: "Failed to update radio note" });
+    }
+  });
+
+  app.delete("/api/radios/:radioId/notes/:noteId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const deleted = await storage.deleteRadioNote(organisationId, req.params.noteId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting radio note:", error);
+      res.status(500).json({ error: "Failed to delete radio note" });
+    }
+  });
+
+  // ========== IMPLANT STATUS REASONS ==========
+  app.get("/api/status-reasons", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const status = req.query.status as 'SUCCES' | 'COMPLICATION' | 'ECHEC' | undefined;
+      const reasons = await storage.getStatusReasons(organisationId, status);
+      res.json(reasons);
+    } catch (error) {
+      console.error("Error fetching status reasons:", error);
+      res.status(500).json({ error: "Failed to fetch status reasons" });
+    }
+  });
+
+  app.post("/api/status-reasons", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { status, code, label } = req.body;
+      if (!status || !code || !label) {
+        return res.status(400).json({ error: "status, code, and label are required" });
+      }
+      if (!['SUCCES', 'COMPLICATION', 'ECHEC'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+      const reason = await storage.createStatusReason(organisationId, { status, code, label });
+      res.status(201).json(reason);
+    } catch (error) {
+      console.error("Error creating status reason:", error);
+      res.status(500).json({ error: "Failed to create status reason" });
+    }
+  });
+
+  // ========== IMPLANT STATUS HISTORY ==========
+  app.get("/api/surgery-implants/:implantId/status-history", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const history = await storage.getImplantStatusHistory(organisationId, req.params.implantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching implant status history:", error);
+      res.status(500).json({ error: "Failed to fetch status history" });
+    }
+  });
+
+  app.post("/api/surgery-implants/:implantId/status", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.jwtUser?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    try {
+      const { toStatus, fromStatus, reasonId, reasonFreeText, evidence } = req.body;
+      if (!toStatus || !['EN_SUIVI', 'SUCCES', 'COMPLICATION', 'ECHEC'].includes(toStatus)) {
+        return res.status(400).json({ error: "Valid toStatus is required" });
+      }
+      const history = await storage.changeImplantStatus(organisationId, {
+        implantId: req.params.implantId,
+        fromStatus,
+        toStatus,
+        reasonId,
+        reasonFreeText,
+        evidence,
+        changedByUserId: userId,
+      });
+      res.status(201).json(history);
+    } catch (error) {
+      console.error("Error changing implant status:", error);
+      res.status(500).json({ error: "Failed to change implant status" });
+    }
+  });
+
+  // ========== IMPLANT STATUS SUGGESTIONS (MVP Rules) ==========
+  app.get("/api/surgery-implants/:implantId/status-suggestions", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const implantId = req.params.implantId;
+      // Fetch surgery implant with ISQ data
+      const implant = await storage.getSurgeryImplant(organisationId, implantId);
+      if (!implant) {
+        return res.status(404).json({ error: "Implant not found" });
+      }
+
+      // Fetch status history and measurements to check for applied suggestions
+      const [statusHistory, measurements] = await Promise.all([
+        storage.getImplantStatusHistory(organisationId, implantId),
+        storage.getImplantMeasurements(organisationId, implantId),
+      ]);
+
+      // Get last status change date and last ISQ measurement date
+      const lastStatusChange = statusHistory.length > 0 ? new Date(statusHistory[0].changedAt) : null;
+      const lastMeasurement = measurements.length > 0 ? new Date(measurements[0].measuredAt) : null;
+
+      // Check if suggestion should be hidden (applied after last ISQ)
+      const isSuggestionApplied = (suggestedStatus: string): boolean => {
+        if (!lastStatusChange) return false;
+        // If current status matches suggestion and status was changed after last ISQ, hide it
+        // If no measurement exists, show the suggestion (can't compare without ISQ data)
+        if (implant.statut === suggestedStatus && lastMeasurement) {
+          return lastStatusChange > lastMeasurement;
+        }
+        return false;
+      };
+
+      const suggestions: Array<{
+        status: 'SUCCES' | 'COMPLICATION' | 'ECHEC';
+        confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+        rule: string;
+        reasonCode?: string;
+      }> = [];
+
+      // MVP Rules based on ISQ values
+      const isqValues: number[] = [];
+      if (implant.isqPose !== null && implant.isqPose !== undefined) isqValues.push(implant.isqPose);
+      if (implant.isq2m !== null && implant.isq2m !== undefined) isqValues.push(implant.isq2m);
+      if (implant.isq3m !== null && implant.isq3m !== undefined) isqValues.push(implant.isq3m);
+      if (implant.isq6m !== null && implant.isq6m !== undefined) isqValues.push(implant.isq6m);
+
+      const latestIsq = isqValues.length > 0 ? isqValues[isqValues.length - 1] : null;
+      const poseIsq = implant.isqPose;
+      const isq6m = implant.isq6m;
+
+      // Rule 1: ISQ 6 mois >= 70 -> SUCCES (HIGH confidence)
+      if (isq6m !== null && isq6m !== undefined && isq6m >= 70) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'HIGH',
+          rule: 'ISQ à 6 mois ≥ 70',
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
+      // Rule 2: ISQ stable and >= 60 at 3 months -> SUCCES (MEDIUM confidence)
+      if (!isq6m && implant.isq3m !== null && implant.isq3m !== undefined && implant.isq3m >= 60) {
+        if (poseIsq !== null && poseIsq !== undefined && implant.isq3m >= poseIsq - 5) {
+          suggestions.push({
+            status: 'SUCCES',
+            confidence: 'MEDIUM',
+            rule: 'ISQ stable à 3 mois (≥ 60, pas de chute > 5)',
+            reasonCode: 'OSTEOINTEGRATION_OK',
+          });
+        }
+      }
+
+      // Rule 3: ISQ drop > 15 points -> COMPLICATION (HIGH confidence)
+      if (isqValues.length >= 2) {
+        const maxDrop = Math.max(...isqValues.slice(0, -1)) - (latestIsq ?? 0);
+        if (maxDrop > 15) {
+          suggestions.push({
+            status: 'COMPLICATION',
+            confidence: 'HIGH',
+            rule: 'Chute ISQ > 15 points',
+            reasonCode: 'ISQ_DROP',
+          });
+        }
+      }
+
+      // Rule 4: Latest ISQ < 50 -> ECHEC (HIGH confidence)
+      if (latestIsq !== null && latestIsq < 50) {
+        suggestions.push({
+          status: 'ECHEC',
+          confidence: 'HIGH',
+          rule: 'ISQ le plus récent < 50',
+          reasonCode: 'DEPOSE',
+        });
+      }
+
+      // Rule 5: Latest ISQ between 50-60 -> COMPLICATION (MEDIUM confidence)
+      if (latestIsq !== null && latestIsq >= 50 && latestIsq < 60) {
+        suggestions.push({
+          status: 'COMPLICATION',
+          confidence: 'MEDIUM',
+          rule: 'ISQ entre 50-60 (ostéointégration insuffisante)',
+          reasonCode: 'ISQ_DROP',
+        });
+      }
+
+      // Filter out suggestions that have been applied and no new ISQ since
+      const filteredSuggestions = suggestions.filter(s => !isSuggestionApplied(s.status));
+
+      res.json({
+        implantId,
+        currentStatus: implant.statut,
+        latestIsq,
+        isqHistory: { pose: poseIsq, m2: implant.isq2m, m3: implant.isq3m, m6: isq6m },
+        suggestions: filteredSuggestions,
+      });
+    } catch (error) {
+      console.error("Error generating status suggestions:", error);
+      res.status(500).json({ error: "Failed to generate suggestions" });
+    }
+  });
+
   // ========== DOCUMENTS (PDF) ==========
   // NOTE: /api/documents/* routes are now handled by the modular Documents router
   // mounted above via app.use("/api/documents", documentsRouter).
@@ -1976,6 +2250,13 @@ export async function registerRoutes(
       // Send notification about new document to other team members
       if (userId) {
         const orgUsers = await storage.getUsersByOrganisation(organisationId);
+        let patientNameForDoc: string | undefined;
+        if (doc.patientId) {
+          const patient = await storage.getPatient(organisationId, doc.patientId);
+          if (patient) {
+            patientNameForDoc = `${patient.prenom || ''} ${patient.nom || ''}`.trim();
+          }
+        }
         
         for (const user of orgUsers) {
           if (user.id !== userId) {
@@ -1986,6 +2267,7 @@ export async function registerRoutes(
               documentId: doc.id,
               documentName: doc.title || doc.fileName,
               patientId: doc.patientId || undefined,
+              patientName: patientNameForDoc,
             }).catch(err => console.error("[Notification] Document uploaded notification failed:", err));
           }
         }
@@ -2112,6 +2394,11 @@ export async function registerRoutes(
           
           // Send notification for low ISQ (< 60)
           if (data.isq < 60 && userId) {
+            const patientForNotif = await storage.getPatient(organisationId, data.patientId);
+            const patientNameForNotif = patientForNotif ? `${patientForNotif.prenom} ${patientForNotif.nom}` : "Patient";
+            const surgeryImplantForNotif = await storage.getSurgeryImplant(organisationId, surgeryImplantId);
+            const implantSiteForNotif = surgeryImplantForNotif?.siteFdi || "inconnu";
+            
             notificationService.createNotification({
               organisationId,
               recipientUserId: userId,
@@ -2119,9 +2406,16 @@ export async function registerRoutes(
               type: "ISQ_LOW",
               severity: data.isq < 50 ? "CRITICAL" : "WARNING",
               title: `ISQ faible detecte: ${data.isq}`,
-              body: `L'implant sur le site a un ISQ de ${data.isq}, ce qui est en dessous du seuil recommande.`,
-              entityType: "IMPLANT",
-              entityId: surgeryImplantId,
+              body: `${patientNameForNotif} - Site ${implantSiteForNotif}: ISQ de ${data.isq}, en dessous du seuil recommande.`,
+              entityType: "PATIENT",
+              entityId: data.patientId,
+              metadata: {
+                patientName: patientNameForNotif,
+                patientId: data.patientId,
+                implantSite: implantSiteForNotif,
+                isqValue: data.isq,
+                surgeryImplantId,
+              },
               dedupeKey: `isq_low_${surgeryImplantId}_${data.isq}`,
             }).catch(err => console.error("[Notification] ISQ_LOW notification failed:", err));
           }
@@ -2245,13 +2539,14 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const { from, to, implantModelId, patientIds, operationIds } = req.query;
+      const { from, to, implantModelId, patientIds, operationIds, implantType } = req.query;
       const dateFrom = from ? String(from) : undefined;
       const dateTo = to ? String(to) : undefined;
       const implantModel = implantModelId ? String(implantModelId) : undefined;
       const patientIdList = patientIds ? String(patientIds).split(",").filter(Boolean) : undefined;
       const operationIdList = operationIds ? String(operationIds).split(",").filter(Boolean) : undefined;
-      const stats = await storage.getClinicalStats(organisationId, dateFrom, dateTo, implantModel, patientIdList, operationIdList);
+      const implantTypeFilter = implantType ? String(implantType) as "IMPLANT" | "MINI_IMPLANT" : undefined;
+      const stats = await storage.getClinicalStats(organisationId, dateFrom, dateTo, implantModel, patientIdList, operationIdList, implantTypeFilter);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching clinical stats:", error);
@@ -2481,6 +2776,21 @@ export async function registerRoutes(
     }
   });
 
+  // Get surgery implants for a specific patient (via their operations)
+  app.get("/api/patients/:patientId/surgery-implants", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { patientId } = req.params;
+      const surgeryImplants = await storage.getPatientSurgeryImplants(organisationId, patientId);
+      res.json(surgeryImplants);
+    } catch (error) {
+      console.error("Error fetching patient surgery implants:", error);
+      res.status(500).json({ error: "Failed to fetch surgery implants" });
+    }
+  });
+
   app.get("/api/appointments/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
@@ -2519,7 +2829,7 @@ export async function registerRoutes(
       
       const userId = req.jwtUser?.userId;
       
-      // If it's a future appointment, resolve the "NO_RECENT_APPOINTMENT" flag for this patient
+      // Immediately resolve NO_RECENT_APPOINTMENT flag for this patient if it's a future appointment
       if (appointment.dateStart >= new Date() && userId) {
         const resolvedCount = await storage.resolveFlagByTypeAndPatient(
           organisationId, 
@@ -2532,8 +2842,15 @@ export async function registerRoutes(
         }
       }
       
-      // Send notification about new appointment
+      // Also trigger full flag detection asynchronously for other flag types
+      runFlagDetection(organisationId).catch(err => 
+        console.error("Flag detection failed after appointment creation:", err)
+      );
+      
+      // Send notification about new appointment with patient name
       if (userId) {
+        const patient = await storage.getPatient(organisationId, patientId);
+        const patientName = patient ? `${patient.prenom} ${patient.nom}` : "Patient";
         notificationService.notificationEvents.onAppointmentCreated({
           organisationId,
           recipientUserId: userId,
@@ -2541,6 +2858,7 @@ export async function registerRoutes(
           appointmentId: appointment.id,
           appointmentDate: appointment.dateStart.toISOString(),
           patientId,
+          patientName,
         }).catch(err => console.error("[Notification] Appointment created notification failed:", err));
       }
       
@@ -2562,6 +2880,12 @@ export async function registerRoutes(
       if (!appointment) {
         return res.status(404).json({ error: "Appointment not found" });
       }
+      
+      // Trigger flag detection asynchronously to update flags based on appointment changes
+      runFlagDetection(organisationId).catch(err => 
+        console.error("Flag detection failed after appointment update:", err)
+      );
+      
       res.json(appointment);
     } catch (error) {
       console.error("Error updating appointment:", error);
@@ -2579,6 +2903,12 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Appointment not found" });
       }
+      
+      // Trigger flag detection asynchronously to update flags after appointment deletion
+      runFlagDetection(organisationId).catch(err => 
+        console.error("Flag detection failed after appointment deletion:", err)
+      );
+      
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting appointment:", error);
@@ -2644,6 +2974,178 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error checking conflicts:", error);
       res.status(500).json({ error: "Failed to check conflicts" });
+    }
+  });
+
+  // ========== APPOINTMENT CLINICAL DATA ==========
+  // GET clinical data for an appointment (implant, ISQ history, flags, suggestions)
+  app.get("/api/appointments/:id/clinical", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const { surgeryImplantId } = req.query;
+      
+      // If surgeryImplantId is provided, use it to get clinical data for that specific implant
+      const clinicalData = await storage.getAppointmentClinicalData(
+        organisationId, 
+        id, 
+        surgeryImplantId as string | undefined
+      );
+      if (!clinicalData) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      res.json(clinicalData);
+    } catch (error) {
+      console.error("Error fetching clinical data:", error);
+      res.status(500).json({ error: "Failed to fetch clinical data" });
+    }
+  });
+
+  // POST ISQ measurement for an appointment (upsert)
+  app.post("/api/appointments/:id/isq", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id: appointmentId } = req.params;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const { surgeryImplantId, isqValue, notes } = req.body;
+      if (!surgeryImplantId || isqValue === undefined || isqValue === null) {
+        return res.status(400).json({ error: "surgeryImplantId and isqValue are required" });
+      }
+
+      // Get appointment to determine measurement type
+      const appointment = await storage.getAppointmentById(organisationId, appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      // Map appointment type to measurement type
+      const measurementTypeMap: Record<string, 'POSE' | 'FOLLOW_UP' | 'CONTROL' | 'EMERGENCY'> = {
+        'CHIRURGIE': 'POSE',
+        'CONTROLE': 'CONTROL',
+        'SUIVI': 'FOLLOW_UP',
+        'URGENCE': 'EMERGENCY',
+        'CONSULTATION': 'FOLLOW_UP',
+        'AUTRE': 'FOLLOW_UP',
+      };
+      const measurementType = measurementTypeMap[appointment.type] || 'FOLLOW_UP';
+
+      // Upsert the measurement
+      const measurement = await storage.upsertImplantMeasurement(organisationId, {
+        surgeryImplantId,
+        appointmentId,
+        type: measurementType,
+        isqValue: Number(isqValue),
+        notes: notes || null,
+        measuredByUserId: userId,
+        measuredAt: appointment.dateStart,
+      });
+
+      // Also update the appointment's ISQ field for backward compatibility
+      await storage.updateAppointment(organisationId, appointmentId, { isq: Number(isqValue) });
+
+      // Recalculate flags and get suggestions
+      const flags = await storage.calculateIsqFlags(organisationId, surgeryImplantId);
+      const suggestions = await storage.generateStatusSuggestions(organisationId, surgeryImplantId, flags);
+
+      res.status(201).json({
+        measurement,
+        flags,
+        suggestions,
+      });
+    } catch (error) {
+      console.error("Error saving ISQ measurement:", error);
+      res.status(500).json({ error: "Failed to save ISQ measurement" });
+    }
+  });
+
+  // ========== APPOINTMENT RADIOS ==========
+  // GET radios linked to an appointment
+  app.get("/api/appointments/:id/radios", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id } = req.params;
+      const links = await storage.getAppointmentRadios(organisationId, id);
+      
+      // Get full radio details for each link
+      const radiosWithDetails = await Promise.all(
+        links.map(async (link) => {
+          const radio = await storage.getRadio(organisationId, link.radioId);
+          return { ...link, radio };
+        })
+      );
+      
+      res.json(radiosWithDetails);
+    } catch (error) {
+      console.error("Error fetching appointment radios:", error);
+      res.status(500).json({ error: "Failed to fetch appointment radios" });
+    }
+  });
+
+  // POST link a radio to an appointment
+  app.post("/api/appointments/:id/radios", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    try {
+      const { id: appointmentId } = req.params;
+      const { radioId, notes } = req.body;
+
+      if (!radioId) {
+        return res.status(400).json({ error: "radioId is required" });
+      }
+
+      // Verify appointment exists
+      const appointment = await storage.getAppointmentById(organisationId, appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      // Verify radio exists
+      const radio = await storage.getRadio(organisationId, radioId);
+      if (!radio) {
+        return res.status(404).json({ error: "Radio not found" });
+      }
+
+      const link = await storage.linkRadioToAppointment(organisationId, appointmentId, radioId, userId, notes);
+      res.status(201).json({ ...link, radio });
+    } catch (error: any) {
+      if (error.code === "23505") {
+        return res.status(409).json({ error: "Radio already linked to this appointment" });
+      }
+      console.error("Error linking radio to appointment:", error);
+      res.status(500).json({ error: "Failed to link radio to appointment" });
+    }
+  });
+
+  // DELETE unlink a radio from an appointment
+  app.delete("/api/appointments/:id/radios/:radioId", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { id: appointmentId, radioId } = req.params;
+      const deleted = await storage.unlinkRadioFromAppointment(organisationId, appointmentId, radioId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Link not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error unlinking radio from appointment:", error);
+      res.status(500).json({ error: "Failed to unlink radio from appointment" });
     }
   });
 
@@ -5300,28 +5802,32 @@ export async function registerRoutes(
     };
     
     const titleMap: Record<string, string> = {
-      ISQ_LOW: "ISQ bas detecte",
-      ISQ_CRITICAL: "ISQ critique",
-      NO_POSTOP_FOLLOWUP: "Suivi post-operatoire manquant",
-      INCOMPLETE_DATA: "Donnees incompletes",
-      OVERDUE_APPOINTMENT: "Rendez-vous en retard",
-      MISSING_XRAY: "Radiographie manquante",
+      ISQ_LOW: "ISQ Bas Détecté",
+      ISQ_CRITICAL: "ISQ Critique",
+      NO_POSTOP_FOLLOWUP: "Suivi Post-opératoire Manquant",
+      INCOMPLETE_DATA: "Données Incomplètes",
+      OVERDUE_APPOINTMENT: "Rendez-vous en Retard",
+      MISSING_XRAY: "Radiographie Manquante",
     };
     
-    return flags.map((flag) => ({
-      id: `flag-${flag.id}`,
-      kind: "ALERT",
-      type: flag.type,
-      severity: severityMap[flag.severity] || "INFO",
-      title: titleMap[flag.type] || flag.type,
-      body: flag.message || `Alerte pour le patient ${flag.patient?.prenom || ""} ${flag.patient?.nom || ""}`.trim(),
-      entityType: "PATIENT",
-      entityId: flag.patientId,
-      createdAt: flag.createdAt || new Date().toISOString(),
-      readAt: flag.resolvedAt || null,
-      isVirtual: true,
-      patientName: flag.patient ? `${flag.patient.prenom || ""} ${flag.patient.nom || ""}`.trim() : null,
-    }));
+    return flags.map((flag) => {
+      const patientName = flag.patient ? `${flag.patient.prenom || ""} ${flag.patient.nom || ""}`.trim() : null;
+      return {
+        id: `flag-${flag.id}`,
+        kind: "ALERT",
+        type: flag.type,
+        severity: severityMap[flag.severity] || "INFO",
+        title: titleMap[flag.type] || flag.type,
+        body: flag.message || (patientName ? `Alerte pour ${patientName}` : "Alerte clinique"),
+        entityType: "PATIENT",
+        entityId: flag.patientId,
+        patientName,
+        patientId: flag.patientId,
+        createdAt: flag.createdAt || new Date().toISOString(),
+        readAt: flag.resolvedAt || null,
+        isVirtual: true,
+      };
+    });
   }
 
   // Helper: Convert upcoming appointments to notification-like objects
@@ -5335,27 +5841,29 @@ export async function registerRoutes(
 
     return appointments
       .filter((apt) => {
-        const aptDate = new Date(apt.dateHeure);
+        const aptDate = new Date(apt.dateStart);
         return aptDate >= today && aptDate < dayAfter;
       })
       .map((apt) => {
-        const aptDate = new Date(apt.dateHeure);
+        const aptDate = new Date(apt.dateStart);
         const isToday = aptDate >= today && aptDate < tomorrow;
         const timeStr = aptDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
         
+        const patientName = apt.patient ? `${apt.patient.prenom || ""} ${apt.patient.nom || ""}`.trim() : null;
         return {
           id: `apt-${apt.id}`,
           kind: "REMINDER",
           type: "UPCOMING_APPOINTMENT",
           severity: isToday ? "WARNING" : "INFO",
-          title: isToday ? `RDV aujourd'hui a ${timeStr}` : `RDV demain a ${timeStr}`,
-          body: apt.patient ? `${apt.patient.prenom || ""} ${apt.patient.nom || ""} - ${apt.type}`.trim() : apt.type,
+          title: isToday ? `RDV Aujourd'hui à ${timeStr}` : `RDV Demain à ${timeStr}`,
+          body: patientName ? `${patientName} - ${apt.type}` : apt.type,
           entityType: "APPOINTMENT",
           entityId: apt.id,
+          patientName,
+          patientId: apt.patientId,
           createdAt: apt.createdAt || new Date().toISOString(),
           readAt: null,
           isVirtual: true,
-          patientName: apt.patient ? `${apt.patient.prenom || ""} ${apt.patient.nom || ""}`.trim() : null,
         };
       });
   }
@@ -5387,9 +5895,27 @@ export async function registerRoutes(
       const virtualFromFlags = flagsToNotifications(flags);
       const virtualFromAppointments = appointmentsToNotifications(appointments);
       
+      // Enrich stored notifications with patient info from metadata
+      const enrichedStoredNotifications = result.notifications.map((notif: any) => {
+        let metadata: any = {};
+        try {
+          if (notif.metadata && typeof notif.metadata === 'string') {
+            metadata = JSON.parse(notif.metadata);
+          } else if (notif.metadata) {
+            metadata = notif.metadata;
+          }
+        } catch (e) { /* ignore parse errors */ }
+        
+        return {
+          ...notif,
+          patientName: metadata.patientName || metadata.patientNom || null,
+          patientId: notif.entityType === 'PATIENT' ? notif.entityId : (metadata.patientId || null),
+        };
+      });
+      
       // Merge and sort by date (newest first)
       const allNotifications = [
-        ...result.notifications,
+        ...enrichedStoredNotifications,
         ...virtualFromFlags,
         ...virtualFromAppointments,
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -5433,7 +5959,7 @@ export async function registerRoutes(
       dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
       
       const upcomingAppointmentsCount = appointments.filter((apt: any) => {
-        const aptDate = new Date(apt.dateHeure);
+        const aptDate = new Date(apt.dateStart);
         return aptDate >= today && aptDate < dayAfterTomorrow;
       }).length;
       
@@ -6125,8 +6651,10 @@ export async function registerRoutes(
   app.post("/api/onboarding/checklist/:itemId/mark-done", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
-    const userId = getUserId(req, res);
-    if (!userId) return;
+    const userId = req.jwtUser?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Utilisateur non authentifié" });
+    }
 
     const { itemId } = req.params;
 

@@ -17,17 +17,17 @@ interface FlagBadgeProps {
 const levelConfig = {
   CRITICAL: {
     icon: AlertTriangle,
-    className: "bg-destructive text-destructive-foreground",
+    className: "bg-[hsl(var(--flag-critical-bg))] text-[hsl(var(--flag-critical-foreground))]",
     label: "Critique",
   },
   WARNING: {
     icon: AlertCircle,
-    className: "bg-orange-500 text-white dark:bg-orange-600",
+    className: "bg-[hsl(var(--flag-warning-bg))] text-[hsl(var(--flag-warning-foreground))]",
     label: "Attention",
   },
   INFO: {
     icon: Info,
-    className: "bg-blue-500 text-white dark:bg-blue-600",
+    className: "bg-[hsl(var(--flag-info-bg))] text-[hsl(var(--flag-info-foreground))]",
     label: "Information",
   },
 };
@@ -70,7 +70,7 @@ export function FlagBadge({ flag, showResolve = false, compact = false, onResolv
             <Icon className="w-3 h-3" />
           </Badge>
         </TooltipTrigger>
-        <TooltipContent>
+        <TooltipContent className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg">
           <p className="font-medium">{flag.label}</p>
           {flag.description && <p className="text-xs text-muted-foreground">{flag.description}</p>}
         </TooltipContent>
@@ -90,7 +90,7 @@ export function FlagBadge({ flag, showResolve = false, compact = false, onResolv
         <Icon className="w-3 h-3" />
         <span>{typeLabels[flag.type] || flag.type}</span>
       </Badge>
-      <span className="text-sm text-muted-foreground flex-1">{flag.description || flag.label}</span>
+      <span className="text-xs text-muted-foreground flex-1">{flag.description || flag.label}</span>
       {showResolve && !flag.resolvedAt && (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -172,7 +172,7 @@ export function CompactFlagList({ flags, maxVisible = 3 }: CompactFlagListProps)
               +{remainingCount}
             </Badge>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-sm">
+          <TooltipContent side="bottom" className="max-w-sm z-[99999] bg-white dark:bg-zinc-900 border shadow-lg">
             <div className="space-y-2">
               {remainingFlags.map((flag) => {
                 const IconComponent = levelConfig[flag.level].icon;
@@ -204,9 +204,10 @@ export function CompactFlagList({ flags, maxVisible = 3 }: CompactFlagListProps)
 interface TopFlagSummaryProps {
   topFlag?: TopFlag;
   activeFlagCount?: number;
+  otherFlags?: { type: string; label: string; level: "CRITICAL" | "WARNING" | "INFO" }[];
 }
 
-export function TopFlagSummary({ topFlag, activeFlagCount = 0 }: TopFlagSummaryProps) {
+export function TopFlagSummary({ topFlag, activeFlagCount = 0, otherFlags = [] }: TopFlagSummaryProps) {
   if (!topFlag || activeFlagCount === 0) {
     return null;
   }
@@ -224,18 +225,46 @@ export function TopFlagSummary({ topFlag, activeFlagCount = 0 }: TopFlagSummaryP
             className={`${config.className} gap-1 cursor-default`}
             data-testid="top-flag-badge"
           >
-            <Icon className="w-3 h-3" />
-            <span className="text-xs">{typeLabel}</span>
+            <Icon className="w-2.5 h-2.5" />
+            <span className="text-[10px]">{typeLabel}</span>
           </Badge>
         </TooltipTrigger>
-        <TooltipContent>
-          <p className="font-medium">{topFlag.label}</p>
+        <TooltipContent className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg">
+          <p className="font-medium text-xs">{topFlag.label}</p>
         </TooltipContent>
       </Tooltip>
       {activeFlagCount > 1 && (
-        <Badge variant="outline" className="text-xs">
-          +{activeFlagCount - 1}
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="outline" className="text-[10px] cursor-default">
+              +{activeFlagCount - 1}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="z-[99999] bg-white dark:bg-zinc-900 border shadow-lg max-w-xs">
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground mb-1">Autres alertes :</p>
+              {otherFlags.length > 0 ? (
+                otherFlags.map((flag, idx) => {
+                  const flagConfig = levelConfig[flag.level];
+                  const FlagIcon = flagConfig.icon;
+                  const flagLabel = typeLabels[flag.type] || flag.label;
+                  return (
+                    <div key={idx} className="flex items-center gap-1">
+                      <Badge variant="secondary" className={`${flagConfig.className} gap-1 text-[10px]`}>
+                        <FlagIcon className="w-2 h-2" />
+                        {flagLabel}
+                      </Badge>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-[10px] text-muted-foreground">
+                  {activeFlagCount - 1} alerte{activeFlagCount > 2 ? "s" : ""} supplémentaire{activeFlagCount > 2 ? "s" : ""}
+                </p>
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );
@@ -276,7 +305,7 @@ export function FlagsTooltipBadge({ flags, variant = "default" }: FlagsTooltipBa
           <span className="text-xs">{flags.length}</span>
         </Badge>
       </TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-xs">
+      <TooltipContent side="bottom" className="max-w-xs z-[99999] bg-white dark:bg-zinc-900 border shadow-lg">
         <div className="space-y-2">
           {sortedFlags.map((flag) => {
             const config = levelConfig[flag.level];

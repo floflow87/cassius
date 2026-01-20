@@ -58,6 +58,13 @@ const implantSchema = z.object({
   isqPose: z.number().min(0).max(100).optional(),
 });
 
+const protheseSchema = z.object({
+  typeProthese: z.enum(["vissee", "scellee"]),
+  quantite: z.enum(["unitaire", "plurale"]),
+  mobilite: z.enum(["amovible", "fixe"]),
+  typePilier: z.enum(["multi_unit", "droit", "angule"]),
+});
+
 const formSchema = z.object({
   dateOperation: z.string().min(1, "La date est requise"),
   typeIntervention: z.enum([
@@ -79,6 +86,8 @@ const formSchema = z.object({
   notesPerop: z.string().optional(),
   observationsPostop: z.string().optional(),
   implants: z.array(implantSchema).default([]),
+  hasProthese: z.boolean().default(false),
+  prothese: protheseSchema.optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -120,6 +129,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
       typeIntervention: "POSE_IMPLANT",
       greffeOsseuse: false,
       implants: [],
+      hasProthese: false,
     },
   });
 
@@ -143,6 +153,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
   }, [defaultImplant, append, fields.length]);
 
   const watchGreffeOsseuse = form.watch("greffeOsseuse");
+  const watchHasProthese = form.watch("hasProthese");
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -229,8 +240,8 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
           className="w-full"
         >
           <AccordionItem value="procedure" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-base font-medium">
-              Procédure
+            <AccordionTrigger className="text-sm font-medium">
+              Intervention
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">
               <div className="grid grid-cols-2 gap-4">
@@ -345,7 +356,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
           </AccordionItem>
 
           <AccordionItem value="implants" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-base font-medium">
+            <AccordionTrigger className="text-sm font-medium">
               Implants ({fields.length})
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">
@@ -601,7 +612,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
           </AccordionItem>
 
           <AccordionItem value="greffe" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-base font-medium">
+            <AccordionTrigger className="text-sm font-medium">
               Greffe osseuse
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">
@@ -609,14 +620,11 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                 control={form.control}
                 name="greffeOsseuse"
                 render={({ field }) => (
-                  <FormItem 
-                    className="flex flex-row items-center justify-between rounded-lg border p-3 cursor-pointer"
-                    onClick={() => field.onChange(!field.value)}
-                  >
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                     <div className="space-y-0.5 flex items-center gap-2">
                       <Plus className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <FormLabel className="cursor-pointer">Greffe osseuse réalisée</FormLabel>
+                        <FormLabel>Greffe osseuse réalisée</FormLabel>
                         <FormDescription>
                           Indiquez si une greffe a été effectuée
                         </FormDescription>
@@ -691,8 +699,130 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
             </AccordionContent>
           </AccordionItem>
 
+          <AccordionItem value="prothese" className="border border-primary/20 rounded-md px-4 mb-2">
+            <AccordionTrigger className="text-sm font-medium">
+              Prothèse
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pt-4">
+              <FormField
+                control={form.control}
+                name="hasProthese"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5 flex items-center gap-2">
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <FormLabel>Prothèse associée</FormLabel>
+                        <FormDescription>
+                          Indiquez si une prothèse est associée à cet acte
+                        </FormDescription>
+                      </div>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-prothese"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {watchHasProthese && (
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="prothese.typeProthese"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Type de prothèse</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-type-prothese">
+                              <SelectValue placeholder="Sélectionner..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="vissee">Vissée</SelectItem>
+                            <SelectItem value="scellee">Scellée</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="prothese.quantite"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantité</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-quantite-prothese">
+                              <SelectValue placeholder="Sélectionner..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="unitaire">Unitaire</SelectItem>
+                            <SelectItem value="plurale">Plurale</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="prothese.mobilite"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mobilité</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-mobilite-prothese">
+                              <SelectValue placeholder="Sélectionner..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="amovible">Amovible</SelectItem>
+                            <SelectItem value="fixe">Fixe</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="prothese.typePilier"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Type de pilier</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-pilier-prothese">
+                              <SelectValue placeholder="Sélectionner..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="multi_unit">Multi-unit</SelectItem>
+                            <SelectItem value="droit">Droit</SelectItem>
+                            <SelectItem value="angule">Angulé</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+
           <AccordionItem value="notes" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-base font-medium">
+            <AccordionTrigger className="text-sm font-medium">
               Notes cliniques
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-4">

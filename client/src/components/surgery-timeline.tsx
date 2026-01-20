@@ -8,6 +8,7 @@ import type { OperationTimeline, TimelineEvent } from "@shared/types";
 
 interface SurgeryTimelineProps {
   operationId: string;
+  patientId: string;
 }
 
 const typeIcons = {
@@ -30,7 +31,7 @@ const stabilityConfig = {
   high: { label: "Élevée", variant: "default" as const },
 };
 
-export function SurgeryTimeline({ operationId }: SurgeryTimelineProps) {
+export function SurgeryTimeline({ operationId, patientId }: SurgeryTimelineProps) {
   const { data: timeline, isLoading } = useQuery<OperationTimeline>({
     queryKey: ["/api/operations", operationId, "timeline"],
   });
@@ -58,8 +59,8 @@ export function SurgeryTimeline({ operationId }: SurgeryTimelineProps) {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">Aucun événement</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-base font-medium mb-2">Aucun événement</h3>
+          <p className="text-xs text-muted-foreground">
             L'historique de cet acte apparaîtra ici
           </p>
         </CardContent>
@@ -84,21 +85,21 @@ export function SurgeryTimeline({ operationId }: SurgeryTimelineProps) {
     
     if (delta > 0) {
       return (
-        <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-mono text-sm">
+        <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-mono text-xs">
           <TrendingUp className="h-3 w-3" />
           +{delta}
         </span>
       );
     } else if (delta < 0) {
       return (
-        <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-mono text-sm">
+        <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-mono text-xs">
           <TrendingDown className="h-3 w-3" />
           {delta}
         </span>
       );
     }
     return (
-      <span className="flex items-center gap-1 text-muted-foreground font-mono text-sm">
+      <span className="flex items-center gap-1 text-muted-foreground font-mono text-xs">
         <Minus className="h-3 w-3" />
         0
       </span>
@@ -109,7 +110,7 @@ export function SurgeryTimeline({ operationId }: SurgeryTimelineProps) {
     <div className="space-y-6">
       {Object.entries(groupedEvents).map(([monthYear, monthEvents]) => (
         <div key={monthYear}>
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
             {monthYear}
           </h3>
           <div className="space-y-3">
@@ -130,41 +131,41 @@ export function SurgeryTimeline({ operationId }: SurgeryTimelineProps) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-medium">{event.title}</h4>
-                          <Badge variant={isFuture ? "default" : "outline"} className="text-xs">
+                          <h4 className="font-medium text-xs">{event.title}</h4>
+                          <Badge variant={isFuture ? "default" : "outline"} className="text-[10px]">
                             {typeLabels[event.type]}
                           </Badge>
                           {isFuture && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="secondary" className="text-[10px]">
                               À venir
                             </Badge>
                           )}
                         </div>
                         
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-[10px] text-muted-foreground mt-1">
                           {formatDate(event.at)}
                         </p>
                         
                         {event.description && (
-                          <p className="text-sm mt-2 line-clamp-2">{event.description}</p>
+                          <p className="text-xs mt-2 line-clamp-2">{event.description}</p>
                         )}
                         
                         {(event.type === "ISQ" || event.type === "VISIT") && (
                           <div className="flex items-center gap-3 mt-2 flex-wrap">
                             {event.siteFdi && (
-                              <span className="text-sm text-muted-foreground">
+                              <span className="text-xs text-muted-foreground">
                                 Site {event.siteFdi}
                               </span>
                             )}
                             {event.value !== undefined ? (
                               <>
-                                <span className="font-mono font-medium">
+                                <span className="font-mono font-medium text-xs">
                                   ISQ: {event.value}
                                 </span>
                                 {event.stability && (
                                   <Badge 
                                     variant={stabilityConfig[event.stability].variant}
-                                    className="text-xs"
+                                    className="text-[10px]"
                                   >
                                     {stabilityConfig[event.stability].label}
                                   </Badge>
@@ -172,7 +173,7 @@ export function SurgeryTimeline({ operationId }: SurgeryTimelineProps) {
                                 {event.delta !== undefined && renderDelta(event.delta)}
                               </>
                             ) : (
-                              <span className="text-sm text-muted-foreground italic">
+                              <span className="text-xs text-muted-foreground italic">
                                 Pas de mesure ISQ
                               </span>
                             )}
@@ -180,15 +181,15 @@ export function SurgeryTimeline({ operationId }: SurgeryTimelineProps) {
                         )}
                         
                         {event.implantLabel && event.type !== "ISQ" && (
-                          <p className="text-sm text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Implant: {event.implantLabel}
                           </p>
                         )}
                         
-                        {event.surgeryImplantId && (
-                          <Link href={`/implants/${event.surgeryImplantId}`}>
+                        {event.surgeryImplantId && patientId && (
+                          <Link href={`/patients/${patientId}/implants/${event.surgeryImplantId}`}>
                             <span 
-                              className="text-sm text-primary hover:underline cursor-pointer mt-1 inline-block"
+                              className="text-xs text-primary hover:underline cursor-pointer mt-1 inline-block"
                               data-testid={`link-implant-${event.surgeryImplantId}`}
                             >
                               Voir l'implant

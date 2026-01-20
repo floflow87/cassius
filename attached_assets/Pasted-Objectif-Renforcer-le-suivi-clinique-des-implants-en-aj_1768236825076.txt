@@ -1,0 +1,161 @@
+Objectif
+Renforcer le suivi clinique des implants en ajoutant :
+1) des remarques structurées sur les radios
+2) des suggestions de changement de statut d’implant basées sur l’ISQ
+3) un système de motifs (succès / complication / échec) avec des valeurs system pré-configurées + motifs custom
+
+Contraintes produit importantes
+- Les radios sont accessibles :
+  - depuis l’onglet “Radios” de la fiche patient
+  - depuis la page “Documents”
+- Une radio ne doit avoir qu’UN seul point d’édition.
+- Toute édition (nom, notes, etc.) doit se faire via un **panneau latéral (drawer)** ouvert depuis le menu “…” de la radio.
+- Le système doit rester simple côté UI, mais structuré côté données.
+
+---
+
+A) Notes / remarques sur les radios (MVP)
+
+1) Modèle de données
+Créer table `radio_notes` :
+- id
+- organisation_id
+- radio_id
+- author_id
+- body TEXT
+- created_at
+- updated_at
+
+(optionnel plus tard : tags, visibilité)
+
+2) API
+- GET /api/radios/:id/notes
+- POST /api/radios/:id/notes { body }
+- DELETE / PATCH si nécessaire
+
+3) UX
+- Dans les listes radios (patient + documents) :
+  - menu “…” → “Modifier”
+- Ouvre un **drawer latéral unique** contenant :
+  - Nom du document (editable)
+  - Métadonnées (date, type)
+  - Section “Remarques”
+    - liste chronologique
+    - ajout rapide
+    - auteur + date visibles
+- Les notes sont visibles depuis les deux contextes car liées à la radio, pas à la vue.
+
+---
+
+B) Motifs de statut implant (avec valeurs system)
+
+1) Table motifs
+Créer table `implant_status_reasons` :
+- id
+- organisation_id (NULL = system)
+- status ENUM ('SUCCES','COMPLICATION','ECHEC')
+- code TEXT (stable, ex: ISQ_LOW)
+- label TEXT (ex: "ISQ faible")
+- is_system BOOLEAN DEFAULT false
+- is_active BOOLEAN DEFAULT true
+- created_at
+
+2) Seed de motifs system (OBLIGATOIRE)
+À créer via migration :
+
+SUCCES
+- SUCCESS_OSSEOINTEGRATION → "Ostéo-intégration confirmée"
+- SUCCESS_PROSTHESIS → "Prothèse posée avec succès"
+- SUCCESS_STABLE_ISQ → "ISQ stable et satisfaisant"
+
+COMPLICATION
+- ISQ_LOW → "ISQ faible"
+- ISQ_DECLINING → "ISQ en diminution"
+- INFECTION → "Infection"
+- PAIN → "Douleur persistante"
+- MOBILITY → "Mobilité de l’implant"
+- RADIO_ANOMALY → "Anomalie radiologique"
+
+ECHEC
+- FAILURE_NO_OSSEOINTEGRATION → "Absence d’ostéo-intégration"
+- FAILURE_IMPLANT_LOST → "Implant perdu / déposé"
+- FAILURE_MOBILITY → "Mobilité irréversible"
+
+3) Motifs custom
+- POST /api/implants/status-reasons
+  { status, label }
+→ crée un motif custom (organisation_id renseigné)
+→ automatiquement sélectionné dans le select
+
+---
+
+C) Historique de statut implant
+
+Créer table `implant_status_history` :
+- id
+- implant_id
+- from_status
+- to_status
+- reason_id (FK implant_status_reasons)
+- reason_free_text (nullable)
+- evidence JSONB (ISQ, radioId, visitId…)
+- changed_by
+- changed_at
+
+API :
+PATCH /api/implants/:id/status
+{
+  toStatus,
+  reasonId?,
+  reasonText?,
+  evidence?,
+  radioId?,
+  visitId?
+}
+
+---
+
+D) Suggestions de changement de statut basées sur ISQ (assistant clinique)
+
+1) Endpoint
+GET /api/implants/:id/status-suggestions
+
+2) Règles MVP
+- Si dernier ISQ < seuil (ex 60) → suggérer COMPLICATION
+  motif par défaut : ISQ_LOW
+- Si baisse ISQ >= X points sur Y jours → COMPLICATION
+  motif : ISQ_DECLINING
+- Si aucun ISQ depuis > 90 jours → suggestion ACTION
+  (pas changement statut)
+- Si implant >= X jours + ISQ stable >= seuil sur ≥ 2 mesures
+  → suggérer SUCCES
+  motif : SUCCESS_STABLE_ISQ
+
+3) Réponse API
+Inclure :
+- toStatus
+- confidence (low / medium / high)
+- message clinique lisible
+- evidence (valeurs ISQ, dates, seuils)
+- defaultReasonCode
+
+4) UX
+- Dans la fiche implant : bloc “Suggestions”
+- Bouton “Appliquer”
+→ ouvre le modal de changement de statut
+→ statut + motif pré-sélectionnés
+→ possibilité de changer le motif ou en créer un nouveau
+
+---
+
+Contraintes
+- Multi-organisation stricte
+- Aucune décision automatique
+- Audit trail complet
+- RGPD OK (notes radios traçables)
+
+Livrables attendus
+- Motifs system disponibles dès le départ
+- Drawer radio unique, accessible depuis patient + documents
+- Suggestions de statut basées ISQ visibles et actionnables
+- Motifs custom persistants et réutilisables

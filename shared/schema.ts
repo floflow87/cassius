@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum, bigint, integer, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, date, timestamp, real, boolean, pgEnum, bigint, integer, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -49,6 +49,8 @@ export const roleEnum = pgEnum("role", ["CHIRURGIEN", "ASSISTANT", "ADMIN"]);
 // Enums pour les prothèses supra-implantaires
 export const typeProtheseEnum = pgEnum("type_prothese", ["VISSEE", "SCELLEE"]);
 export const typePilierEnum = pgEnum("type_pilier", ["DROIT", "ANGULE", "MULTI_UNIT"]);
+export const quantiteProtheseEnum = pgEnum("quantite_prothese", ["UNITAIRE", "PLURALE"]);
+export const mobiliteProtheseEnum = pgEnum("mobilite_prothese", ["AMOVIBLE", "FIXE"]);
 export const typeNoteTagEnum = pgEnum("type_note_tag", ["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"]);
 export const typeRendezVousTagEnum = pgEnum("type_rdv_tag", ["CONSULTATION", "SUIVI", "CHIRURGIE"]);
 
@@ -90,7 +92,7 @@ export const syncConflictSourceEnum = pgEnum("sync_conflict_source", [
 ]);
 export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSENTEMENT", "COMPTE_RENDU", "ASSURANCE", "AUTRE"]);
 export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
-export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT"]);
+export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT", "PROTHESE"]);
 
 export const savedFilterPageTypeEnum = pgEnum("saved_filter_page_type", ["patients", "implants", "actes"]);
 
@@ -194,6 +196,11 @@ export const implants = pgTable("implants", {
   longueur: real("longueur").notNull(),
   lot: text("lot"), // Numéro de lot fabricant
   notes: text("notes"), // Notes générales sur ce type d'implant
+  // Champs spécifiques aux prothèses (optionnels, utilisés uniquement quand typeImplant = PROTHESE)
+  typeProthese: typeProtheseEnum("type_prothese"), // vissée, scellée
+  quantite: quantiteProtheseEnum("quantite"), // unitaire, plurale
+  mobilite: mobiliteProtheseEnum("mobilite"), // amovible, fixe
+  typePilier: typePilierEnum("type_pilier"), // multi-unit, droit, angulé
 });
 
 export const implantsRelations = relations(implants, ({ one, many }) => ({
@@ -553,6 +560,45 @@ export const insertAppointmentExternalLinkSchema = createInsertSchema(appointmen
 });
 export type InsertAppointmentExternalLink = z.infer<typeof insertAppointmentExternalLinkSchema>;
 export type AppointmentExternalLink = typeof appointmentExternalLinks.$inferSelect;
+
+// Table appointment_radios - Links radios to appointments (many-to-many)
+export const appointmentRadios = pgTable("appointment_radios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  appointmentId: varchar("appointment_id").notNull().references(() => appointments.id, { onDelete: "cascade" }),
+  radioId: varchar("radio_id").notNull().references(() => radios.id, { onDelete: "cascade" }),
+  linkedBy: varchar("linked_by").references(() => users.id, { onDelete: "set null" }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("appointment_radios_unique_idx").on(table.appointmentId, table.radioId),
+]);
+
+export const appointmentRadiosRelations = relations(appointmentRadios, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [appointmentRadios.organisationId],
+    references: [organisations.id],
+  }),
+  appointment: one(appointments, {
+    fields: [appointmentRadios.appointmentId],
+    references: [appointments.id],
+  }),
+  radio: one(radios, {
+    fields: [appointmentRadios.radioId],
+    references: [radios.id],
+  }),
+  linkedByUser: one(users, {
+    fields: [appointmentRadios.linkedBy],
+    references: [users.id],
+  }),
+}));
+
+export const insertAppointmentRadioSchema = createInsertSchema(appointmentRadios).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAppointmentRadio = z.infer<typeof insertAppointmentRadioSchema>;
+export type AppointmentRadio = typeof appointmentRadios.$inferSelect;
 
 // Table google_calendar_events - Imported Google Calendar events for V2 bidirectional sync
 export const googleCalendarEvents = pgTable("google_calendar_events", {
@@ -1237,7 +1283,146 @@ export const onboardingStateRelations = relations(onboardingState, ({ one }) => 
   }),
 }));
 
+// ============================================
+// RADIO NOTES - Remarques sur les radios
+// ============================================
+
+export const radioNotes = pgTable("radio_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  radioId: varchar("radio_id").notNull().references(() => radios.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const radioNotesRelations = relations(radioNotes, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [radioNotes.organisationId],
+    references: [organisations.id],
+  }),
+  radio: one(radios, {
+    fields: [radioNotes.radioId],
+    references: [radios.id],
+  }),
+  author: one(users, {
+    fields: [radioNotes.authorId],
+    references: [users.id],
+  }),
+}));
+
+// ============================================
+// IMPLANT STATUS REASONS - Motifs de statut
+// ============================================
+
+export const implantStatusReasons = pgTable("implant_status_reasons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").references(() => organisations.id, { onDelete: "cascade" }), // NULL = system
+  status: statutImplantEnum("status").notNull(), // SUCCES, COMPLICATION, ECHEC
+  code: text("code").notNull(), // Stable code like ISQ_LOW
+  label: text("label").notNull(), // Human-readable label
+  isSystem: boolean("is_system").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const implantStatusReasonsRelations = relations(implantStatusReasons, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [implantStatusReasons.organisationId],
+    references: [organisations.id],
+  }),
+}));
+
+// ============================================
+// IMPLANT STATUS HISTORY - Historique des statuts
+// ============================================
+
+export const implantStatusHistory = pgTable("implant_status_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  implantId: varchar("implant_id").notNull().references(() => surgeryImplants.id, { onDelete: "cascade" }),
+  fromStatus: statutImplantEnum("from_status"),
+  toStatus: statutImplantEnum("to_status").notNull(),
+  reasonId: varchar("reason_id").references(() => implantStatusReasons.id, { onDelete: "set null" }),
+  reasonFreeText: text("reason_free_text"),
+  evidence: text("evidence"), // JSON string with ISQ, radioId, visitId, etc.
+  changedByUserId: varchar("changed_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+});
+
+export const implantStatusHistoryRelations = relations(implantStatusHistory, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [implantStatusHistory.organisationId],
+    references: [organisations.id],
+  }),
+  implant: one(surgeryImplants, {
+    fields: [implantStatusHistory.implantId],
+    references: [surgeryImplants.id],
+  }),
+  reason: one(implantStatusReasons, {
+    fields: [implantStatusHistory.reasonId],
+    references: [implantStatusReasons.id],
+  }),
+  changedBy: one(users, {
+    fields: [implantStatusHistory.changedByUserId],
+    references: [users.id],
+  }),
+}));
+
+// ============================================
+// IMPLANT MEASUREMENTS - Source de vérité ISQ
+// ============================================
+
+export const measurementTypeEnum = pgEnum("measurement_type", ["POSE", "FOLLOW_UP", "CONTROL", "EMERGENCY"]);
+
+export const implantMeasurements = pgTable("implant_measurements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  surgeryImplantId: varchar("surgery_implant_id").notNull().references(() => surgeryImplants.id, { onDelete: "cascade" }),
+  appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  type: measurementTypeEnum("type").notNull(),
+  isqValue: real("isq_value"),
+  isqStability: text("isq_stability"), // low, moderate, high
+  boneLossScore: integer("bone_loss_score"),
+  notes: text("notes"),
+  measuredAt: timestamp("measured_at").notNull(),
+  measuredByUserId: varchar("measured_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+}, (table) => [
+  index("idx_implant_measurements_org").on(table.organisationId),
+  index("idx_implant_measurements_implant").on(table.surgeryImplantId),
+  index("idx_implant_measurements_appointment").on(table.appointmentId),
+  index("idx_implant_measurements_measured_at").on(table.measuredAt),
+]);
+
+export const implantMeasurementsRelations = relations(implantMeasurements, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [implantMeasurements.organisationId],
+    references: [organisations.id],
+  }),
+  surgeryImplant: one(surgeryImplants, {
+    fields: [implantMeasurements.surgeryImplantId],
+    references: [surgeryImplants.id],
+  }),
+  appointment: one(appointments, {
+    fields: [implantMeasurements.appointmentId],
+    references: [appointments.id],
+  }),
+  measuredBy: one(users, {
+    fields: [implantMeasurements.measuredByUserId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas for new tables
+export const insertImplantMeasurementSchema = createInsertSchema(implantMeasurements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertEmailTokenSchema = createInsertSchema(emailTokens).omit({
   id: true,
   createdAt: true,
@@ -1279,6 +1464,22 @@ export const insertOnboardingStateSchema = createInsertSchema(onboardingState).o
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertRadioNoteSchema = createInsertSchema(radioNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertImplantStatusReasonSchema = createInsertSchema(implantStatusReasons).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertImplantStatusHistorySchema = createInsertSchema(implantStatusHistory).omit({
+  id: true,
+  changedAt: true,
 });
 
 export type InsertOrganisation = z.infer<typeof insertOrganisationSchema>;
@@ -1355,6 +1556,18 @@ export type PatientShareLink = typeof patientShareLinks.$inferSelect;
 
 export type InsertOnboardingState = z.infer<typeof insertOnboardingStateSchema>;
 export type OnboardingState = typeof onboardingState.$inferSelect;
+
+export type InsertRadioNote = z.infer<typeof insertRadioNoteSchema>;
+export type RadioNote = typeof radioNotes.$inferSelect;
+
+export type InsertImplantStatusReason = z.infer<typeof insertImplantStatusReasonSchema>;
+export type ImplantStatusReason = typeof implantStatusReasons.$inferSelect;
+
+export type InsertImplantStatusHistory = z.infer<typeof insertImplantStatusHistorySchema>;
+export type ImplantStatusHistory = typeof implantStatusHistory.$inferSelect;
+
+export type InsertImplantMeasurement = z.infer<typeof insertImplantMeasurementSchema>;
+export type ImplantMeasurement = typeof implantMeasurements.$inferSelect;
 
 // Onboarding data interface
 export interface OnboardingData {
@@ -1437,3 +1650,54 @@ export interface PublicPatientShareData {
   sharedByUserName: string;
   createdAt: string;
 }
+
+// Radio note with author details
+export interface RadioNoteWithAuthor extends RadioNote {
+  authorNom?: string | null;
+  authorPrenom?: string | null;
+}
+
+// Implant status suggestion from clinical assistant
+export interface ImplantStatusSuggestion {
+  toStatus: "SUCCES" | "COMPLICATION" | "ECHEC";
+  confidence: "low" | "medium" | "high";
+  message: string;
+  evidence: {
+    latestIsq?: number;
+    isqDelta?: number;
+    daysSinceLastIsq?: number;
+    daysSincePose?: number;
+    isqHistory?: Array<{ value: number; date: string }>;
+  };
+  defaultReasonCode: string;
+}
+
+// Implant status history with details
+export interface ImplantStatusHistoryWithDetails extends ImplantStatusHistory {
+  reasonLabel?: string | null;
+  reasonCode?: string | null;
+  changedByNom?: string | null;
+  changedByPrenom?: string | null;
+}
+
+// System status reason codes
+export const SYSTEM_STATUS_REASONS = {
+  SUCCES: [
+    { code: "SUCCESS_OSSEOINTEGRATION", label: "Ostéo-intégration confirmée" },
+    { code: "SUCCESS_PROSTHESIS", label: "Prothèse posée avec succès" },
+    { code: "SUCCESS_STABLE_ISQ", label: "ISQ stable et satisfaisant" },
+  ],
+  COMPLICATION: [
+    { code: "ISQ_LOW", label: "ISQ faible" },
+    { code: "ISQ_DECLINING", label: "ISQ en diminution" },
+    { code: "INFECTION", label: "Infection" },
+    { code: "PAIN", label: "Douleur persistante" },
+    { code: "MOBILITY", label: "Mobilité de l'implant" },
+    { code: "RADIO_ANOMALY", label: "Anomalie radiologique" },
+  ],
+  ECHEC: [
+    { code: "FAILURE_NO_OSSEOINTEGRATION", label: "Absence d'ostéo-intégration" },
+    { code: "FAILURE_IMPLANT_LOST", label: "Implant perdu / déposé" },
+    { code: "FAILURE_MOBILITY", label: "Mobilité irréversible" },
+  ],
+} as const;
