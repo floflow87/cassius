@@ -1327,16 +1327,17 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const [surgeryImplant, flagSummary] = await Promise.all([
+      const [surgeryImplant, flagSummary, visitMeasurements] = await Promise.all([
         storage.getSurgeryImplantWithDetails(organisationId, req.params.id),
         storage.getSurgeryImplantFlagSummary(organisationId, req.params.id),
+        storage.getImplantMeasurements(organisationId, req.params.id),
       ]);
       if (!surgeryImplant) {
         return res.status(404).json({ error: "Implant not found" });
       }
       res.json({
         ...surgeryImplant,
-        latestIsq: computeLatestIsq(surgeryImplant),
+        latestIsq: computeLatestIsq(surgeryImplant, visitMeasurements),
         topFlag: flagSummary.topFlag,
         activeFlagCount: flagSummary.activeFlagCount,
       });

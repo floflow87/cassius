@@ -4860,22 +4860,57 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Helper function to compute latest ISQ from surgery implant fields
-export function computeLatestIsq(surgeryImplant: SurgeryImplant): LatestIsq | undefined {
-  // Check in order: 6m > 3m > 2m > pose
-  if (surgeryImplant.isq6m !== null && surgeryImplant.isq6m !== undefined) {
-    return { value: surgeryImplant.isq6m, label: "6m" };
-  }
-  if (surgeryImplant.isq3m !== null && surgeryImplant.isq3m !== undefined) {
-    return { value: surgeryImplant.isq3m, label: "3m" };
+// Helper function to compute latest ISQ from surgery implant fields AND visit measurements
+export function computeLatestIsq(
+  surgeryImplant: SurgeryImplant, 
+  visitMeasurements?: Array<{ isqValue: number | null; measuredAt: Date | string }>
+): LatestIsq | undefined {
+  // Collect all ISQ values with their estimated dates
+  const isqEntries: Array<{ value: number; label: string; date: Date }> = [];
+  
+  const datePose = surgeryImplant.datePose ? new Date(surgeryImplant.datePose) : new Date();
+  
+  // Add implant field ISQs with estimated dates
+  if (surgeryImplant.isqPose !== null && surgeryImplant.isqPose !== undefined) {
+    isqEntries.push({ value: surgeryImplant.isqPose, label: "pose", date: datePose });
   }
   if (surgeryImplant.isq2m !== null && surgeryImplant.isq2m !== undefined) {
-    return { value: surgeryImplant.isq2m, label: "2m" };
+    const date2m = new Date(datePose);
+    date2m.setMonth(date2m.getMonth() + 2);
+    isqEntries.push({ value: surgeryImplant.isq2m, label: "2m", date: date2m });
   }
-  if (surgeryImplant.isqPose !== null && surgeryImplant.isqPose !== undefined) {
-    return { value: surgeryImplant.isqPose, label: "pose" };
+  if (surgeryImplant.isq3m !== null && surgeryImplant.isq3m !== undefined) {
+    const date3m = new Date(datePose);
+    date3m.setMonth(date3m.getMonth() + 3);
+    isqEntries.push({ value: surgeryImplant.isq3m, label: "3m", date: date3m });
   }
-  return undefined;
+  if (surgeryImplant.isq6m !== null && surgeryImplant.isq6m !== undefined) {
+    const date6m = new Date(datePose);
+    date6m.setMonth(date6m.getMonth() + 6);
+    isqEntries.push({ value: surgeryImplant.isq6m, label: "6m", date: date6m });
+  }
+  
+  // Add visit measurements with their actual dates
+  if (visitMeasurements && visitMeasurements.length > 0) {
+    for (const m of visitMeasurements) {
+      if (m.isqValue !== null && m.isqValue !== undefined) {
+        const measureDate = new Date(m.measuredAt);
+        // Calculate months since pose for label
+        const monthsDiff = Math.round((measureDate.getTime() - datePose.getTime()) / (30 * 24 * 60 * 60 * 1000));
+        const label = monthsDiff <= 0 ? "pose" : `+${monthsDiff}m`;
+        isqEntries.push({ value: m.isqValue, label, date: measureDate });
+      }
+    }
+  }
+  
+  if (isqEntries.length === 0) {
+    return undefined;
+  }
+  
+  // Sort by date descending and return the most recent
+  isqEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
+  const latest = isqEntries[0];
+  return { value: latest.value, label: latest.label };
 }
 
 export const storage = new DatabaseStorage();
