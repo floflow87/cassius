@@ -657,7 +657,7 @@ export default function StatsPage() {
                         setSearchOpen(false);
                       }
                     }}
-                    className="pl-9 bg-white dark:bg-zinc-900"
+                    className="pl-9 bg-white dark:bg-zinc-900 placeholder-xs"
                     data-testid="input-stats-search"
                   />
                 </div>
