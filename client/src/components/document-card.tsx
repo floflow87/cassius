@@ -225,13 +225,13 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
                 <Badge 
                   key={tag} 
                   variant="secondary" 
-                  className={`text-xs ${TAG_COLORS[tag] || TAG_COLORS.AUTRE}`}
+                  className={`text-[10px] ${TAG_COLORS[tag] || TAG_COLORS.AUTRE}`}
                 >
                   {TAG_LABELS[tag] || tag}
                 </Badge>
               ))}
               {document.tags.length > 2 && (
-                <Badge variant="secondary" className="text-xs">+{document.tags.length - 2}</Badge>
+                <Badge variant="secondary" className="text-[10px]">+{document.tags.length - 2}</Badge>
               )}
             </div>
           )}

@@ -120,7 +120,7 @@ function MiniCalendar({ selectedDate, onDateSelect, appointments }: MiniCalendar
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="text-sm font-medium">
+        <span className="text-xs font-medium">
           {format(viewMonth, "MMMM yyyy", { locale: fr })}
         </span>
         <Button 
@@ -152,7 +152,7 @@ function MiniCalendar({ selectedDate, onDateSelect, appointments }: MiniCalendar
               key={i}
               onClick={() => onDateSelect(d)}
               className={`
-                relative py-1.5 text-xs rounded-md transition-colors
+                relative py-1.5 text-[10px] rounded-md transition-colors cursor-pointer
                 ${!isCurrentMonth ? "text-muted-foreground/50" : ""}
                 ${isSelected ? "bg-primary text-primary-foreground" : "hover-elevate"}
                 ${isToday && !isSelected ? "font-bold text-primary" : ""}
@@ -1897,7 +1897,7 @@ export default function CalendarPage() {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <span className="text-lg font-medium" data-testid="text-calendar-title">
+            <span className="text-base font-medium" data-testid="text-calendar-title">
               {format(selectedDate, "MMMM yyyy", { locale: fr })}
             </span>
           </div>
@@ -1924,7 +1924,7 @@ export default function CalendarPage() {
               ].map(v => (
                 <button
                   key={v.key}
-                  className="relative px-3 py-1.5 text-sm font-medium rounded-full transition-colors"
+                  className="relative px-3 py-1.5 text-xs font-medium rounded-full transition-colors"
                   onClick={() => changeView(v.key as typeof currentView)}
                   data-testid={`button-view-${v.key}`}
                 >

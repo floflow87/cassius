@@ -1492,7 +1492,7 @@ export default function PatientDetailsPage() {
               return null;
             })()}
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {calculateAge(patient.dateNaissance)} ans - Depuis {new Date(patient.createdAt).getFullYear()}
           </p>
         </div>
@@ -2726,6 +2726,7 @@ export default function PatientDetailsPage() {
                   onChange={(e) => setNoteContent(e.target.value)}
                   placeholder="Saisissez votre note ici..."
                   rows={4}
+                  className="text-xs placeholder:text-[10px]"
                   data-testid="input-note-content"
                 />
               </div>
@@ -2743,7 +2744,7 @@ export default function PatientDetailsPage() {
           </Card>
 
           <div className="space-y-4">
-            <h3 className="text-base font-semibold">Historique</h3>
+            <h3 className="text-sm font-semibold">Historique</h3>
             {notesLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
@@ -2806,17 +2807,17 @@ export default function PatientDetailsPage() {
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-xs">{authorName}</span>
+                                  <span className="font-medium text-[10px]">{authorName}</span>
                                   {tagConfig && (
-                                    <Badge variant="secondary" className={`text-[10px] ${tagConfig.className}`}>
+                                    <Badge variant="secondary" className={`text-[9px] ${tagConfig.className}`}>
                                       {tagConfig.label}
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-[10px] text-muted-foreground mb-3">
+                                <p className="text-[9px] text-muted-foreground mb-2">
                                   {formatNoteDatetime(note.createdAt)}
                                 </p>
-                                <p className="text-xs text-foreground whitespace-pre-wrap">
+                                <p className="text-[10px] text-foreground whitespace-pre-wrap">
                                   {note.contenu}
                                 </p>
                               </div>

@@ -490,6 +490,15 @@
 .fc .fc-col-header-cell-cushion {
   color: hsl(var(--foreground));
   text-decoration: none;
+  font-size: 0.75rem;
+}
+
+.fc .fc-daygrid-day {
+  cursor: pointer;
+}
+
+.fc .fc-timegrid-slot {
+  cursor: pointer;
 }
 
 .fc .fc-timegrid-slot-label {

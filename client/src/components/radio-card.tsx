@@ -153,7 +153,7 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
               <FileImage className="h-12 w-12 text-muted-foreground" />
             </div>
           )}
-          <Badge variant="secondary" className="absolute top-2 left-2">
+          <Badge variant="secondary" className="absolute top-2 left-2 text-[10px]">
             {typeLabels[radio.type] || radio.type}
           </Badge>
         </div>

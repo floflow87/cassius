@@ -53,6 +53,7 @@ import type { FilterRule, PatientSearchResult, TopFlag } from "@shared/types";
 import { AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronUp, Activity, Clock, CheckCircle, Stethoscope, AlertCircle, ClipboardList } from "lucide-react";
@@ -884,10 +885,17 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
             <TabsTrigger
               key={tab.value}
               value={tab.value}
-              className="relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none"
+              className="relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 data-[state=inactive]:text-muted-foreground data-[state=inactive]:bg-transparent data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:shadow-none"
               data-testid={`tab-${tab.value}`}
             >
-              {tab.label}
+              {activeTab === tab.value && (
+                <motion.div
+                  layoutId="patients-tab-indicator"
+                  className="absolute inset-0 bg-primary rounded-full -z-10"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                />
+              )}
+              <span className="relative z-10">{tab.label}</span>
             </TabsTrigger>
           ))}
         </TabsList>

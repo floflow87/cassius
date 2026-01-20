@@ -216,7 +216,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
                 <FormLabel>Type</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger data-testid="select-appointment-type">
+                    <SelectTrigger className="text-xs" data-testid="select-appointment-type">
                       <SelectValue placeholder="Type de RDV" />
                     </SelectTrigger>
                   </FormControl>
@@ -241,7 +241,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
                 <FormLabel>Statut</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger data-testid="select-appointment-status">
+                    <SelectTrigger className="text-xs" data-testid="select-appointment-status">
                       <SelectValue placeholder="Statut" />
                     </SelectTrigger>
                   </FormControl>
@@ -275,7 +275,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
                   disabled={implantsLoading}
                 >
                   <FormControl>
-                    <SelectTrigger data-testid="select-surgery-implant">
+                    <SelectTrigger className="text-xs" data-testid="select-surgery-implant">
                       <SelectValue placeholder={implantsLoading ? "Chargement..." : "Sélectionner un implant"} />
                     </SelectTrigger>
                   </FormControl>
