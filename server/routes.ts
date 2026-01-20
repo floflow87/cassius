@@ -1906,17 +1906,59 @@ export async function registerRoutes(
         storage.getImplantMeasurements(organisationId, implantId),
       ]);
 
-      // Get last status change date and last ISQ measurement date
+      // Get last status change date
       const lastStatusChange = statusHistory.length > 0 ? new Date(statusHistory[0].changedAt) : null;
-      const lastMeasurement = measurements.length > 0 ? new Date(measurements[0].measuredAt) : null;
+      
+      // Get last ISQ measurement date - check both measurements table AND implant fields
+      // Implant fields use datePose as the reference date for isqPose, and we estimate dates for 2m/3m/6m
+      let lastMeasurementDate: Date | null = null;
+      
+      // Check implantMeasurements table first (visit measurements)
+      if (measurements.length > 0) {
+        lastMeasurementDate = new Date(measurements[0].measuredAt);
+      }
+      
+      // Also check implant ISQ fields (pose/2m/3m/6m) - use datePose as base
+      if (implant.datePose) {
+        const datePose = new Date(implant.datePose);
+        // Check which ISQ fields exist and estimate their dates
+        const isqDates: Date[] = [];
+        if (implant.isqPose !== null && implant.isqPose !== undefined) {
+          isqDates.push(datePose);
+        }
+        if (implant.isq2m !== null && implant.isq2m !== undefined) {
+          const date2m = new Date(datePose);
+          date2m.setMonth(date2m.getMonth() + 2);
+          isqDates.push(date2m);
+        }
+        if (implant.isq3m !== null && implant.isq3m !== undefined) {
+          const date3m = new Date(datePose);
+          date3m.setMonth(date3m.getMonth() + 3);
+          isqDates.push(date3m);
+        }
+        if (implant.isq6m !== null && implant.isq6m !== undefined) {
+          const date6m = new Date(datePose);
+          date6m.setMonth(date6m.getMonth() + 6);
+          isqDates.push(date6m);
+        }
+        
+        // Get the most recent ISQ date from implant fields
+        if (isqDates.length > 0) {
+          const maxImplantIsqDate = new Date(Math.max(...isqDates.map(d => d.getTime())));
+          // Use the most recent date between measurements and implant fields
+          if (!lastMeasurementDate || maxImplantIsqDate > lastMeasurementDate) {
+            lastMeasurementDate = maxImplantIsqDate;
+          }
+        }
+      }
 
       // Check if suggestion should be hidden (applied after last ISQ)
       const isSuggestionApplied = (suggestedStatus: string): boolean => {
         if (!lastStatusChange) return false;
         // If current status matches suggestion and status was changed after last ISQ, hide it
         // If no measurement exists, show the suggestion (can't compare without ISQ data)
-        if (implant.statut === suggestedStatus && lastMeasurement) {
-          return lastStatusChange > lastMeasurement;
+        if (implant.statut === suggestedStatus && lastMeasurementDate) {
+          return lastStatusChange > lastMeasurementDate;
         }
         return false;
       };
