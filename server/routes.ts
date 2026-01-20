@@ -1900,9 +1900,6 @@ export async function registerRoutes(
       if (!implant) {
         return res.status(404).json({ error: "Implant not found" });
       }
-      
-      // DEBUG: Log the actual status from DB
-      console.log(`[SUGGESTIONS] implant.statut='${implant.statut}' for id=${surgeryImplantId}`);
 
       // Fetch status history, measurements, and visites to check for applied suggestions
       // Note: visites are linked to catalog implant.id, not surgeryImplant.id
@@ -2094,7 +2091,7 @@ export async function registerRoutes(
         suggestions.push({
           status: 'EN_SUIVI',
           confidence: 'MEDIUM',
-          rule: 'Statut ECHEC mais ISQ récent ≥ 60 (récupération possible)',
+          rule: 'Statut actuel : Échec, mais ISQ récent ≥ 60 (récupération possible)',
           reasonCode: 'RECOVERY_POSSIBLE',
         });
       }
@@ -2104,7 +2101,7 @@ export async function registerRoutes(
         suggestions.push({
           status: 'SUCCES',
           confidence: 'LOW',
-          rule: 'Statut ECHEC mais ISQ récent ≥ 65 (ostéointégration réussie)',
+          rule: 'Statut actuel : Échec, mais ISQ récent ≥ 65 (ostéointégration réussie)',
           reasonCode: 'OSTEOINTEGRATION_OK',
         });
       }
