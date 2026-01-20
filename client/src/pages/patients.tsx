@@ -912,8 +912,8 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
               className="max-w-sm"
               data-testid="input-search-patients"
             />
-            <span className="text-sm italic text-muted-foreground">
-              {patients?.length?.toLocaleString() || 0} patients
+            <span className="text-xs italic text-muted-foreground">
+              {patients?.length?.toLocaleString() || 0} patient{(patients?.length || 0) > 1 ? "s" : ""}
             </span>
             
             <AdvancedFilterDrawer

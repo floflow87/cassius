@@ -1922,20 +1922,30 @@ export async function registerRoutes(
       };
 
       const suggestions: Array<{
-        status: 'SUCCES' | 'COMPLICATION' | 'ECHEC';
+        status: 'SUCCES' | 'COMPLICATION' | 'ECHEC' | 'EN_SUIVI';
         confidence: 'HIGH' | 'MEDIUM' | 'LOW';
         rule: string;
         reasonCode?: string;
       }> = [];
 
-      // MVP Rules based on ISQ values
+      // MVP Rules based on ISQ values - include measurements from visits
       const isqValues: number[] = [];
       if (implant.isqPose !== null && implant.isqPose !== undefined) isqValues.push(implant.isqPose);
       if (implant.isq2m !== null && implant.isq2m !== undefined) isqValues.push(implant.isq2m);
       if (implant.isq3m !== null && implant.isq3m !== undefined) isqValues.push(implant.isq3m);
       if (implant.isq6m !== null && implant.isq6m !== undefined) isqValues.push(implant.isq6m);
-
-      const latestIsq = isqValues.length > 0 ? isqValues[isqValues.length - 1] : null;
+      
+      // Also include ISQ from visits/measurements (sorted by date)
+      const visitIsqValues = measurements
+        .filter(m => m.isqValue !== null && m.isqValue !== undefined)
+        .sort((a, b) => new Date(a.measuredAt).getTime() - new Date(b.measuredAt).getTime())
+        .map(m => m.isqValue as number);
+      
+      // Combine all ISQ values for analysis
+      const allIsqValues = [...isqValues, ...visitIsqValues];
+      
+      // Latest ISQ is the most recent from either source
+      const latestIsq = allIsqValues.length > 0 ? allIsqValues[allIsqValues.length - 1] : null;
       const poseIsq = implant.isqPose;
       const isq6m = implant.isq6m;
 
@@ -1991,6 +2001,26 @@ export async function registerRoutes(
           confidence: 'MEDIUM',
           rule: 'ISQ entre 50-60 (ostéointégration insuffisante)',
           reasonCode: 'ISQ_DROP',
+        });
+      }
+
+      // Rule 6: Status is ECHEC but latest ISQ >= 60 -> suggest EN_SUIVI (potential recovery)
+      if (implant.statut === 'ECHEC' && latestIsq !== null && latestIsq >= 60) {
+        suggestions.push({
+          status: 'EN_SUIVI',
+          confidence: 'MEDIUM',
+          rule: 'Statut ECHEC mais ISQ récent ≥ 60 (récupération possible)',
+          reasonCode: 'RECOVERY_POSSIBLE',
+        });
+      }
+
+      // Rule 7: Status is ECHEC but latest ISQ >= 65 -> suggest SUCCES (good recovery)
+      if (implant.statut === 'ECHEC' && latestIsq !== null && latestIsq >= 65) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'LOW',
+          rule: 'Statut ECHEC mais ISQ récent ≥ 65 (ostéointégration réussie)',
+          reasonCode: 'OSTEOINTEGRATION_OK',
         });
       }
 

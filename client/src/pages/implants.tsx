@@ -504,7 +504,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
               </button>
             ))}
           </div>
-          <span className="text-sm text-muted-foreground">{totalImplants} implant{totalImplants > 1 ? "s" : ""}</span>
+          <span className="text-xs italic text-muted-foreground">{totalImplants} implant{totalImplants > 1 ? "s" : ""}</span>
         </div>
 
         <ImplantFilterChips

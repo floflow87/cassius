@@ -124,7 +124,7 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
                         <FormControl>
                           <Input 
                             placeholder="Jean" 
-                            className="h-11 border-gray-300 dark:border-gray-700"
+                            className="h-11 border-gray-300 dark:border-gray-700 placeholder-xs"
                             {...field} 
                             data-testid="input-prenom" 
                           />
@@ -142,7 +142,7 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
                         <FormControl>
                           <Input 
                             placeholder="Dupont" 
-                            className="h-11 border-gray-300 dark:border-gray-700"
+                            className="h-11 border-gray-300 dark:border-gray-700 placeholder-xs"
                             {...field} 
                             data-testid="input-nom" 
                           />
@@ -163,7 +163,7 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
                         <Input 
                           type="email"
                           placeholder="votre@email.com" 
-                          className="h-11 border-gray-300 dark:border-gray-700"
+                          className="h-11 border-gray-300 dark:border-gray-700 placeholder-xs"
                           {...field} 
                           data-testid="input-username" 
                         />
@@ -183,7 +183,7 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
                         <Input 
                           type="password" 
                           placeholder="Min. 6 caractères" 
-                          className="h-11 border-gray-300 dark:border-gray-700"
+                          className="h-11 border-gray-300 dark:border-gray-700 placeholder-xs"
                           {...field} 
                           data-testid="input-password" 
                         />
@@ -203,7 +203,7 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
                         <Input 
                           type="password" 
                           placeholder="Confirmez votre mot de passe" 
-                          className="h-11 border-gray-300 dark:border-gray-700"
+                          className="h-11 border-gray-300 dark:border-gray-700 placeholder-xs"
                           {...field} 
                           data-testid="input-confirm-password" 
                         />

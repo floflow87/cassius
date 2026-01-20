@@ -661,7 +661,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
+        <span className="text-xs italic text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
         <ActeFilterChips
           filters={advancedFilters}
           onRemoveFilter={(ruleId) => {
