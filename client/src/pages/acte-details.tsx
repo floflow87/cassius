@@ -44,9 +44,9 @@ import { SurgeryImplantAddSheet } from "@/components/surgery-implant-add-sheet";
 import { SurgeryTimeline } from "@/components/surgery-timeline";
 import type { OperationDetail, SurgeryImplantWithDetails } from "@shared/types";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" }> = {
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" | "success" }> = {
   EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
-  SUCCES: { label: "Succès", variant: "default" },
+  SUCCES: { label: "Succès", variant: "success" },
   COMPLICATION: { label: "Complication", variant: "complication" },
   ECHEC: { label: "Échec", variant: "echec" },
 };

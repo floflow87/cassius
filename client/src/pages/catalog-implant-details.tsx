@@ -44,11 +44,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ImplantWithStats, SurgeryImplantWithDetails } from "@shared/schema";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  EN_SUIVI: { label: "En suivi", variant: "secondary" },
-  SUCCES: { label: "Succès", variant: "default" },
-  COMPLICATION: { label: "Complication", variant: "outline" },
-  ECHEC: { label: "Échec", variant: "destructive" },
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" | "success" }> = {
+  EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
+  SUCCES: { label: "Succès", variant: "success" },
+  COMPLICATION: { label: "Complication", variant: "complication" },
+  ECHEC: { label: "Échec", variant: "echec" },
 };
 
 export default function CatalogImplantDetailsPage() {
