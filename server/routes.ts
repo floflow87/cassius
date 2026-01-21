@@ -2190,6 +2190,38 @@ export async function registerRoutes(
         });
       }
 
+      // Rule 12: Status is EN_SUIVI and latest ISQ >= 70 -> suggest SUCCES (HIGH confidence)
+      // This is the main rule for transitioning from follow-up to success when ISQ is excellent
+      if (implant.statut === 'EN_SUIVI' && latestIsq !== null && latestIsq >= 70) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'HIGH',
+          rule: 'Statut actuel : En suivi, ISQ récent ≥ 70 (ostéointégration réussie)',
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
+      // Rule 13: Status is EN_SUIVI, latest ISQ >= 65 and at least 3 months since pose -> suggest SUCCES (MEDIUM confidence)
+      const monthsSincePose = datePose ? Math.floor((Date.now() - datePose.getTime()) / (1000 * 60 * 60 * 24 * 30)) : 0;
+      if (implant.statut === 'EN_SUIVI' && latestIsq !== null && latestIsq >= 65 && latestIsq < 70 && monthsSincePose >= 3) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'MEDIUM',
+          rule: `Statut actuel : En suivi, ISQ récent ≥ 65 après ${monthsSincePose} mois (ostéointégration satisfaisante)`,
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
+      // Rule 14: Status is EN_SUIVI, latest ISQ between 60-64 and at least 6 months since pose -> suggest SUCCES (LOW confidence)
+      if (implant.statut === 'EN_SUIVI' && latestIsq !== null && latestIsq >= 60 && latestIsq < 65 && monthsSincePose >= 6) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'LOW',
+          rule: `Statut actuel : En suivi, ISQ stable ≥ 60 après ${monthsSincePose} mois (considérer validation clinique)`,
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
       // Filter out suggestions that match the current status (no point suggesting what's already applied)
       // Also filter out suggestions that have been applied and no new ISQ since
       const filteredSuggestions = suggestions.filter(s => 
