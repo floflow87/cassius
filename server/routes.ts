@@ -6146,7 +6146,7 @@ export async function registerRoutes(
           patientName,
           patientId: apt.patientId,
           createdAt: apt.createdAt || new Date().toISOString(),
-          readAt: null,
+          readAt: new Date().toISOString(),
           isVirtual: true,
         };
       });
