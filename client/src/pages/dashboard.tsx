@@ -67,7 +67,8 @@ import { Link } from "wouter";
 const DASHBOARD_BLOCKS = [
   { id: "stats-primary", label: "Statistiques principales" },
   { id: "stats-secondary", label: "Statistiques secondaires" },
-  { id: "rdv-alerts", label: "Rendez-vous & Alertes" },
+  { id: "rdv-upcoming", label: "Rendez-vous à venir" },
+  { id: "alerts", label: "À surveiller" },
   { id: "recent-implants", label: "Implants récents avec ISQ" },
 ] as const;
 
@@ -79,7 +80,7 @@ interface DashboardPreferences {
 }
 
 const DEFAULT_PREFERENCES: DashboardPreferences = {
-  blockOrder: ["stats-primary", "stats-secondary", "rdv-alerts", "recent-implants"],
+  blockOrder: ["stats-primary", "stats-secondary", "rdv-upcoming", "alerts", "recent-implants"],
   hiddenBlocks: [],
 };
 
@@ -593,236 +594,237 @@ export default function DashboardPage() {
             />
           </div>
         );
-      case "rdv-alerts":
+      case "rdv-upcoming":
         return (
-          <div key={blockId} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-4">
-                <CardTitle className="text-sm">Rendez-vous à venir</CardTitle>
-                <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                  <SheetTrigger asChild>
-                    <Button size="sm" data-testid="button-new-rdv">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Nouveau rdv
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent className="sm:max-w-md">
-                    <SheetHeader>
-                      <SheetTitle>Nouveau rendez-vous</SheetTitle>
-                    </SheetHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label>Patient</Label>
-                        <Popover open={patientPopoverOpen} onOpenChange={setPatientPopoverOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={patientPopoverOpen}
-                              className="w-full justify-between"
-                              data-testid="button-select-patient"
-                            >
-                              {selectedPatient
-                                ? `${selectedPatient.prenom} ${selectedPatient.nom}`
-                                : "Sélectionner un patient..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-full p-0" align="start">
-                            <Command>
-                              <CommandInput 
-                                placeholder="Rechercher un patient..." 
-                                value={patientSearch}
-                                onValueChange={setPatientSearch}
-                                data-testid="input-patient-search"
-                              />
-                              <CommandList>
-                                <CommandEmpty>Aucun patient trouvé.</CommandEmpty>
-                                <CommandGroup>
-                                  {filteredPatients.slice(0, 10).map((patient) => (
-                                    <CommandItem
-                                      key={patient.id}
-                                      value={`${patient.prenom} ${patient.nom}`}
-                                      onSelect={() => {
-                                        setNewRdvData(prev => ({ ...prev, patientId: patient.id }));
-                                        setPatientPopoverOpen(false);
-                                      }}
-                                      data-testid={`patient-option-${patient.id}`}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          newRdvData.patientId === patient.id ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {patient.prenom} {patient.nom}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="titre">Titre</Label>
-                        <Input 
-                          id="titre"
-                          placeholder="Ex: Contrôle implant"
-                          value={newRdvData.titre}
-                          onChange={(e) => setNewRdvData(prev => ({ ...prev, titre: e.target.value }))}
-                          data-testid="input-titre"
-                        />
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="date">Date</Label>
-                          <Input 
-                            id="date"
-                            type="date"
-                            value={newRdvData.date}
-                            onChange={(e) => setNewRdvData(prev => ({ ...prev, date: e.target.value }))}
-                            data-testid="input-date"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="heureDebut">Début</Label>
-                          <Input 
-                            id="heureDebut"
-                            type="time"
-                            value={newRdvData.heureDebut}
-                            onChange={(e) => setNewRdvData(prev => ({ ...prev, heureDebut: e.target.value }))}
-                            data-testid="input-heure-debut"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="heureFin">Fin</Label>
-                          <Input 
-                            id="heureFin"
-                            type="time"
-                            value={newRdvData.heureFin}
-                            onChange={(e) => setNewRdvData(prev => ({ ...prev, heureFin: e.target.value }))}
-                            data-testid="input-heure-fin"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="type">Type</Label>
-                        <Select
-                          value={newRdvData.type}
-                          onValueChange={(value) => setNewRdvData(prev => ({ ...prev, type: value }))}
-                        >
-                          <SelectTrigger data-testid="select-type">
-                            <SelectValue placeholder="Sélectionner un type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="consultation" data-testid="select-type-consultation">Consultation</SelectItem>
-                            <SelectItem value="suivi" data-testid="select-type-suivi">Suivi</SelectItem>
-                            <SelectItem value="chirurgie" data-testid="select-type-chirurgie">Chirurgie</SelectItem>
-                            <SelectItem value="controle" data-testid="select-type-controle">Contrôle</SelectItem>
-                            <SelectItem value="urgence" data-testid="select-type-urgence">Urgence</SelectItem>
-                            <SelectItem value="autre" data-testid="select-type-autre">Autre</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="description">Description (optionnelle)</Label>
-                        <Textarea 
-                          id="description"
-                          placeholder="Informations complémentaires..."
-                          value={newRdvData.description}
-                          onChange={(e) => setNewRdvData(prev => ({ ...prev, description: e.target.value }))}
-                          data-testid="input-description"
-                        />
-                      </div>
-                      <Button 
-                        className="w-full" 
-                        onClick={handleCreateRdv}
-                        disabled={createAppointmentMutation.isPending}
-                        data-testid="button-submit-rdv"
-                      >
-                        {createAppointmentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Créer le rendez-vous
-                      </Button>
+          <Card key={blockId}>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-sm">Rendez-vous à venir</CardTitle>
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button size="sm" data-testid="button-new-rdv">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Nouveau rdv
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="sm:max-w-md">
+                  <SheetHeader>
+                    <SheetTitle>Nouveau rendez-vous</SheetTitle>
+                  </SheetHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Patient</Label>
+                      <Popover open={patientPopoverOpen} onOpenChange={setPatientPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={patientPopoverOpen}
+                            className="w-full justify-between"
+                            data-testid="button-select-patient"
+                          >
+                            {selectedPatient
+                              ? `${selectedPatient.prenom} ${selectedPatient.nom}`
+                              : "Sélectionner un patient..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput 
+                              placeholder="Rechercher un patient..." 
+                              value={patientSearch}
+                              onValueChange={setPatientSearch}
+                              data-testid="input-patient-search"
+                            />
+                            <CommandList>
+                              <CommandEmpty>Aucun patient trouvé.</CommandEmpty>
+                              <CommandGroup>
+                                {filteredPatients.slice(0, 10).map((patient) => (
+                                  <CommandItem
+                                    key={patient.id}
+                                    value={`${patient.prenom} ${patient.nom}`}
+                                    onSelect={() => {
+                                      setNewRdvData(prev => ({ ...prev, patientId: patient.id }));
+                                      setPatientPopoverOpen(false);
+                                    }}
+                                    data-testid={`patient-option-${patient.id}`}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        newRdvData.patientId === patient.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {patient.prenom} {patient.nom}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
-                  </SheetContent>
-                </Sheet>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {upcomingVisites.length > 0 ? (
-                  upcomingVisites.map((apt) => (
-                    <AppointmentItem
-                      key={apt.id}
-                      date={new Date(apt.dateStart)}
-                      title={apt.title}
-                      patientName={`${apt.patientPrenom || ""} ${apt.patientNom || ""}`.trim() || "Patient"}
-                      patientId={apt.patientId}
-                      type={apt.type.toLowerCase() === "chirurgie" ? "action" : apt.type.toLowerCase() as "consultation" | "suivi" | "action"}
-                      time={new Date(apt.dateStart).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                    />
-                  ))
-                ) : (
-                  <p className="text-xs text-muted-foreground py-2">Aucun rendez-vous à venir</p>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-4">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-                  À surveiller
-                </CardTitle>
-                <Badge variant="secondary" className="text-xs">
-                  {flagsData?.length || 0} alertes
-                </Badge>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {flagsData && flagsData.length > 0 ? (
-                  [...flagsData]
-                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                    .slice(0, 5)
-                    .map((flag) => {
-                      const isIsqFlag = ['ISQ_LOW', 'ISQ_DECLINING', 'UNSTABLE_ISQ_HISTORY'].includes(flag.type);
-                      const isqMatch = flag.description?.match(/ISQ[^=]*=?\s*(\d+)/);
-                      const isqValue = isqMatch ? isqMatch[1] : null;
-                      
-                      return (
-                        <Link 
-                          key={flag.id} 
-                          href={flag.patientId ? `/patients/${flag.patientId}` : "#"}
-                          className="block"
-                        >
-                          <div className="flex items-start gap-3 p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer" data-testid={`flag-dashboard-${flag.id}`}>
-                            <FlagBadge flag={flag} compact />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-xs font-medium truncate">{flag.label}</p>
-                                {isIsqFlag && isqValue && (
-                                  <Badge variant="secondary" className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                                    ISQ {isqValue}
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-muted-foreground truncate">
-                                {flag.patientPrenom} {flag.patientNom} {flag.entityName ? `- ${flag.entityName}` : ""}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                                {format(new Date(flag.createdAt), "dd MMM yyyy", { locale: fr })}
-                              </p>
-                            </div>
-                          </div>
-                        </Link>
-                      );
-                    })
-                ) : (
-                  <div className="text-center py-6">
-                    <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Aucune alerte en cours</p>
+                    <div className="space-y-2">
+                      <Label htmlFor="titre">Titre</Label>
+                      <Input 
+                        id="titre"
+                        placeholder="Ex: Contrôle implant"
+                        value={newRdvData.titre}
+                        onChange={(e) => setNewRdvData(prev => ({ ...prev, titre: e.target.value }))}
+                        data-testid="input-titre"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="date">Date</Label>
+                        <Input 
+                          id="date"
+                          type="date"
+                          value={newRdvData.date}
+                          onChange={(e) => setNewRdvData(prev => ({ ...prev, date: e.target.value }))}
+                          data-testid="input-date"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="heureDebut">Début</Label>
+                        <Input 
+                          id="heureDebut"
+                          type="time"
+                          value={newRdvData.heureDebut}
+                          onChange={(e) => setNewRdvData(prev => ({ ...prev, heureDebut: e.target.value }))}
+                          data-testid="input-heure-debut"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="heureFin">Fin</Label>
+                        <Input 
+                          id="heureFin"
+                          type="time"
+                          value={newRdvData.heureFin}
+                          onChange={(e) => setNewRdvData(prev => ({ ...prev, heureFin: e.target.value }))}
+                          data-testid="input-heure-fin"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="type">Type</Label>
+                      <Select
+                        value={newRdvData.type}
+                        onValueChange={(value) => setNewRdvData(prev => ({ ...prev, type: value }))}
+                      >
+                        <SelectTrigger data-testid="select-type">
+                          <SelectValue placeholder="Sélectionner un type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="consultation" data-testid="select-type-consultation">Consultation</SelectItem>
+                          <SelectItem value="suivi" data-testid="select-type-suivi">Suivi</SelectItem>
+                          <SelectItem value="chirurgie" data-testid="select-type-chirurgie">Chirurgie</SelectItem>
+                          <SelectItem value="controle" data-testid="select-type-controle">Contrôle</SelectItem>
+                          <SelectItem value="urgence" data-testid="select-type-urgence">Urgence</SelectItem>
+                          <SelectItem value="autre" data-testid="select-type-autre">Autre</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description (optionnelle)</Label>
+                      <Textarea 
+                        id="description"
+                        placeholder="Informations complémentaires..."
+                        value={newRdvData.description}
+                        onChange={(e) => setNewRdvData(prev => ({ ...prev, description: e.target.value }))}
+                        data-testid="input-description"
+                      />
+                    </div>
+                    <Button 
+                      className="w-full" 
+                      onClick={handleCreateRdv}
+                      disabled={createAppointmentMutation.isPending}
+                      data-testid="button-submit-rdv"
+                    >
+                      {createAppointmentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Créer le rendez-vous
+                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                </SheetContent>
+              </Sheet>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {upcomingVisites.length > 0 ? (
+                upcomingVisites.map((apt) => (
+                  <AppointmentItem
+                    key={apt.id}
+                    date={new Date(apt.dateStart)}
+                    title={apt.title}
+                    patientName={`${apt.patientPrenom || ""} ${apt.patientNom || ""}`.trim() || "Patient"}
+                    patientId={apt.patientId}
+                    type={apt.type.toLowerCase() === "chirurgie" ? "action" : apt.type.toLowerCase() as "consultation" | "suivi" | "action"}
+                    time={new Date(apt.dateStart).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  />
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground py-2">Aucun rendez-vous à venir</p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      case "alerts":
+        return (
+          <Card key={blockId}>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                À surveiller
+              </CardTitle>
+              <Badge variant="secondary" className="text-xs">
+                {flagsData?.length || 0} alertes
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {flagsData && flagsData.length > 0 ? (
+                [...flagsData]
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                  .slice(0, 5)
+                  .map((flag) => {
+                    const isIsqFlag = ['ISQ_LOW', 'ISQ_DECLINING', 'UNSTABLE_ISQ_HISTORY'].includes(flag.type);
+                    const isqMatch = flag.description?.match(/ISQ[^=]*=?\s*(\d+)/);
+                    const isqValue = isqMatch ? isqMatch[1] : null;
+                    
+                    return (
+                      <Link 
+                        key={flag.id} 
+                        href={flag.patientId ? `/patients/${flag.patientId}` : "#"}
+                        className="block"
+                      >
+                        <div className="flex items-start gap-3 p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer" data-testid={`flag-dashboard-${flag.id}`}>
+                          <FlagBadge flag={flag} compact />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-xs font-medium truncate">{flag.label}</p>
+                              {isIsqFlag && isqValue && (
+                                <Badge variant="secondary" className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                  ISQ {isqValue}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {flag.patientPrenom} {flag.patientNom} {flag.entityName ? `- ${flag.entityName}` : ""}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                              {format(new Date(flag.createdAt), "dd MMM yyyy", { locale: fr })}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })
+              ) : (
+                <div className="text-center py-6">
+                  <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Aucune alerte en cours</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         );
       case "recent-implants":
         if (!surgeryImplants || surgeryImplants.length === 0) return null;
@@ -841,7 +843,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {surgeryImplants.slice(0, 8).map((si) => {
+                {surgeryImplants.slice(0, 10).map((si) => {
                   const lastIsq = si.isq6m ?? si.isq3m ?? si.isq2m ?? si.isqPose;
                   const isqLabel = si.isq6m ? "6m" : si.isq3m ? "3m" : si.isq2m ? "2m" : si.isqPose ? "pose" : null;
                   const isLowIsq = lastIsq !== null && lastIsq <= 55;
@@ -966,7 +968,41 @@ export default function DashboardPage() {
       <SetupChecklist />
 
       {/* Dynamic block rendering based on user preferences */}
-      {visibleBlocksInOrder.map((blockId) => renderBlock(blockId))}
+      {visibleBlocksInOrder.map((blockId, index) => {
+        // Group rdv-upcoming and alerts in a 2-column grid
+        if (blockId === "rdv-upcoming" || blockId === "alerts") {
+          // Find if both are visible and consecutive
+          const otherBlockId = blockId === "rdv-upcoming" ? "alerts" : "rdv-upcoming";
+          const otherIndex = visibleBlocksInOrder.indexOf(otherBlockId);
+          const bothVisible = otherIndex !== -1;
+          const areConsecutive = bothVisible && Math.abs(otherIndex - index) === 1;
+          
+          // If both are consecutive, only render grid on the first one
+          if (areConsecutive && index > otherIndex) {
+            return null; // Skip, already rendered in the grid
+          }
+          
+          if (areConsecutive) {
+            // Render both in a grid
+            const firstBlock = index < otherIndex ? blockId : otherBlockId;
+            const secondBlock = index < otherIndex ? otherBlockId : blockId;
+            return (
+              <div key="rdv-alerts-grid" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {renderBlock(firstBlock)}
+                {renderBlock(secondBlock)}
+              </div>
+            );
+          }
+          
+          // Render single block in a half-width grid (allows empty space beside)
+          return (
+            <div key={`${blockId}-grid`} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {renderBlock(blockId)}
+            </div>
+          );
+        }
+        return renderBlock(blockId);
+      })}
 
       {(!stats || stats.totalPatients === 0) && (
         <Card>
