@@ -130,13 +130,14 @@ export function SurgeryImplantsFilterDrawer({ filters, onFiltersChange, activeFi
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [filterName, setFilterName] = useState("");
 
-  const { data: savedFilters = [] } = useQuery<SavedFilter[]>({
+  const { data: savedFilters = [], isLoading: isLoadingFilters } = useQuery<SavedFilter[]>({
     queryKey: ["/api/saved-filters/surgery-implants"],
   });
 
   const saveMutation = useMutation({
     mutationFn: async (data: { name: string; pageType: string; filterData: string }) => {
-      return apiRequest("POST", "/api/saved-filters", data);
+      const res = await apiRequest("POST", "/api/saved-filters", data);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/saved-filters/surgery-implants"] });
@@ -144,8 +145,9 @@ export function SurgeryImplantsFilterDrawer({ filters, onFiltersChange, activeFi
       setSaveDialogOpen(false);
       setFilterName("");
     },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de sauvegarder le filtre.", variant: "destructive" });
+    onError: (error: Error) => {
+      console.error("Save filter error:", error);
+      toast({ title: "Erreur", description: error.message || "Impossible de sauvegarder le filtre.", variant: "destructive" });
     },
   });
 
@@ -280,67 +282,89 @@ export function SurgeryImplantsFilterDrawer({ filters, onFiltersChange, activeFi
     }));
   }, []);
 
-  const updateGroupOperator = useCallback((operator: "AND" | "OR") => {
-    setLocalFilters(prev => ({ ...prev, operator }));
+  const toggleGroupOperator = useCallback(() => {
+    setLocalFilters(prev => ({
+      ...prev,
+      operator: prev.operator === "AND" ? "OR" : "AND",
+    }));
   }, []);
 
   return (
-    <>
-      <Sheet open={isOpen} onOpenChange={handleOpen}>
-        <SheetTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2" data-testid="button-surgery-implant-advanced-filters">
-            <Filter className="h-3.5 w-3.5" />
-            Filtres
-            {activeFilterCount > 0 && (
-              <Badge className="h-5 w-5 p-0 flex items-center justify-center text-[10px]">
-                {activeFilterCount}
-              </Badge>
-            )}
-          </Button>
-        </SheetTrigger>
-        <SheetContent className="w-[450px] sm:w-[540px] flex flex-col">
-          <SheetHeader>
-            <SheetTitle>Filtres avancés - Implants posés</SheetTitle>
-            <SheetDescription>
-              Configurez des filtres pour affiner la liste des implants posés.
-            </SheetDescription>
-          </SheetHeader>
+    <Sheet open={isOpen} onOpenChange={handleOpen}>
+      <SheetTrigger asChild>
+        <Button variant="outline" size="default" className="bg-white dark:bg-zinc-900" data-testid="button-surgery-implant-advanced-filters">
+          <Filter className="h-4 w-4 mr-2" />
+          Filtres avancés
+          {activeFilterCount > 0 && (
+            <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>
+          )}
+        </Button>
+      </SheetTrigger>
+      <SheetContent className="w-[500px] sm:max-w-[500px] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Filtres avancés - Implants posés</SheetTitle>
+          <SheetDescription>
+            Créez des filtres personnalisés pour affiner votre recherche d'implants
+          </SheetDescription>
+        </SheetHeader>
 
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-4 py-4">
-              {savedFilters.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Favoris</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {savedFilters.map((filter) => (
-                      <div key={filter.id} className="flex items-center gap-1">
+        <div className="py-6 space-y-6">
+          {/* Section Favoris */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Star className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm font-medium">Favoris</Label>
+            </div>
+            {isLoadingFilters ? (
+              <p className="text-sm text-muted-foreground">Chargement...</p>
+            ) : savedFilters.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucun favori enregistré</p>
+            ) : (
+              <ScrollArea className="max-h-40">
+                <div className="space-y-1">
+                  {savedFilters.map((filter) => (
+                    <div 
+                      key={filter.id}
+                      className="flex items-center justify-between gap-2 p-2 rounded-md hover-elevate"
+                      data-testid={`favorite-filter-${filter.id}`}
+                    >
+                      <span 
+                        className="text-sm truncate flex-1 cursor-pointer"
+                        onClick={() => handleLoadFilter(filter)}
+                      >
+                        {filter.name}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
-                              className="gap-1.5 text-xs"
-                              onClick={() => handleLoadFilter(filter)}
-                              data-testid={`button-load-filter-${filter.id}`}
+                              className="h-6 px-2 text-xs"
+                              onClick={() => handleLoadFilter(filter, "AND")}
+                              data-testid={`button-combine-and-${filter.id}`}
                             >
-                              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                              {filter.name}
+                              +ET
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom" className="flex gap-2">
-                            <Button size="sm" variant="ghost" onClick={() => handleLoadFilter(filter)}>
-                              Remplacer
+                          <TooltipContent>
+                            <p>Combiner avec les filtres actuels (ET)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => handleLoadFilter(filter, "OR")}
+                              data-testid={`button-combine-or-${filter.id}`}
+                            >
+                              +OU
                             </Button>
-                            {filters && filters.rules.length > 0 && (
-                              <>
-                                <Button size="sm" variant="ghost" onClick={() => handleLoadFilter(filter, "AND")}>
-                                  + ET
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={() => handleLoadFilter(filter, "OR")}>
-                                  + OU
-                                </Button>
-                              </>
-                            )}
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Combiner avec les filtres actuels (OU)</p>
                           </TooltipContent>
                         </Tooltip>
                         <Button
@@ -348,235 +372,241 @@ export function SurgeryImplantsFilterDrawer({ filters, onFiltersChange, activeFi
                           size="icon"
                           className="h-6 w-6"
                           onClick={(e) => handleDeleteFilter(e, filter.id)}
-                          data-testid={`button-delete-filter-${filter.id}`}
+                          data-testid={`button-delete-favorite-${filter.id}`}
                         >
-                          <X className="h-3 w-3" />
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </ScrollArea>
+            )}
+          </div>
 
-              <div className="flex items-center gap-2">
-                <Label className="text-xs">Combiner avec</Label>
-                <Select value={localFilters.operator} onValueChange={(v) => updateGroupOperator(v as "AND" | "OR")}>
-                  <SelectTrigger className="w-20 h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AND">ET</SelectItem>
-                    <SelectItem value="OR">OU</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="border-t" />
 
-              <div className="space-y-3">
-                {localFilters.rules.map((rule, index) => {
-                  const fieldConfig = SURGERY_IMPLANT_FILTER_CONFIGS.find(c => c.field === rule.field);
-                  const needsValue = rule.operator !== "is_null" && rule.operator !== "is_not_null";
-                  const needsSecondValue = rule.operator === "between";
+          {/* Section création de filtres */}
+          <div className="flex items-center gap-2">
+            <Label className="text-sm text-muted-foreground">Combiner les filtres avec :</Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleGroupOperator}
+              data-testid="button-toggle-operator"
+            >
+              {localFilters.operator === "AND" ? "ET (tous)" : "OU (un parmi)"}
+            </Button>
+          </div>
 
-                  return (
-                    <Card key={rule.id} className="p-3">
-                      <div className="flex items-start gap-2">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex gap-2">
-                            <Select 
-                              value={rule.field} 
-                              onValueChange={(v) => {
-                                const newFieldConfig = SURGERY_IMPLANT_FILTER_CONFIGS.find(c => c.field === v);
-                                updateRule(rule.id, { 
-                                  field: v as SurgeryImplantFilterField,
-                                  operator: newFieldConfig?.operators[0] || "equals",
-                                  value: "",
-                                  value2: undefined,
-                                });
-                              }}
-                            >
-                              <SelectTrigger className="flex-1 h-8 text-xs">
-                                <SelectValue placeholder="Champ" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {SURGERY_IMPLANT_FILTER_CONFIGS.map(config => (
-                                  <SelectItem key={config.field} value={config.field}>
-                                    {config.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+          <div className="space-y-3">
+            {localFilters.rules.map((rule, index) => {
+              const fieldConfig = SURGERY_IMPLANT_FILTER_CONFIGS.find(c => c.field === rule.field);
+              const needsValue = rule.operator !== "is_null" && rule.operator !== "is_not_null";
+              const needsSecondValue = rule.operator === "between";
 
-                            <Select 
-                              value={rule.operator} 
-                              onValueChange={(v) => updateRule(rule.id, { operator: v as SurgeryImplantFilterOperator })}
-                            >
-                              <SelectTrigger className="w-[140px] h-8 text-xs">
-                                <SelectValue placeholder="Opérateur" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {fieldConfig?.operators.map(op => (
-                                  <SelectItem key={op} value={op}>
-                                    {OPERATOR_LABELS[op]}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {needsValue && (
-                            <div className="flex gap-2">
-                              {fieldConfig?.type === "enum" ? (
-                                <Select 
-                                  value={String(rule.value || "")} 
-                                  onValueChange={(v) => updateRule(rule.id, { value: v })}
-                                >
-                                  <SelectTrigger className="flex-1 h-8 text-xs">
-                                    <SelectValue placeholder="Valeur" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {fieldConfig.enumValues?.map(opt => (
-                                      <SelectItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : fieldConfig?.type === "date" ? (
-                                <>
-                                  <Input
-                                    type="date"
-                                    className="flex-1 h-8 text-xs"
-                                    value={String(rule.value || "")}
-                                    onChange={(e) => updateRule(rule.id, { value: e.target.value })}
-                                    data-testid={`input-filter-value-${index}`}
-                                  />
-                                  {needsSecondValue && (
-                                    <>
-                                      <span className="flex items-center text-xs text-muted-foreground">et</span>
-                                      <Input
-                                        type="date"
-                                        className="flex-1 h-8 text-xs"
-                                        value={String(rule.value2 || "")}
-                                        onChange={(e) => updateRule(rule.id, { value2: e.target.value })}
-                                        data-testid={`input-filter-value2-${index}`}
-                                      />
-                                    </>
-                                  )}
-                                </>
-                              ) : fieldConfig?.type === "number" ? (
-                                <>
-                                  <Input
-                                    type="number"
-                                    className="flex-1 h-8 text-xs"
-                                    placeholder="Valeur"
-                                    value={rule.value === null ? "" : String(rule.value)}
-                                    onChange={(e) => updateRule(rule.id, { value: e.target.value })}
-                                    data-testid={`input-filter-value-${index}`}
-                                  />
-                                  {needsSecondValue && (
-                                    <>
-                                      <span className="flex items-center text-xs text-muted-foreground">et</span>
-                                      <Input
-                                        type="number"
-                                        className="flex-1 h-8 text-xs"
-                                        placeholder="Valeur"
-                                        value={rule.value2 === null || rule.value2 === undefined ? "" : String(rule.value2)}
-                                        onChange={(e) => updateRule(rule.id, { value2: e.target.value })}
-                                        data-testid={`input-filter-value2-${index}`}
-                                      />
-                                    </>
-                                  )}
-                                </>
-                              ) : (
-                                <Input
-                                  type="text"
-                                  className="flex-1 h-8 text-xs"
-                                  placeholder="Valeur"
-                                  value={String(rule.value || "")}
-                                  onChange={(e) => updateRule(rule.id, { value: e.target.value })}
-                                  data-testid={`input-filter-value-${index}`}
-                                />
-                              )}
-                            </div>
-                          )}
+              return (
+                <Card key={rule.id} className="p-4">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-1 block">Champ</Label>
+                          <Select 
+                            value={rule.field} 
+                            onValueChange={(v) => {
+                              const newFieldConfig = SURGERY_IMPLANT_FILTER_CONFIGS.find(c => c.field === v);
+                              updateRule(rule.id, { 
+                                field: v as SurgeryImplantFilterField,
+                                operator: newFieldConfig?.operators[0] || "equals",
+                                value: "",
+                                value2: undefined,
+                              });
+                            }}
+                          >
+                            <SelectTrigger data-testid={`select-field-${index}`}>
+                              <SelectValue placeholder="Champ" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SURGERY_IMPLANT_FILTER_CONFIGS.map(config => (
+                                <SelectItem key={config.field} value={config.field}>
+                                  {config.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
 
-                        {localFilters.rules.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0"
-                            onClick={() => removeRule(rule.id)}
-                            data-testid={`button-remove-rule-${index}`}
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-1 block">Opérateur</Label>
+                          <Select 
+                            value={rule.operator} 
+                            onValueChange={(v) => updateRule(rule.id, { operator: v as SurgeryImplantFilterOperator })}
                           >
-                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                          </Button>
-                        )}
+                            <SelectTrigger data-testid={`select-operator-${index}`}>
+                              <SelectValue placeholder="Opérateur" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {fieldConfig?.operators.map(op => (
+                                <SelectItem key={op} value={op}>
+                                  {OPERATOR_LABELS[op]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    </Card>
-                  );
-                })}
-              </div>
 
-              <Button variant="outline" size="sm" className="gap-2" onClick={addRule} data-testid="button-add-rule">
-                <Plus className="h-3.5 w-3.5" />
-                Ajouter une condition
-              </Button>
-            </div>
-          </ScrollArea>
+                      {needsValue && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-1 block">Valeur</Label>
+                          {fieldConfig?.type === "enum" ? (
+                            <Select 
+                              value={String(rule.value || "")} 
+                              onValueChange={(v) => updateRule(rule.id, { value: v })}
+                            >
+                              <SelectTrigger data-testid={`select-value-${index}`}>
+                                <SelectValue placeholder="Sélectionner..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {fieldConfig.enumValues?.map(opt => (
+                                  <SelectItem key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : fieldConfig?.type === "date" ? (
+                            <div className="flex gap-2">
+                              <Input
+                                type="date"
+                                value={String(rule.value || "")}
+                                onChange={(e) => updateRule(rule.id, { value: e.target.value })}
+                                data-testid={`input-filter-value-${index}`}
+                              />
+                              {needsSecondValue && (
+                                <>
+                                  <span className="flex items-center text-muted-foreground">et</span>
+                                  <Input
+                                    type="date"
+                                    value={String(rule.value2 || "")}
+                                    onChange={(e) => updateRule(rule.id, { value2: e.target.value })}
+                                    data-testid={`input-filter-value2-${index}`}
+                                  />
+                                </>
+                              )}
+                            </div>
+                          ) : fieldConfig?.type === "number" ? (
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                placeholder="Valeur"
+                                value={rule.value === null ? "" : String(rule.value)}
+                                onChange={(e) => updateRule(rule.id, { value: e.target.value })}
+                                data-testid={`input-filter-value-${index}`}
+                              />
+                              {needsSecondValue && (
+                                <>
+                                  <span className="flex items-center text-muted-foreground">et</span>
+                                  <Input
+                                    type="number"
+                                    placeholder="Valeur max"
+                                    value={rule.value2 === null || rule.value2 === undefined ? "" : String(rule.value2)}
+                                    onChange={(e) => updateRule(rule.id, { value2: e.target.value })}
+                                    data-testid={`input-filter-value2-${index}`}
+                                  />
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <Input
+                              type="text"
+                              placeholder="Valeur..."
+                              value={String(rule.value || "")}
+                              onChange={(e) => updateRule(rule.id, { value: e.target.value })}
+                              data-testid={`input-filter-value-${index}`}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
 
-          <SheetFooter className="flex-row gap-2 pt-4 border-t">
-            <Button variant="outline" size="sm" onClick={handleClear} data-testid="button-clear-filters">
-              Effacer
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-1.5" 
-              onClick={() => setSaveDialogOpen(true)}
-              disabled={localFilters.rules.length === 0}
-              data-testid="button-save-filter"
-            >
-              <Save className="h-3.5 w-3.5" />
-              Enregistrer
-            </Button>
-            <Button size="sm" onClick={handleApply} data-testid="button-apply-filters">
-              Appliquer
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
-      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Enregistrer le filtre</DialogTitle>
-            <DialogDescription>
-              Donnez un nom à ce filtre pour le retrouver facilement.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="filter-name">Nom du filtre</Label>
-            <Input
-              id="filter-name"
-              placeholder="Ex: Implants en succès"
-              value={filterName}
-              onChange={(e) => setFilterName(e.target.value)}
-              className="mt-2"
-              data-testid="input-filter-name"
-            />
+                    {localFilters.rules.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 mt-6"
+                        onClick={() => removeRule(rule.id)}
+                        data-testid={`button-remove-rule-${index}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
-              Annuler
-            </Button>
-            <Button onClick={handleSaveFilter} disabled={!filterName.trim()}>
-              Enregistrer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+
+          <Button variant="outline" className="w-full" onClick={addRule} data-testid="button-add-rule">
+            <Plus className="h-4 w-4 mr-2" />
+            Ajouter un filtre
+          </Button>
+        </div>
+
+        <SheetFooter className="flex gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => setSaveDialogOpen(true)}
+                data-testid="button-save-filter-favorite"
+              >
+                <Save className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Sauvegarder ce filtre en favoris</p>
+            </TooltipContent>
+          </Tooltip>
+          <Button variant="outline" onClick={handleClear} data-testid="button-clear-filters">
+            <X className="h-4 w-4 mr-2" />
+            Effacer tout
+          </Button>
+          <Button onClick={handleApply} data-testid="button-apply-filters">
+            Appliquer
+          </Button>
+        </SheetFooter>
+
+        <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Ajouter aux favoris</DialogTitle>
+              <DialogDescription>
+                Donnez un nom à ce filtre pour le retrouver facilement.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                placeholder="Nom du favori"
+                value={filterName}
+                onChange={(e) => setFilterName(e.target.value)}
+                data-testid="input-favorite-name"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button onClick={handleSaveFilter} disabled={!filterName.trim() || saveMutation.isPending}>
+                Enregistrer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -591,56 +621,43 @@ export function SurgeryImplantFilterChips({
 }) {
   if (!filters || filters.rules.length === 0) return null;
 
-  const getChipLabel = (rule: SurgeryImplantFilterRule): string => {
-    const fieldConfig = SURGERY_IMPLANT_FILTER_CONFIGS.find(c => c.field === rule.field);
-    const fieldLabel = fieldConfig?.label || rule.field;
-    const operatorLabel = OPERATOR_LABELS[rule.operator];
-
-    if (rule.operator === "is_null" || rule.operator === "is_not_null") {
-      return `${fieldLabel} ${operatorLabel}`;
-    }
-
-    let valueLabel = String(rule.value);
-    if (fieldConfig?.type === "enum" && fieldConfig.enumValues) {
-      const enumOption = fieldConfig.enumValues.find(v => v.value === rule.value);
-      valueLabel = enumOption?.label || valueLabel;
-    }
-
-    if (rule.operator === "between") {
-      return `${fieldLabel} ${operatorLabel} ${valueLabel} et ${rule.value2}`;
-    }
-
-    return `${fieldLabel} ${operatorLabel} ${valueLabel}`;
-  };
-
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {filters.rules.map((rule, index) => (
-        <Badge 
-          key={rule.id} 
-          variant="secondary" 
-          className="gap-1.5 text-xs py-1"
-        >
-          {index > 0 && (
-            <span className="text-muted-foreground font-normal">
-              {filters.operator === "AND" ? "ET" : "OU"}
-            </span>
-          )}
-          {getChipLabel(rule)}
-          <button
-            className="ml-1 hover:text-destructive transition-colors"
+    <div className="flex flex-wrap gap-2 items-center">
+      <span className="text-sm text-muted-foreground">Filtres actifs:</span>
+      {filters.rules.map((rule, index) => {
+        const fieldConfig = SURGERY_IMPLANT_FILTER_CONFIGS.find(c => c.field === rule.field);
+        
+        let displayValue = String(rule.value || "");
+        if (fieldConfig?.type === "enum" && fieldConfig.enumValues) {
+          const option = fieldConfig.enumValues.find(o => o.value === rule.value);
+          displayValue = option?.label || displayValue;
+        }
+        if (rule.operator === "is_null") {
+          displayValue = "";
+        }
+        if (rule.operator === "is_not_null") {
+          displayValue = "";
+        }
+
+        const chipLabel = `${fieldConfig?.label || rule.field} ${OPERATOR_LABELS[rule.operator]}${displayValue ? ` ${displayValue}` : ""}`;
+
+        return (
+          <Badge 
+            key={rule.id} 
+            variant="secondary" 
+            className="cursor-pointer"
             onClick={() => onRemoveFilter(rule.id)}
-            data-testid={`button-remove-chip-${index}`}
+            data-testid={`filter-chip-${index}`}
           >
-            <X className="h-3 w-3" />
-          </button>
-        </Badge>
-      ))}
-      {filters.rules.length > 1 && (
+            {chipLabel}
+            <X className="h-3 w-3 ml-1" />
+          </Badge>
+        );
+      })}
+      {filters.rules.length > 0 && (
         <Button 
           variant="ghost" 
           size="sm" 
-          className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
           onClick={onClearAll}
           data-testid="button-clear-all-chips"
         >
