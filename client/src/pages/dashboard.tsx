@@ -167,6 +167,9 @@ interface BasicStats {
   totalOperations: number;
   monthlyImplants: number;
   monthlyOperations: number;
+  previousMonthImplants: number;
+  previousMonthOperations: number;
+  previousMonthPatients: number;
   implantsByStatus: Record<string, number>;
   recentOperations: Operation[];
 }
@@ -515,6 +518,24 @@ export default function DashboardPage() {
     critique: (stats?.implantsByStatus?.["COMPLICATION"] || 0) + (stats?.implantsByStatus?.["ECHEC"] || 0),
   };
 
+  const calculateChange = (current: number, previous: number): { value: string; positive: boolean } | undefined => {
+    if (previous === 0) {
+      if (current > 0) {
+        return { value: `+${current} ce mois`, positive: true };
+      }
+      return undefined;
+    }
+    const percentChange = ((current - previous) / previous) * 100;
+    const sign = percentChange >= 0 ? "+" : "";
+    return {
+      value: `${sign}${percentChange.toFixed(0)}% vs mois dernier`,
+      positive: percentChange >= 0,
+    };
+  };
+
+  const implantChange = calculateChange(stats?.monthlyImplants || 0, stats?.previousMonthImplants || 0);
+  const operationChange = calculateChange(stats?.monthlyOperations || 0, stats?.previousMonthOperations || 0);
+
   // Render block by ID
   const renderBlock = (blockId: BlockId) => {
     switch (blockId) {
@@ -526,7 +547,6 @@ export default function DashboardPage() {
               value={stats?.totalPatients || 0}
               icon={<Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
               iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-              change={{ value: "+12% vs mois dernier", positive: true }}
             />
             <StatCard
               title="Implants posés ce mois"
@@ -537,21 +557,20 @@ export default function DashboardPage() {
                 </svg>
               }
               iconBgColor="bg-amber-100 dark:bg-amber-900/30"
-              change={{ value: "+8% vs mois dernier", positive: true }}
+              change={implantChange}
             />
             <StatCard
               title="Actes ce mois"
               value={stats?.monthlyOperations || 0}
               icon={<ClipboardList className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
               iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-              change={{ value: "+15% vs mois dernier", positive: true }}
+              change={operationChange}
             />
             <StatCard
               title="Taux de succès"
               value={`${advancedStats?.successRate || 0}%`}
               icon={<CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
               iconBgColor="bg-green-100 dark:bg-green-900/30"
-              change={{ value: "+0.5% vs année dernière", positive: true }}
             />
           </div>
         );

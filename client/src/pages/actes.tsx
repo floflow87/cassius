@@ -66,6 +66,7 @@ import { cn } from "@/lib/utils";
 import { OperationForm } from "@/components/operation-form";
 import { queryClient } from "@/lib/queryClient";
 import { ActesAdvancedFilterDrawer, ActeFilterChips, type ActeFilterGroup } from "@/components/actes-advanced-filter-drawer";
+import { SurgeryImplantsFilterDrawer, SurgeryImplantFilterChips, type SurgeryImplantFilterGroup } from "@/components/surgery-implants-filter-drawer";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Operation, Patient, SurgeryImplant, Implant } from "@shared/schema";
 
@@ -198,6 +199,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<ActeFilterGroup | null>(null);
+  const [surgeryImplantFilters, setSurgeryImplantFilters] = useState<SurgeryImplantFilterGroup | null>(null);
   const [implantCurrentPage, setImplantCurrentPage] = useState(1);
   const { toast } = useToast();
 
@@ -618,8 +620,97 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
       });
     }
     
+    // Apply advanced filters
+    if (surgeryImplantFilters && surgeryImplantFilters.rules.length > 0) {
+      filtered = filtered.filter((si) => {
+        const results = surgeryImplantFilters.rules.map((rule) => {
+          let fieldValue: string | number | null = null;
+          
+          switch (rule.field) {
+            case "datePose":
+              fieldValue = si.datePose || null;
+              break;
+            case "statut":
+              fieldValue = si.statut || "EN_SUIVI";
+              break;
+            case "marque":
+              fieldValue = si.implant?.marque || null;
+              break;
+            case "siteFdi":
+              fieldValue = si.siteFdi || null;
+              break;
+            case "isqPose":
+              fieldValue = si.isqPose ?? null;
+              break;
+            case "isq2m":
+              fieldValue = si.isq2m ?? null;
+              break;
+            case "isq3m":
+              fieldValue = si.isq3m ?? null;
+              break;
+            case "isq6m":
+              fieldValue = si.isq6m ?? null;
+              break;
+            case "diametre":
+              fieldValue = si.implant?.diametre ?? null;
+              break;
+            case "longueur":
+              fieldValue = si.implant?.longueur ?? null;
+              break;
+          }
+          
+          switch (rule.operator) {
+            case "equals":
+              return fieldValue === rule.value;
+            case "not_equals":
+              return fieldValue !== rule.value;
+            case "contains":
+              return typeof fieldValue === "string" && typeof rule.value === "string" && fieldValue.toLowerCase().includes(rule.value.toLowerCase());
+            case "greater_than":
+              if (rule.field === "datePose") {
+                return fieldValue && rule.value && new Date(fieldValue) > new Date(String(rule.value));
+              }
+              return typeof fieldValue === "number" && typeof rule.value === "number" && fieldValue > rule.value;
+            case "greater_than_or_equal":
+              if (rule.field === "datePose") {
+                return fieldValue && rule.value && new Date(fieldValue) >= new Date(String(rule.value));
+              }
+              return typeof fieldValue === "number" && typeof rule.value === "number" && fieldValue >= rule.value;
+            case "less_than":
+              if (rule.field === "datePose") {
+                return fieldValue && rule.value && new Date(fieldValue) < new Date(String(rule.value));
+              }
+              return typeof fieldValue === "number" && typeof rule.value === "number" && fieldValue < rule.value;
+            case "less_than_or_equal":
+              if (rule.field === "datePose") {
+                return fieldValue && rule.value && new Date(fieldValue) <= new Date(String(rule.value));
+              }
+              return typeof fieldValue === "number" && typeof rule.value === "number" && fieldValue <= rule.value;
+            case "between":
+              if (rule.field === "datePose") {
+                return fieldValue && rule.value && rule.value2 && 
+                  new Date(fieldValue) >= new Date(String(rule.value)) && 
+                  new Date(fieldValue) <= new Date(String(rule.value2));
+              }
+              return typeof fieldValue === "number" && typeof rule.value === "number" && typeof rule.value2 === "number" && 
+                fieldValue >= rule.value && fieldValue <= rule.value2;
+            case "is_null":
+              return fieldValue === null || fieldValue === undefined;
+            case "is_not_null":
+              return fieldValue !== null && fieldValue !== undefined;
+            default:
+              return true;
+          }
+        });
+        
+        return surgeryImplantFilters.operator === "AND" 
+          ? results.every(Boolean) 
+          : results.some(Boolean);
+      });
+    }
+    
     return filtered;
-  }, [surgeryImplants, searchQuery]);
+  }, [surgeryImplants, searchQuery, surgeryImplantFilters]);
 
   const sortedImplants = useMemo(() => {
     if (!implantSortColumn || !implantSortDirection) return filteredImplants;
@@ -857,6 +948,14 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                 filters={advancedFilters}
                 onFiltersChange={setAdvancedFilters}
                 activeFilterCount={advancedFilters?.rules.length || 0}
+              />
+            )}
+
+            {activeTab === "implants" && (
+              <SurgeryImplantsFilterDrawer
+                filters={surgeryImplantFilters}
+                onFiltersChange={setSurgeryImplantFilters}
+                activeFilterCount={surgeryImplantFilters?.rules.length || 0}
               />
             )}
             
@@ -1124,6 +1223,19 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             <>
               <div className="flex items-center justify-between mb-4">
                 <span className="text-xs italic text-muted-foreground">{sortedImplants.length} implant{sortedImplants.length !== 1 ? "s" : ""}</span>
+                <SurgeryImplantFilterChips
+                  filters={surgeryImplantFilters}
+                  onRemoveFilter={(ruleId) => {
+                    if (!surgeryImplantFilters) return;
+                    const updatedRules = surgeryImplantFilters.rules.filter(r => r.id !== ruleId);
+                    if (updatedRules.length === 0) {
+                      setSurgeryImplantFilters(null);
+                    } else {
+                      setSurgeryImplantFilters({ ...surgeryImplantFilters, rules: updatedRules });
+                    }
+                  }}
+                  onClearAll={() => setSurgeryImplantFilters(null)}
+                />
               </div>
 
               <div className="bg-card rounded-lg border border-border-gray overflow-hidden">

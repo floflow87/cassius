@@ -258,6 +258,9 @@ export interface DashboardStats {
   totalRadios: number;
   monthlyImplants: number;
   monthlyOperations: number;
+  previousMonthImplants: number;
+  previousMonthOperations: number;
+  previousMonthPatients: number;
   implantsByStatus: Record<string, number>;
   recentOperations: Operation[];
 }

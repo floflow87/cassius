@@ -1824,6 +1824,10 @@ export class DatabaseStorage implements IStorage {
 
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+    
     const monthlyImplants = allSurgeryImplants.filter(si => 
       si.datePose.startsWith(currentMonth)
     ).length;
@@ -1832,6 +1836,20 @@ export class DatabaseStorage implements IStorage {
       op.dateOperation.startsWith(currentMonth)
     ).length;
 
+    const previousMonthImplants = allSurgeryImplants.filter(si => 
+      si.datePose.startsWith(previousMonth)
+    ).length;
+
+    const previousMonthOperations = allOperations.filter(op => 
+      op.dateOperation.startsWith(previousMonth)
+    ).length;
+
+    const previousMonthPatients = allPatients.filter(p => {
+      if (!p.createdAt) return false;
+      const createdDate = new Date(p.createdAt);
+      return `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}` === previousMonth;
+    }).length;
+
     return {
       totalPatients: allPatients.length,
       totalOperations: allOperations.length,
@@ -1839,6 +1857,9 @@ export class DatabaseStorage implements IStorage {
       totalRadios: allRadios.length,
       monthlyImplants,
       monthlyOperations,
+      previousMonthImplants,
+      previousMonthOperations,
+      previousMonthPatients,
       implantsByStatus,
       recentOperations: allOperations.slice(0, 10),
     };
