@@ -6220,7 +6220,7 @@ export async function registerRoutes(
     }
   });
 
-  // Get unread count (including flags and upcoming appointments)
+  // Get unread count (stored notifications + unresolved flags, excluding virtual appointments)
   app.get("/api/notifications/unread-count", requireJwtOrSession, async (req, res) => {
     try {
       const organisationId = getOrganisationId(req, res);
@@ -6231,23 +6231,11 @@ export async function registerRoutes(
       // Get stored notification count
       const storedCount = await notificationService.getUnreadCount(userId, organisationId);
       
-      // Also count unresolved flags and upcoming appointments
-      const [flags, appointments] = await Promise.all([
-        storage.getFlagsWithEntity(organisationId, false),
-        storage.getAppointmentsForSync(organisationId),
-      ]);
+      // Also count unresolved flags (clinical alerts that need attention)
+      // Note: We don't count upcoming appointments as they are informational, not unread items
+      const flagsList = await storage.getFlagsWithEntity(organisationId, false);
       
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const dayAfterTomorrow = new Date(today);
-      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-      
-      const upcomingAppointmentsCount = appointments.filter((apt: any) => {
-        const aptDate = new Date(apt.dateStart);
-        return aptDate >= today && aptDate < dayAfterTomorrow;
-      }).length;
-      
-      const totalCount = storedCount + flags.length + upcomingAppointmentsCount;
+      const totalCount = storedCount + flagsList.length;
       
       res.json({ count: totalCount });
     } catch (error: any) {
@@ -6304,8 +6292,18 @@ export async function registerRoutes(
       const userId = req.jwtUser?.userId;
       if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
 
-      const count = await notificationService.markAllAsRead(userId, organisationId);
-      res.json({ success: true, count });
+      // Mark all stored notifications as read
+      const notifCount = await notificationService.markAllAsRead(userId, organisationId);
+      
+      // Also resolve all unresolved flags (virtual notifications)
+      const unresolvedFlags = await storage.getFlagsWithEntity(organisationId, false);
+      let flagsResolved = 0;
+      for (const flag of unresolvedFlags) {
+        await storage.resolveFlag(organisationId, flag.id, userId);
+        flagsResolved++;
+      }
+      
+      res.json({ success: true, count: notifCount + flagsResolved });
     } catch (error: any) {
       console.error("[Notifications] Error marking all as read:", error);
       res.status(500).json({ error: error.message });
