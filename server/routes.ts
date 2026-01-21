@@ -2169,8 +2169,11 @@ export async function registerRoutes(
         });
       }
 
-      // Filter out suggestions that have been applied and no new ISQ since
-      const filteredSuggestions = suggestions.filter(s => !isSuggestionApplied(s.status));
+      // Filter out suggestions that match the current status (no point suggesting what's already applied)
+      // Also filter out suggestions that have been applied and no new ISQ since
+      const filteredSuggestions = suggestions.filter(s => 
+        s.status !== implant.statut && !isSuggestionApplied(s.status)
+      );
 
       // Deduplicate suggestions by status, keeping only the highest confidence for each status
       const confidenceOrder = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
