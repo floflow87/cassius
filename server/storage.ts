@@ -2625,7 +2625,6 @@ export class DatabaseStorage implements IStorage {
         dateStart: appointments.dateStart,
         dateEnd: appointments.dateEnd,
         isq: appointments.isq,
-        color: appointments.color,
         patientNom: patients.nom,
         patientPrenom: patients.prenom,
       })

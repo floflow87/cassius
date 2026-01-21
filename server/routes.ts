@@ -6081,34 +6081,35 @@ export async function registerRoutes(
 
   // Helper: Convert flags to notification-like objects
   function flagsToNotifications(flags: any[]): any[] {
-    const severityMap: Record<string, string> = {
-      CRITICAL: "CRITICAL",
-      WARNING: "WARNING",
-      INFO: "INFO",
-    };
-    
     const titleMap: Record<string, string> = {
       ISQ_LOW: "ISQ Bas Détecté",
       ISQ_CRITICAL: "ISQ Critique",
+      ISQ_DECLINING: "ISQ en Déclin",
       NO_POSTOP_FOLLOWUP: "Suivi Post-opératoire Manquant",
       INCOMPLETE_DATA: "Données Incomplètes",
-      OVERDUE_APPOINTMENT: "Rendez-vous en Retard",
-      MISSING_XRAY: "Radiographie Manquante",
+      NO_RECENT_ISQ: "Mesure ISQ Manquante",
+      NO_RECENT_APPOINTMENT: "Rendez-vous en Retard",
+      LOW_SUCCESS_RATE: "Taux de Succès Bas",
+      IMPLANT_NO_OPERATION: "Implant Sans Intervention",
+      MISSING_DOCUMENT: "Document Manquant",
     };
     
     return flags.map((flag) => {
-      const patientName = flag.patient ? `${flag.patient.prenom || ""} ${flag.patient.nom || ""}`.trim() : null;
+      // Build patient name from FlagWithEntity fields
+      const patientName = flag.patientNom && flag.patientPrenom 
+        ? `${flag.patientPrenom} ${flag.patientNom}`.trim() 
+        : flag.entityName || null;
       return {
         id: `flag-${flag.id}`,
         kind: "ALERT",
         type: flag.type,
-        severity: severityMap[flag.severity] || "INFO",
-        title: titleMap[flag.type] || flag.type,
-        body: flag.message || (patientName ? `Alerte pour ${patientName}` : "Alerte clinique"),
-        entityType: "PATIENT",
-        entityId: flag.patientId,
+        severity: flag.level || "INFO", // Use 'level' not 'severity'
+        title: titleMap[flag.type] || flag.label || flag.type,
+        body: flag.description || (patientName ? `Alerte pour ${patientName}` : "Alerte clinique"),
+        entityType: flag.entityType || "PATIENT",
+        entityId: flag.patientId || flag.entityId,
         patientName,
-        patientId: flag.patientId,
+        patientId: flag.patientId || (flag.entityType === "PATIENT" ? flag.entityId : null),
         createdAt: flag.createdAt || new Date().toISOString(),
         readAt: flag.resolvedAt || null,
         isVirtual: true,
