@@ -120,6 +120,7 @@ export interface IStorage {
   // Patient methods - all require organisationId for multi-tenant isolation
   getPatients(organisationId: string): Promise<Patient[]>;
   getPatient(organisationId: string, id: string): Promise<Patient | undefined>;
+  getPatientsByIds(organisationId: string, ids: string[]): Promise<Patient[]>;
   getPatientWithDetails(organisationId: string, id: string): Promise<PatientDetail | undefined>;
   createPatient(organisationId: string, patient: InsertPatient): Promise<Patient>;
   updatePatient(organisationId: string, id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined>;
@@ -131,6 +132,7 @@ export interface IStorage {
 
   // Operation methods
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
+  getOperationsByIds(organisationId: string, ids: string[]): Promise<Operation[]>;
   getOperationWithDetails(organisationId: string, id: string): Promise<OperationDetail | undefined>;
   getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; successRate: number | null })[]>;
   createOperation(organisationId: string, operation: InsertOperation): Promise<Operation>;
@@ -160,6 +162,7 @@ export interface IStorage {
 
   // Implant catalog methods
   getImplant(organisationId: string, id: string): Promise<Implant | undefined>;
+  getImplantsByIds(organisationId: string, ids: string[]): Promise<Implant[]>;
   createImplant(organisationId: string, implant: InsertImplant): Promise<Implant>;
   updateCatalogImplant(organisationId: string, id: string, updates: Partial<InsertImplant>): Promise<Implant | undefined>;
   deleteImplant(organisationId: string, id: string): Promise<boolean>;
@@ -385,6 +388,33 @@ export class DatabaseStorage implements IStorage {
         eq(patients.organisationId, organisationId)
       ));
     return patient || undefined;
+  }
+
+  async getPatientsByIds(organisationId: string, ids: string[]): Promise<Patient[]> {
+    if (ids.length === 0) return [];
+    return await db.select().from(patients)
+      .where(and(
+        inArray(patients.id, ids),
+        eq(patients.organisationId, organisationId)
+      ));
+  }
+
+  async getOperationsByIds(organisationId: string, ids: string[]): Promise<Operation[]> {
+    if (ids.length === 0) return [];
+    return await db.select().from(operations)
+      .where(and(
+        inArray(operations.id, ids),
+        eq(operations.organisationId, organisationId)
+      ));
+  }
+
+  async getImplantsByIds(organisationId: string, ids: string[]): Promise<Implant[]> {
+    if (ids.length === 0) return [];
+    return await db.select().from(implants)
+      .where(and(
+        inArray(implants.id, ids),
+        eq(implants.organisationId, organisationId)
+      ));
   }
 
   async getPatientWithDetails(organisationId: string, id: string): Promise<PatientDetail | undefined> {

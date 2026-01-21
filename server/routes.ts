@@ -1517,12 +1517,33 @@ export async function registerRoutes(
       const implantIds = surgeryImplants.map(si => si.id);
       const flagSummaries = await storage.getSurgeryImplantFlagSummaries(organisationId, implantIds);
       
+      // Batch fetch operations for patient info
+      const surgeryIds = [...new Set(surgeryImplants.map(si => si.surgeryId))];
+      const operationsData = await storage.getOperationsByIds(organisationId, surgeryIds);
+      const operationsMap = new Map(operationsData.map(op => [op.id, op]));
+      
+      // Batch fetch patients
+      const patientIds = [...new Set(operationsData.map(op => op.patientId))];
+      const patientsData = await storage.getPatientsByIds(organisationId, patientIds);
+      const patientsMap = new Map(patientsData.map(p => [p.id, p]));
+      
+      // Batch fetch implant catalog info
+      const catalogImplantIds = [...new Set(surgeryImplants.map(si => si.implantId))];
+      const catalogImplants = await storage.getImplantsByIds(organisationId, catalogImplantIds);
+      const catalogImplantsMap = new Map(catalogImplants.map(i => [i.id, i]));
+      
       const implantsWithExtras = surgeryImplants.map((si) => {
         const flagSummary = flagSummaries.get(si.id) || { activeFlagCount: 0 };
         // Get visites for this surgery implant's catalog implantId
         const visiteMeasurements = visitesByImplantId.get(si.implantId) || [];
+        const operation = operationsMap.get(si.surgeryId);
+        const patient = operation ? patientsMap.get(operation.patientId) : null;
+        const implant = catalogImplantsMap.get(si.implantId);
         return {
           ...si,
+          implant: implant || null,
+          patient: patient ? { id: patient.id, nom: patient.nom, prenom: patient.prenom } : null,
+          datePose: operation?.dateOperation || null,
           latestIsq: computeLatestIsq(si, visiteMeasurements),
           topFlag: flagSummary.topFlag,
           activeFlagCount: flagSummary.activeFlagCount,
