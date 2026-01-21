@@ -1696,7 +1696,13 @@ export class DatabaseStorage implements IStorage {
 
   async syncVisiteIsqToSurgeryImplant(organisationId: string, surgeryImplantId: string, isqValue: number, visiteDate: string): Promise<void> {
     const [si] = await db
-      .select({ datePose: surgeryImplants.datePose })
+      .select({ 
+        datePose: surgeryImplants.datePose,
+        isqPose: surgeryImplants.isqPose,
+        isq2m: surgeryImplants.isq2m,
+        isq3m: surgeryImplants.isq3m,
+        isq6m: surgeryImplants.isq6m,
+      })
       .from(surgeryImplants)
       .where(and(
         eq(surgeryImplants.id, surgeryImplantId),
@@ -1709,6 +1715,7 @@ export class DatabaseStorage implements IStorage {
     const visiteDateObj = new Date(visiteDate);
     const daysDiff = Math.floor((visiteDateObj.getTime() - poseDate.getTime()) / (1000 * 60 * 60 * 24));
     
+    // Determine which field to potentially update based on timing
     let updateField: 'isqPose' | 'isq2m' | 'isq3m' | 'isq6m';
     if (daysDiff < 30) {
       updateField = 'isqPose';
@@ -1718,6 +1725,13 @@ export class DatabaseStorage implements IStorage {
       updateField = 'isq3m';
     } else {
       updateField = 'isq6m';
+    }
+    
+    // Only update if the field is currently empty - don't overwrite existing values
+    const existingValue = si[updateField];
+    if (existingValue !== null && existingValue !== undefined) {
+      console.log(`[ISQ-SYNC] Skipping update - ${updateField} already has value ${existingValue} (visite ISQ=${isqValue} stored in visites table only)`);
+      return;
     }
     
     await db
