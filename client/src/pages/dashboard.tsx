@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -15,7 +15,27 @@ import {
   Check,
   ChevronsUpDown,
   Loader2,
+  Settings,
+  GripVertical,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DashboardSkeleton } from "@/components/page-skeletons";
@@ -42,6 +62,103 @@ import { FlagBadge } from "@/components/flag-badge";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { Link } from "wouter";
+
+// Dashboard block definitions
+const DASHBOARD_BLOCKS = [
+  { id: "stats-primary", label: "Statistiques principales" },
+  { id: "stats-secondary", label: "Statistiques secondaires" },
+  { id: "rdv-upcoming", label: "Rendez-vous à venir" },
+  { id: "alerts", label: "À surveiller" },
+  { id: "recent-implants", label: "Implants récents avec ISQ" },
+] as const;
+
+type BlockId = typeof DASHBOARD_BLOCKS[number]["id"];
+
+interface DashboardPreferences {
+  blockOrder: BlockId[];
+  hiddenBlocks: BlockId[];
+}
+
+const DEFAULT_PREFERENCES: DashboardPreferences = {
+  blockOrder: ["stats-primary", "stats-secondary", "rdv-upcoming", "alerts", "recent-implants"],
+  hiddenBlocks: [],
+};
+
+const STORAGE_KEY = "cassius-dashboard-preferences";
+
+function loadPreferences(): DashboardPreferences {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        blockOrder: parsed.blockOrder || DEFAULT_PREFERENCES.blockOrder,
+        hiddenBlocks: parsed.hiddenBlocks || DEFAULT_PREFERENCES.hiddenBlocks,
+      };
+    }
+  } catch (e) {
+    console.error("Failed to load dashboard preferences:", e);
+  }
+  return DEFAULT_PREFERENCES;
+}
+
+function savePreferences(prefs: DashboardPreferences) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+  } catch (e) {
+    console.error("Failed to save dashboard preferences:", e);
+  }
+}
+
+// Sortable item for the drawer
+function SortableBlockItem({ 
+  id, 
+  label, 
+  visible, 
+  onToggle 
+}: { 
+  id: string; 
+  label: string; 
+  visible: boolean; 
+  onToggle: (visible: boolean) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 p-3 bg-muted/30 rounded-md"
+    >
+      <button
+        className="cursor-grab touch-none"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </button>
+      <span className="flex-1 text-sm">{label}</span>
+      <Switch
+        checked={visible}
+        onCheckedChange={onToggle}
+        data-testid={`switch-block-${id}`}
+      />
+    </div>
+  );
+}
 
 interface BasicStats {
   totalPatients: number;
@@ -195,6 +312,8 @@ export default function DashboardPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [patientPopoverOpen, setPatientPopoverOpen] = useState(false);
   const [patientSearch, setPatientSearch] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [preferences, setPreferences] = useState<DashboardPreferences>(loadPreferences);
   const [newRdvData, setNewRdvData] = useState({
     patientId: "",
     titre: "",
@@ -205,6 +324,40 @@ export default function DashboardPage() {
     description: "",
   });
   const { toast } = useToast();
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = preferences.blockOrder.indexOf(active.id as BlockId);
+      const newIndex = preferences.blockOrder.indexOf(over.id as BlockId);
+      const newOrder = arrayMove(preferences.blockOrder, oldIndex, newIndex);
+      const newPrefs = { ...preferences, blockOrder: newOrder };
+      setPreferences(newPrefs);
+      savePreferences(newPrefs);
+    }
+  };
+
+  // Toggle block visibility
+  const toggleBlockVisibility = (blockId: BlockId, visible: boolean) => {
+    const newHidden = visible
+      ? preferences.hiddenBlocks.filter(id => id !== blockId)
+      : [...preferences.hiddenBlocks, blockId];
+    const newPrefs = { ...preferences, hiddenBlocks: newHidden };
+    setPreferences(newPrefs);
+    savePreferences(newPrefs);
+  };
+
+  // Check if block is visible
+  const isBlockVisible = (blockId: BlockId) => !preferences.hiddenBlocks.includes(blockId);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/user"],
@@ -361,87 +514,134 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6 space-y-6">
-      <h1 className="text-lg font-medium" data-testid="text-welcome-title">
-        Bienvenue {getUserFirstName()}
-      </h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-lg font-medium" data-testid="text-welcome-title">
+          Bienvenue {getUserFirstName()}
+        </h1>
+        <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" data-testid="button-dashboard-settings">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Personnaliser le tableau de bord</SheetTitle>
+              <SheetDescription>
+                Glissez-déposez pour réorganiser, activez ou désactivez les blocs.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="py-4 space-y-2">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={preferences.blockOrder}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {preferences.blockOrder.map((blockId) => {
+                    const block = DASHBOARD_BLOCKS.find(b => b.id === blockId);
+                    if (!block) return null;
+                    return (
+                      <SortableBlockItem
+                        key={blockId}
+                        id={blockId}
+                        label={block.label}
+                        visible={isBlockVisible(blockId)}
+                        onToggle={(visible) => toggleBlockVisibility(blockId, visible)}
+                      />
+                    );
+                  })}
+                </SortableContext>
+              </DndContext>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
 
       <OnboardingChecklist />
       <SetupChecklist />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Patients actifs"
-          value={stats?.totalPatients || 0}
-          icon={<Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
-          iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-          change={{ value: "+12% vs mois dernier", positive: true }}
-        />
-        <StatCard
-          title="Implants posés ce mois"
-          value={stats?.monthlyImplants?.toLocaleString("fr-FR") || 0}
-          icon={
-            <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
-            </svg>
-          }
-          iconBgColor="bg-amber-100 dark:bg-amber-900/30"
-          change={{ value: "+8% vs mois dernier", positive: true }}
-        />
-        <StatCard
-          title="Actes ce mois"
-          value={stats?.monthlyOperations || 0}
-          icon={<ClipboardList className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
-          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-          change={{ value: "+15% vs mois dernier", positive: true }}
-        />
-        <StatCard
-          title="Taux de succès"
-          value={`${advancedStats?.successRate || 0}%`}
-          icon={<CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
-          iconBgColor="bg-green-100 dark:bg-green-900/30"
-          change={{ value: "+0.5% vs année dernière", positive: true }}
-        />
-      </div>
+      {isBlockVisible("stats-primary") && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" style={{ order: preferences.blockOrder.indexOf("stats-primary") }}>
+          <StatCard
+            title="Patients actifs"
+            value={stats?.totalPatients || 0}
+            icon={<Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
+            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
+            change={{ value: "+12% vs mois dernier", positive: true }}
+          />
+          <StatCard
+            title="Implants posés ce mois"
+            value={stats?.monthlyImplants?.toLocaleString("fr-FR") || 0}
+            icon={
+              <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
+              </svg>
+            }
+            iconBgColor="bg-amber-100 dark:bg-amber-900/30"
+            change={{ value: "+8% vs mois dernier", positive: true }}
+          />
+          <StatCard
+            title="Actes ce mois"
+            value={stats?.monthlyOperations || 0}
+            icon={<ClipboardList className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
+            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+            change={{ value: "+15% vs mois dernier", positive: true }}
+          />
+          <StatCard
+            title="Taux de succès"
+            value={`${advancedStats?.successRate || 0}%`}
+            icon={<CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
+            iconBgColor="bg-green-100 dark:bg-green-900/30"
+            change={{ value: "+0.5% vs année dernière", positive: true }}
+          />
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <SecondaryStatCard
-          title="Visites de suivi"
-          icon={<Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
-          iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-          stats={[
-            { label: "Aujourd'hui", value: upcomingVisites.filter(apt => {
-              const today = new Date();
-              const visitDate = new Date(apt.dateStart);
-              return visitDate.toDateString() === today.toDateString();
-            }).length },
-            { label: "Cette semaine", value: upcomingVisites.length },
-            { label: "À planifier", value: Math.max(0, 15 - upcomingVisites.length) },
-          ]}
-        />
-        <SecondaryStatCard
-          title="Radiographies"
-          icon={<FileImage className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
-          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-          stats={[
-            { label: "CBCT", value: Math.floor((stats?.totalRadios || 0) * 0.1) },
-            { label: "Panoramiques", value: Math.floor((stats?.totalRadios || 0) * 0.25) },
-            { label: "Post-op", value: Math.floor((stats?.totalRadios || 0) * 0.65) },
-          ]}
-        />
-        <SecondaryStatCard
-          title="ISQ"
-          icon={<AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />}
-          iconBgColor="bg-amber-100 dark:bg-amber-900/30"
-          stats={[
-            { label: "Succès", value: isqStats.success },
-            { label: "Moyen", value: isqStats.moyen },
-            { label: "Critique", value: isqStats.critique },
-          ]}
-        />
-      </div>
+      {isBlockVisible("stats-secondary") && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ order: preferences.blockOrder.indexOf("stats-secondary") }}>
+          <SecondaryStatCard
+            title="Visites de suivi"
+            icon={<Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
+            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
+            stats={[
+              { label: "Aujourd'hui", value: upcomingVisites.filter(apt => {
+                const today = new Date();
+                const visitDate = new Date(apt.dateStart);
+                return visitDate.toDateString() === today.toDateString();
+              }).length },
+              { label: "Cette semaine", value: upcomingVisites.length },
+              { label: "À planifier", value: Math.max(0, 15 - upcomingVisites.length) },
+            ]}
+          />
+          <SecondaryStatCard
+            title="Radiographies"
+            icon={<FileImage className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
+            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+            stats={[
+              { label: "CBCT", value: Math.floor((stats?.totalRadios || 0) * 0.1) },
+              { label: "Panoramiques", value: Math.floor((stats?.totalRadios || 0) * 0.25) },
+              { label: "Post-op", value: Math.floor((stats?.totalRadios || 0) * 0.65) },
+            ]}
+          />
+          <SecondaryStatCard
+            title="ISQ"
+            icon={<AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />}
+            iconBgColor="bg-amber-100 dark:bg-amber-900/30"
+            stats={[
+              { label: "Succès", value: isqStats.success },
+              { label: "Moyen", value: isqStats.moyen },
+              { label: "Critique", value: isqStats.critique },
+            ]}
+          />
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ order: Math.max(preferences.blockOrder.indexOf("rdv-upcoming"), preferences.blockOrder.indexOf("alerts")) }}>
+        {isBlockVisible("rdv-upcoming") && <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <CardTitle className="text-sm">Rendez-vous à venir</CardTitle>
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -611,9 +811,9 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground py-2">Aucun rendez-vous à venir</p>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
-        <Card>
+        {isBlockVisible("alerts") && <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <CardTitle className="text-sm flex items-center gap-2">
               <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
@@ -668,11 +868,11 @@ export default function DashboardPage() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
       {/* Section Implants récents avec ISQ */}
-      {surgeryImplants && surgeryImplants.length > 0 && (
+      {isBlockVisible("recent-implants") && surgeryImplants && surgeryImplants.length > 0 && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <CardTitle className="text-sm flex items-center gap-2">

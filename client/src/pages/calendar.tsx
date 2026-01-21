@@ -725,7 +725,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
       return apiRequest("DELETE", `/api/appointments/${appointmentId}`);
     },
     onSuccess: () => {
-      toast({ title: "Rendez-vous supprimé" });
+      toast({ title: "Rendez-vous supprimé", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
       onUpdated();
       onClose();
