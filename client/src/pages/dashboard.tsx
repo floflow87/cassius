@@ -773,7 +773,7 @@ export default function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <CardTitle className="text-sm flex items-center gap-2">
                 <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-                À surveiller
+                Patients à surveiller
               </CardTitle>
               <Badge variant="secondary" className="text-xs">
                 {flagsData?.length || 0} alertes
