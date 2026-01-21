@@ -2106,6 +2106,26 @@ export async function registerRoutes(
         });
       }
 
+      // Rule 8: Status is COMPLICATION but latest ISQ >= 70 -> suggest SUCCES (recovery)
+      if (implant.statut === 'COMPLICATION' && latestIsq !== null && latestIsq >= 70) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'MEDIUM',
+          rule: 'Statut actuel : Complication, mais ISQ récent ≥ 70 (ostéointégration réussie)',
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
+      // Rule 9: Status is COMPLICATION but latest ISQ >= 60 and < 70 -> suggest EN_SUIVI (improving)
+      if (implant.statut === 'COMPLICATION' && latestIsq !== null && latestIsq >= 60 && latestIsq < 70) {
+        suggestions.push({
+          status: 'EN_SUIVI',
+          confidence: 'MEDIUM',
+          rule: 'Statut actuel : Complication, mais ISQ récent ≥ 60 (amélioration en cours)',
+          reasonCode: 'RECOVERY_POSSIBLE',
+        });
+      }
+
       // Filter out suggestions that have been applied and no new ISQ since
       const filteredSuggestions = suggestions.filter(s => !isSuggestionApplied(s.status));
 
