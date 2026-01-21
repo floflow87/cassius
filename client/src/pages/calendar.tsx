@@ -725,7 +725,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
       return apiRequest("DELETE", `/api/appointments/${appointmentId}`);
     },
     onSuccess: () => {
-      toast({ title: "Rendez-vous supprimé" });
+      toast({ title: "Rendez-vous supprimé", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
       onUpdated();
       onClose();
@@ -1212,7 +1212,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
   const createMutation = useMutation({
     mutationFn: async (data: QuickCreateFormData) => {
       const dateStart = new Date(`${data.dateStart}T${data.timeStart}`).toISOString();
-      return apiRequest("POST", `/api/patients/${data.patientId}/appointments`, {
+      await apiRequest("POST", `/api/patients/${data.patientId}/appointments`, {
         title: data.title,
         type: data.type,
         status: "UPCOMING",
@@ -1220,10 +1220,13 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
         description: data.description || null,
         color: data.color || null,
       });
+      return data.patientId;
     },
-    onSuccess: () => {
-      toast({ title: "Rendez-vous créé" });
+    onSuccess: (patientId) => {
+      toast({ title: "Rendez-vous créé", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments?status=UPCOMING&withPatient=true"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "appointments"] });
       onCreated();
       form.reset();
       onClose();
@@ -1528,28 +1531,74 @@ export default function CalendarPage() {
     },
   });
   
-  const { data: googleStatus } = useQuery<{ connected: boolean; syncEnabled: boolean; lastSyncTime?: string; errorCount?: number }>({
+  interface GoogleStatusResponse {
+    connected: boolean;
+    configured: boolean;
+    email?: string;
+    error?: string;
+    integration?: {
+      id: string;
+      isEnabled: boolean;
+      targetCalendarId: string | null;
+      targetCalendarName: string | null;
+      lastSyncAt: string | null;
+      syncErrorCount: number;
+      lastSyncError: string | null;
+    } | null;
+    // Computed convenience properties
+    syncEnabled?: boolean;
+    errorCount?: number;
+  }
+  
+  const { data: googleStatus } = useQuery<GoogleStatusResponse>({
     queryKey: ["/api/integrations/google/status"],
     queryFn: async () => {
       const res = await fetch("/api/integrations/google/status", { credentials: "include" });
-      if (!res.ok) return { connected: false, syncEnabled: false };
-      return res.json();
+      if (!res.ok) return { connected: false, configured: false };
+      const data = await res.json();
+      // Compute convenience properties from integration data
+      return {
+        ...data,
+        syncEnabled: data.integration?.isEnabled ?? false,
+        errorCount: data.integration?.syncErrorCount ?? 0,
+      };
     },
     staleTime: 60000,
   });
   
-  // Fetch Google imported events
-  const { data: googleEvents = [] } = useQuery<GoogleCalendarEvent[]>({
-    queryKey: ["/api/google/imported-events", dateRange.start, dateRange.end],
+  const targetCalendarId = googleStatus?.integration?.targetCalendarId;
+  
+  // Fetch Google Calendar events directly from Google API
+  const { data: googleEvents = [] } = useQuery<GoogleLiveEvent[]>({
+    queryKey: ["/api/google/events", targetCalendarId, dateRange.start, dateRange.end],
     queryFn: async () => {
+      if (!targetCalendarId) return [];
       const res = await fetch(
-        `/api/google/imported-events?timeMin=${dateRange.start}T00:00:00Z&timeMax=${dateRange.end}T23:59:59Z`,
+        `/api/google/events?calendarId=${encodeURIComponent(targetCalendarId)}&timeMin=${dateRange.start}T00:00:00Z&timeMax=${dateRange.end}T23:59:59Z`,
         { credentials: "include" }
       );
       if (!res.ok) return [];
-      return res.json();
+      const data = await res.json();
+      // Filter out Cassius-created events (they have [Cassius] prefix)
+      type ApiEvent = { id: string; summary?: string | null; description?: string | null; location?: string | null; start?: string | null; end?: string | null; allDay?: boolean; htmlLink?: string | null; attendees?: unknown[] };
+      const externalEvents = (data.events || []).filter((event: ApiEvent) => 
+        !event.summary?.startsWith("[Cassius]")
+      );
+      // Map API format to GoogleLiveEvent (only fields needed by calendar UI)
+      return externalEvents.map((event: ApiEvent): GoogleLiveEvent => ({
+        id: event.id,
+        googleEventId: event.id,
+        summary: event.summary ?? null,
+        description: event.description ?? null,
+        location: event.location ?? null,
+        startAt: event.start ? new Date(event.start) : null,
+        endAt: event.end ? new Date(event.end) : null,
+        allDay: event.allDay ?? false,
+        htmlLink: event.htmlLink ?? null,
+        attendees: JSON.stringify(event.attendees || []),
+      }));
     },
-    enabled: !!googleStatus?.connected && showGoogleEvents,
+    enabled: !!googleStatus?.connected && !!targetCalendarId && showGoogleEvents,
     staleTime: 30000,
   });
   
@@ -1664,8 +1713,9 @@ export default function CalendarPage() {
       return apiRequest("PATCH", `/api/appointments/${id}`, { dateStart, dateEnd });
     },
     onSuccess: () => {
-      toast({ title: "Rendez-vous déplacé" });
+      toast({ title: "Rendez-vous déplacé", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments?status=UPCOMING&withPatient=true"] });
     },
     onError: () => {
       toast({ title: "Erreur lors du déplacement", variant: "destructive" });
@@ -2013,6 +2063,7 @@ export default function CalendarPage() {
             slotMinTime="07:00:00"
             slotMaxTime="21:00:00"
             slotDuration="00:30:00"
+            slotLabelInterval="00:30:00"
             eventClick={handleEventClick}
             dateClick={handleDateClick}
             eventDrop={handleEventDrop}
@@ -2096,9 +2147,23 @@ export default function CalendarPage() {
   );
 }
 
+// Type for live Google Calendar events (directly from API, not DB)
+interface GoogleLiveEvent {
+  id: string;
+  googleEventId: string;
+  summary: string | null;
+  description: string | null;
+  location: string | null;
+  startAt: Date | null;
+  endAt: Date | null;
+  allDay: boolean;
+  htmlLink: string | null;
+  attendees: string;
+}
+
 interface GoogleEventDrawerContentProps {
   eventId: string;
-  googleEvents: GoogleCalendarEvent[];
+  googleEvents: GoogleLiveEvent[];
   conflicts: SyncConflict[];
   onClose: () => void;
 }
