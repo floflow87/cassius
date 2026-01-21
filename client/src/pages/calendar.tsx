@@ -1212,7 +1212,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
   const createMutation = useMutation({
     mutationFn: async (data: QuickCreateFormData) => {
       const dateStart = new Date(`${data.dateStart}T${data.timeStart}`).toISOString();
-      return apiRequest("POST", `/api/patients/${data.patientId}/appointments`, {
+      await apiRequest("POST", `/api/patients/${data.patientId}/appointments`, {
         title: data.title,
         type: data.type,
         status: "UPCOMING",
@@ -1220,10 +1220,13 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
         description: data.description || null,
         color: data.color || null,
       });
+      return data.patientId;
     },
-    onSuccess: () => {
-      toast({ title: "Rendez-vous créé" });
+    onSuccess: (patientId) => {
+      toast({ title: "Rendez-vous créé", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments?status=UPCOMING&withPatient=true"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "appointments"] });
       onCreated();
       form.reset();
       onClose();
@@ -1664,8 +1667,9 @@ export default function CalendarPage() {
       return apiRequest("PATCH", `/api/appointments/${id}`, { dateStart, dateEnd });
     },
     onSuccess: () => {
-      toast({ title: "Rendez-vous déplacé" });
+      toast({ title: "Rendez-vous déplacé", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments?status=UPCOMING&withPatient=true"] });
     },
     onError: () => {
       toast({ title: "Erreur lors du déplacement", variant: "destructive" });
@@ -2013,6 +2017,7 @@ export default function CalendarPage() {
             slotMinTime="07:00:00"
             slotMaxTime="21:00:00"
             slotDuration="00:30:00"
+            slotLabelInterval="00:30:00"
             eventClick={handleEventClick}
             dateClick={handleDateClick}
             eventDrop={handleEventDrop}
