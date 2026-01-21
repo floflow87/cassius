@@ -177,8 +177,8 @@ function AppointmentItem({ date, title, patientName, patientId, type, time }: Ap
           <span className="text-xs text-muted-foreground">{month}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{title}</p>
-          <p className="text-sm text-primary hover:underline truncate">{patientName}</p>
+          <p className="text-xs font-medium truncate">{title}</p>
+          <p className="text-xs text-primary hover:underline truncate">{patientName}</p>
         </div>
         <Badge className={`${badgeVariant} no-default-hover-elevate no-default-active-elevate`}>
           {badgeLabel}
@@ -201,7 +201,7 @@ export default function DashboardPage() {
     date: new Date().toISOString().split("T")[0],
     heureDebut: "09:00",
     heureFin: "09:30",
-    type: "consultation" as "consultation" | "suivi" | "chirurgie",
+    type: "consultation" as string,
     description: "",
   });
   const { toast } = useToast();
@@ -270,9 +270,10 @@ export default function DashboardPage() {
       return res.json();
     },
     onSuccess: () => {
-      // Invalidate upcoming appointments query to refresh the list
+      // Invalidate all appointment queries to refresh lists everywhere
       queryClient.invalidateQueries({ queryKey: ["/api/appointments?status=UPCOMING&withPatient=true"] });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/calendar"] });
       setSheetOpen(false);
       setPatientPopoverOpen(false);
       setPatientSearch("");
@@ -553,44 +554,22 @@ export default function DashboardPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Type</Label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={cn(
-                          newRdvData.type === "consultation" && "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700"
-                        )}
-                        onClick={() => setNewRdvData(prev => ({ ...prev, type: "consultation" }))}
-                        data-testid="button-type-consultation"
-                      >
-                        Consultation
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={cn(
-                          newRdvData.type === "suivi" && "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700"
-                        )}
-                        onClick={() => setNewRdvData(prev => ({ ...prev, type: "suivi" }))}
-                        data-testid="button-type-suivi"
-                      >
-                        Suivi
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={cn(
-                          newRdvData.type === "chirurgie" && "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700"
-                        )}
-                        onClick={() => setNewRdvData(prev => ({ ...prev, type: "chirurgie" }))}
-                        data-testid="button-type-chirurgie"
-                      >
-                        Chirurgie
-                      </Button>
-                    </div>
+                    <Select
+                      value={newRdvData.type}
+                      onValueChange={(value) => setNewRdvData(prev => ({ ...prev, type: value }))}
+                    >
+                      <SelectTrigger data-testid="select-type">
+                        <SelectValue placeholder="Sélectionner un type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="consultation" data-testid="select-type-consultation">Consultation</SelectItem>
+                        <SelectItem value="suivi" data-testid="select-type-suivi">Suivi</SelectItem>
+                        <SelectItem value="chirurgie" data-testid="select-type-chirurgie">Chirurgie</SelectItem>
+                        <SelectItem value="controle" data-testid="select-type-controle">Contrôle</SelectItem>
+                        <SelectItem value="urgence" data-testid="select-type-urgence">Urgence</SelectItem>
+                        <SelectItem value="autre" data-testid="select-type-autre">Autre</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="description">Description (optionnelle)</Label>
