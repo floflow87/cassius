@@ -2126,6 +2126,26 @@ export async function registerRoutes(
         });
       }
 
+      // Rule 10: Status is SUCCES but latest ISQ < 60 -> suggest COMPLICATION (not enough stability)
+      if (implant.statut === 'SUCCES' && latestIsq !== null && latestIsq < 60) {
+        suggestions.push({
+          status: 'COMPLICATION',
+          confidence: 'HIGH',
+          rule: 'Statut actuel : Succès, mais ISQ récent < 60 (stabilité insuffisante)',
+          reasonCode: 'ISQ_DROP',
+        });
+      }
+
+      // Rule 11: Status is SUCCES but latest ISQ >= 60 and < 70 -> suggest EN_SUIVI (needs monitoring)
+      if (implant.statut === 'SUCCES' && latestIsq !== null && latestIsq >= 60 && latestIsq < 70) {
+        suggestions.push({
+          status: 'EN_SUIVI',
+          confidence: 'MEDIUM',
+          rule: 'Statut actuel : Succès, mais ISQ récent entre 60-69 (surveillance recommandée)',
+          reasonCode: 'MONITORING_NEEDED',
+        });
+      }
+
       // Filter out suggestions that have been applied and no new ISQ since
       const filteredSuggestions = suggestions.filter(s => !isSuggestionApplied(s.status));
 
