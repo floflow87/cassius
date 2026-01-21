@@ -75,9 +75,9 @@ import { OperationForm } from "@/components/operation-form";
 import { ImplantStatusSuggestions } from "@/components/implant-status-suggestions";
 import type { ImplantDetail } from "@shared/types";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" }> = {
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" | "success" }> = {
   EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
-  SUCCES: { label: "Succès", variant: "default" },
+  SUCCES: { label: "Succès", variant: "success" },
   COMPLICATION: { label: "Complication", variant: "complication" },
   ECHEC: { label: "Échec", variant: "echec" },
 };

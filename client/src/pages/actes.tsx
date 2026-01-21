@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { 
   ArrowUpDown,
   ArrowUp,
@@ -17,7 +18,7 @@ import {
   Search,
   Activity,
 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -815,16 +816,31 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
     <div className="flex flex-col h-full overflow-auto px-6 pb-6">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "actes" | "implants")} className="w-full">
         <div className="flex items-center justify-between gap-4 mb-5">
-          <TabsList>
-            <TabsTrigger value="actes" data-testid="tab-actes">
-              <Stethoscope className="h-4 w-4 mr-2" />
-              Actes
-            </TabsTrigger>
-            <TabsTrigger value="implants" data-testid="tab-implants">
-              <Activity className="h-4 w-4 mr-2" />
-              Implants posés
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit" data-testid="tabs-actes-page">
+            {[
+              { value: "actes" as const, label: "Actes", icon: Stethoscope },
+              { value: "implants" as const, label: "Implants posés", icon: Activity },
+            ].map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setActiveTab(tab.value)}
+                className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 flex items-center gap-2 ${
+                  activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid={`tab-${tab.value}`}
+              >
+                {activeTab === tab.value && (
+                  <motion.div
+                    layoutId="actes-tab-indicator"
+                    className="absolute inset-0 bg-primary rounded-full"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                  />
+                )}
+                <tab.icon className="h-4 w-4 relative z-10" />
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            ))}
+          </div>
           
           <div className="flex items-center gap-4">
             <CassiusSearchInput 

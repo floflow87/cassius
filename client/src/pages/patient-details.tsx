@@ -1027,8 +1027,8 @@ export default function PatientDetailsPage() {
   };
 
   const getStatusBadge = (statut: string) => {
-    const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" }> = {
-      SUCCES: { label: "Succès", variant: "default" },
+    const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" | "success" }> = {
+      SUCCES: { label: "Succès", variant: "success" },
       EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
       COMPLICATION: { label: "Complication", variant: "complication" },
       ECHEC: { label: "Échec", variant: "echec" },
