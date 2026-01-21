@@ -359,6 +359,9 @@ export default function DashboardPage() {
   // Check if block is visible
   const isBlockVisible = (blockId: BlockId) => !preferences.hiddenBlocks.includes(blockId);
 
+  // Get visible blocks in order
+  const visibleBlocksInOrder = preferences.blockOrder.filter(id => isBlockVisible(id));
+
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/user"],
   });
@@ -512,6 +515,406 @@ export default function DashboardPage() {
     critique: (stats?.implantsByStatus?.["COMPLICATION"] || 0) + (stats?.implantsByStatus?.["ECHEC"] || 0),
   };
 
+  // Render block by ID
+  const renderBlock = (blockId: BlockId) => {
+    switch (blockId) {
+      case "stats-primary":
+        return (
+          <div key={blockId} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="Patients actifs"
+              value={stats?.totalPatients || 0}
+              icon={<Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
+              iconBgColor="bg-blue-100 dark:bg-blue-900/30"
+              change={{ value: "+12% vs mois dernier", positive: true }}
+            />
+            <StatCard
+              title="Implants posés ce mois"
+              value={stats?.monthlyImplants?.toLocaleString("fr-FR") || 0}
+              icon={
+                <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
+                </svg>
+              }
+              iconBgColor="bg-amber-100 dark:bg-amber-900/30"
+              change={{ value: "+8% vs mois dernier", positive: true }}
+            />
+            <StatCard
+              title="Actes ce mois"
+              value={stats?.monthlyOperations || 0}
+              icon={<ClipboardList className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
+              iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+              change={{ value: "+15% vs mois dernier", positive: true }}
+            />
+            <StatCard
+              title="Taux de succès"
+              value={`${advancedStats?.successRate || 0}%`}
+              icon={<CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
+              iconBgColor="bg-green-100 dark:bg-green-900/30"
+              change={{ value: "+0.5% vs année dernière", positive: true }}
+            />
+          </div>
+        );
+      case "stats-secondary":
+        return (
+          <div key={blockId} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <SecondaryStatCard
+              title="Visites de suivi"
+              icon={<Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
+              iconBgColor="bg-blue-100 dark:bg-blue-900/30"
+              stats={[
+                { label: "Aujourd'hui", value: upcomingVisites.filter(apt => {
+                  const today = new Date();
+                  const visitDate = new Date(apt.dateStart);
+                  return visitDate.toDateString() === today.toDateString();
+                }).length },
+                { label: "Cette semaine", value: upcomingVisites.length },
+                { label: "À planifier", value: Math.max(0, 15 - upcomingVisites.length) },
+              ]}
+            />
+            <SecondaryStatCard
+              title="Radiographies"
+              icon={<FileImage className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
+              iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+              stats={[
+                { label: "CBCT", value: Math.floor((stats?.totalRadios || 0) * 0.1) },
+                { label: "Panoramiques", value: Math.floor((stats?.totalRadios || 0) * 0.25) },
+                { label: "Post-op", value: Math.floor((stats?.totalRadios || 0) * 0.65) },
+              ]}
+            />
+            <SecondaryStatCard
+              title="ISQ"
+              icon={<AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />}
+              iconBgColor="bg-amber-100 dark:bg-amber-900/30"
+              stats={[
+                { label: "Succès", value: isqStats.success },
+                { label: "Moyen", value: isqStats.moyen },
+                { label: "Critique", value: isqStats.critique },
+              ]}
+            />
+          </div>
+        );
+      case "rdv-upcoming":
+        return (
+          <Card key={blockId}>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-sm">Rendez-vous à venir</CardTitle>
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button size="sm" data-testid="button-new-rdv">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Nouveau rdv
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="sm:max-w-md">
+                  <SheetHeader>
+                    <SheetTitle>Nouveau rendez-vous</SheetTitle>
+                  </SheetHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Patient</Label>
+                      <Popover open={patientPopoverOpen} onOpenChange={setPatientPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={patientPopoverOpen}
+                            className="w-full justify-between"
+                            data-testid="button-select-patient"
+                          >
+                            {selectedPatient
+                              ? `${selectedPatient.prenom} ${selectedPatient.nom}`
+                              : "Sélectionner un patient..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput 
+                              placeholder="Rechercher un patient..." 
+                              value={patientSearch}
+                              onValueChange={setPatientSearch}
+                              data-testid="input-patient-search"
+                            />
+                            <CommandList>
+                              <CommandEmpty>Aucun patient trouvé.</CommandEmpty>
+                              <CommandGroup>
+                                {filteredPatients.slice(0, 10).map((patient) => (
+                                  <CommandItem
+                                    key={patient.id}
+                                    value={`${patient.prenom} ${patient.nom}`}
+                                    onSelect={() => {
+                                      setNewRdvData(prev => ({ ...prev, patientId: patient.id }));
+                                      setPatientPopoverOpen(false);
+                                    }}
+                                    data-testid={`patient-option-${patient.id}`}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        newRdvData.patientId === patient.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {patient.prenom} {patient.nom}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="titre">Titre</Label>
+                      <Input 
+                        id="titre"
+                        placeholder="Ex: Contrôle implant"
+                        value={newRdvData.titre}
+                        onChange={(e) => setNewRdvData(prev => ({ ...prev, titre: e.target.value }))}
+                        data-testid="input-titre"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="date">Date</Label>
+                        <Input 
+                          id="date"
+                          type="date"
+                          value={newRdvData.date}
+                          onChange={(e) => setNewRdvData(prev => ({ ...prev, date: e.target.value }))}
+                          data-testid="input-date"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="heureDebut">Début</Label>
+                        <Input 
+                          id="heureDebut"
+                          type="time"
+                          value={newRdvData.heureDebut}
+                          onChange={(e) => setNewRdvData(prev => ({ ...prev, heureDebut: e.target.value }))}
+                          data-testid="input-heure-debut"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="heureFin">Fin</Label>
+                        <Input 
+                          id="heureFin"
+                          type="time"
+                          value={newRdvData.heureFin}
+                          onChange={(e) => setNewRdvData(prev => ({ ...prev, heureFin: e.target.value }))}
+                          data-testid="input-heure-fin"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="type">Type</Label>
+                      <Select
+                        value={newRdvData.type}
+                        onValueChange={(value) => setNewRdvData(prev => ({ ...prev, type: value }))}
+                      >
+                        <SelectTrigger data-testid="select-type">
+                          <SelectValue placeholder="Sélectionner un type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="consultation" data-testid="select-type-consultation">Consultation</SelectItem>
+                          <SelectItem value="suivi" data-testid="select-type-suivi">Suivi</SelectItem>
+                          <SelectItem value="chirurgie" data-testid="select-type-chirurgie">Chirurgie</SelectItem>
+                          <SelectItem value="controle" data-testid="select-type-controle">Contrôle</SelectItem>
+                          <SelectItem value="urgence" data-testid="select-type-urgence">Urgence</SelectItem>
+                          <SelectItem value="autre" data-testid="select-type-autre">Autre</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description (optionnelle)</Label>
+                      <Textarea 
+                        id="description"
+                        placeholder="Informations complémentaires..."
+                        value={newRdvData.description}
+                        onChange={(e) => setNewRdvData(prev => ({ ...prev, description: e.target.value }))}
+                        data-testid="input-description"
+                      />
+                    </div>
+                    <Button 
+                      className="w-full" 
+                      onClick={handleCreateRdv}
+                      disabled={createAppointmentMutation.isPending}
+                      data-testid="button-submit-rdv"
+                    >
+                      {createAppointmentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Créer le rendez-vous
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {upcomingVisites.length > 0 ? (
+                upcomingVisites.map((apt) => (
+                  <AppointmentItem
+                    key={apt.id}
+                    date={new Date(apt.dateStart)}
+                    title={apt.title}
+                    patientName={`${apt.patientPrenom || ""} ${apt.patientNom || ""}`.trim() || "Patient"}
+                    patientId={apt.patientId}
+                    type={apt.type.toLowerCase() === "chirurgie" ? "action" : apt.type.toLowerCase() as "consultation" | "suivi" | "action"}
+                    time={new Date(apt.dateStart).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  />
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground py-2">Aucun rendez-vous à venir</p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      case "alerts":
+        return (
+          <Card key={blockId}>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                À surveiller
+              </CardTitle>
+              <Badge variant="secondary" className="text-xs">
+                {flagsData?.length || 0} alertes
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {flagsData && flagsData.length > 0 ? (
+                [...flagsData]
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                  .slice(0, 5)
+                  .map((flag) => {
+                    const isIsqFlag = ['ISQ_LOW', 'ISQ_DECLINING', 'UNSTABLE_ISQ_HISTORY'].includes(flag.type);
+                    const isqMatch = flag.description?.match(/ISQ[^=]*=?\s*(\d+)/);
+                    const isqValue = isqMatch ? isqMatch[1] : null;
+                    
+                    return (
+                      <Link 
+                        key={flag.id} 
+                        href={flag.patientId ? `/patients/${flag.patientId}` : "#"}
+                        className="block"
+                      >
+                        <div className="flex items-start gap-3 p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer" data-testid={`flag-dashboard-${flag.id}`}>
+                          <FlagBadge flag={flag} compact />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-xs font-medium truncate">{flag.label}</p>
+                              {isIsqFlag && isqValue && (
+                                <Badge variant="secondary" className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                  ISQ {isqValue}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {flag.patientPrenom} {flag.patientNom} {flag.entityName ? `- ${flag.entityName}` : ""}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                              {format(new Date(flag.createdAt), "dd MMM yyyy", { locale: fr })}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })
+              ) : (
+                <div className="text-center py-6">
+                  <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Aucune alerte en cours</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      case "recent-implants":
+        if (!surgeryImplants || surgeryImplants.length === 0) return null;
+        return (
+          <Card key={blockId}>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <svg className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
+                </svg>
+                Implants récents
+              </CardTitle>
+              <Badge variant="secondary" className="text-xs">
+                {surgeryImplants.length} implants
+              </Badge>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {surgeryImplants.slice(0, 8).map((si) => {
+                  const lastIsq = si.isq6m ?? si.isq3m ?? si.isq2m ?? si.isqPose;
+                  const isqLabel = si.isq6m ? "6m" : si.isq3m ? "3m" : si.isq2m ? "2m" : si.isqPose ? "pose" : null;
+                  const isLowIsq = lastIsq !== null && lastIsq <= 55;
+                  const patientId = si.patient?.id;
+                  const datePose = si.datePose ? new Date(si.datePose).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : null;
+                  
+                  return (
+                    <Link 
+                      key={si.id} 
+                      href={patientId ? `/patients/${patientId}/implants/${si.id}` : "#"}
+                      className="block"
+                    >
+                      <div 
+                        className="flex items-center justify-between p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer"
+                        data-testid={`implant-dashboard-${si.id}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                            <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                              {si.siteFdi}
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium truncate">
+                              {si.patient?.prenom} {si.patient?.nom}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {si.implant?.marque} {si.implant?.diametre}x{si.implant?.longueur}mm
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 flex items-center gap-3">
+                          {lastIsq !== null ? (
+                            <div className="flex items-center gap-2">
+                              <Badge 
+                                variant="secondary" 
+                                className={isLowIsq 
+                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" 
+                                  : lastIsq >= 70 
+                                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                }
+                              >
+                                ISQ {lastIsq}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                ({isqLabel})
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                          {datePose && (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {datePose}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -564,397 +967,37 @@ export default function DashboardPage() {
       <OnboardingChecklist />
       <SetupChecklist />
 
-      {isBlockVisible("stats-primary") && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" style={{ order: preferences.blockOrder.indexOf("stats-primary") }}>
-          <StatCard
-            title="Patients actifs"
-            value={stats?.totalPatients || 0}
-            icon={<Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
-            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-            change={{ value: "+12% vs mois dernier", positive: true }}
-          />
-          <StatCard
-            title="Implants posés ce mois"
-            value={stats?.monthlyImplants?.toLocaleString("fr-FR") || 0}
-            icon={
-              <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
-              </svg>
-            }
-            iconBgColor="bg-amber-100 dark:bg-amber-900/30"
-            change={{ value: "+8% vs mois dernier", positive: true }}
-          />
-          <StatCard
-            title="Actes ce mois"
-            value={stats?.monthlyOperations || 0}
-            icon={<ClipboardList className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
-            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-            change={{ value: "+15% vs mois dernier", positive: true }}
-          />
-          <StatCard
-            title="Taux de succès"
-            value={`${advancedStats?.successRate || 0}%`}
-            icon={<CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
-            iconBgColor="bg-green-100 dark:bg-green-900/30"
-            change={{ value: "+0.5% vs année dernière", positive: true }}
-          />
-        </div>
-      )}
-
-      {isBlockVisible("stats-secondary") && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ order: preferences.blockOrder.indexOf("stats-secondary") }}>
-          <SecondaryStatCard
-            title="Visites de suivi"
-            icon={<Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
-            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-            stats={[
-              { label: "Aujourd'hui", value: upcomingVisites.filter(apt => {
-                const today = new Date();
-                const visitDate = new Date(apt.dateStart);
-                return visitDate.toDateString() === today.toDateString();
-              }).length },
-              { label: "Cette semaine", value: upcomingVisites.length },
-              { label: "À planifier", value: Math.max(0, 15 - upcomingVisites.length) },
-            ]}
-          />
-          <SecondaryStatCard
-            title="Radiographies"
-            icon={<FileImage className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
-            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-            stats={[
-              { label: "CBCT", value: Math.floor((stats?.totalRadios || 0) * 0.1) },
-              { label: "Panoramiques", value: Math.floor((stats?.totalRadios || 0) * 0.25) },
-              { label: "Post-op", value: Math.floor((stats?.totalRadios || 0) * 0.65) },
-            ]}
-          />
-          <SecondaryStatCard
-            title="ISQ"
-            icon={<AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />}
-            iconBgColor="bg-amber-100 dark:bg-amber-900/30"
-            stats={[
-              { label: "Succès", value: isqStats.success },
-              { label: "Moyen", value: isqStats.moyen },
-              { label: "Critique", value: isqStats.critique },
-            ]}
-          />
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ order: Math.max(preferences.blockOrder.indexOf("rdv-upcoming"), preferences.blockOrder.indexOf("alerts")) }}>
-        {isBlockVisible("rdv-upcoming") && <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-sm">Rendez-vous à venir</CardTitle>
-            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-              <SheetTrigger asChild>
-                <Button size="sm" data-testid="button-new-rdv">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Nouveau rdv
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="sm:max-w-md">
-                <SheetHeader>
-                  <SheetTitle>Nouveau rendez-vous</SheetTitle>
-                </SheetHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Patient</Label>
-                    <Popover open={patientPopoverOpen} onOpenChange={setPatientPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={patientPopoverOpen}
-                          className="w-full justify-between"
-                          data-testid="button-select-patient"
-                        >
-                          {selectedPatient
-                            ? `${selectedPatient.prenom} ${selectedPatient.nom}`
-                            : "Sélectionner un patient..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0" align="start">
-                        <Command>
-                          <CommandInput 
-                            placeholder="Rechercher un patient..." 
-                            value={patientSearch}
-                            onValueChange={setPatientSearch}
-                            data-testid="input-patient-search"
-                          />
-                          <CommandList>
-                            <CommandEmpty>Aucun patient trouvé.</CommandEmpty>
-                            <CommandGroup>
-                              {filteredPatients.slice(0, 10).map((patient) => (
-                                <CommandItem
-                                  key={patient.id}
-                                  value={`${patient.prenom} ${patient.nom}`}
-                                  onSelect={() => {
-                                    setNewRdvData(prev => ({ ...prev, patientId: patient.id }));
-                                    setPatientPopoverOpen(false);
-                                    setPatientSearch("");
-                                  }}
-                                  data-testid={`patient-option-${patient.id}`}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      newRdvData.patientId === patient.id ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  {patient.prenom} {patient.nom}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="titre">Titre</Label>
-                    <Input 
-                      id="titre"
-                      placeholder="Ex: Consultation pré-opératoire"
-                      value={newRdvData.titre}
-                      onChange={(e) => setNewRdvData(prev => ({ ...prev, titre: e.target.value }))}
-                      data-testid="input-titre"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Date</Label>
-                    <Input 
-                      id="date"
-                      type="date" 
-                      value={newRdvData.date}
-                      onChange={(e) => setNewRdvData(prev => ({ ...prev, date: e.target.value }))}
-                      data-testid="input-date"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="heureDebut">Heure début</Label>
-                      <Input 
-                        id="heureDebut"
-                        type="time" 
-                        value={newRdvData.heureDebut}
-                        onChange={(e) => setNewRdvData(prev => ({ ...prev, heureDebut: e.target.value }))}
-                        data-testid="input-heure-debut"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="heureFin">Heure fin</Label>
-                      <Input 
-                        id="heureFin"
-                        type="time" 
-                        value={newRdvData.heureFin}
-                        onChange={(e) => setNewRdvData(prev => ({ ...prev, heureFin: e.target.value }))}
-                        data-testid="input-heure-fin"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select
-                      value={newRdvData.type}
-                      onValueChange={(value) => setNewRdvData(prev => ({ ...prev, type: value }))}
-                    >
-                      <SelectTrigger data-testid="select-type">
-                        <SelectValue placeholder="Sélectionner un type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="consultation" data-testid="select-type-consultation">Consultation</SelectItem>
-                        <SelectItem value="suivi" data-testid="select-type-suivi">Suivi</SelectItem>
-                        <SelectItem value="chirurgie" data-testid="select-type-chirurgie">Chirurgie</SelectItem>
-                        <SelectItem value="controle" data-testid="select-type-controle">Contrôle</SelectItem>
-                        <SelectItem value="urgence" data-testid="select-type-urgence">Urgence</SelectItem>
-                        <SelectItem value="autre" data-testid="select-type-autre">Autre</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description (optionnelle)</Label>
-                    <Textarea 
-                      id="description"
-                      placeholder="Informations complémentaires..."
-                      value={newRdvData.description}
-                      onChange={(e) => setNewRdvData(prev => ({ ...prev, description: e.target.value }))}
-                      data-testid="input-description"
-                    />
-                  </div>
-                  <Button 
-                    className="w-full" 
-                    onClick={handleCreateRdv}
-                    disabled={createAppointmentMutation.isPending}
-                    data-testid="button-submit-rdv"
-                  >
-                    {createAppointmentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Créer le rendez-vous
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {upcomingVisites.length > 0 ? (
-              upcomingVisites.map((apt) => (
-                <AppointmentItem
-                  key={apt.id}
-                  date={new Date(apt.dateStart)}
-                  title={apt.title}
-                  patientName={`${apt.patientPrenom || ""} ${apt.patientNom || ""}`.trim() || "Patient"}
-                  patientId={apt.patientId}
-                  type={apt.type.toLowerCase() === "chirurgie" ? "action" : apt.type.toLowerCase() as "consultation" | "suivi" | "action"}
-                  time={new Date(apt.dateStart).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                />
-              ))
-            ) : (
-              <p className="text-xs text-muted-foreground py-2">Aucun rendez-vous à venir</p>
-            )}
-          </CardContent>
-        </Card>}
-
-        {isBlockVisible("alerts") && <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-              À surveiller
-            </CardTitle>
-            <Badge variant="secondary" className="text-xs">
-              {flagsData?.length || 0} alertes
-            </Badge>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {flagsData && flagsData.length > 0 ? (
-              [...flagsData]
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                .slice(0, 5)
-                .map((flag) => {
-                  const isIsqFlag = ['ISQ_LOW', 'ISQ_DECLINING', 'UNSTABLE_ISQ_HISTORY'].includes(flag.type);
-                  const isqMatch = flag.description?.match(/ISQ[^=]*=?\s*(\d+)/);
-                  const isqValue = isqMatch ? isqMatch[1] : null;
-                  
-                  return (
-                    <Link 
-                      key={flag.id} 
-                      href={flag.patientId ? `/patients/${flag.patientId}` : "#"}
-                      className="block"
-                    >
-                      <div className="flex items-start gap-3 p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer" data-testid={`flag-dashboard-${flag.id}`}>
-                        <FlagBadge flag={flag} compact />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-xs font-medium truncate">{flag.label}</p>
-                            {isIsqFlag && isqValue && (
-                              <Badge variant="secondary" className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                                ISQ {isqValue}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-muted-foreground truncate">
-                            {flag.patientPrenom} {flag.patientNom} {flag.entityName ? `- ${flag.entityName}` : ""}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                            {format(new Date(flag.createdAt), "dd MMM yyyy", { locale: fr })}
-                          </p>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })
-            ) : (
-              <div className="text-center py-6">
-                <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Aucune alerte en cours</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>}
-      </div>
-
-      {/* Section Implants récents avec ISQ */}
-      {isBlockVisible("recent-implants") && surgeryImplants && surgeryImplants.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <svg className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
-              </svg>
-              Implants récents
-            </CardTitle>
-            <Badge variant="secondary" className="text-xs">
-              {surgeryImplants.length} implants
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {surgeryImplants.slice(0, 8).map((si) => {
-                // Determine the last ISQ value
-                const lastIsq = si.isq6m ?? si.isq3m ?? si.isq2m ?? si.isqPose;
-                const isqLabel = si.isq6m ? "6m" : si.isq3m ? "3m" : si.isq2m ? "2m" : si.isqPose ? "pose" : null;
-                const isLowIsq = lastIsq !== null && lastIsq <= 55;
-                const patientId = si.patient?.id;
-                const datePose = si.datePose ? new Date(si.datePose).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : null;
-                
-                return (
-                  <Link 
-                    key={si.id} 
-                    href={patientId ? `/patients/${patientId}/implants/${si.id}` : "#"}
-                    className="block"
-                  >
-                    <div 
-                      className="flex items-center justify-between p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer"
-                      data-testid={`implant-dashboard-${si.id}`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                          <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                            {si.siteFdi}
-                          </span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium truncate">
-                            {si.patient?.prenom} {si.patient?.nom}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground truncate">
-                            {si.implant?.marque} {si.implant?.diametre}x{si.implant?.longueur}mm
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex-shrink-0 flex items-center gap-3">
-                        {lastIsq !== null ? (
-                          <div className="flex items-center gap-2">
-                            <Badge 
-                              variant="secondary" 
-                              className={isLowIsq 
-                                ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" 
-                                : lastIsq >= 70 
-                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                              }
-                            >
-                              ISQ {lastIsq}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              ({isqLabel})
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                        {datePose && (
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {datePose}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
+      {/* Dynamic block rendering based on user preferences */}
+      {visibleBlocksInOrder.map((blockId) => {
+        // Group rdv-upcoming and alerts together in a grid
+        if (blockId === "rdv-upcoming") {
+          const showAlerts = isBlockVisible("alerts");
+          const alertsIndex = preferences.blockOrder.indexOf("alerts");
+          const rdvIndex = preferences.blockOrder.indexOf("rdv-upcoming");
+          // Only render the grid when rdv-upcoming comes first, or when alerts is hidden
+          if (showAlerts && alertsIndex < rdvIndex) return null;
+          return (
+            <div key="rdv-alerts-grid" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {renderBlock("rdv-upcoming")}
+              {showAlerts && renderBlock("alerts")}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          );
+        }
+        if (blockId === "alerts") {
+          const showRdv = isBlockVisible("rdv-upcoming");
+          const alertsIndex = preferences.blockOrder.indexOf("alerts");
+          const rdvIndex = preferences.blockOrder.indexOf("rdv-upcoming");
+          // Only render the grid when alerts comes first
+          if (showRdv && rdvIndex < alertsIndex) return null;
+          return (
+            <div key="alerts-rdv-grid" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {renderBlock("alerts")}
+              {showRdv && renderBlock("rdv-upcoming")}
+            </div>
+          );
+        }
+        return renderBlock(blockId);
+      })}
 
       {(!stats || stats.totalPatients === 0) && (
         <Card>
