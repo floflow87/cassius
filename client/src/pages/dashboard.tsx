@@ -198,7 +198,7 @@ function StatCard({ title, value, icon, iconBgColor, change, subtitle }: StatCar
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <p className="text-sm text-muted-foreground mb-1">{title}</p>
+            <p className="text-xs text-muted-foreground mb-1">{title}</p>
             <p className="text-3xl font-bold">{value}</p>
             {subtitle && (
               <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
@@ -240,7 +240,7 @@ function SecondaryStatCard({ title, icon, iconBgColor, stats }: SecondaryStatCar
           <div className={`p-2 rounded-lg ${iconBgColor}`}>
             {icon}
           </div>
-          <h3 className="font-semibold text-sm">{title}</h3>
+          <h3 className="font-semibold text-xs">{title}</h3>
         </div>
         <div className="space-y-3">
           {stats.map((stat) => (
