@@ -850,6 +850,14 @@ export default function DashboardPage() {
                   const patientId = si.patient?.id;
                   const datePose = si.datePose ? new Date(si.datePose).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : null;
                   
+                  const statutLabels: Record<string, { label: string; className: string }> = {
+                    EN_SUIVI: { label: "En suivi", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+                    SUCCES: { label: "Succès", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
+                    COMPLICATION: { label: "Complication", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" },
+                    ECHEC: { label: "Échec", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" },
+                  };
+                  const statutInfo = statutLabels[si.statut || "EN_SUIVI"] || statutLabels.EN_SUIVI;
+                  
                   return (
                     <Link 
                       key={si.id} 
@@ -876,6 +884,9 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <div className="flex-shrink-0 flex items-center gap-3">
+                          <Badge className={`text-[10px] border-0 ${statutInfo.className}`}>
+                            {statutInfo.label}
+                          </Badge>
                           {lastIsq !== null ? (
                             <div className="flex items-center gap-2">
                               <Badge 
