@@ -2149,12 +2149,24 @@ export async function registerRoutes(
       // Filter out suggestions that have been applied and no new ISQ since
       const filteredSuggestions = suggestions.filter(s => !isSuggestionApplied(s.status));
 
+      // Deduplicate suggestions by status, keeping only the highest confidence for each status
+      const confidenceOrder = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+      const deduplicatedSuggestions = Object.values(
+        filteredSuggestions.reduce((acc, suggestion) => {
+          const existing = acc[suggestion.status];
+          if (!existing || confidenceOrder[suggestion.confidence] > confidenceOrder[existing.confidence]) {
+            acc[suggestion.status] = suggestion;
+          }
+          return acc;
+        }, {} as Record<string, typeof filteredSuggestions[0]>)
+      );
+
       res.json({
         implantId: surgeryImplantId,
         currentStatus: implant.statut,
         latestIsq,
         isqHistory: { pose: poseIsq, m2: implant.isq2m, m3: implant.isq3m, m6: isq6m },
-        suggestions: filteredSuggestions,
+        suggestions: deduplicatedSuggestions,
       });
     } catch (error) {
       console.error("Error generating status suggestions:", error);
