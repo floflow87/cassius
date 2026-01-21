@@ -68,7 +68,7 @@ const DASHBOARD_BLOCKS = [
   { id: "stats-primary", label: "Statistiques principales" },
   { id: "stats-secondary", label: "Statistiques secondaires" },
   { id: "rdv-upcoming", label: "Rendez-vous à venir" },
-  { id: "alerts", label: "À surveiller" },
+  { id: "alerts", label: "Patients à surveiller" },
   { id: "recent-implants", label: "Implants récents avec ISQ" },
 ] as const;
 
@@ -150,7 +150,7 @@ function SortableBlockItem({
       >
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </button>
-      <span className="flex-1 text-sm">{label}</span>
+      <span className="flex-1 text-xs">{label}</span>
       <Switch
         checked={visible}
         onCheckedChange={onToggle}
