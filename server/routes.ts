@@ -2171,11 +2171,9 @@ export async function registerRoutes(
 
       // Filter out suggestions that match the current status (no point suggesting what's already applied)
       // Also filter out suggestions that have been applied and no new ISQ since
-      console.log('[STATUS-SUGGESTIONS] Current status:', implant.statut, 'Suggestions before filter:', suggestions.map(s => s.status));
       const filteredSuggestions = suggestions.filter(s => 
         s.status !== implant.statut && !isSuggestionApplied(s.status)
       );
-      console.log('[STATUS-SUGGESTIONS] Suggestions after filter:', filteredSuggestions.map(s => s.status));
 
       // Deduplicate suggestions by status, keeping only the highest confidence for each status
       const confidenceOrder = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };

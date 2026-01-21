@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import {
   Users,
   CheckCircle2,
@@ -12,6 +14,7 @@ import {
   Plus,
   Check,
   ChevronsUpDown,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -242,7 +245,70 @@ export default function DashboardPage() {
 
   const selectedPatient = patients?.find(p => p.id === newRdvData.patientId);
 
+  // Mutation to create appointment via API
+  const createAppointmentMutation = useMutation({
+    mutationFn: async (data: {
+      patientId: string;
+      title: string;
+      type: string;
+      dateStart: string;
+      dateEnd: string;
+      description?: string;
+    }) => {
+      const res = await apiRequest("POST", `/api/patients/${data.patientId}/appointments`, {
+        title: data.title,
+        type: data.type.toUpperCase(),
+        dateStart: data.dateStart,
+        dateEnd: data.dateEnd,
+        description: data.description || null,
+        status: "UPCOMING",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erreur lors de la création");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      // Invalidate upcoming appointments query to refresh the list
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments?status=UPCOMING&withPatient=true"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      setSheetOpen(false);
+      setPatientPopoverOpen(false);
+      setPatientSearch("");
+      setNewRdvData({
+        patientId: "",
+        titre: "",
+        date: new Date().toISOString().split("T")[0],
+        heureDebut: "09:00",
+        heureFin: "09:30",
+        type: "consultation",
+        description: "",
+      });
+      toast({
+        title: "Rendez-vous créé",
+        description: "Le nouveau rendez-vous a été enregistré.",
+        variant: "success",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de créer le rendez-vous.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateRdv = () => {
+    if (!newRdvData.patientId) {
+      toast({
+        title: "Patient requis",
+        description: "Veuillez sélectionner un patient.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!newRdvData.titre || !newRdvData.date) {
       toast({
         title: "Champs requis",
@@ -251,22 +317,18 @@ export default function DashboardPage() {
       });
       return;
     }
-    setSheetOpen(false);
-    setPatientPopoverOpen(false);
-    setPatientSearch("");
-    setNewRdvData({
-      patientId: "",
-      titre: "",
-      date: new Date().toISOString().split("T")[0],
-      heureDebut: "09:00",
-      heureFin: "09:30",
-      type: "consultation",
-      description: "",
-    });
-    toast({
-      title: "Rendez-vous créé",
-      description: "Le nouveau rendez-vous a été enregistré.",
-      variant: "success",
+    
+    // Build ISO datetime strings
+    const dateStart = `${newRdvData.date}T${newRdvData.heureDebut}:00`;
+    const dateEnd = `${newRdvData.date}T${newRdvData.heureFin}:00`;
+    
+    createAppointmentMutation.mutate({
+      patientId: newRdvData.patientId,
+      title: newRdvData.titre,
+      type: newRdvData.type,
+      dateStart,
+      dateEnd,
+      description: newRdvData.description,
     });
   };
 
@@ -543,8 +605,10 @@ export default function DashboardPage() {
                   <Button 
                     className="w-full" 
                     onClick={handleCreateRdv}
+                    disabled={createAppointmentMutation.isPending}
                     data-testid="button-submit-rdv"
                   >
+                    {createAppointmentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Créer le rendez-vous
                   </Button>
                 </div>
@@ -582,23 +646,42 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {flagsData && flagsData.length > 0 ? (
-              flagsData.slice(0, 5).map((flag) => (
-                <Link 
-                  key={flag.id} 
-                  href={flag.patientId ? `/patients/${flag.patientId}` : "#"}
-                  className="block"
-                >
-                  <div className="flex items-start gap-3 p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer" data-testid={`flag-dashboard-${flag.id}`}>
-                    <FlagBadge flag={flag} compact />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{flag.label}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">
-                        {flag.patientPrenom} {flag.patientNom} {flag.entityName ? `- ${flag.entityName}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              ))
+              [...flagsData]
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .slice(0, 5)
+                .map((flag) => {
+                  const isIsqFlag = ['ISQ_LOW', 'ISQ_DECLINING', 'UNSTABLE_ISQ_HISTORY'].includes(flag.type);
+                  const isqMatch = flag.description?.match(/ISQ[^=]*=?\s*(\d+)/);
+                  const isqValue = isqMatch ? isqMatch[1] : null;
+                  
+                  return (
+                    <Link 
+                      key={flag.id} 
+                      href={flag.patientId ? `/patients/${flag.patientId}` : "#"}
+                      className="block"
+                    >
+                      <div className="flex items-start gap-3 p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer" data-testid={`flag-dashboard-${flag.id}`}>
+                        <FlagBadge flag={flag} compact />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs font-medium truncate">{flag.label}</p>
+                            {isIsqFlag && isqValue && (
+                              <Badge variant="secondary" className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                ISQ {isqValue}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {flag.patientPrenom} {flag.patientNom} {flag.entityName ? `- ${flag.entityName}` : ""}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                            {format(new Date(flag.createdAt), "dd MMM yyyy", { locale: fr })}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })
             ) : (
               <div className="text-center py-6">
                 <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
