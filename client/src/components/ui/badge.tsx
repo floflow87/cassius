@@ -17,6 +17,7 @@ const badgeVariants = cva(
         echec: "border-transparent bg-[#FEF2F2] text-red-600 dark:bg-red-950/50 dark:text-red-400",
         complication: "border-transparent bg-[#FFF7ED] text-orange-600 dark:bg-orange-950/50 dark:text-orange-400",
         ensuivi: "border-transparent bg-[#EFF6FF] text-blue-600 dark:bg-blue-950/50 dark:text-blue-400",
+        success: "border-transparent bg-[#DCFCE7] text-green-700 dark:bg-green-950/50 dark:text-green-400",
       },
     },
     defaultVariants: {

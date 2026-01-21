@@ -21,6 +21,11 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -73,11 +78,18 @@ interface ImplantStatusSuggestionsProps {
   currentStatus: string;
 }
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi"; icon: typeof CheckCircle2 }> = {
-  EN_SUIVI: { label: "En suivi", variant: "ensuivi", icon: History },
-  SUCCES: { label: "Succes", variant: "default", icon: CheckCircle2 },
-  COMPLICATION: { label: "Complication", variant: "complication", icon: AlertTriangle },
-  ECHEC: { label: "Echec", variant: "echec", icon: XCircle },
+const statusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle2 }> = {
+  EN_SUIVI: { label: "En suivi", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800", icon: History },
+  SUCCES: { label: "Succès", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800", icon: CheckCircle2 },
+  COMPLICATION: { label: "Complication", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800", icon: AlertTriangle },
+  ECHEC: { label: "Echec", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800", icon: XCircle },
+};
+
+const tooltipMessages: Record<string, string> = {
+  EN_SUIVI: "Choisir EN_SUIVI pour continuer la surveillance",
+  SUCCES: "Choisir SUCCES si les signes cliniques confirment la récupération",
+  COMPLICATION: "Choisir COMPLICATION si des problèmes sont détectés",
+  ECHEC: "Choisir ECHEC si l'implant doit être déposé",
 };
 
 const confidenceConfig: Record<string, { label: string; className: string }> = {
@@ -184,12 +196,17 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
     <>
       {/* Inline section - no Card wrapper for embedding in ISQ section */}
       <div className="mt-4 pt-4 border-t space-y-3 p-3 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="status-suggestions-section">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Lightbulb className="h-4 w-4 text-amber-500" />
           <span className="text-sm font-medium">Suggestions de statut</span>
           {suggestionsQuery.data?.latestIsq && (
             <span className="text-xs text-muted-foreground">
               (ISQ: {suggestionsQuery.data.latestIsq})
+            </span>
+          )}
+          {hasSuggestions && (
+            <span className="text-xs text-muted-foreground italic">
+              — choisissez parmi :
             </span>
           )}
         </div>
@@ -208,28 +225,36 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
               const config = statusConfig[suggestion.status] || statusConfig.EN_SUIVI;
               const confidenceConf = confidenceConfig[suggestion.confidence] || confidenceConfig.LOW;
 
+              const tooltipMsg = tooltipMessages[suggestion.status] || "";
+
               return (
-                <div
-                  key={index}
-                  className="flex flex-col gap-3 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-card shadow-sm"
-                  data-testid={`suggestion-${suggestion.status}-${index}`}
-                >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={config.variant} className="text-[10px]">{config.label}</Badge>
-                    <Badge variant="outline" className={`text-[10px] ${confidenceConf.className}`}>
-                      {confidenceConf.label}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground flex-1">{suggestion.rule}</p>
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleApplySuggestion(suggestion)}
-                    data-testid={`button-apply-suggestion-${index}`}
-                  >
-                    Appliquer
-                  </Button>
-                </div>
+                <Tooltip key={index}>
+                  <TooltipTrigger asChild>
+                    <div
+                      className="flex flex-col gap-3 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-card shadow-sm cursor-pointer"
+                      data-testid={`suggestion-${suggestion.status}-${index}`}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className={`text-[10px] ${config.className}`}>{config.label}</Badge>
+                        <Badge variant="outline" className={`text-[10px] ${confidenceConf.className}`}>
+                          {confidenceConf.label}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground flex-1">{suggestion.rule}</p>
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleApplySuggestion(suggestion)}
+                        data-testid={`button-apply-suggestion-${index}`}
+                      >
+                        Appliquer
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="bg-white dark:bg-zinc-900 text-foreground border shadow-md">
+                    <p className="text-xs">{tooltipMsg}</p>
+                  </TooltipContent>
+                </Tooltip>
               );
             })}
           </div>
@@ -243,11 +268,11 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
             <SheetDescription>
               {selectedSuggestion && (
                 <span className="flex items-center gap-2 mt-1">
-                  <Badge variant={statusConfig[currentStatus]?.variant || "secondary"}>
+                  <Badge variant="outline" className={`text-[10px] ${statusConfig[currentStatus]?.className || ""}`}>
                     {statusConfig[currentStatus]?.label || currentStatus}
                   </Badge>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  <Badge variant={statusConfig[selectedSuggestion.status]?.variant || "secondary"}>
+                  <Badge variant="outline" className={`text-[10px] ${statusConfig[selectedSuggestion.status]?.className || ""}`}>
                     {statusConfig[selectedSuggestion.status]?.label || selectedSuggestion.status}
                   </Badge>
                 </span>
@@ -354,13 +379,13 @@ export function ImplantStatusSuggestions({ implantId, currentStatus }: ImplantSt
                       <div className="flex items-center gap-2">
                         {entry.fromStatus && (
                           <>
-                            <Badge variant={statusConfig[entry.fromStatus]?.variant || "secondary"}>
+                            <Badge variant="outline" className={`text-[10px] ${statusConfig[entry.fromStatus]?.className || ""}`}>
                               {statusConfig[entry.fromStatus]?.label || entry.fromStatus}
                             </Badge>
                             <ChevronRight className="h-4 w-4 text-muted-foreground" />
                           </>
                         )}
-                        <Badge variant={statusConfig[entry.toStatus]?.variant || "secondary"}>
+                        <Badge variant="outline" className={`text-[10px] ${statusConfig[entry.toStatus]?.className || ""}`}>
                           {statusConfig[entry.toStatus]?.label || entry.toStatus}
                         </Badge>
                       </div>

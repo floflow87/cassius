@@ -540,14 +540,24 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const [patient, upcomingAppointments, flagSummary] = await Promise.all([
+      const [patient, upcomingAppointments, flagSummary, allVisites] = await Promise.all([
         storage.getPatientWithDetails(organisationId, req.params.id),
         storage.getPatientUpcomingRendezVous(organisationId, req.params.id),
         storage.getPatientFlagSummary(organisationId, req.params.id),
+        storage.getAllVisites(organisationId),
       ]);
       
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      // Group visites by implantId (catalogue) to include in latestIsq calculation
+      const visitesByImplantId = new Map<string, Array<{ isqValue: number | null; measuredAt: Date | string }>>();
+      for (const v of allVisites) {
+        if (!visitesByImplantId.has(v.implantId)) {
+          visitesByImplantId.set(v.implantId, []);
+        }
+        visitesByImplantId.get(v.implantId)!.push({ isqValue: v.isq, measuredAt: v.date });
       }
       
       // OPTIMIZATION: Don't generate signed URLs upfront
@@ -564,9 +574,10 @@ export async function registerRoutes(
       
       const surgeryImplantsWithExtras = (patient.surgeryImplants || []).map((si) => {
         const siFlagSummary = implantFlagSummaries.get(si.id) || { activeFlagCount: 0 };
+        const visiteMeasurements = visitesByImplantId.get(si.implantId) || [];
         return {
           ...si,
-          latestIsq: computeLatestIsq(si),
+          latestIsq: computeLatestIsq(si, visiteMeasurements),
           topFlag: siFlagSummary.topFlag,
           activeFlagCount: siFlagSummary.activeFlagCount,
         };
@@ -1327,16 +1338,17 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const [surgeryImplant, flagSummary] = await Promise.all([
+      const [surgeryImplant, flagSummary, visitMeasurements] = await Promise.all([
         storage.getSurgeryImplantWithDetails(organisationId, req.params.id),
         storage.getSurgeryImplantFlagSummary(organisationId, req.params.id),
+        storage.getImplantMeasurements(organisationId, req.params.id),
       ]);
       if (!surgeryImplant) {
         return res.status(404).json({ error: "Implant not found" });
       }
       res.json({
         ...surgeryImplant,
-        latestIsq: computeLatestIsq(surgeryImplant),
+        latestIsq: computeLatestIsq(surgeryImplant, visitMeasurements),
         topFlag: flagSummary.topFlag,
         activeFlagCount: flagSummary.activeFlagCount,
       });
@@ -1491,15 +1503,48 @@ export async function registerRoutes(
         surgeryImplants = await storage.getAllSurgeryImplants(organisationId);
       }
       
+      // Batch fetch all visites and group by implantId (catalogue) to avoid N+1
+      const allVisites = await storage.getAllVisites(organisationId);
+      const visitesByImplantId = new Map<string, Array<{ isqValue: number | null; measuredAt: Date | string }>>();
+      for (const v of allVisites) {
+        if (!visitesByImplantId.has(v.implantId)) {
+          visitesByImplantId.set(v.implantId, []);
+        }
+        visitesByImplantId.get(v.implantId)!.push({ isqValue: v.isq, measuredAt: v.date });
+      }
+      
       // Add latestIsq and flag info to each implant (batch to avoid N+1)
       const implantIds = surgeryImplants.map(si => si.id);
       const flagSummaries = await storage.getSurgeryImplantFlagSummaries(organisationId, implantIds);
       
+      // Batch fetch operations for patient info
+      const surgeryIds = [...new Set(surgeryImplants.map(si => si.surgeryId))];
+      const operationsData = await storage.getOperationsByIds(organisationId, surgeryIds);
+      const operationsMap = new Map(operationsData.map(op => [op.id, op]));
+      
+      // Batch fetch patients
+      const patientIds = [...new Set(operationsData.map(op => op.patientId))];
+      const patientsData = await storage.getPatientsByIds(organisationId, patientIds);
+      const patientsMap = new Map(patientsData.map(p => [p.id, p]));
+      
+      // Batch fetch implant catalog info
+      const catalogImplantIds = [...new Set(surgeryImplants.map(si => si.implantId))];
+      const catalogImplants = await storage.getImplantsByIds(organisationId, catalogImplantIds);
+      const catalogImplantsMap = new Map(catalogImplants.map(i => [i.id, i]));
+      
       const implantsWithExtras = surgeryImplants.map((si) => {
         const flagSummary = flagSummaries.get(si.id) || { activeFlagCount: 0 };
+        // Get visites for this surgery implant's catalog implantId
+        const visiteMeasurements = visitesByImplantId.get(si.implantId) || [];
+        const operation = operationsMap.get(si.surgeryId);
+        const patient = operation ? patientsMap.get(operation.patientId) : null;
+        const implant = catalogImplantsMap.get(si.implantId);
         return {
           ...si,
-          latestIsq: computeLatestIsq(si),
+          implant: implant || null,
+          patient: patient ? { id: patient.id, nom: patient.nom, prenom: patient.prenom } : null,
+          datePose: operation?.dateOperation || null,
+          latestIsq: computeLatestIsq(si, visiteMeasurements),
           topFlag: flagSummary.topFlag,
           activeFlagCount: flagSummary.activeFlagCount,
         };
@@ -1893,49 +1938,140 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const implantId = req.params.implantId;
+      const surgeryImplantId = req.params.implantId;
       // Fetch surgery implant with ISQ data
-      const implant = await storage.getSurgeryImplant(organisationId, implantId);
+      const implant = await storage.getSurgeryImplant(organisationId, surgeryImplantId);
       if (!implant) {
         return res.status(404).json({ error: "Implant not found" });
       }
 
-      // Fetch status history and measurements to check for applied suggestions
-      const [statusHistory, measurements] = await Promise.all([
-        storage.getImplantStatusHistory(organisationId, implantId),
-        storage.getImplantMeasurements(organisationId, implantId),
+      // Fetch status history, measurements, and visites to check for applied suggestions
+      // Note: visites are linked to catalog implant.id, not surgeryImplant.id
+      const [statusHistory, measurements, visites] = await Promise.all([
+        storage.getImplantStatusHistory(organisationId, surgeryImplantId),
+        storage.getImplantMeasurements(organisationId, surgeryImplantId),
+        storage.getImplantVisites(organisationId, implant.implantId), // Use catalog implant ID for visites
       ]);
 
-      // Get last status change date and last ISQ measurement date
+      // Get last status change date
       const lastStatusChange = statusHistory.length > 0 ? new Date(statusHistory[0].changedAt) : null;
-      const lastMeasurement = measurements.length > 0 ? new Date(measurements[0].measuredAt) : null;
+      
+      // Collect ALL ISQ dates from all sources for lastMeasurementDate calculation
+      const allIsqDates: Date[] = [];
+      
+      // 1. Check implantMeasurements table
+      for (const m of measurements) {
+        if (m.isqValue !== null) {
+          allIsqDates.push(new Date(m.measuredAt));
+        }
+      }
+      
+      // 2. Check visites table (linked to catalog implant)
+      for (const v of visites) {
+        if (v.isq !== null && v.isq !== undefined) {
+          allIsqDates.push(new Date(v.date));
+        }
+      }
+      
+      // 3. Check implant ISQ fields (pose/2m/3m/6m)
+      const datePoseForCalc = implant.datePose ? new Date(implant.datePose) : new Date();
+      if (implant.isqPose !== null && implant.isqPose !== undefined) {
+        allIsqDates.push(datePoseForCalc);
+      }
+      if (implant.isq2m !== null && implant.isq2m !== undefined) {
+        const date2m = new Date(datePoseForCalc);
+        date2m.setMonth(date2m.getMonth() + 2);
+        allIsqDates.push(date2m);
+      }
+      if (implant.isq3m !== null && implant.isq3m !== undefined) {
+        const date3m = new Date(datePoseForCalc);
+        date3m.setMonth(date3m.getMonth() + 3);
+        allIsqDates.push(date3m);
+      }
+      if (implant.isq6m !== null && implant.isq6m !== undefined) {
+        const date6m = new Date(datePoseForCalc);
+        date6m.setMonth(date6m.getMonth() + 6);
+        allIsqDates.push(date6m);
+      }
+      
+      // Get the most recent ISQ date from all sources
+      const lastMeasurementDate = allIsqDates.length > 0 
+        ? new Date(Math.max(...allIsqDates.map(d => d.getTime()))) 
+        : null;
 
       // Check if suggestion should be hidden (applied after last ISQ)
       const isSuggestionApplied = (suggestedStatus: string): boolean => {
         if (!lastStatusChange) return false;
         // If current status matches suggestion and status was changed after last ISQ, hide it
         // If no measurement exists, show the suggestion (can't compare without ISQ data)
-        if (implant.statut === suggestedStatus && lastMeasurement) {
-          return lastStatusChange > lastMeasurement;
+        if (implant.statut === suggestedStatus && lastMeasurementDate) {
+          return lastStatusChange > lastMeasurementDate;
         }
         return false;
       };
 
       const suggestions: Array<{
-        status: 'SUCCES' | 'COMPLICATION' | 'ECHEC';
+        status: 'SUCCES' | 'COMPLICATION' | 'ECHEC' | 'EN_SUIVI';
         confidence: 'HIGH' | 'MEDIUM' | 'LOW';
         rule: string;
         reasonCode?: string;
       }> = [];
 
-      // MVP Rules based on ISQ values
-      const isqValues: number[] = [];
-      if (implant.isqPose !== null && implant.isqPose !== undefined) isqValues.push(implant.isqPose);
-      if (implant.isq2m !== null && implant.isq2m !== undefined) isqValues.push(implant.isq2m);
-      if (implant.isq3m !== null && implant.isq3m !== undefined) isqValues.push(implant.isq3m);
-      if (implant.isq6m !== null && implant.isq6m !== undefined) isqValues.push(implant.isq6m);
-
-      const latestIsq = isqValues.length > 0 ? isqValues[isqValues.length - 1] : null;
+      // MVP Rules based on ISQ values - include measurements from visits
+      // Collect all ISQ entries with their dates for proper chronological sorting
+      const datePose = implant.datePose ? new Date(implant.datePose) : new Date();
+      const allIsqEntries: Array<{ value: number; date: Date; source: string }> = [];
+      
+      // Add implant field ISQs with estimated dates
+      if (implant.isqPose !== null && implant.isqPose !== undefined) {
+        allIsqEntries.push({ value: implant.isqPose, date: datePose, source: 'pose' });
+      }
+      if (implant.isq2m !== null && implant.isq2m !== undefined) {
+        const date2m = new Date(datePose);
+        date2m.setMonth(date2m.getMonth() + 2);
+        allIsqEntries.push({ value: implant.isq2m, date: date2m, source: '2m' });
+      }
+      if (implant.isq3m !== null && implant.isq3m !== undefined) {
+        const date3m = new Date(datePose);
+        date3m.setMonth(date3m.getMonth() + 3);
+        allIsqEntries.push({ value: implant.isq3m, date: date3m, source: '3m' });
+      }
+      if (implant.isq6m !== null && implant.isq6m !== undefined) {
+        const date6m = new Date(datePose);
+        date6m.setMonth(date6m.getMonth() + 6);
+        allIsqEntries.push({ value: implant.isq6m, date: date6m, source: '6m' });
+      }
+      
+      // Add visit/measurement ISQs with their actual dates (from implant_measurements table)
+      for (const m of measurements) {
+        if (m.isqValue !== null && m.isqValue !== undefined) {
+          allIsqEntries.push({ 
+            value: m.isqValue, 
+            date: new Date(m.measuredAt), 
+            source: 'measurement' 
+          });
+        }
+      }
+      
+      // Add visites ISQs with their actual dates (from visites table - linked to catalog implant)
+      for (const v of visites) {
+        if (v.isq !== null && v.isq !== undefined) {
+          allIsqEntries.push({ 
+            value: v.isq, 
+            date: new Date(v.date), 
+            source: 'visite' 
+          });
+        }
+      }
+      
+      // Sort all entries chronologically
+      allIsqEntries.sort((a, b) => a.date.getTime() - b.date.getTime());
+      
+      // Get ISQ values in chronological order for rules
+      const allIsqValues = allIsqEntries.map(e => e.value);
+      
+      // Latest ISQ is the most recent (last in sorted array)
+      const latestIsq = allIsqEntries.length > 0 ? allIsqEntries[allIsqEntries.length - 1].value : null;
       const poseIsq = implant.isqPose;
       const isq6m = implant.isq6m;
 
@@ -1962,8 +2098,8 @@ export async function registerRoutes(
       }
 
       // Rule 3: ISQ drop > 15 points -> COMPLICATION (HIGH confidence)
-      if (isqValues.length >= 2) {
-        const maxDrop = Math.max(...isqValues.slice(0, -1)) - (latestIsq ?? 0);
+      if (allIsqValues.length >= 2) {
+        const maxDrop = Math.max(...allIsqValues.slice(0, -1)) - (latestIsq ?? 0);
         if (maxDrop > 15) {
           suggestions.push({
             status: 'COMPLICATION',
@@ -1974,35 +2110,142 @@ export async function registerRoutes(
         }
       }
 
-      // Rule 4: Latest ISQ < 50 -> ECHEC (HIGH confidence)
-      if (latestIsq !== null && latestIsq < 50) {
+      // Rule 4: Latest ISQ <= 50 -> ECHEC (HIGH confidence) - ISQ 50 or below indicates failure
+      if (latestIsq !== null && latestIsq <= 50) {
         suggestions.push({
           status: 'ECHEC',
           confidence: 'HIGH',
-          rule: 'ISQ le plus récent < 50',
+          rule: 'ISQ le plus récent ≤ 50 (échec ostéointégration)',
           reasonCode: 'DEPOSE',
         });
       }
 
-      // Rule 5: Latest ISQ between 50-60 -> COMPLICATION (MEDIUM confidence)
-      if (latestIsq !== null && latestIsq >= 50 && latestIsq < 60) {
+      // Rule 5: Latest ISQ between 51-59 -> COMPLICATION (MEDIUM confidence)
+      if (latestIsq !== null && latestIsq > 50 && latestIsq < 60) {
         suggestions.push({
           status: 'COMPLICATION',
           confidence: 'MEDIUM',
-          rule: 'ISQ entre 50-60 (ostéointégration insuffisante)',
+          rule: 'ISQ entre 51-59 (ostéointégration insuffisante)',
           reasonCode: 'ISQ_DROP',
         });
       }
 
-      // Filter out suggestions that have been applied and no new ISQ since
-      const filteredSuggestions = suggestions.filter(s => !isSuggestionApplied(s.status));
+      // Rule 6: Status is ECHEC but latest ISQ >= 60 -> suggest EN_SUIVI (potential recovery)
+      if (implant.statut === 'ECHEC' && latestIsq !== null && latestIsq >= 60) {
+        suggestions.push({
+          status: 'EN_SUIVI',
+          confidence: 'MEDIUM',
+          rule: 'Statut actuel : Échec, mais ISQ récent ≥ 60 (récupération possible)',
+          reasonCode: 'RECOVERY_POSSIBLE',
+        });
+      }
+
+      // Rule 7: Status is ECHEC but latest ISQ >= 65 -> suggest SUCCES (good recovery)
+      if (implant.statut === 'ECHEC' && latestIsq !== null && latestIsq >= 65) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'LOW',
+          rule: 'Statut actuel : Échec, mais ISQ récent ≥ 65 (ostéointégration réussie)',
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
+      // Rule 8: Status is COMPLICATION but latest ISQ >= 70 -> suggest SUCCES (recovery)
+      if (implant.statut === 'COMPLICATION' && latestIsq !== null && latestIsq >= 70) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'MEDIUM',
+          rule: 'Statut actuel : Complication, mais ISQ récent ≥ 70 (ostéointégration réussie)',
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
+      // Rule 9: Status is COMPLICATION but latest ISQ >= 60 and < 70 -> suggest EN_SUIVI (improving)
+      if (implant.statut === 'COMPLICATION' && latestIsq !== null && latestIsq >= 60 && latestIsq < 70) {
+        suggestions.push({
+          status: 'EN_SUIVI',
+          confidence: 'MEDIUM',
+          rule: 'Statut actuel : Complication, mais ISQ récent ≥ 60 (amélioration en cours)',
+          reasonCode: 'RECOVERY_POSSIBLE',
+        });
+      }
+
+      // Rule 10: Status is SUCCES but latest ISQ < 60 -> suggest COMPLICATION (not enough stability)
+      if (implant.statut === 'SUCCES' && latestIsq !== null && latestIsq < 60) {
+        suggestions.push({
+          status: 'COMPLICATION',
+          confidence: 'HIGH',
+          rule: 'Statut actuel : Succès, mais ISQ récent < 60 (stabilité insuffisante)',
+          reasonCode: 'ISQ_DROP',
+        });
+      }
+
+      // Rule 11: Status is SUCCES but latest ISQ >= 60 and < 70 -> suggest EN_SUIVI (needs monitoring)
+      if (implant.statut === 'SUCCES' && latestIsq !== null && latestIsq >= 60 && latestIsq < 70) {
+        suggestions.push({
+          status: 'EN_SUIVI',
+          confidence: 'MEDIUM',
+          rule: 'Statut actuel : Succès, mais ISQ récent entre 60-69 (surveillance recommandée)',
+          reasonCode: 'MONITORING_NEEDED',
+        });
+      }
+
+      // Rule 12: Status is EN_SUIVI and latest ISQ >= 70 -> suggest SUCCES (HIGH confidence)
+      // This is the main rule for transitioning from follow-up to success when ISQ is excellent
+      if (implant.statut === 'EN_SUIVI' && latestIsq !== null && latestIsq >= 70) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'HIGH',
+          rule: 'Statut actuel : En suivi, ISQ récent ≥ 70 (ostéointégration réussie)',
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
+      // Rule 13: Status is EN_SUIVI, latest ISQ >= 65 and at least 3 months since pose -> suggest SUCCES (MEDIUM confidence)
+      const monthsSincePose = datePose ? Math.floor((Date.now() - datePose.getTime()) / (1000 * 60 * 60 * 24 * 30)) : 0;
+      if (implant.statut === 'EN_SUIVI' && latestIsq !== null && latestIsq >= 65 && latestIsq < 70 && monthsSincePose >= 3) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'MEDIUM',
+          rule: `Statut actuel : En suivi, ISQ récent ≥ 65 après ${monthsSincePose} mois (ostéointégration satisfaisante)`,
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
+      // Rule 14: Status is EN_SUIVI, latest ISQ between 60-64 and at least 6 months since pose -> suggest SUCCES (LOW confidence)
+      if (implant.statut === 'EN_SUIVI' && latestIsq !== null && latestIsq >= 60 && latestIsq < 65 && monthsSincePose >= 6) {
+        suggestions.push({
+          status: 'SUCCES',
+          confidence: 'LOW',
+          rule: `Statut actuel : En suivi, ISQ stable ≥ 60 après ${monthsSincePose} mois (considérer validation clinique)`,
+          reasonCode: 'OSTEOINTEGRATION_OK',
+        });
+      }
+
+      // Filter out suggestions that match the current status (no point suggesting what's already applied)
+      // Also filter out suggestions that have been applied and no new ISQ since
+      const filteredSuggestions = suggestions.filter(s => 
+        s.status !== implant.statut && !isSuggestionApplied(s.status)
+      );
+
+      // Deduplicate suggestions by status, keeping only the highest confidence for each status
+      const confidenceOrder = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+      const deduplicatedSuggestions = Object.values(
+        filteredSuggestions.reduce((acc, suggestion) => {
+          const existing = acc[suggestion.status];
+          if (!existing || confidenceOrder[suggestion.confidence] > confidenceOrder[existing.confidence]) {
+            acc[suggestion.status] = suggestion;
+          }
+          return acc;
+        }, {} as Record<string, typeof filteredSuggestions[0]>)
+      );
 
       res.json({
-        implantId,
+        implantId: surgeryImplantId,
         currentStatus: implant.statut,
         latestIsq,
         isqHistory: { pose: poseIsq, m2: implant.isq2m, m3: implant.isq3m, m6: isq6m },
-        suggestions: filteredSuggestions,
+        suggestions: deduplicatedSuggestions,
       });
     } catch (error) {
       console.error("Error generating status suggestions:", error);
@@ -2473,6 +2716,47 @@ export async function registerRoutes(
       }
       console.error("Error creating visite:", error);
       res.status(500).json({ error: "Failed to create visite" });
+    }
+  });
+
+  // PATCH /api/visites/:id - Update a visite (e.g., to set ISQ to null)
+  app.patch("/api/visites/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const visiteId = req.params.id;
+      const updates = req.body;
+      
+      const updated = await storage.updateVisite(organisationId, visiteId, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "Visite not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating visite:", error);
+      res.status(500).json({ error: "Failed to update visite" });
+    }
+  });
+
+  // DELETE /api/visites/:id - Delete a visite
+  app.delete("/api/visites/:id", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const visiteId = req.params.id;
+      
+      const deleted = await storage.deleteVisite(organisationId, visiteId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Visite not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting visite:", error);
+      res.status(500).json({ error: "Failed to delete visite" });
     }
   });
 
@@ -4125,19 +4409,21 @@ export async function registerRoutes(
         });
       }
       
-      const { start, end } = req.query;
+      // Support both timeMin/timeMax (from frontend) and start/end formats
+      const timeMin = req.query.timeMin || req.query.start;
+      const timeMax = req.query.timeMax || req.query.end;
       
-      if (!start || !end) {
+      if (!timeMin || !timeMax) {
         return res.status(400).json({ 
           error: "MISSING_PARAMS",
-          message: "start et end sont requis" 
+          message: "timeMin et timeMax (ou start et end) sont requis" 
         });
       }
       
       const events = await storage.getGoogleCalendarEvents(
         organisationId,
-        new Date(String(start)),
-        new Date(String(end))
+        new Date(String(timeMin)),
+        new Date(String(timeMax))
       );
       
       res.json(events);
@@ -5862,7 +6148,7 @@ export async function registerRoutes(
           patientName,
           patientId: apt.patientId,
           createdAt: apt.createdAt || new Date().toISOString(),
-          readAt: null,
+          readAt: new Date().toISOString(),
           isVirtual: true,
         };
       });
@@ -5936,7 +6222,7 @@ export async function registerRoutes(
     }
   });
 
-  // Get unread count (including flags and upcoming appointments)
+  // Get unread count (stored notifications + unresolved flags, excluding virtual appointments)
   app.get("/api/notifications/unread-count", requireJwtOrSession, async (req, res) => {
     try {
       const organisationId = getOrganisationId(req, res);
@@ -5947,23 +6233,11 @@ export async function registerRoutes(
       // Get stored notification count
       const storedCount = await notificationService.getUnreadCount(userId, organisationId);
       
-      // Also count unresolved flags and upcoming appointments
-      const [flags, appointments] = await Promise.all([
-        storage.getFlagsWithEntity(organisationId, false),
-        storage.getAppointmentsForSync(organisationId),
-      ]);
+      // Also count unresolved flags (clinical alerts that need attention)
+      // Note: We don't count upcoming appointments as they are informational, not unread items
+      const flagsList = await storage.getFlagsWithEntity(organisationId, false);
       
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const dayAfterTomorrow = new Date(today);
-      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-      
-      const upcomingAppointmentsCount = appointments.filter((apt: any) => {
-        const aptDate = new Date(apt.dateStart);
-        return aptDate >= today && aptDate < dayAfterTomorrow;
-      }).length;
-      
-      const totalCount = storedCount + flags.length + upcomingAppointmentsCount;
+      const totalCount = storedCount + flagsList.length;
       
       res.json({ count: totalCount });
     } catch (error: any) {
@@ -6020,8 +6294,18 @@ export async function registerRoutes(
       const userId = req.jwtUser?.userId;
       if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
 
-      const count = await notificationService.markAllAsRead(userId, organisationId);
-      res.json({ success: true, count });
+      // Mark all stored notifications as read
+      const notifCount = await notificationService.markAllAsRead(userId, organisationId);
+      
+      // Also resolve all unresolved flags (virtual notifications)
+      const unresolvedFlags = await storage.getFlagsWithEntity(organisationId, false);
+      let flagsResolved = 0;
+      for (const flag of unresolvedFlags) {
+        await storage.resolveFlag(organisationId, flag.id, userId);
+        flagsResolved++;
+      }
+      
+      res.json({ success: true, count: notifCount + flagsResolved });
     } catch (error: any) {
       console.error("[Notifications] Error marking all as read:", error);
       res.status(500).json({ error: error.message });

@@ -116,7 +116,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                         <Input 
                           type="email"
                           placeholder="votre@email.com" 
-                          className="h-11 border-gray-300 dark:border-gray-700"
+                          className="h-11 border-gray-300 dark:border-gray-700 placeholder-xs"
                           {...field} 
                           data-testid="input-email" 
                         />
@@ -137,7 +137,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                           <Input 
                             type={showPassword ? "text" : "password"}
                             placeholder="••••••••" 
-                            className="h-11 border-gray-300 dark:border-gray-700 pr-11"
+                            className="h-11 border-gray-300 dark:border-gray-700 pr-11 placeholder-xs"
                             {...field} 
                             data-testid="input-password" 
                           />

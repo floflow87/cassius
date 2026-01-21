@@ -70,11 +70,11 @@ interface StatusReason {
   isActive: boolean;
 }
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  EN_SUIVI: { label: "En suivi", variant: "secondary" },
-  SUCCES: { label: "Succes", variant: "default" },
-  COMPLICATION: { label: "Complication", variant: "destructive" },
-  ECHEC: { label: "Echec", variant: "destructive" },
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "success" | "ensuivi" | "echec" | "complication" }> = {
+  EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
+  SUCCES: { label: "Succès", variant: "success" },
+  COMPLICATION: { label: "Complication", variant: "complication" },
+  ECHEC: { label: "Échec", variant: "echec" },
 };
 
 interface SurgeryImplantBasic {

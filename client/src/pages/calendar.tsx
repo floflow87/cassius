@@ -1568,8 +1568,28 @@ export default function CalendarPage() {
   
   const targetCalendarId = googleStatus?.integration?.targetCalendarId;
   
+<<<<<<< HEAD
   // Fetch Google Calendar events directly from Google API
   const { data: googleEvents = [] } = useQuery<GoogleLiveEvent[]>({
+=======
+  // Google API event format (from /api/google/events)
+  interface GoogleApiEvent {
+    id: string;
+    etag: string;
+    status: string;
+    summary: string | null;
+    description: string | null;
+    location: string | null;
+    start: string | null;
+    end: string | null;
+    allDay: boolean;
+    attendees: Array<{ email: string; displayName?: string; responseStatus?: string }>;
+    htmlLink: string | null;
+  }
+  
+  // Fetch Google Calendar events directly from Google API
+  const { data: googleEvents = [] } = useQuery<GoogleCalendarEvent[]>({
+>>>>>>> staging
     queryKey: ["/api/google/events", targetCalendarId, dateRange.start, dateRange.end],
     queryFn: async () => {
       if (!targetCalendarId) return [];
@@ -1580,22 +1600,32 @@ export default function CalendarPage() {
       if (!res.ok) return [];
       const data = await res.json();
       // Filter out Cassius-created events (they have [Cassius] prefix)
-      type ApiEvent = { id: string; summary?: string | null; description?: string | null; location?: string | null; start?: string | null; end?: string | null; allDay?: boolean; htmlLink?: string | null; attendees?: unknown[] };
-      const externalEvents = (data.events || []).filter((event: ApiEvent) => 
+      const externalEvents = (data.events || []).filter((event: GoogleApiEvent) => 
         !event.summary?.startsWith("[Cassius]")
       );
-      // Map API format to GoogleLiveEvent (only fields needed by calendar UI)
-      return externalEvents.map((event: ApiEvent): GoogleLiveEvent => ({
+      // Map API format to GoogleCalendarEvent format used by calendar
+      return externalEvents.map((event: GoogleApiEvent): GoogleCalendarEvent => ({
         id: event.id,
+        organisationId: "",
+        userId: null,
+        integrationId: null,
+        googleCalendarId: targetCalendarId,
         googleEventId: event.id,
-        summary: event.summary ?? null,
-        description: event.description ?? null,
-        location: event.location ?? null,
+        summary: event.summary,
+        description: event.description,
+        location: event.location,
         startAt: event.start ? new Date(event.start) : null,
         endAt: event.end ? new Date(event.end) : null,
-        allDay: event.allDay ?? false,
-        htmlLink: event.htmlLink ?? null,
-        attendees: JSON.stringify(event.attendees || []),
+        allDay: event.allDay,
+        status: event.status as "confirmed" | "tentative" | "cancelled",
+        htmlLink: event.htmlLink,
+        attendees: JSON.stringify(event.attendees),
+        etag: event.etag,
+        updatedAtGoogle: null,
+        lastSyncedAt: new Date(),
+        cassiusAppointmentId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }));
     },
     enabled: !!googleStatus?.connected && !!targetCalendarId && showGoogleEvents,

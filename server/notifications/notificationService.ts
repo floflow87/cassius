@@ -895,7 +895,14 @@ export const notificationEvents = {
       body: `L'implant site ${params.implantSite} (${params.patientName}) a perdu ${params.drop} points ISQ (${params.previousIsq} -> ${params.currentIsq}).`,
       entityType: "PATIENT",
       entityId: params.patientId,
-      metadata: { implantSite: params.implantSite, previousIsq: params.previousIsq, currentIsq: params.currentIsq, drop: params.drop },
+      metadata: { 
+        implantSite: params.implantSite, 
+        previousIsq: params.previousIsq, 
+        currentIsq: params.currentIsq, 
+        drop: params.drop,
+        patientName: params.patientName,
+        patientId: params.patientId,
+      },
       dedupeKey: `isq_declining_${params.patientId}_${params.implantSite}`,
     });
   },

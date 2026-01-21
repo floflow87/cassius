@@ -1239,13 +1239,13 @@ function CollaboratorsSection() {
                       onValueChange={(role) => updateRoleMutation.mutate({ id: collab.id, role })}
                       disabled={collab.type === "invitation"}
                     >
-                      <SelectTrigger className="w-40" data-testid={`select-role-${collab.id}`}>
+                      <SelectTrigger className="w-32 h-8 text-xs" data-testid={`select-role-${collab.id}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ADMIN">Administrateur</SelectItem>
-                        <SelectItem value="CHIRURGIEN">Collaborateur</SelectItem>
-                        <SelectItem value="ASSISTANT">Assistant</SelectItem>
+                        <SelectItem value="ADMIN" className="text-xs">Administrateur</SelectItem>
+                        <SelectItem value="CHIRURGIEN" className="text-xs">Collaborateur</SelectItem>
+                        <SelectItem value="ASSISTANT" className="text-xs">Assistant</SelectItem>
                       </SelectContent>
                     </Select>
                     {/* Hide delete button for current user (type=user and same id) */}

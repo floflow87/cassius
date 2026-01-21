@@ -75,9 +75,9 @@ import { OperationForm } from "@/components/operation-form";
 import { ImplantStatusSuggestions } from "@/components/implant-status-suggestions";
 import type { ImplantDetail } from "@shared/types";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" }> = {
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" | "success" }> = {
   EN_SUIVI: { label: "En suivi", variant: "ensuivi" },
-  SUCCES: { label: "Succès", variant: "default" },
+  SUCCES: { label: "Succès", variant: "success" },
   COMPLICATION: { label: "Complication", variant: "complication" },
   ECHEC: { label: "Échec", variant: "echec" },
 };
@@ -168,8 +168,6 @@ export default function ImplantDetailsPage() {
   const [deleteIsqDialogOpen, setDeleteIsqDialogOpen] = useState(false);
   const [isqPointToDelete, setIsqPointToDelete] = useState<ISQPoint | null>(null);
   const [statusHistoryOpen, setStatusHistoryOpen] = useState(false);
-  const [isqViewMode, setIsqViewMode] = useState<"timeline" | "cohorte">("timeline");
-  const [isqDateRange, setIsqDateRange] = useState({ start: "", end: "" });
 
   const { data: implantData, isLoading, isFetching } = useQuery<ImplantDetail>({
     queryKey: ["/api/surgery-implants", implantId],
@@ -946,28 +944,26 @@ export default function ImplantDetailsPage() {
               </TooltipTrigger>
               <TooltipContent side="right" className="max-w-xs">
                 <div className="space-y-1 text-xs">
-                  <p className="font-medium">Seuils de stabilité ISQ</p>
+                  <p className="font-medium">Statuts possibles</p>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    <span>En suivi</span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>70+ : Stabilité élevée</span>
+                    <span>Succès</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    <span>60-69 : Stabilité modérée</span>
+                    <span>Complication</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                    <span>&lt;60 : Stabilité faible</span>
+                    <span>Échec</span>
                   </div>
                 </div>
               </TooltipContent>
             </Tooltip>
-            <Tabs value={isqViewMode} onValueChange={(v) => setIsqViewMode(v as "timeline" | "cohorte")} className="ml-2">
-              <TabsList className="h-7">
-                <TabsTrigger value="timeline" className="text-[10px] px-2 py-1" data-testid="tab-isq-timeline">Timeline</TabsTrigger>
-                <TabsTrigger value="cohorte" className="text-[10px] px-2 py-1" data-testid="tab-isq-cohorte">Cohorte</TabsTrigger>
-              </TabsList>
-            </Tabs>
           </div>
           <Sheet open={addISQSheetOpen} onOpenChange={setAddISQSheetOpen}>
             <SheetTrigger asChild>
@@ -1026,8 +1022,7 @@ export default function ImplantDetailsPage() {
           </Sheet>
         </CardHeader>
         <CardContent>
-          {isqViewMode === "timeline" ? (
-            isqTimeline.length === 0 ? (
+          {isqTimeline.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <TrendingUp className="h-8 w-8 mb-2" />
                 <p className="text-xs">Aucune mesure ISQ enregistrée</p>
@@ -1211,101 +1206,6 @@ export default function ImplantDetailsPage() {
                   </CollapsibleContent>
                 </Collapsible>
               )}
-            </div>
-            )
-          ) : (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3 pb-4 border-b">
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs text-muted-foreground">Du</Label>
-                  <Input 
-                    type="date" 
-                    value={isqDateRange.start}
-                    onChange={(e) => setIsqDateRange(prev => ({ ...prev, start: e.target.value }))}
-                    className="h-8 w-36 text-xs"
-                    data-testid="input-isq-date-start"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs text-muted-foreground">Au</Label>
-                  <Input 
-                    type="date" 
-                    value={isqDateRange.end}
-                    onChange={(e) => setIsqDateRange(prev => ({ ...prev, end: e.target.value }))}
-                    className="h-8 w-36 text-xs"
-                    data-testid="input-isq-date-end"
-                  />
-                </div>
-                {(isqDateRange.start || isqDateRange.end) && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setIsqDateRange({ start: "", end: "" })}
-                    className="h-7 text-[10px]"
-                    data-testid="button-clear-date-filter"
-                  >
-                    Effacer
-                  </Button>
-                )}
-              </div>
-              
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Date</TableHead>
-                    <TableHead className="text-xs">Type d'implant</TableHead>
-                    <TableHead className="text-xs">ISQ</TableHead>
-                    <TableHead className="text-xs">Statut</TableHead>
-                    <TableHead className="text-xs">Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isqTimeline
-                    .filter((point) => {
-                      if (!isqDateRange.start && !isqDateRange.end) return true;
-                      const pointDate = new Date(point.date);
-                      if (isqDateRange.start && pointDate < new Date(isqDateRange.start)) return false;
-                      if (isqDateRange.end && pointDate > new Date(isqDateRange.end)) return false;
-                      return true;
-                    })
-                    .map((point, index) => {
-                      const badge = getISQBadge(point.value);
-                      return (
-                        <TableRow key={index} data-testid={`cohorte-row-${index}`}>
-                          <TableCell className="text-xs">{formatShortDate(point.date)}</TableCell>
-                          <TableCell className="text-xs">
-                            {implantData?.implant?.marque || "-"}
-                            {implantData?.implant?.referenceFabricant && (
-                              <span className="text-muted-foreground ml-1">({implantData.implant.referenceFabricant})</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm font-bold">{point.value}</span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={`${badge.className} text-[10px]`}>{badge.label}</Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
-                            {point.notes || "-"}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  {isqTimeline.filter((point) => {
-                    if (!isqDateRange.start && !isqDateRange.end) return true;
-                    const pointDate = new Date(point.date);
-                    if (isqDateRange.start && pointDate < new Date(isqDateRange.start)) return false;
-                    if (isqDateRange.end && pointDate > new Date(isqDateRange.end)) return false;
-                    return true;
-                  }).length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-xs">
-                        Aucune mesure ISQ dans cette période
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
             </div>
           )}
         </CardContent>

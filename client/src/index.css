@@ -499,6 +499,7 @@
 
 .fc .fc-timegrid-slot {
   cursor: pointer;
+  height: 2.5rem;
 }
 
 .fc .fc-timegrid-slot-label {

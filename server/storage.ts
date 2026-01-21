@@ -120,6 +120,7 @@ export interface IStorage {
   // Patient methods - all require organisationId for multi-tenant isolation
   getPatients(organisationId: string): Promise<Patient[]>;
   getPatient(organisationId: string, id: string): Promise<Patient | undefined>;
+  getPatientsByIds(organisationId: string, ids: string[]): Promise<Patient[]>;
   getPatientWithDetails(organisationId: string, id: string): Promise<PatientDetail | undefined>;
   createPatient(organisationId: string, patient: InsertPatient): Promise<Patient>;
   updatePatient(organisationId: string, id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined>;
@@ -131,6 +132,7 @@ export interface IStorage {
 
   // Operation methods
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
+  getOperationsByIds(organisationId: string, ids: string[]): Promise<Operation[]>;
   getOperationWithDetails(organisationId: string, id: string): Promise<OperationDetail | undefined>;
   getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; successRate: number | null })[]>;
   createOperation(organisationId: string, operation: InsertOperation): Promise<Operation>;
@@ -160,6 +162,7 @@ export interface IStorage {
 
   // Implant catalog methods
   getImplant(organisationId: string, id: string): Promise<Implant | undefined>;
+  getImplantsByIds(organisationId: string, ids: string[]): Promise<Implant[]>;
   createImplant(organisationId: string, implant: InsertImplant): Promise<Implant>;
   updateCatalogImplant(organisationId: string, id: string, updates: Partial<InsertImplant>): Promise<Implant | undefined>;
   deleteImplant(organisationId: string, id: string): Promise<boolean>;
@@ -187,7 +190,10 @@ export interface IStorage {
   // Visite methods
   getVisite(organisationId: string, id: string): Promise<Visite | undefined>;
   getImplantVisites(organisationId: string, implantId: string): Promise<Visite[]>;
+  getAllVisites(organisationId: string): Promise<Visite[]>;
   createVisite(organisationId: string, visite: InsertVisite): Promise<Visite>;
+  updateVisite(organisationId: string, id: string, updates: Partial<InsertVisite>): Promise<Visite | undefined>;
+  deleteVisite(organisationId: string, id: string): Promise<boolean>;
   getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; titre: string | null }>>;
   findSurgeryImplantForVisite(organisationId: string, catalogImplantId: string, patientId: string): Promise<string | null>;
   syncVisiteIsqToSurgeryImplant(organisationId: string, surgeryImplantId: string, isqValue: number, visiteDate: string): Promise<void>;
@@ -382,6 +388,33 @@ export class DatabaseStorage implements IStorage {
         eq(patients.organisationId, organisationId)
       ));
     return patient || undefined;
+  }
+
+  async getPatientsByIds(organisationId: string, ids: string[]): Promise<Patient[]> {
+    if (ids.length === 0) return [];
+    return await db.select().from(patients)
+      .where(and(
+        inArray(patients.id, ids),
+        eq(patients.organisationId, organisationId)
+      ));
+  }
+
+  async getOperationsByIds(organisationId: string, ids: string[]): Promise<Operation[]> {
+    if (ids.length === 0) return [];
+    return await db.select().from(operations)
+      .where(and(
+        inArray(operations.id, ids),
+        eq(operations.organisationId, organisationId)
+      ));
+  }
+
+  async getImplantsByIds(organisationId: string, ids: string[]): Promise<Implant[]> {
+    if (ids.length === 0) return [];
+    return await db.select().from(implants)
+      .where(and(
+        inArray(implants.id, ids),
+        eq(implants.organisationId, organisationId)
+      ));
   }
 
   async getPatientWithDetails(organisationId: string, id: string): Promise<PatientDetail | undefined> {
@@ -1623,12 +1656,41 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(visites.date));
   }
 
+  async getAllVisites(organisationId: string): Promise<Visite[]> {
+    return db
+      .select()
+      .from(visites)
+      .where(eq(visites.organisationId, organisationId))
+      .orderBy(desc(visites.date));
+  }
+
   async createVisite(organisationId: string, visite: InsertVisite): Promise<Visite> {
     const [newVisite] = await db.insert(visites).values({
       ...visite,
       organisationId,
     }).returning();
     return newVisite;
+  }
+
+  async updateVisite(organisationId: string, id: string, updates: Partial<InsertVisite>): Promise<Visite | undefined> {
+    const [updated] = await db.update(visites)
+      .set(updates)
+      .where(and(
+        eq(visites.id, id),
+        eq(visites.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteVisite(organisationId: string, id: string): Promise<boolean> {
+    const result = await db.delete(visites)
+      .where(and(
+        eq(visites.id, id),
+        eq(visites.organisationId, organisationId)
+      ))
+      .returning({ id: visites.id });
+    return result.length > 0;
   }
 
   async getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; titre: string | null }>> {
@@ -1673,7 +1735,13 @@ export class DatabaseStorage implements IStorage {
 
   async syncVisiteIsqToSurgeryImplant(organisationId: string, surgeryImplantId: string, isqValue: number, visiteDate: string): Promise<void> {
     const [si] = await db
-      .select({ datePose: surgeryImplants.datePose })
+      .select({ 
+        datePose: surgeryImplants.datePose,
+        isqPose: surgeryImplants.isqPose,
+        isq2m: surgeryImplants.isq2m,
+        isq3m: surgeryImplants.isq3m,
+        isq6m: surgeryImplants.isq6m,
+      })
       .from(surgeryImplants)
       .where(and(
         eq(surgeryImplants.id, surgeryImplantId),
@@ -1686,6 +1754,7 @@ export class DatabaseStorage implements IStorage {
     const visiteDateObj = new Date(visiteDate);
     const daysDiff = Math.floor((visiteDateObj.getTime() - poseDate.getTime()) / (1000 * 60 * 60 * 24));
     
+    // Determine which field to potentially update based on timing
     let updateField: 'isqPose' | 'isq2m' | 'isq3m' | 'isq6m';
     if (daysDiff < 30) {
       updateField = 'isqPose';
@@ -1695,6 +1764,13 @@ export class DatabaseStorage implements IStorage {
       updateField = 'isq3m';
     } else {
       updateField = 'isq6m';
+    }
+    
+    // Only update if the field is currently empty - don't overwrite existing values
+    const existingValue = si[updateField];
+    if (existingValue !== null && existingValue !== undefined) {
+      console.log(`[ISQ-SYNC] Skipping update - ${updateField} already has value ${existingValue} (visite ISQ=${isqValue} stored in visites table only)`);
+      return;
     }
     
     await db
@@ -1748,6 +1824,10 @@ export class DatabaseStorage implements IStorage {
 
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+    
     const monthlyImplants = allSurgeryImplants.filter(si => 
       si.datePose.startsWith(currentMonth)
     ).length;
@@ -1756,6 +1836,20 @@ export class DatabaseStorage implements IStorage {
       op.dateOperation.startsWith(currentMonth)
     ).length;
 
+    const previousMonthImplants = allSurgeryImplants.filter(si => 
+      si.datePose.startsWith(previousMonth)
+    ).length;
+
+    const previousMonthOperations = allOperations.filter(op => 
+      op.dateOperation.startsWith(previousMonth)
+    ).length;
+
+    const previousMonthPatients = allPatients.filter(p => {
+      if (!p.createdAt) return false;
+      const createdDate = new Date(p.createdAt);
+      return `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}` === previousMonth;
+    }).length;
+
     return {
       totalPatients: allPatients.length,
       totalOperations: allOperations.length,
@@ -1763,6 +1857,9 @@ export class DatabaseStorage implements IStorage {
       totalRadios: allRadios.length,
       monthlyImplants,
       monthlyOperations,
+      previousMonthImplants,
+      previousMonthOperations,
+      previousMonthPatients,
       implantsByStatus,
       recentOperations: allOperations.slice(0, 10),
     };
@@ -4860,22 +4957,57 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Helper function to compute latest ISQ from surgery implant fields
-export function computeLatestIsq(surgeryImplant: SurgeryImplant): LatestIsq | undefined {
-  // Check in order: 6m > 3m > 2m > pose
-  if (surgeryImplant.isq6m !== null && surgeryImplant.isq6m !== undefined) {
-    return { value: surgeryImplant.isq6m, label: "6m" };
-  }
-  if (surgeryImplant.isq3m !== null && surgeryImplant.isq3m !== undefined) {
-    return { value: surgeryImplant.isq3m, label: "3m" };
+// Helper function to compute latest ISQ from surgery implant fields AND visit measurements
+export function computeLatestIsq(
+  surgeryImplant: SurgeryImplant, 
+  visitMeasurements?: Array<{ isqValue: number | null; measuredAt: Date | string }>
+): LatestIsq | undefined {
+  // Collect all ISQ values with their estimated dates
+  const isqEntries: Array<{ value: number; label: string; date: Date }> = [];
+  
+  const datePose = surgeryImplant.datePose ? new Date(surgeryImplant.datePose) : new Date();
+  
+  // Add implant field ISQs with estimated dates
+  if (surgeryImplant.isqPose !== null && surgeryImplant.isqPose !== undefined) {
+    isqEntries.push({ value: surgeryImplant.isqPose, label: "pose", date: datePose });
   }
   if (surgeryImplant.isq2m !== null && surgeryImplant.isq2m !== undefined) {
-    return { value: surgeryImplant.isq2m, label: "2m" };
+    const date2m = new Date(datePose);
+    date2m.setMonth(date2m.getMonth() + 2);
+    isqEntries.push({ value: surgeryImplant.isq2m, label: "2m", date: date2m });
   }
-  if (surgeryImplant.isqPose !== null && surgeryImplant.isqPose !== undefined) {
-    return { value: surgeryImplant.isqPose, label: "pose" };
+  if (surgeryImplant.isq3m !== null && surgeryImplant.isq3m !== undefined) {
+    const date3m = new Date(datePose);
+    date3m.setMonth(date3m.getMonth() + 3);
+    isqEntries.push({ value: surgeryImplant.isq3m, label: "3m", date: date3m });
   }
-  return undefined;
+  if (surgeryImplant.isq6m !== null && surgeryImplant.isq6m !== undefined) {
+    const date6m = new Date(datePose);
+    date6m.setMonth(date6m.getMonth() + 6);
+    isqEntries.push({ value: surgeryImplant.isq6m, label: "6m", date: date6m });
+  }
+  
+  // Add visit measurements with their actual dates
+  if (visitMeasurements && visitMeasurements.length > 0) {
+    for (const m of visitMeasurements) {
+      if (m.isqValue !== null && m.isqValue !== undefined) {
+        const measureDate = new Date(m.measuredAt);
+        // Calculate months since pose for label
+        const monthsDiff = Math.round((measureDate.getTime() - datePose.getTime()) / (30 * 24 * 60 * 60 * 1000));
+        const label = monthsDiff <= 0 ? "pose" : `+${monthsDiff}m`;
+        isqEntries.push({ value: m.isqValue, label, date: measureDate });
+      }
+    }
+  }
+  
+  if (isqEntries.length === 0) {
+    return undefined;
+  }
+  
+  // Sort by date descending and return the most recent
+  isqEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
+  const latest = isqEntries[0];
+  return { value: latest.value, label: latest.label };
 }
 
 export const storage = new DatabaseStorage();
