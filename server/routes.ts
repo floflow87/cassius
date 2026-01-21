@@ -2089,22 +2089,22 @@ export async function registerRoutes(
         }
       }
 
-      // Rule 4: Latest ISQ < 50 -> ECHEC (HIGH confidence)
-      if (latestIsq !== null && latestIsq < 50) {
+      // Rule 4: Latest ISQ <= 50 -> ECHEC (HIGH confidence) - ISQ 50 or below indicates failure
+      if (latestIsq !== null && latestIsq <= 50) {
         suggestions.push({
           status: 'ECHEC',
           confidence: 'HIGH',
-          rule: 'ISQ le plus récent < 50',
+          rule: 'ISQ le plus récent ≤ 50 (échec ostéointégration)',
           reasonCode: 'DEPOSE',
         });
       }
 
-      // Rule 5: Latest ISQ between 50-60 -> COMPLICATION (MEDIUM confidence)
-      if (latestIsq !== null && latestIsq >= 50 && latestIsq < 60) {
+      // Rule 5: Latest ISQ between 51-59 -> COMPLICATION (MEDIUM confidence)
+      if (latestIsq !== null && latestIsq > 50 && latestIsq < 60) {
         suggestions.push({
           status: 'COMPLICATION',
           confidence: 'MEDIUM',
-          rule: 'ISQ entre 50-60 (ostéointégration insuffisante)',
+          rule: 'ISQ entre 51-59 (ostéointégration insuffisante)',
           reasonCode: 'ISQ_DROP',
         });
       }
