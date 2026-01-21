@@ -4409,19 +4409,21 @@ export async function registerRoutes(
         });
       }
       
-      const { start, end } = req.query;
+      // Support both timeMin/timeMax (from frontend) and start/end formats
+      const timeMin = req.query.timeMin || req.query.start;
+      const timeMax = req.query.timeMax || req.query.end;
       
-      if (!start || !end) {
+      if (!timeMin || !timeMax) {
         return res.status(400).json({ 
           error: "MISSING_PARAMS",
-          message: "start et end sont requis" 
+          message: "timeMin et timeMax (ou start et end) sont requis" 
         });
       }
       
       const events = await storage.getGoogleCalendarEvents(
         organisationId,
-        new Date(String(start)),
-        new Date(String(end))
+        new Date(String(timeMin)),
+        new Date(String(timeMax))
       );
       
       res.json(events);

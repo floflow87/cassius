@@ -1531,28 +1531,99 @@ export default function CalendarPage() {
     },
   });
   
-  const { data: googleStatus } = useQuery<{ connected: boolean; syncEnabled: boolean; lastSyncTime?: string; errorCount?: number }>({
+  interface GoogleStatusResponse {
+    connected: boolean;
+    configured: boolean;
+    email?: string;
+    error?: string;
+    integration?: {
+      id: string;
+      isEnabled: boolean;
+      targetCalendarId: string | null;
+      targetCalendarName: string | null;
+      lastSyncAt: string | null;
+      syncErrorCount: number;
+      lastSyncError: string | null;
+    } | null;
+    // Computed convenience properties
+    syncEnabled?: boolean;
+    errorCount?: number;
+  }
+  
+  const { data: googleStatus } = useQuery<GoogleStatusResponse>({
     queryKey: ["/api/integrations/google/status"],
     queryFn: async () => {
       const res = await fetch("/api/integrations/google/status", { credentials: "include" });
-      if (!res.ok) return { connected: false, syncEnabled: false };
-      return res.json();
+      if (!res.ok) return { connected: false, configured: false };
+      const data = await res.json();
+      // Compute convenience properties from integration data
+      return {
+        ...data,
+        syncEnabled: data.integration?.isEnabled ?? false,
+        errorCount: data.integration?.syncErrorCount ?? 0,
+      };
     },
     staleTime: 60000,
   });
   
-  // Fetch Google imported events
+  const targetCalendarId = googleStatus?.integration?.targetCalendarId;
+  
+  // Google API event format (from /api/google/events)
+  interface GoogleApiEvent {
+    id: string;
+    etag: string;
+    status: string;
+    summary: string | null;
+    description: string | null;
+    location: string | null;
+    start: string | null;
+    end: string | null;
+    allDay: boolean;
+    attendees: Array<{ email: string; displayName?: string; responseStatus?: string }>;
+    htmlLink: string | null;
+  }
+  
+  // Fetch Google Calendar events directly from Google API
   const { data: googleEvents = [] } = useQuery<GoogleCalendarEvent[]>({
-    queryKey: ["/api/google/imported-events", dateRange.start, dateRange.end],
+    queryKey: ["/api/google/events", targetCalendarId, dateRange.start, dateRange.end],
     queryFn: async () => {
+      if (!targetCalendarId) return [];
       const res = await fetch(
-        `/api/google/imported-events?timeMin=${dateRange.start}T00:00:00Z&timeMax=${dateRange.end}T23:59:59Z`,
+        `/api/google/events?calendarId=${encodeURIComponent(targetCalendarId)}&timeMin=${dateRange.start}T00:00:00Z&timeMax=${dateRange.end}T23:59:59Z`,
         { credentials: "include" }
       );
       if (!res.ok) return [];
-      return res.json();
+      const data = await res.json();
+      // Filter out Cassius-created events (they have [Cassius] prefix)
+      const externalEvents = (data.events || []).filter((event: GoogleApiEvent) => 
+        !event.summary?.startsWith("[Cassius]")
+      );
+      // Map API format to GoogleCalendarEvent format used by calendar
+      return externalEvents.map((event: GoogleApiEvent): GoogleCalendarEvent => ({
+        id: event.id,
+        organisationId: "",
+        userId: null,
+        integrationId: null,
+        googleCalendarId: targetCalendarId,
+        googleEventId: event.id,
+        summary: event.summary,
+        description: event.description,
+        location: event.location,
+        startAt: event.start ? new Date(event.start) : null,
+        endAt: event.end ? new Date(event.end) : null,
+        allDay: event.allDay,
+        status: event.status as "confirmed" | "tentative" | "cancelled",
+        htmlLink: event.htmlLink,
+        attendees: JSON.stringify(event.attendees),
+        etag: event.etag,
+        updatedAtGoogle: null,
+        lastSyncedAt: new Date(),
+        cassiusAppointmentId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
     },
-    enabled: !!googleStatus?.connected && showGoogleEvents,
+    enabled: !!googleStatus?.connected && !!targetCalendarId && showGoogleEvents,
     staleTime: 30000,
   });
   
