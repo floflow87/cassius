@@ -109,7 +109,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 <FormField
                   control={loginForm.control}
                   name="email"
-                  render={({ field }) => (
+                  render={({ field, fieldState }) => (
                     <FormItem>
                       <FormLabel className="text-sm text-muted-foreground">Adresse email</FormLabel>
                       <FormControl>
@@ -121,7 +121,11 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                           data-testid="input-email" 
                         />
                       </FormControl>
-                      <FormMessage />
+                      {fieldState.error && (
+                        <p className="auth-error-message" data-testid="text-email-error">
+                          {fieldState.error.message}
+                        </p>
+                      )}
                     </FormItem>
                   )}
                 />

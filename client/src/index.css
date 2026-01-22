@@ -626,17 +626,25 @@
 
 /* Smaller placeholder text for search inputs */
 .placeholder-xs::placeholder {
-  font-size: 0.6875rem; /* 11px - 2px smaller than text-xs (12px) */
+  font-size: 0.75rem; /* 12px */
 }
 
 .placeholder-xs::-webkit-input-placeholder {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
 }
 
 .placeholder-xs::-moz-placeholder {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
 }
 
 .placeholder-xs:-ms-input-placeholder {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
+}
+
+/* Auth form error message styling */
+.auth-error-message {
+  font-size: 0.625rem; /* 10px - 2px smaller than text-xs */
+  font-style: italic;
+  font-weight: 300;
+  color: hsl(var(--destructive));
 }
