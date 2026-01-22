@@ -289,24 +289,32 @@ function AppointmentItem({ date, title, patientName, patientId, type, time }: Ap
     ? "Suivi" 
     : "Action";
 
+  const content = (
+    <div className={`flex items-center gap-4 p-3 border-l-4 ${borderColor} bg-muted/30 rounded-r-md ${patientId ? "hover-elevate cursor-pointer" : ""}`}>
+      <div className="flex flex-col items-center justify-center min-w-[48px]">
+        <span className="text-2xl font-bold">{day}</span>
+        <span className="text-xs text-muted-foreground">{month}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium truncate">{title}</p>
+        <p className={`text-xs truncate ${patientId ? "text-primary hover:underline" : "text-muted-foreground"}`}>{patientName}</p>
+      </div>
+      <Badge className={`${badgeVariant} no-default-hover-elevate no-default-active-elevate`}>
+        {badgeLabel}
+      </Badge>
+      {time && (
+        <span className="text-sm text-muted-foreground whitespace-nowrap">{time}</span>
+      )}
+    </div>
+  );
+
+  if (!patientId) {
+    return <div className="block" data-testid="appointment-no-patient">{content}</div>;
+  }
+
   return (
     <Link href={`/patients/${patientId}`} className="block" data-testid={`link-appointment-patient-${patientId}`}>
-      <div className={`flex items-center gap-4 p-3 border-l-4 ${borderColor} bg-muted/30 rounded-r-md hover-elevate cursor-pointer`}>
-        <div className="flex flex-col items-center justify-center min-w-[48px]">
-          <span className="text-2xl font-bold">{day}</span>
-          <span className="text-xs text-muted-foreground">{month}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium truncate">{title}</p>
-          <p className="text-xs text-primary hover:underline truncate">{patientName}</p>
-        </div>
-        <Badge className={`${badgeVariant} no-default-hover-elevate no-default-active-elevate`}>
-          {badgeLabel}
-        </Badge>
-        {time && (
-          <span className="text-sm text-muted-foreground whitespace-nowrap">{time}</span>
-        )}
-      </div>
+      {content}
     </Link>
   );
 }

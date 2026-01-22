@@ -1568,6 +1568,30 @@ export default function CalendarPage() {
   
   const targetCalendarId = googleStatus?.integration?.targetCalendarId;
   
+  // Sync Google Calendar mutation
+  const syncGoogleMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/integrations/google/sync-now");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/google/imported-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
+      toast({
+        title: "Synchronisation terminée",
+        description: `${data.created || 0} créé(s), ${data.updated || 0} mis à jour, ${data.skipped || 0} ignoré(s)`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur de synchronisation",
+        description: error.message || "La synchronisation a échoué",
+        variant: "destructive",
+      });
+    },
+  });
+  
 // Google API event format (from /api/google/events)
   interface GoogleApiEvent {
     id: string;
@@ -2020,30 +2044,41 @@ export default function CalendarPage() {
             {googleStatus?.connected && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Link href="/settings/integrations/google-calendar">
-                    <Button variant="ghost" size="icon" className="relative" data-testid="button-google-calendar-status">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="relative" 
+                    data-testid="button-google-calendar-sync"
+                    onClick={() => syncGoogleMutation.mutate()}
+                    disabled={syncGoogleMutation.isPending || !googleStatus.syncEnabled}
+                  >
+                    {syncGoogleMutation.isPending ? (
+                      <RotateCcw className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : (
                       <SiGoogle className={`h-4 w-4 ${googleStatus.syncEnabled ? "text-muted-foreground" : "text-muted-foreground/50"}`} />
-                      {googleStatus.syncEnabled ? (
-                        googleStatus.errorCount && googleStatus.errorCount > 0 ? (
-                          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground">
-                            {googleStatus.errorCount > 9 ? "9+" : googleStatus.errorCount}
-                          </span>
-                        ) : (
-                          <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500" />
-                        )
+                    )}
+                    {googleStatus.syncEnabled && !syncGoogleMutation.isPending ? (
+                      googleStatus.errorCount && googleStatus.errorCount > 0 ? (
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground">
+                          {googleStatus.errorCount > 9 ? "9+" : googleStatus.errorCount}
+                        </span>
                       ) : (
-                        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-muted-foreground/30" />
-                      )}
-                    </Button>
-                  </Link>
+                        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500" />
+                      )
+                    ) : !syncGoogleMutation.isPending ? (
+                      <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-muted-foreground/30" />
+                    ) : null}
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>
-                    {!googleStatus.syncEnabled
+                    {syncGoogleMutation.isPending
+                      ? "Synchronisation en cours..."
+                      : !googleStatus.syncEnabled
                       ? "Google Calendar connecté (sync désactivé)"
                       : googleStatus.errorCount && googleStatus.errorCount > 0
-                        ? `Google Calendar sync actif (${googleStatus.errorCount} erreur${googleStatus.errorCount > 1 ? "s" : ""})`
-                        : "Google Calendar sync actif"}
+                        ? `Cliquez pour synchroniser (${googleStatus.errorCount} erreur${googleStatus.errorCount > 1 ? "s" : ""})`
+                        : "Cliquez pour synchroniser avec Google Calendar"}
                   </p>
                 </TooltipContent>
               </Tooltip>
