@@ -712,6 +712,8 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
     onSuccess: () => {
       toast({ title: "Rendez-vous mis à jour" });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
       onUpdated();
       setIsEditing(false);
     },
@@ -727,6 +729,8 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
     onSuccess: () => {
       toast({ title: "Rendez-vous supprimé", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
       onUpdated();
       onClose();
     },
@@ -742,6 +746,8 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
     onSuccess: () => {
       toast({ title: "Rendez-vous dupliqué" });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
       onUpdated();
     },
     onError: () => {
@@ -1225,8 +1231,10 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
     onSuccess: (patientId) => {
       toast({ title: "Rendez-vous créé", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/calendar"] });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments?status=UPCOMING&withPatient=true"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
       onCreated();
       form.reset();
       onClose();
