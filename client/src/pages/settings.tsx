@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearch, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -175,52 +176,34 @@ export default function SettingsPage() {
     <div className="flex flex-col h-full overflow-auto px-6 pb-6" data-testid="settings-page">
       <div className="w-full">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="bg-white dark:bg-zinc-900 p-1 h-auto gap-1 border-b-0 rounded-full mb-6">
-            <TabsTrigger 
-              value="security" 
-              className="text-xs px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-              data-testid="nav-security"
-            >
-              <Shield className="w-4 h-4" />
-              Informations & Sécurité
-            </TabsTrigger>
-            <TabsTrigger 
-              value="notifications" 
-              className="text-xs px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-              data-testid="nav-notifications"
-            >
-              <Bell className="w-4 h-4" />
-              Notifications
-            </TabsTrigger>
-            {userIsAdmin && (
-              <TabsTrigger 
-                value="collaborators" 
-                className="text-xs px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-                data-testid="nav-collaborators"
+          <div className="flex gap-1 bg-white dark:bg-zinc-900 p-1 rounded-full mb-6 w-fit">
+            {[
+              { value: "security", label: "Informations & Sécurité", icon: Shield, show: true },
+              { value: "notifications", label: "Notifications", icon: Bell, show: true },
+              { value: "collaborators", label: "Collaborateurs", icon: Users, show: userIsAdmin },
+              { value: "organization", label: "Organisation", icon: Building2, show: userIsAdmin },
+              { value: "integrations", label: "Intégrations", icon: Link2, show: true },
+            ].filter(tab => tab.show).map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setActiveTab(tab.value)}
+                className={`relative flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-full transition-colors duration-200 ${
+                  activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid={`nav-${tab.value}`}
               >
-                <Users className="w-4 h-4" />
-                Collaborateurs
-              </TabsTrigger>
-            )}
-            {userIsAdmin && (
-              <TabsTrigger 
-                value="organization" 
-                className="text-xs px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-                data-testid="nav-organization"
-              >
-                <Building2 className="w-4 h-4" />
-                Organisation
-              </TabsTrigger>
-            )}
-            <TabsTrigger 
-              value="integrations" 
-              className="text-xs px-4 py-2 rounded-[50px] gap-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-none data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground" 
-              data-testid="nav-integrations"
-            >
-              <Link2 className="w-4 h-4" />
-              Intégrations
-            </TabsTrigger>
-          </TabsList>
+                {activeTab === tab.value && (
+                  <motion.div
+                    layoutId="settings-tab-indicator"
+                    className="absolute inset-0 bg-primary rounded-full"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                  />
+                )}
+                <tab.icon className="w-4 h-4 relative z-10" />
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            ))}
+          </div>
 
           <TabsContent value="security">
             {profile ? (
