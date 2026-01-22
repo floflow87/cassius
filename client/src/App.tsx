@@ -22,7 +22,7 @@ import ActeDetailsPage from "@/pages/acte-details";
 import DocumentsPage from "@/pages/documents";
 import CalendarPage from "@/pages/calendar";
 import SettingsPage from "@/pages/settings";
-import IntegrationsPage from "@/pages/settings-integrations";
+import GoogleCalendarPage from "@/pages/settings-google-calendar";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import ForgotPasswordPage from "@/pages/forgot-password";
@@ -208,12 +208,10 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/notifications" component={NotificationsPage} />
       <Route path="/onboarding" component={OnboardingPage} />
       <Route path="/share/:token" component={PublicSharePage} />
-      <Route path="/settings/integrations/:rest*">
-        <IntegrationsPage />
-      </Route>
       <Route path="/settings/integrations">
-        <IntegrationsPage />
+        <Redirect to="/settings?tab=integrations" />
       </Route>
+      <Route path="/settings/google-calendar" component={GoogleCalendarPage} />
       <Route path="/settings/:section" component={SettingsPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />

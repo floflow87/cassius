@@ -1,15 +1,11 @@
-import { Route, Switch, Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, Check, RefreshCw, ChevronDown, AlertCircle } from "lucide-react";
+import { Check, RefreshCw, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch as SwitchUI } from "@/components/ui/switch";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import GoogleCalendarIntegration from "@/pages/settings-google-calendar";
 import googleCalendarIcon from "@assets/Google_Calendar_icon_(2020).svg_1767601723458.png";
 import gmailIcon from "@assets/gmail_1767602212820.png";
 import outlookIcon from "@assets/Microsoft_Outlook_Icon_(2025–present).svg_1767602593769.png";
@@ -64,31 +60,6 @@ function IntegrationsList({ embedded = false }: { embedded?: boolean }) {
     },
   });
 
-  const syncNowMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/sync/trigger");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
-      toast({ title: "Synchronisation démarrée" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const toggleSyncMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      return apiRequest("PATCH", "/api/integrations/google/settings", { isEnabled: enabled });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    },
-  });
-
   return (
     <div className={embedded ? "" : "p-6"} data-testid="settings-integrations">
       {!embedded && (
@@ -130,80 +101,17 @@ function IntegrationsList({ embedded = false }: { embedded?: boolean }) {
               </div>
             ) : googleStatus?.connected ? (
               <div className="space-y-3">
-                <Collapsible>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-full justify-between text-xs text-muted-foreground hover:text-foreground" data-testid="button-toggle-google-details">
-                      <span>Voir les détails</span>
-                      <ChevronDown className="w-4 h-4" />
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-3 pt-3 border-t mt-2">
-                    {googleStatus.email && (
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Compte connecté</Label>
-                        <p className="font-medium text-xs">{googleStatus.email}</p>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <Label className="text-xs">Synchronisation automatique</Label>
-                        <p className="text-xs text-muted-foreground">
-                          Sync activée
-                        </p>
-                      </div>
-                      <SwitchUI
-                        checked={googleStatus.integration?.isEnabled ?? false}
-                        onCheckedChange={(checked) => toggleSyncMutation.mutate(checked)}
-                        disabled={toggleSyncMutation.isPending}
-                        data-testid="switch-google-sync"
-                      />
-                    </div>
-
-                    {googleStatus.integration?.targetCalendarName && (
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Calendrier cible</Label>
-                        <p className="font-medium text-xs flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
-                          {googleStatus.integration.targetCalendarName}
-                        </p>
-                      </div>
-                    )}
-
-                    {googleStatus.integration?.lastSyncAt && (
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Dernière synchronisation</Label>
-                        <p className="text-xs">
-                          {new Date(googleStatus.integration.lastSyncAt).toLocaleString("fr-FR")}
-                        </p>
-                      </div>
-                    )}
-
-                    {googleStatus.integration?.syncErrorCount && googleStatus.integration.syncErrorCount > 0 && (
-                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                        <AlertCircle className="w-4 h-4" />
-                        <span className="text-xs">{googleStatus.integration.syncErrorCount} erreurs</span>
-                      </div>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
-
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => syncNowMutation.mutate()}
-                    disabled={syncNowMutation.isPending}
-                    data-testid="button-sync-now"
-                  >
-                    {syncNowMutation.isPending ? (
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                    )}
-                    Synchroniser
-                  </Button>
+                  <Link href="/settings/google-calendar" className="flex-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      data-testid="button-configure-google"
+                    >
+                      Configurer
+                    </Button>
+                  </Link>
                   <Button
                     variant="outline"
                     size="sm"
@@ -297,22 +205,7 @@ function IntegrationsList({ embedded = false }: { embedded?: boolean }) {
 }
 
 export default function IntegrationsPage({ embedded = false }: { embedded?: boolean }) {
-  const [location] = useLocation();
-  
-  if (embedded) {
-    return <IntegrationsList embedded />;
-  }
-  
-  return (
-    <Switch>
-      <Route path="/settings/integrations/google-calendar">
-        <GoogleCalendarIntegration />
-      </Route>
-      <Route path="/settings/integrations">
-        <IntegrationsList />
-      </Route>
-    </Switch>
-  );
+  return <IntegrationsList embedded={embedded} />;
 }
 
 export { IntegrationsList };

@@ -557,7 +557,7 @@ export default function GoogleCalendarIntegration() {
   return (
     <div className="px-6 pb-6" data-testid="settings-google-calendar">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/settings/integrations">
+        <Link href="/settings?tab=integrations">
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -573,7 +573,7 @@ export default function GoogleCalendarIntegration() {
         </div>
       </div>
       
-      <div className="max-w-4xl space-y-4">
+      <div className="space-y-4">
         
         {/* Non-connected state - full width */}
         {!isConnected && (
