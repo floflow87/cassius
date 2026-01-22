@@ -5462,6 +5462,7 @@ export async function registerRoutes(
         id: org.id,
         nom: org.nom,
         adresse: org.adresse || null,
+        telephone: org.telephone || null,
         timezone: org.timezone || "Europe/Paris",
         createdAt: org.createdAt,
       });
@@ -5481,11 +5482,12 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Accès réservé aux administrateurs" });
       }
       
-      const { nom, adresse, timezone } = req.body;
+      const { nom, adresse, telephone, timezone } = req.body;
       
       await storage.updateOrganisation(organisationId, { 
         nom, 
-        adresse, 
+        adresse,
+        telephone,
         timezone 
       });
       
@@ -5495,6 +5497,7 @@ export async function registerRoutes(
         id: updated?.id,
         nom: updated?.nom,
         adresse: updated?.adresse || null,
+        telephone: updated?.telephone || null,
         timezone: updated?.timezone || "Europe/Paris",
         createdAt: updated?.createdAt,
       });
@@ -6811,6 +6814,26 @@ export async function registerRoutes(
 
       if (dataPatch) {
         data = { ...data, ...dataPatch };
+        
+        // Synchronize with organisation table when relevant fields are updated
+        const orgUpdate: Partial<{ nom: string; adresse: string; telephone: string; timezone: string }> = {};
+        if (dataPatch.clinicName !== undefined) {
+          orgUpdate.nom = dataPatch.clinicName;
+        }
+        if (dataPatch.address !== undefined) {
+          orgUpdate.adresse = dataPatch.address;
+        }
+        if (dataPatch.phone !== undefined) {
+          orgUpdate.telephone = dataPatch.phone;
+        }
+        if (dataPatch.timezone !== undefined) {
+          orgUpdate.timezone = dataPatch.timezone;
+        }
+        
+        // Update organisation if any fields changed
+        if (Object.keys(orgUpdate).length > 0) {
+          await storage.updateOrganisation(organisationId, orgUpdate);
+        }
       }
 
       // Update the state

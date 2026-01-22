@@ -75,12 +75,13 @@ export function OnboardingChecklist() {
             <div className="flex items-center gap-2">
               <Button 
                 variant="ghost" 
-                size="sm" 
+                size="sm"
+                className="text-xs text-muted-foreground italic font-light"
                 onClick={handleDismiss}
                 disabled={isPending}
                 data-testid="button-dismiss-onboarding"
               >
-                <EyeOff className="w-4 h-4 mr-1" />
+                <EyeOff className="w-3.5 h-3.5 mr-1" />
                 Ne plus afficher
               </Button>
               <Button size="sm" onClick={() => handleResumeOnboarding()} data-testid="button-resume-onboarding">

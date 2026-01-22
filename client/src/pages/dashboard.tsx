@@ -882,9 +882,17 @@ export default function DashboardPage() {
                 </svg>
                 Implants récents
               </CardTitle>
-              <Badge variant="secondary" className="text-xs">
-                {surgeryImplants.length} implants
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs">
+                  {surgeryImplants.length} implants
+                </Badge>
+                <Link href="/actes">
+                  <Button size="sm" variant="outline" data-testid="button-new-acte-dashboard">
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Nouvel acte
+                  </Button>
+                </Link>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">

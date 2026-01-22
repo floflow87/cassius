@@ -652,6 +652,7 @@ export default function OnboardingPage() {
           toast({
             title: "Configuration terminée",
             description: "Bienvenue sur Cassius !",
+            className: "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800",
           });
           setLocation(result.redirectTo || "/dashboard");
         }

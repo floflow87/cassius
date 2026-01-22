@@ -219,7 +219,7 @@ export interface IStorage {
   // Organisation methods
   createOrganisation(data: InsertOrganisation): Promise<Organisation>;
   getOrganisationById(id: string): Promise<Organisation | undefined>;
-  updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; timezone: string }>): Promise<Organisation | undefined>;
+  updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; telephone: string; timezone: string }>): Promise<Organisation | undefined>;
 
   // Note methods
   getPatientNotes(organisationId: string, patientId: string): Promise<(Note & { user: { nom: string | null; prenom: string | null } })[]>;
@@ -2375,7 +2375,7 @@ export class DatabaseStorage implements IStorage {
     return org;
   }
   
-  async updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; timezone: string }>): Promise<Organisation | undefined> {
+  async updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; telephone: string; timezone: string }>): Promise<Organisation | undefined> {
     const [org] = await db.update(organisations).set(data as any).where(eq(organisations.id, id)).returning();
     return org;
   }

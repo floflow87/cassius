@@ -91,6 +91,7 @@ interface Organisation {
   id: string;
   nom: string;
   adresse?: string | null;
+  telephone?: string | null;
   timezone?: string;
   createdAt: string;
 }
@@ -558,6 +559,7 @@ function OnboardingSettingsSection() {
         toast({
           title: "Félicitations !",
           description: "Vous avez terminé la configuration de Cassius.",
+          className: "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800",
         });
         queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       }
@@ -591,8 +593,8 @@ function OnboardingSettingsSection() {
     );
   }
 
-  const progress = checklist ? Math.round((checklist.completedCount / checklist.totalCount) * 100) : 0;
-  const allCompleted = checklist?.completedCount === checklist?.totalCount;
+  const progress = checklist && checklist.totalCount > 0 ? Math.round((checklist.completedCount / checklist.totalCount) * 100) : 0;
+  const allCompleted = checklist && checklist.totalCount > 0 && checklist.completedCount === checklist.totalCount;
   const isOpen = isOpenOverride !== null ? isOpenOverride : !allCompleted;
   const setIsOpen = setIsOpenOverride;
   const statusBadge = allCompleted ? (
@@ -1245,6 +1247,7 @@ function OrganizationSection() {
   const [formData, setFormData] = useState({
     nom: "",
     adresse: "",
+    telephone: "",
     timezone: "Europe/Paris",
   });
 
@@ -1253,6 +1256,7 @@ function OrganizationSection() {
       setFormData({
         nom: organisation.nom || "",
         adresse: organisation.adresse || "",
+        telephone: organisation.telephone || "",
         timezone: organisation.timezone || "Europe/Paris",
       });
     }
@@ -1277,6 +1281,7 @@ function OrganizationSection() {
       setFormData({
         nom: organisation.nom || "",
         adresse: organisation.adresse || "",
+        telephone: organisation.telephone || "",
         timezone: organisation.timezone || "Europe/Paris",
       });
     }
@@ -1330,6 +1335,16 @@ function OrganizationSection() {
                 />
               </div>
               <div>
+                <Label htmlFor="org-telephone" className="font-light">Téléphone</Label>
+                <Input
+                  id="org-telephone"
+                  value={formData.telephone}
+                  onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
+                  placeholder="+33 1 23 45 67 89"
+                  data-testid="input-org-telephone"
+                />
+              </div>
+              <div>
                 <Label htmlFor="org-timezone" className="font-light">Fuseau horaire</Label>
                 <Select
                   value={formData.timezone}
@@ -1365,6 +1380,10 @@ function OrganizationSection() {
               <div>
                 <Label className="text-muted-foreground text-xs font-light">Adresse</Label>
                 <p className="font-medium text-xs" data-testid="text-org-adresse">{organisation?.adresse || "—"}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs font-light">Téléphone</Label>
+                <p className="font-medium text-xs" data-testid="text-org-telephone">{organisation?.telephone || "—"}</p>
               </div>
               <div>
                 <Label className="text-muted-foreground text-xs font-light">Fuseau horaire</Label>
