@@ -863,13 +863,97 @@ export default function DashboardPage() {
         if (!surgeryImplants || surgeryImplants.length === 0) {
           return (
             <Card key={blockId}>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <svg className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
                   </svg>
                   Implants récents
                 </CardTitle>
+                <Sheet open={newActeSheetOpen} onOpenChange={(open) => {
+                  setNewActeSheetOpen(open);
+                  if (!open) {
+                    setSelectedPatientForActe(null);
+                  }
+                }}>
+                  <SheetTrigger asChild>
+                    <Button size="sm" data-testid="button-new-acte-dashboard-empty">
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Nouvel acte
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent className="sm:max-w-lg overflow-y-auto">
+                    <SheetHeader>
+                      <SheetTitle>Nouvel acte chirurgical</SheetTitle>
+                    </SheetHeader>
+                    <div className="py-4 space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Patient</label>
+                        <Popover open={actePatientPopoverOpen} onOpenChange={setActePatientPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={actePatientPopoverOpen}
+                              className="w-full justify-between"
+                              data-testid="select-patient-acte-trigger-empty"
+                            >
+                              {selectedPatientForActe
+                                ? patients?.find((p) => p.id === selectedPatientForActe)
+                                  ? `${patients.find((p) => p.id === selectedPatientForActe)?.prenom} ${patients.find((p) => p.id === selectedPatientForActe)?.nom}`
+                                  : "Sélectionner un patient..."
+                                : "Sélectionner un patient..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[350px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Rechercher un patient..." data-testid="input-search-patient-acte-empty" />
+                              <CommandList>
+                                <CommandEmpty>Aucun patient trouvé.</CommandEmpty>
+                                <CommandGroup>
+                                  <ScrollArea className="h-[200px]">
+                                    {patients?.map((patient) => (
+                                      <CommandItem
+                                        key={patient.id}
+                                        value={`${patient.prenom} ${patient.nom}`}
+                                        onSelect={() => {
+                                          setSelectedPatientForActe(patient.id);
+                                          setActePatientPopoverOpen(false);
+                                        }}
+                                        data-testid={`select-patient-acte-empty-${patient.id}`}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            selectedPatientForActe === patient.id ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        {patient.prenom} {patient.nom}
+                                      </CommandItem>
+                                    ))}
+                                  </ScrollArea>
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      
+                      {selectedPatientForActe && (
+                        <OperationForm 
+                          patientId={selectedPatientForActe}
+                          onSuccess={() => {
+                            setNewActeSheetOpen(false);
+                            setSelectedPatientForActe(null);
+                            queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+                            queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants"] });
+                          }}
+                        />
+                      )}
+                    </div>
+                  </SheetContent>
+                </Sheet>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
