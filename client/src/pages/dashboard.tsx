@@ -1060,18 +1060,6 @@ export default function DashboardPage() {
         return renderBlock(blockId);
       })}
 
-      {(!stats || stats.totalPatients === 0) && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Users className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Bienvenue sur Cassius</h3>
-            <p className="text-sm text-muted-foreground text-center max-w-md">
-              Commencez par ajouter votre premier patient pour documenter vos opérations
-              implantologiques et suivre l'évolution de vos implants.
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

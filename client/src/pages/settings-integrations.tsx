@@ -101,6 +101,16 @@ function IntegrationsList({ embedded = false }: { embedded?: boolean }) {
               </div>
             ) : googleStatus?.connected ? (
               <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Votre compte Google est connecté.{" "}
+                  <Link 
+                    href="/settings/google-calendar" 
+                    className="text-primary hover:underline"
+                    data-testid="link-google-calendar-details"
+                  >
+                    Voir les détails
+                  </Link>
+                </p>
                 <div className="flex gap-2">
                   <Link href="/settings/google-calendar" className="flex-1">
                     <Button

@@ -656,11 +656,11 @@ export default function GoogleCalendarIntegration() {
         
         {/* Connected state - Two columns layout */}
         {isConnected && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* LEFT COLUMN: Compte connecté, Export, Conflits */}
-            <div className="space-y-4">
+          <div className="space-y-4">
+            {/* Row 1: Compte connecté + Aperçu (same height) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr">
               {/* Section 1: Compte connecté */}
-              <Card data-testid="card-connection">
+              <Card data-testid="card-connection" className="flex flex-col">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">Compte connecté</CardTitle>
                 </CardHeader>
@@ -739,12 +739,59 @@ export default function GoogleCalendarIntegration() {
                 </CardContent>
               </Card>
               
-              {/* Section 2: Export Cassius vers Google */}
-              <Card data-testid="card-sync-options">
+              {/* Section 2: Aperçu dans Google Calendar */}
+              <Card data-testid="card-event-preview" className="flex flex-col">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Aperçu dans Google Calendar</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <div className="rounded-lg border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20 p-3">
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <Calendar className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium text-blue-900 dark:text-blue-100">
+                            [Cassius] CHIRURGIE - Martin Dupont
+                          </p>
+                          <p className="text-[10px] text-blue-700 dark:text-blue-300">
+                            Mardi 14 janvier 2025
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <Clock className="h-3 w-3 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
+                        <span className="text-blue-800 dark:text-blue-200">09:00 - 11:00</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <User className="h-3 w-3 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
+                        <span className="text-blue-800 dark:text-blue-200">Patient: Martin Dupont</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <MapPin className="h-3 w-3 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
+                        <span className="text-blue-800 dark:text-blue-200">
+                          {integration?.targetCalendarName || "Calendrier principal"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    Les événements exportés sont préfixés par [Cassius]
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Row 2: Export + Import (same height) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr">
+              {/* Section 3: Export Cassius vers Google */}
+              <Card data-testid="card-sync-options" className="flex flex-col">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">Export Cassius vers Google</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-3 flex-1 flex flex-col">
                   <div className="flex items-center justify-between gap-3">
                     <div className="space-y-0.5">
                       <Label htmlFor="sync-enabled" className="text-xs font-normal">
@@ -811,8 +858,186 @@ export default function GoogleCalendarIntegration() {
                 </CardContent>
               </Card>
 
-              {/* Section 3: Conflits de synchronisation */}
-              <Card data-testid="card-conflicts">
+              {/* Section 4: Import Google vers Cassius */}
+              <Card data-testid="card-import" className="flex flex-col">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-sm font-medium">Import Google vers Cassius</CardTitle>
+                    <div className="flex items-center gap-2">
+                      {importStatus && importStatus.importedEventsCount > 0 && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {importStatus.importedEventsCount} importé(s)
+                        </Badge>
+                      )}
+                      <Switch
+                        checked={importEnabled}
+                        onCheckedChange={handleToggleImportEnabled}
+                        disabled={updateImportSettingsMutation.isPending}
+                        data-testid="switch-import-enabled"
+                      />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 flex-1 flex flex-col">
+                  {migrationRequired && (
+                    <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-800 p-2.5">
+                      <div className="flex gap-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">Migration requise</p>
+                          <p className="text-[10px] text-yellow-700 dark:text-yellow-400 mt-0.5">
+                            Tables d'import indisponibles.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Calendrier source</Label>
+                    {calendarsLoading ? (
+                      <Skeleton className="h-8 w-full" />
+                    ) : (
+                      <Select
+                        value={sourceCalendarId}
+                        onValueChange={(val) => {
+                          handleSourceCalendarChange(val);
+                          setPreviewResult(null);
+                          setPreviewDone(false);
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs" data-testid="select-source-calendar">
+                          <SelectValue placeholder="Sélectionnez un calendrier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {calendars.map((cal) => (
+                            <SelectItem key={cal.id} value={cal.id} className="text-xs">
+                              {cal.summary} {cal.primary && "(Principal)"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Période d'import</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button
+                        variant={rangePreset === "7d" ? "default" : "outline"}
+                        size="sm"
+                        className="text-[10px] h-7 px-2"
+                        onClick={() => {
+                          setRangePreset("7d");
+                          setPreviewResult(null);
+                          setPreviewDone(false);
+                        }}
+                        data-testid="button-range-7d"
+                      >
+                        7j
+                      </Button>
+                      <Button
+                        variant={rangePreset === "30d" ? "default" : "outline"}
+                        size="sm"
+                        className="text-[10px] h-7 px-2"
+                        onClick={() => {
+                          setRangePreset("30d");
+                          setPreviewResult(null);
+                          setPreviewDone(false);
+                        }}
+                        data-testid="button-range-30d"
+                      >
+                        30j
+                      </Button>
+                      <Button
+                        variant={rangePreset === "month" ? "default" : "outline"}
+                        size="sm"
+                        className="text-[10px] h-7 px-2"
+                        onClick={() => {
+                          setRangePreset("month");
+                          setPreviewResult(null);
+                          setPreviewDone(false);
+                        }}
+                        data-testid="button-range-month"
+                      >
+                        Mois
+                      </Button>
+                      <Button
+                        variant={rangePreset === "custom" ? "default" : "outline"}
+                        size="sm"
+                        className="text-[10px] h-7 px-2"
+                        onClick={() => {
+                          setRangePreset("custom");
+                          setPreviewResult(null);
+                          setPreviewDone(false);
+                        }}
+                        data-testid="button-range-custom"
+                      >
+                        Autre
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 mt-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => previewMutation.mutate()}
+                      disabled={!canPreview || previewMutation.isPending}
+                      className="flex-1 text-[10px] h-8"
+                      data-testid="button-preview"
+                    >
+                      {previewMutation.isPending ? (
+                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                      ) : (
+                        <Eye className="h-3 w-3 mr-1.5" />
+                      )}
+                      Prévisualiser
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => importMutation.mutate()}
+                      disabled={!canImport || importMutation.isPending}
+                      className="flex-1 text-[10px] h-8"
+                      data-testid="button-import"
+                    >
+                      {importMutation.isPending ? (
+                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3 w-3 mr-1.5" />
+                      )}
+                      Importer
+                    </Button>
+                  </div>
+                  
+                  {importStatus && (
+                    <div className="flex items-center justify-between text-[10px] pt-2 border-t">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>Dernier: {formatLastSync(importStatus.lastImportAt) || "Jamais"}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={openImportedEventsModal}
+                        className="text-[10px] h-6 px-2"
+                        data-testid="button-view-imported"
+                      >
+                        <FileText className="h-3 w-3 mr-1" />
+                        Voir
+                      </Button>
+                    </div>
+                  )}
+                  
+                  <p className="text-[10px] text-muted-foreground">
+                    Les événements [Cassius] sont ignorés automatiquement.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Row 3: Conflits (full width) */}
+            <Card data-testid="card-conflicts">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-sm font-medium">Conflits de synchronisation</CardTitle>
@@ -924,308 +1149,6 @@ export default function GoogleCalendarIntegration() {
                 )}
                 </CardContent>
               </Card>
-            </div>
-            
-            {/* RIGHT COLUMN: Aperçu, Import */}
-            <div className="space-y-4">
-              {/* Section 4: Aperçu dans Google Calendar */}
-              <Card data-testid="card-event-preview">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Aperçu dans Google Calendar</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20 p-3">
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2">
-                        <Calendar className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-xs font-medium text-blue-900 dark:text-blue-100">
-                            [Cassius] CHIRURGIE - Martin Dupont
-                          </p>
-                          <p className="text-[10px] text-blue-700 dark:text-blue-300">
-                            Mardi 14 janvier 2025
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-[10px]">
-                        <Clock className="h-3 w-3 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
-                        <span className="text-blue-800 dark:text-blue-200">09:00 - 11:00</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-[10px]">
-                        <User className="h-3 w-3 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
-                        <span className="text-blue-800 dark:text-blue-200">Patient: Martin Dupont</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-[10px]">
-                        <MapPin className="h-3 w-3 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
-                        <span className="text-blue-800 dark:text-blue-200">
-                          {integration?.targetCalendarName || "Calendrier principal"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-2">
-                    Les événements exportés sont préfixés par [Cassius]
-                  </p>
-                </CardContent>
-              </Card>
-              
-              {/* Section 5: Import Google vers Cassius */}
-              <Card data-testid="card-import">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-sm font-medium">Import Google vers Cassius</CardTitle>
-                    <div className="flex items-center gap-2">
-                      {importStatus && importStatus.importedEventsCount > 0 && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          {importStatus.importedEventsCount} importé(s)
-                        </Badge>
-                      )}
-                      <Switch
-                        checked={importEnabled}
-                        onCheckedChange={handleToggleImportEnabled}
-                        disabled={updateImportSettingsMutation.isPending}
-                        data-testid="switch-import-enabled"
-                      />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {migrationRequired && (
-                    <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-800 p-2.5">
-                      <div className="flex gap-2">
-                        <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">Migration requise</p>
-                          <p className="text-[10px] text-yellow-700 dark:text-yellow-400 mt-0.5">
-                            Tables d'import indisponibles.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Calendrier source</Label>
-                    {calendarsLoading ? (
-                      <Skeleton className="h-8 w-full" />
-                    ) : (
-                      <Select
-                        value={sourceCalendarId}
-                        onValueChange={(val) => {
-                          handleSourceCalendarChange(val);
-                          setPreviewResult(null);
-                          setPreviewDone(false);
-                        }}
-                      >
-                        <SelectTrigger className="h-8 text-xs" data-testid="select-source-calendar">
-                          <SelectValue placeholder="Sélectionnez un calendrier" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {calendars.map((cal) => (
-                            <SelectItem key={cal.id} value={cal.id} className="text-xs">
-                              {cal.summary} {cal.primary && "(Principal)"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Période d'import</Label>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Button
-                        variant={rangePreset === "7d" ? "default" : "outline"}
-                        size="sm"
-                        className="text-[10px] h-7 px-2"
-                        onClick={() => {
-                          setRangePreset("7d");
-                          setPreviewResult(null);
-                          setPreviewDone(false);
-                        }}
-                        data-testid="button-range-7d"
-                      >
-                        7j
-                      </Button>
-                      <Button
-                        variant={rangePreset === "30d" ? "default" : "outline"}
-                        size="sm"
-                        className="text-[10px] h-7 px-2"
-                        onClick={() => {
-                          setRangePreset("30d");
-                          setPreviewResult(null);
-                          setPreviewDone(false);
-                        }}
-                        data-testid="button-range-30d"
-                      >
-                        30j
-                      </Button>
-                      <Button
-                        variant={rangePreset === "month" ? "default" : "outline"}
-                        size="sm"
-                        className="text-[10px] h-7 px-2"
-                        onClick={() => {
-                          setRangePreset("month");
-                          setPreviewResult(null);
-                          setPreviewDone(false);
-                        }}
-                        data-testid="button-range-month"
-                      >
-                        Mois
-                      </Button>
-                      <Button
-                        variant={rangePreset === "custom" ? "default" : "outline"}
-                        size="sm"
-                        className="text-[10px] h-7 px-2"
-                        onClick={() => {
-                          setRangePreset("custom");
-                          setPreviewResult(null);
-                          setPreviewDone(false);
-                        }}
-                        data-testid="button-range-custom"
-                      >
-                        Autre
-                      </Button>
-                    </div>
-                    
-                    {rangePreset === "custom" && (
-                      <div className="flex gap-2 mt-1.5">
-                        <div className="flex-1">
-                          <Label className="text-[10px] text-muted-foreground">Début</Label>
-                          <input
-                            type="date"
-                            value={customStartDate}
-                            onChange={(e) => setCustomStartDate(e.target.value)}
-                            className="w-full h-7 px-2 rounded-md border border-input bg-background text-xs"
-                            data-testid="input-start-date"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <Label className="text-[10px] text-muted-foreground">Fin</Label>
-                          <input
-                            type="date"
-                            value={customEndDate}
-                            onChange={(e) => setCustomEndDate(e.target.value)}
-                            className="w-full h-7 px-2 rounded-md border border-input bg-background text-xs"
-                            data-testid="input-end-date"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => previewMutation.mutate()}
-                      disabled={!canPreview || previewMutation.isPending}
-                      className="flex-1"
-                      size="sm"
-                      data-testid="button-preview"
-                    >
-                      {previewMutation.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      ) : (
-                        <Eye className="h-3.5 w-3.5 mr-1.5" />
-                      )}
-                      Prévisualiser
-                    </Button>
-                    <Button
-                      onClick={() => importMutation.mutate()}
-                      disabled={!canImport || importMutation.isPending}
-                      className="flex-1"
-                      size="sm"
-                      data-testid="button-import"
-                    >
-                      {importMutation.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      ) : (
-                        <Download className="h-3.5 w-3.5 mr-1.5" />
-                      )}
-                      Importer
-                    </Button>
-                  </div>
-                  
-                  {previewResult && (
-                    <div className="p-2.5 rounded-md bg-muted/50 space-y-2" data-testid="import-results">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium">
-                          {previewResult.mode === "preview" ? "Prévisualisation" : "Import terminé"}
-                        </span>
-                        <Badge variant="secondary" className="text-[10px]">{previewResult.total} évt</Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                        <div className="flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                          <span className="text-muted-foreground">Créés:</span>
-                          <span className="font-medium">{previewResult.created}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                          <span className="text-muted-foreground">Mis à jour:</span>
-                          <span className="font-medium">{previewResult.updated}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                          <span className="text-muted-foreground">Ignorés:</span>
-                          <span className="font-medium">{previewResult.skipped}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                          <span className="text-muted-foreground">Erreurs:</span>
-                          <span className="font-medium">{previewResult.failed}</span>
-                        </div>
-                      </div>
-                      
-                      {previewResult.failures.length > 0 && (
-                        <div className="pt-1.5 border-t">
-                          <p className="text-[10px] text-destructive mb-0.5">Erreurs :</p>
-                          <ul className="text-[10px] space-y-0.5">
-                            {previewResult.failures.slice(0, 2).map((f, i) => (
-                              <li key={i} className="text-muted-foreground truncate">
-                                {f.eventId}: {f.reason}
-                              </li>
-                            ))}
-                            {previewResult.failures.length > 2 && (
-                              <li className="text-muted-foreground">
-                                ... +{previewResult.failures.length - 2} autre(s)
-                              </li>
-                            )}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {importStatus && (
-                    <div className="flex items-center justify-between text-[10px] pt-2 border-t">
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>Dernier: {formatLastSync(importStatus.lastImportAt) || "Jamais"}</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={openImportedEventsModal}
-                        className="text-[10px] h-6 px-2"
-                        data-testid="button-view-imported"
-                      >
-                        <FileText className="h-3 w-3 mr-1" />
-                        Voir
-                      </Button>
-                    </div>
-                  )}
-                  
-                  <p className="text-[10px] text-muted-foreground">
-                    Les événements [Cassius] sont ignorés automatiquement.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
           </div>
         )}
       </div>
