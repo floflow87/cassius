@@ -556,677 +556,677 @@ export default function GoogleCalendarIntegration() {
 
   return (
     <div className="px-6 pb-6" data-testid="settings-google-calendar">
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex items-center gap-3 mb-6">
         <Link href="/settings/integrations">
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-950">
-            <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold">Google Calendar</h1>
-            <p className="text-sm text-muted-foreground">Synchronisation bidirectionnelle</p>
+            <h1 className="text-xl font-semibold">Google Calendar</h1>
+            <p className="text-xs text-muted-foreground">Synchronisation bidirectionnelle</p>
           </div>
         </div>
       </div>
       
-      <div className="max-w-2xl space-y-6">
+      <div className="max-w-4xl space-y-4">
         
-        {/* Section 1: Connection Status */}
-        <Card data-testid="card-connection">
-          <CardContent className="pt-6">
-            {statusLoading ? (
-              <div className="flex items-center gap-4">
-                <Skeleton className="h-12 w-12 rounded-full" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-3 w-48" />
+        {/* Non-connected state - full width */}
+        {!isConnected && (
+          <Card data-testid="card-connection">
+            <CardContent className="pt-5">
+              {statusLoading ? (
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-3 w-40" />
+                  </div>
                 </div>
-              </div>
-            ) : isConnected ? (
-              <div className="space-y-4">
-                {/* Connected Status Header */}
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-950">
-                      <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted">
+                      <XCircle className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium">Compte connecté</span>
-                        <Badge 
-                          variant="secondary" 
-                          className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400 gap-1"
-                        >
-                          <Check className="h-3 w-3" />
-                          Actif
-                        </Badge>
-                      </div>
-                      {status.email && (
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Mail className="h-3.5 w-3.5" />
-                          {status.email}
+                      <p className="text-sm font-medium">Non connecté</p>
+                      <p className="text-xs text-muted-foreground">
+                        Liez votre compte Google pour synchroniser vos rendez-vous
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {status?.error && (
+                    <div className="flex items-center gap-2 text-xs text-destructive">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      {status.error}
+                    </div>
+                  )}
+                  
+                  {!isConfigured && (
+                    <div className="p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md space-y-2">
+                      <p className="text-xs text-amber-800 dark:text-amber-200">
+                        L'intégration n'est pas configurée. Contactez l'administrateur.
+                      </p>
+                      
+                      {envCheck && envCheck.missingVariables.length > 0 && (
+                        <div className="pt-2 border-t border-amber-200 dark:border-amber-800">
+                          <p className="text-[10px] font-medium text-amber-800 dark:text-amber-200 mb-1">
+                            Variables manquantes :
+                          </p>
+                          <ul className="list-disc list-inside text-[10px] text-amber-700 dark:text-amber-300">
+                            {envCheck.missingVariables.map((variable) => (
+                              <li key={variable} className="font-mono">{variable}</li>
+                            ))}
+                          </ul>
                         </div>
                       )}
                     </div>
-                  </div>
+                  )}
                   
                   <Button 
-                    variant="ghost" 
+                    onClick={handleConnect}
+                    disabled={!isConfigured || isConnecting || connectMutation.isPending}
+                    className="w-full"
                     size="sm"
-                    onClick={() => disconnectMutation.mutate()}
-                    disabled={disconnectMutation.isPending}
-                    className="text-muted-foreground"
-                    data-testid="button-disconnect"
+                    data-testid="button-connect-google"
                   >
-                    {disconnectMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                    {(isConnecting || connectMutation.isPending) ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                        Connexion en cours...
+                      </>
                     ) : (
-                      <Unplug className="h-4 w-4" />
+                      <>
+                        <ExternalLink className="h-3.5 w-3.5 mr-2" />
+                        Connecter Google Calendar
+                      </>
                     )}
                   </Button>
                 </div>
-                
-                <Separator />
-                
-                {/* Quick Stats */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Calendrier cible</p>
-                      <p className="text-sm font-medium truncate">
-                        {integration?.targetCalendarName || "Non sélectionné"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Dernière sync</p>
-                      <p className="text-sm font-medium">
-                        {formatLastSync(integration?.lastSyncAt ?? null) || "Jamais"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Sync Error Alert */}
-                {integration?.lastSyncError && (
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
-                      {integration.lastSyncError}
-                    </p>
-                  </div>
-                )}
-                
-                {/* Sync Button */}
-                <Button 
-                  onClick={() => syncNowMutation.mutate()}
-                  disabled={syncNowMutation.isPending}
-                  className="w-full"
-                  data-testid="button-sync-now"
-                >
-                  {syncNowMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Synchronisation en cours...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Synchroniser vers Google
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Disconnected State */}
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-muted">
-                    <XCircle className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Non connecté</p>
-                    <p className="text-sm text-muted-foreground">
-                      Liez votre compte Google pour synchroniser vos rendez-vous
-                    </p>
-                  </div>
-                </div>
-                
-                {status?.error && (
-                  <div className="flex items-center gap-2 text-sm text-destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    {status.error}
-                  </div>
-                )}
-                
-                {!isConfigured && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md space-y-2">
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
-                      L'intégration n'est pas configurée. Contactez l'administrateur.
-                    </p>
-                    
-                    {envCheck && envCheck.missingVariables.length > 0 && (
-                      <div className="pt-2 border-t border-amber-200 dark:border-amber-800">
-                        <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-1">
-                          Variables manquantes :
-                        </p>
-                        <ul className="list-disc list-inside text-xs text-amber-700 dark:text-amber-300">
-                          {envCheck.missingVariables.map((variable) => (
-                            <li key={variable} className="font-mono">{variable}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                <Button 
-                  onClick={handleConnect}
-                  disabled={!isConfigured || isConnecting || connectMutation.isPending}
-                  className="w-full"
-                  data-testid="button-connect-google"
-                >
-                  {(isConnecting || connectMutation.isPending) ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Connexion en cours...
-                    </>
-                  ) : (
-                    <>
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Connecter Google Calendar
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        )}
         
+        {/* Connected state - Two columns layout */}
         {isConnected && (
-          <>
-            {/* Section 2: Sync Rules (Cassius -> Google) */}
-            <Card data-testid="card-sync-options">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-medium">Export Cassius vers Google</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="sync-enabled" className="text-sm font-normal">
-                      Synchronisation automatique
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Envoie les RDV Cassius vers Google Calendar
-                    </p>
-                  </div>
-                  <Switch
-                    id="sync-enabled"
-                    checked={integration?.isEnabled ?? true}
-                    onCheckedChange={handleToggleEnabled}
-                    disabled={updateIntegrationMutation.isPending}
-                    data-testid="switch-sync-enabled"
-                  />
-                </div>
-                
-                <Separator />
-                
-                {/* Target Calendar */}
-                {calendarsLoading ? (
-                  <Skeleton className="h-10 w-full" />
-                ) : (
-                  <div className="space-y-2">
-                    <Label className="text-sm">Calendrier cible</Label>
-                    <Select
-                      value={currentCalendarId}
-                      onValueChange={handleCalendarChange}
-                      disabled={updateIntegrationMutation.isPending}
-                    >
-                      <SelectTrigger id="calendar-select" data-testid="select-calendar">
-                        <SelectValue placeholder="Sélectionnez un calendrier" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {calendars.map((cal) => (
-                          <SelectItem key={cal.id} value={cal.id}>
-                            {cal.summary} {cal.primary && "(Principal)"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Les événements Cassius seront créés avec le préfixe [Cassius]
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            
-            {/* Section 3: Import from Google (V2) */}
-            <Card data-testid="card-import">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-base font-medium">Import Google vers Cassius</CardTitle>
-                  <div className="flex items-center gap-2">
-                    {importStatus && importStatus.importedEventsCount > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {importStatus.importedEventsCount} importé(s)
-                      </Badge>
-                    )}
-                    <Switch
-                      checked={importEnabled}
-                      onCheckedChange={handleToggleImportEnabled}
-                      disabled={updateImportSettingsMutation.isPending}
-                      data-testid="switch-import-enabled"
-                    />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Migration Required Alert */}
-                {migrationRequired && (
-                  <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-800 p-4">
-                    <div className="flex gap-3">
-                      <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* LEFT COLUMN: Compte connecté, Export, Conflits */}
+            <div className="space-y-4">
+              {/* Section 1: Compte connecté */}
+              <Card data-testid="card-connection">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Compte connecté</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-9 h-9 rounded-full bg-green-100 dark:bg-green-950">
+                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </div>
                       <div>
-                        <p className="font-medium text-yellow-800 dark:text-yellow-300">Migration requise</p>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
-                          Les tables d'import Google Calendar ne sont pas disponibles. 
-                          Exécutez la migration <code className="bg-yellow-100 dark:bg-yellow-900/50 px-1 rounded">20241230_005_google_events_import.sql</code> sur Supabase.
-                        </p>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <Badge 
+                            variant="secondary" 
+                            className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400 gap-1 text-[10px]"
+                          >
+                            <Check className="h-2.5 w-2.5" />
+                            Actif
+                          </Badge>
+                        </div>
+                        {status?.email && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Mail className="h-3 w-3" />
+                            {status.email}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                )}
-                
-                {/* Source Calendar */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Calendrier source</Label>
-                  {calendarsLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                  ) : (
-                    <Select
-                      value={sourceCalendarId}
-                      onValueChange={(val) => {
-                        handleSourceCalendarChange(val);
-                        setPreviewResult(null);
-                        setPreviewDone(false);
-                      }}
+                    
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => disconnectMutation.mutate()}
+                      disabled={disconnectMutation.isPending}
+                      className="text-muted-foreground h-8 w-8"
+                      data-testid="button-disconnect"
                     >
-                      <SelectTrigger data-testid="select-source-calendar">
-                        <SelectValue placeholder="Sélectionnez un calendrier à importer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {calendars.map((cal) => (
-                          <SelectItem key={cal.id} value={cal.id}>
-                            {cal.summary} {cal.primary && "(Principal)"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-                
-                {/* Date Range */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Période d'import</Label>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant={rangePreset === "7d" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setRangePreset("7d");
-                        setPreviewResult(null);
-                        setPreviewDone(false);
-                      }}
-                      data-testid="button-range-7d"
-                    >
-                      7 jours
-                    </Button>
-                    <Button
-                      variant={rangePreset === "30d" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setRangePreset("30d");
-                        setPreviewResult(null);
-                        setPreviewDone(false);
-                      }}
-                      data-testid="button-range-30d"
-                    >
-                      30 jours
-                    </Button>
-                    <Button
-                      variant={rangePreset === "month" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setRangePreset("month");
-                        setPreviewResult(null);
-                        setPreviewDone(false);
-                      }}
-                      data-testid="button-range-month"
-                    >
-                      Mois en cours
-                    </Button>
-                    <Button
-                      variant={rangePreset === "custom" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setRangePreset("custom");
-                        setPreviewResult(null);
-                        setPreviewDone(false);
-                      }}
-                      data-testid="button-range-custom"
-                    >
-                      Personnalisé
+                      {disconnectMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Unplug className="h-3.5 w-3.5" />
+                      )}
                     </Button>
                   </div>
                   
-                  {rangePreset === "custom" && (
-                    <div className="flex gap-2 mt-2">
-                      <div className="flex-1">
-                        <Label className="text-xs text-muted-foreground">Début</Label>
-                        <input
-                          type="date"
-                          value={customStartDate}
-                          onChange={(e) => setCustomStartDate(e.target.value)}
-                          className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
-                          data-testid="input-start-date"
-                        />
+                  <Separator />
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Calendrier</p>
+                        <p className="text-xs font-medium truncate">
+                          {integration?.targetCalendarName || "Non sélectionné"}
+                        </p>
                       </div>
-                      <div className="flex-1">
-                        <Label className="text-xs text-muted-foreground">Fin</Label>
-                        <input
-                          type="date"
-                          value={customEndDate}
-                          onChange={(e) => setCustomEndDate(e.target.value)}
-                          className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
-                          data-testid="input-end-date"
-                        />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Dernière sync</p>
+                        <p className="text-xs font-medium">
+                          {formatLastSync(integration?.lastSyncAt ?? null) || "Jamais"}
+                        </p>
                       </div>
+                    </div>
+                  </div>
+                  
+                  {integration?.lastSyncError && (
+                    <div className="flex items-start gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                      <p className="text-xs text-amber-800 dark:text-amber-200">
+                        {integration.lastSyncError}
+                      </p>
                     </div>
                   )}
-                </div>
-                
-                {/* Action Buttons */}
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => previewMutation.mutate()}
-                    disabled={!canPreview || previewMutation.isPending}
-                    className="flex-1"
-                    data-testid="button-preview"
-                  >
-                    {previewMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Eye className="h-4 w-4 mr-2" />
-                    )}
-                    Prévisualiser
-                  </Button>
-                  <Button
-                    onClick={() => importMutation.mutate()}
-                    disabled={!canImport || importMutation.isPending}
-                    className="flex-1"
-                    data-testid="button-import"
-                  >
-                    {importMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4 mr-2" />
-                    )}
-                    Importer maintenant
-                  </Button>
-                </div>
-                
-                {/* Preview/Import Results */}
-                {previewResult && (
-                  <div className="p-4 rounded-md bg-muted/50 space-y-3" data-testid="import-results">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {previewResult.mode === "preview" ? "Prévisualisation" : "Import terminé"}
-                      </span>
-                      <Badge variant="secondary">{previewResult.total} événement(s)</Badge>
+                </CardContent>
+              </Card>
+              
+              {/* Section 2: Export Cassius vers Google */}
+              <Card data-testid="card-sync-options">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Export Cassius vers Google</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="sync-enabled" className="text-xs font-normal">
+                        Synchronisation automatique
+                      </Label>
+                      <p className="text-[10px] text-muted-foreground">
+                        Envoie les RDV Cassius vers Google Calendar
+                      </p>
                     </div>
-                    
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-green-500" />
-                        <span className="text-muted-foreground">Créés:</span>
-                        <span className="font-medium">{previewResult.created}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-blue-500" />
-                        <span className="text-muted-foreground">Mis à jour:</span>
-                        <span className="font-medium">{previewResult.updated}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-gray-400" />
-                        <span className="text-muted-foreground">Ignorés:</span>
-                        <span className="font-medium">{previewResult.skipped}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-red-500" />
-                        <span className="text-muted-foreground">Erreurs:</span>
-                        <span className="font-medium">{previewResult.failed}</span>
-                      </div>
-                    </div>
-                    
-                    {previewResult.failures.length > 0 && (
-                      <div className="pt-2 border-t">
-                        <p className="text-xs text-destructive mb-1">Erreurs :</p>
-                        <ul className="text-xs space-y-1">
-                          {previewResult.failures.slice(0, 3).map((f, i) => (
-                            <li key={i} className="text-muted-foreground">
-                              {f.eventId}: {f.reason}
-                            </li>
+                    <Switch
+                      id="sync-enabled"
+                      checked={integration?.isEnabled ?? true}
+                      onCheckedChange={handleToggleEnabled}
+                      disabled={updateIntegrationMutation.isPending}
+                      data-testid="switch-sync-enabled"
+                    />
+                  </div>
+                  
+                  <Separator />
+                  
+                  {calendarsLoading ? (
+                    <Skeleton className="h-8 w-full" />
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Calendrier cible</Label>
+                      <Select
+                        value={currentCalendarId}
+                        onValueChange={handleCalendarChange}
+                        disabled={updateIntegrationMutation.isPending}
+                      >
+                        <SelectTrigger id="calendar-select" className="h-8 text-xs" data-testid="select-calendar">
+                          <SelectValue placeholder="Sélectionnez un calendrier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {calendars.map((cal) => (
+                            <SelectItem key={cal.id} value={cal.id} className="text-xs">
+                              {cal.summary} {cal.primary && "(Principal)"}
+                            </SelectItem>
                           ))}
-                          {previewResult.failures.length > 3 && (
-                            <li className="text-muted-foreground">
-                              ... et {previewResult.failures.length - 3} autre(s)
-                            </li>
-                          )}
-                        </ul>
-                      </div>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  
+                  <Button 
+                    onClick={() => syncNowMutation.mutate()}
+                    disabled={syncNowMutation.isPending}
+                    className="w-full"
+                    size="sm"
+                    data-testid="button-sync-now"
+                  >
+                    {syncNowMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                        Synchronisation...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                        Synchroniser vers Google
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Section 3: Conflits de synchronisation */}
+              <Card data-testid="card-conflicts">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-sm font-medium">Conflits de synchronisation</CardTitle>
+                    {openConflictsCount > 0 && (
+                      <Badge variant="destructive" className="text-[10px]">
+                        {openConflictsCount} ouvert(s)
+                      </Badge>
                     )}
                   </div>
-                )}
-                
-                {/* Import Status */}
-                {importStatus && (
-                  <div className="flex items-center justify-between text-sm pt-2 border-t">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>Dernier import: {formatLastSync(importStatus.lastImportAt) || "Jamais"}</span>
-                    </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex gap-1 p-1 bg-muted rounded-md">
                     <Button
-                      variant="ghost"
+                      variant={conflictFilter === "open" ? "secondary" : "ghost"}
                       size="sm"
-                      onClick={openImportedEventsModal}
-                      className="text-xs"
-                      data-testid="button-view-imported"
+                      onClick={() => setConflictFilter("open")}
+                      className="flex-1 text-[10px] h-7"
+                      data-testid="button-filter-open"
                     >
-                      <FileText className="h-3.5 w-3.5 mr-1" />
-                      Voir les événements
+                      Ouverts
+                    </Button>
+                    <Button
+                      variant={conflictFilter === "resolved" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setConflictFilter("resolved")}
+                      className="flex-1 text-[10px] h-7"
+                      data-testid="button-filter-resolved"
+                    >
+                      Résolus
+                    </Button>
+                    <Button
+                      variant={conflictFilter === "ignored" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setConflictFilter("ignored")}
+                      className="flex-1 text-[10px] h-7"
+                      data-testid="button-filter-ignored"
+                    >
+                      Ignorés
                     </Button>
                   </div>
-                )}
-                
-                <p className="text-xs text-muted-foreground">
-                  Les événements [Cassius] sont automatiquement ignorés pour éviter les boucles.
-                </p>
-              </CardContent>
-            </Card>
-            
-            {/* Section 4: Conflicts */}
-            <Card data-testid="card-conflicts">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-base font-medium">Conflits de synchronisation</CardTitle>
-                  {openConflictsCount > 0 && (
-                    <Badge variant="destructive" className="text-xs">
-                      {openConflictsCount} ouvert(s)
-                    </Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Filter Tabs */}
-                <div className="flex gap-1 p-1 bg-muted rounded-md">
-                  <Button
-                    variant={conflictFilter === "open" ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setConflictFilter("open")}
-                    className="flex-1 text-xs"
-                    data-testid="button-filter-open"
-                  >
-                    Ouverts
-                  </Button>
-                  <Button
-                    variant={conflictFilter === "resolved" ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setConflictFilter("resolved")}
-                    className="flex-1 text-xs"
-                    data-testid="button-filter-resolved"
-                  >
-                    Résolus
-                  </Button>
-                  <Button
-                    variant={conflictFilter === "ignored" ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setConflictFilter("ignored")}
-                    className="flex-1 text-xs"
-                    data-testid="button-filter-ignored"
-                  >
-                    Ignorés
-                  </Button>
-                </div>
-                
-                {/* Conflicts List */}
-                {conflicts.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Aucun conflit {conflictFilter === "open" ? "en attente" : conflictFilter === "resolved" ? "résolu" : "ignoré"}</p>
-                  </div>
-                ) : (
-                  <ScrollArea className="h-[240px]">
-                    <div className="space-y-2">
-                      {conflicts.map((conflict) => (
-                        <div
-                          key={conflict.id}
-                          className="p-3 rounded-md border bg-card"
-                          data-testid={`conflict-${conflict.id}`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Badge variant="outline" className="text-xs shrink-0">
-                                  {conflict.source === "google" ? "Google" : "Cassius"}
-                                </Badge>
-                                <span className="text-sm font-medium truncate">
-                                  {conflict.reason}
-                                </span>
+                  
+                  {conflicts.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground">
+                      <CheckCircle2 className="h-6 w-6 mx-auto mb-1.5 opacity-50" />
+                      <p className="text-xs">Aucun conflit {conflictFilter === "open" ? "en attente" : conflictFilter === "resolved" ? "résolu" : "ignoré"}</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[180px]">
+                      <div className="space-y-2">
+                        {conflicts.map((conflict) => (
+                          <div
+                            key={conflict.id}
+                            className="p-2 rounded-md border bg-card"
+                            data-testid={`conflict-${conflict.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <Badge variant="outline" className="text-[10px] shrink-0">
+                                    {conflict.source === "google" ? "Google" : "Cassius"}
+                                  </Badge>
+                                  <span className="text-xs font-medium truncate">
+                                    {conflict.reason}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {format(new Date(conflict.createdAt), "dd MMM yyyy HH:mm", { locale: fr })}
+                                </p>
                               </div>
-                              <p className="text-xs text-muted-foreground">
-                                {format(new Date(conflict.createdAt), "dd MMM yyyy HH:mm", { locale: fr })}
-                              </p>
-                            </div>
-                            
-                            {conflict.status === "open" && (
-                              <div className="flex gap-1 shrink-0">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => resolveConflictMutation.mutate({ 
-                                    id: conflict.id, 
-                                    status: "resolved",
-                                    resolution: "keep_google"
-                                  })}
-                                  disabled={resolveConflictMutation.isPending}
-                                  className="text-xs h-7 px-2"
-                                  title="Garder Google"
-                                  data-testid={`button-keep-google-${conflict.id}`}
-                                >
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => resolveConflictMutation.mutate({ 
-                                    id: conflict.id, 
-                                    status: "ignored" 
-                                  })}
-                                  disabled={resolveConflictMutation.isPending}
-                                  className="text-xs h-7 px-2"
-                                  title="Ignorer"
-                                  data-testid={`button-ignore-${conflict.id}`}
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            )}
+                              
+                              {conflict.status === "open" && (
+                                <div className="flex gap-1 shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => resolveConflictMutation.mutate({ 
+                                      id: conflict.id, 
+                                      status: "resolved",
+                                      resolution: "keep_google"
+                                    })}
+                                    disabled={resolveConflictMutation.isPending}
+                                    className="h-6 w-6"
+                                    title="Garder Google"
+                                    data-testid={`button-keep-google-${conflict.id}`}
+                                  >
+                                    <CheckCircle2 className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => resolveConflictMutation.mutate({ 
+                                      id: conflict.id, 
+                                      status: "ignored" 
+                                    })}
+                                    disabled={resolveConflictMutation.isPending}
+                                    className="h-6 w-6"
+                                    title="Ignorer"
+                                    data-testid={`button-ignore-${conflict.id}`}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
                           </div>
                         </div>
                       ))}
                     </div>
                   </ScrollArea>
                 )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
             
-            {/* Section 5: Event Preview */}
-            <Card data-testid="card-event-preview">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-medium">Aperçu dans Google Calendar</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-lg border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20 p-4">
-                  <div className="space-y-3">
-                    {/* Event Title */}
-                    <div className="flex items-start gap-3">
-                      <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="font-medium text-blue-900 dark:text-blue-100">
-                          [Cassius] CHIRURGIE - Martin Dupont
-                        </p>
-                        <p className="text-sm text-blue-700 dark:text-blue-300">
-                          Mardi 14 janvier 2025
-                        </p>
+            {/* RIGHT COLUMN: Aperçu, Import */}
+            <div className="space-y-4">
+              {/* Section 4: Aperçu dans Google Calendar */}
+              <Card data-testid="card-event-preview">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Aperçu dans Google Calendar</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20 p-3">
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <Calendar className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium text-blue-900 dark:text-blue-100">
+                            [Cassius] CHIRURGIE - Martin Dupont
+                          </p>
+                          <p className="text-[10px] text-blue-700 dark:text-blue-300">
+                            Mardi 14 janvier 2025
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <Clock className="h-3 w-3 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
+                        <span className="text-blue-800 dark:text-blue-200">09:00 - 11:00</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <User className="h-3 w-3 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
+                        <span className="text-blue-800 dark:text-blue-200">Patient: Martin Dupont</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <MapPin className="h-3 w-3 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
+                        <span className="text-blue-800 dark:text-blue-200">
+                          {integration?.targetCalendarName || "Calendrier principal"}
+                        </span>
                       </div>
                     </div>
-                    
-                    {/* Time */}
-                    <div className="flex items-center gap-3 text-sm">
-                      <Clock className="h-4 w-4 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
-                      <span className="text-blue-800 dark:text-blue-200">09:00 - 11:00</span>
-                    </div>
-                    
-                    {/* Patient */}
-                    <div className="flex items-center gap-3 text-sm">
-                      <User className="h-4 w-4 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
-                      <span className="text-blue-800 dark:text-blue-200">Patient: Martin Dupont</span>
-                    </div>
-                    
-                    {/* Calendar indicator */}
-                    <div className="flex items-center gap-3 text-sm">
-                      <MapPin className="h-4 w-4 text-blue-600/70 dark:text-blue-400/70 shrink-0" />
-                      <span className="text-blue-800 dark:text-blue-200">
-                        {integration?.targetCalendarName || "Calendrier principal"}
-                      </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    Les événements exportés sont préfixés par [Cassius]
+                  </p>
+                </CardContent>
+              </Card>
+              
+              {/* Section 5: Import Google vers Cassius */}
+              <Card data-testid="card-import">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-sm font-medium">Import Google vers Cassius</CardTitle>
+                    <div className="flex items-center gap-2">
+                      {importStatus && importStatus.importedEventsCount > 0 && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {importStatus.importedEventsCount} importé(s)
+                        </Badge>
+                      )}
+                      <Switch
+                        checked={importEnabled}
+                        onCheckedChange={handleToggleImportEnabled}
+                        disabled={updateImportSettingsMutation.isPending}
+                        data-testid="switch-import-enabled"
+                      />
                     </div>
                   </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  Les événements exportés sont préfixés par [Cassius] pour les identifier
-                </p>
-              </CardContent>
-            </Card>
-          </>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {migrationRequired && (
+                    <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-800 p-2.5">
+                      <div className="flex gap-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">Migration requise</p>
+                          <p className="text-[10px] text-yellow-700 dark:text-yellow-400 mt-0.5">
+                            Tables d'import indisponibles.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Calendrier source</Label>
+                    {calendarsLoading ? (
+                      <Skeleton className="h-8 w-full" />
+                    ) : (
+                      <Select
+                        value={sourceCalendarId}
+                        onValueChange={(val) => {
+                          handleSourceCalendarChange(val);
+                          setPreviewResult(null);
+                          setPreviewDone(false);
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs" data-testid="select-source-calendar">
+                          <SelectValue placeholder="Sélectionnez un calendrier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {calendars.map((cal) => (
+                            <SelectItem key={cal.id} value={cal.id} className="text-xs">
+                              {cal.summary} {cal.primary && "(Principal)"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Période d'import</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button
+                        variant={rangePreset === "7d" ? "default" : "outline"}
+                        size="sm"
+                        className="text-[10px] h-7 px-2"
+                        onClick={() => {
+                          setRangePreset("7d");
+                          setPreviewResult(null);
+                          setPreviewDone(false);
+                        }}
+                        data-testid="button-range-7d"
+                      >
+                        7j
+                      </Button>
+                      <Button
+                        variant={rangePreset === "30d" ? "default" : "outline"}
+                        size="sm"
+                        className="text-[10px] h-7 px-2"
+                        onClick={() => {
+                          setRangePreset("30d");
+                          setPreviewResult(null);
+                          setPreviewDone(false);
+                        }}
+                        data-testid="button-range-30d"
+                      >
+                        30j
+                      </Button>
+                      <Button
+                        variant={rangePreset === "month" ? "default" : "outline"}
+                        size="sm"
+                        className="text-[10px] h-7 px-2"
+                        onClick={() => {
+                          setRangePreset("month");
+                          setPreviewResult(null);
+                          setPreviewDone(false);
+                        }}
+                        data-testid="button-range-month"
+                      >
+                        Mois
+                      </Button>
+                      <Button
+                        variant={rangePreset === "custom" ? "default" : "outline"}
+                        size="sm"
+                        className="text-[10px] h-7 px-2"
+                        onClick={() => {
+                          setRangePreset("custom");
+                          setPreviewResult(null);
+                          setPreviewDone(false);
+                        }}
+                        data-testid="button-range-custom"
+                      >
+                        Autre
+                      </Button>
+                    </div>
+                    
+                    {rangePreset === "custom" && (
+                      <div className="flex gap-2 mt-1.5">
+                        <div className="flex-1">
+                          <Label className="text-[10px] text-muted-foreground">Début</Label>
+                          <input
+                            type="date"
+                            value={customStartDate}
+                            onChange={(e) => setCustomStartDate(e.target.value)}
+                            className="w-full h-7 px-2 rounded-md border border-input bg-background text-xs"
+                            data-testid="input-start-date"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Label className="text-[10px] text-muted-foreground">Fin</Label>
+                          <input
+                            type="date"
+                            value={customEndDate}
+                            onChange={(e) => setCustomEndDate(e.target.value)}
+                            className="w-full h-7 px-2 rounded-md border border-input bg-background text-xs"
+                            data-testid="input-end-date"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => previewMutation.mutate()}
+                      disabled={!canPreview || previewMutation.isPending}
+                      className="flex-1"
+                      size="sm"
+                      data-testid="button-preview"
+                    >
+                      {previewMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Prévisualiser
+                    </Button>
+                    <Button
+                      onClick={() => importMutation.mutate()}
+                      disabled={!canImport || importMutation.isPending}
+                      className="flex-1"
+                      size="sm"
+                      data-testid="button-import"
+                    >
+                      {importMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Importer
+                    </Button>
+                  </div>
+                  
+                  {previewResult && (
+                    <div className="p-2.5 rounded-md bg-muted/50 space-y-2" data-testid="import-results">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium">
+                          {previewResult.mode === "preview" ? "Prévisualisation" : "Import terminé"}
+                        </span>
+                        <Badge variant="secondary" className="text-[10px]">{previewResult.total} évt</Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                        <div className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                          <span className="text-muted-foreground">Créés:</span>
+                          <span className="font-medium">{previewResult.created}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          <span className="text-muted-foreground">Mis à jour:</span>
+                          <span className="font-medium">{previewResult.updated}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                          <span className="text-muted-foreground">Ignorés:</span>
+                          <span className="font-medium">{previewResult.skipped}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          <span className="text-muted-foreground">Erreurs:</span>
+                          <span className="font-medium">{previewResult.failed}</span>
+                        </div>
+                      </div>
+                      
+                      {previewResult.failures.length > 0 && (
+                        <div className="pt-1.5 border-t">
+                          <p className="text-[10px] text-destructive mb-0.5">Erreurs :</p>
+                          <ul className="text-[10px] space-y-0.5">
+                            {previewResult.failures.slice(0, 2).map((f, i) => (
+                              <li key={i} className="text-muted-foreground truncate">
+                                {f.eventId}: {f.reason}
+                              </li>
+                            ))}
+                            {previewResult.failures.length > 2 && (
+                              <li className="text-muted-foreground">
+                                ... +{previewResult.failures.length - 2} autre(s)
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {importStatus && (
+                    <div className="flex items-center justify-between text-[10px] pt-2 border-t">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>Dernier: {formatLastSync(importStatus.lastImportAt) || "Jamais"}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={openImportedEventsModal}
+                        className="text-[10px] h-6 px-2"
+                        data-testid="button-view-imported"
+                      >
+                        <FileText className="h-3 w-3 mr-1" />
+                        Voir
+                      </Button>
+                    </div>
+                  )}
+                  
+                  <p className="text-[10px] text-muted-foreground">
+                    Les événements [Cassius] sont ignorés automatiquement.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         )}
       </div>
       
