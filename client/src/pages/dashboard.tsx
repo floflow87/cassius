@@ -854,7 +854,25 @@ export default function DashboardPage() {
           </Card>
         );
       case "recent-implants":
-        if (!surgeryImplants || surgeryImplants.length === 0) return null;
+        if (!surgeryImplants || surgeryImplants.length === 0) {
+          return (
+            <Card key={blockId}>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <svg className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
+                  </svg>
+                  Implants récents
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Commencez par ajouter votre premier acte pour documenter vos opérations et suivre l'évolution de vos implants.
+                </p>
+              </CardContent>
+            </Card>
+          );
+        }
         return (
           <Card key={blockId}>
             <CardHeader className="flex flex-row items-center justify-between gap-4">
