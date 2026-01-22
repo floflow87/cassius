@@ -695,6 +695,8 @@ export async function sendRadiographAddedEmail(
 export async function sendAppointmentCreatedEmail(
   toEmail: string,
   firstName: string,
+  patientFirstName: string,
+  patientLastName: string,
   appointmentTitle: string,
   appointmentDateLabel: string,
   appointmentTimeLabel: string,
@@ -712,6 +714,10 @@ export async function sendAppointmentCreatedEmail(
     }
     const { client, fromEmail } = clientData;
     
+    const patientName = patientFirstName && patientLastName 
+      ? `${patientFirstName} ${patientLastName}` 
+      : patientFirstName || patientLastName || '—';
+    
     const htmlContent = createEmailTemplate({
       title: 'Nouveau rendez-vous planifié',
       content: `
@@ -721,11 +727,12 @@ export async function sendAppointmentCreatedEmail(
       infoBox: {
         title: 'Résumé',
         lines: [
+          `Patient : <b>${patientName}</b>`,
           `Intitulé : <b>${appointmentTitle}</b>`,
           `Date : ${appointmentDateLabel}`,
           `Heure : ${appointmentTimeLabel}`,
           `Créé par : ${actorName}`,
-          `Contexte : ${contextLabel}`
+          `Contexte : ${contextLabel || '—'}`
         ]
       },
       actionUrl,
@@ -747,6 +754,72 @@ export async function sendAppointmentCreatedEmail(
     return { success: true, messageId: data?.id };
   } catch (err: any) {
     console.error('[Email] Error sending appointment created email:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendAppointmentUpdatedEmail(
+  toEmail: string,
+  firstName: string,
+  patientFirstName: string,
+  patientLastName: string,
+  appointmentTitle: string,
+  appointmentDateLabel: string,
+  appointmentTimeLabel: string,
+  actorName: string,
+  contextLabel: string,
+  actionUrl: string
+): Promise<EmailResult> {
+  try {
+    let clientData;
+    try {
+      clientData = await getUncachableResendClient();
+    } catch (credError: any) {
+      console.log("[EMAIL] Resend not configured, skipping email:", credError.message);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    const { client, fromEmail } = clientData;
+    
+    const patientName = patientFirstName && patientLastName 
+      ? `${patientFirstName} ${patientLastName}` 
+      : patientFirstName || patientLastName || '—';
+    
+    const htmlContent = createEmailTemplate({
+      title: 'Rendez-vous modifié',
+      content: `
+        <p style="margin:0 0 14px 0;">Bonjour ${firstName},</p>
+        <p style="margin:0 0 14px 0;">Un rendez-vous a été modifié dans votre agenda Cassius.</p>
+      `,
+      infoBox: {
+        title: 'Résumé',
+        lines: [
+          `Patient : <b>${patientName}</b>`,
+          `Intitulé : <b>${appointmentTitle}</b>`,
+          `Date : ${appointmentDateLabel}`,
+          `Heure : ${appointmentTimeLabel}`,
+          `Modifié par : ${actorName}`,
+          `Contexte : ${contextLabel || '—'}`
+        ]
+      },
+      actionUrl,
+      actionLabel: 'Voir le rendez-vous'
+    });
+
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Rendez-vous modifié — ${APP_NAME}`,
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error('[Email] Failed to send appointment updated email:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (err: any) {
+    console.error('[Email] Error sending appointment updated email:', err);
     return { success: false, error: err.message };
   }
 }

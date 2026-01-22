@@ -1,4 +1,6 @@
 import type { Express, Request, Response } from "express";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import { createServer, type Server } from "http";
 import { storage, computeLatestIsq } from "./storage";
 import { requireJwtOrSession } from "./jwtMiddleware";
@@ -3134,7 +3136,13 @@ export async function registerRoutes(
       // Send notification about new appointment with patient name
       if (userId) {
         const patient = await storage.getPatient(organisationId, patientId);
-        const patientName = patient ? `${patient.prenom} ${patient.nom}` : "Patient";
+        const currentUser = await storage.getUser(userId!);
+        const actorName = currentUser ? `${currentUser.prenom} ${currentUser.nom}`.trim() || currentUser.username : 'Un membre';
+        const dateHuman = format(appointment.dateStart, "EEEE d MMMM yyyy", { locale: fr });
+        const timeStart = format(appointment.dateStart, "HH:mm", { locale: fr });
+        const timeEnd = appointment.dateEnd ? format(appointment.dateEnd, "HH:mm", { locale: fr }) : null;
+        const timeHuman = timeEnd ? `${timeStart} – ${timeEnd}` : timeStart;
+        
         notificationService.notificationEvents.onAppointmentCreated({
           organisationId,
           recipientUserId: userId,
@@ -3142,7 +3150,13 @@ export async function registerRoutes(
           appointmentId: appointment.id,
           appointmentDate: appointment.dateStart.toISOString(),
           patientId,
-          patientName,
+          patientFirstName: patient?.prenom || '',
+          patientLastName: patient?.nom || '',
+          appointmentTitle: appointment.title || 'Rendez-vous',
+          appointmentDateLabel: dateHuman,
+          appointmentTimeLabel: timeHuman,
+          actorName,
+          contextLabel: appointment.description || '',
         }).catch(err => console.error("[Notification] Appointment created notification failed:", err));
       }
       
@@ -3169,6 +3183,34 @@ export async function registerRoutes(
       runFlagDetection(organisationId).catch(err => 
         console.error("Flag detection failed after appointment update:", err)
       );
+      
+      // Send notification about updated appointment
+      const userId = getUserId(req);
+      if (userId && appointment.patientId) {
+        const patient = await storage.getPatient(organisationId, appointment.patientId);
+        const currentUser = await storage.getUser(userId!);
+        const actorName = currentUser ? `${currentUser.prenom} ${currentUser.nom}`.trim() || currentUser.username : 'Un membre';
+        const dateHuman = format(appointment.dateStart, "EEEE d MMMM yyyy", { locale: fr });
+        const timeStart = format(appointment.dateStart, "HH:mm", { locale: fr });
+        const timeEnd = appointment.dateEnd ? format(appointment.dateEnd, "HH:mm", { locale: fr }) : null;
+        const timeHuman = timeEnd ? `${timeStart} – ${timeEnd}` : timeStart;
+        
+        notificationService.notificationEvents.onAppointmentUpdated({
+          organisationId,
+          recipientUserId: userId,
+          actorUserId: userId,
+          appointmentId: appointment.id,
+          appointmentDate: appointment.dateStart.toISOString(),
+          patientId: appointment.patientId,
+          patientFirstName: patient?.prenom || '',
+          patientLastName: patient?.nom || '',
+          appointmentTitle: appointment.title || 'Rendez-vous',
+          appointmentDateLabel: dateHuman,
+          appointmentTimeLabel: timeHuman,
+          actorName,
+          contextLabel: appointment.description || '',
+        }).catch(err => console.error("[Notification] Appointment updated notification failed:", err));
+      }
       
       res.json(appointment);
     } catch (error) {

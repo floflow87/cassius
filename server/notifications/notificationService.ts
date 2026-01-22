@@ -16,6 +16,7 @@ import {
   sendDocumentAddedEmail,
   sendRadiographAddedEmail,
   sendAppointmentCreatedEmail,
+  sendAppointmentUpdatedEmail,
   sendPatientUpdatedEmail,
   sendAppointmentReminderEmail,
   sendSyncErrorEmail,
@@ -302,6 +303,23 @@ async function sendImmediateEmailNotification(notification: Notification, userId
         await sendAppointmentCreatedEmail(
           user.username,
           firstName,
+          metadata.patientFirstName || '',
+          metadata.patientLastName || '',
+          metadata.appointmentTitle || 'Rendez-vous',
+          metadata.appointmentDateLabel || '',
+          metadata.appointmentTimeLabel || '',
+          metadata.actorName || 'Un membre',
+          metadata.contextLabel || '',
+          deepLink
+        );
+        break;
+      
+      case 'APPOINTMENT_UPDATED':
+        await sendAppointmentUpdatedEmail(
+          user.username,
+          firstName,
+          metadata.patientFirstName || '',
+          metadata.patientLastName || '',
           metadata.appointmentTitle || 'Rendez-vous',
           metadata.appointmentDateLabel || '',
           metadata.appointmentTimeLabel || '',
@@ -857,8 +875,15 @@ export const notificationEvents = {
     appointmentId: string;
     appointmentDate: string;
     patientId: string;
-    patientName: string;
+    patientFirstName: string;
+    patientLastName: string;
+    appointmentTitle: string;
+    appointmentDateLabel: string;
+    appointmentTimeLabel: string;
+    actorName: string;
+    contextLabel: string;
   }) {
+    const patientName = `${params.patientFirstName} ${params.patientLastName}`.trim() || 'Patient';
     return createNotification({
       organisationId: params.organisationId,
       recipientUserId: params.recipientUserId,
@@ -866,11 +891,64 @@ export const notificationEvents = {
       type: "APPOINTMENT_CREATED",
       severity: "INFO",
       title: "Nouveau rendez-vous",
-      body: `${params.patientName} - Un rendez-vous a été programmé.`,
+      body: `${patientName} - ${params.appointmentTitle}`,
       entityType: "PATIENT",
       entityId: params.patientId,
       actorUserId: params.actorUserId,
-      metadata: { appointmentDate: params.appointmentDate, patientId: params.patientId, patientName: params.patientName, appointmentId: params.appointmentId },
+      metadata: { 
+        appointmentDate: params.appointmentDate, 
+        patientId: params.patientId, 
+        patientFirstName: params.patientFirstName,
+        patientLastName: params.patientLastName,
+        appointmentId: params.appointmentId,
+        appointmentTitle: params.appointmentTitle,
+        appointmentDateLabel: params.appointmentDateLabel,
+        appointmentTimeLabel: params.appointmentTimeLabel,
+        actorName: params.actorName,
+        contextLabel: params.contextLabel,
+      },
+    });
+  },
+
+  async onAppointmentUpdated(params: {
+    organisationId: string;
+    recipientUserId: string;
+    actorUserId?: string;
+    appointmentId: string;
+    appointmentDate: string;
+    patientId: string;
+    patientFirstName: string;
+    patientLastName: string;
+    appointmentTitle: string;
+    appointmentDateLabel: string;
+    appointmentTimeLabel: string;
+    actorName: string;
+    contextLabel: string;
+  }) {
+    const patientName = `${params.patientFirstName} ${params.patientLastName}`.trim() || 'Patient';
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ACTIVITY",
+      type: "APPOINTMENT_UPDATED",
+      severity: "INFO",
+      title: "Rendez-vous modifié",
+      body: `${patientName} - ${params.appointmentTitle}`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      actorUserId: params.actorUserId,
+      metadata: { 
+        appointmentDate: params.appointmentDate, 
+        patientId: params.patientId, 
+        patientFirstName: params.patientFirstName,
+        patientLastName: params.patientLastName,
+        appointmentId: params.appointmentId,
+        appointmentTitle: params.appointmentTitle,
+        appointmentDateLabel: params.appointmentDateLabel,
+        appointmentTimeLabel: params.appointmentTimeLabel,
+        actorName: params.actorName,
+        contextLabel: params.contextLabel,
+      },
     });
   },
 
