@@ -61,6 +61,8 @@ import type { Operation, Appointment, User, Patient, SurgeryImplantWithDetails, 
 import { FlagBadge } from "@/components/flag-badge";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import { SetupChecklist } from "@/components/setup-checklist";
+import { OperationForm } from "@/components/operation-form";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link } from "wouter";
 
 // Dashboard block definitions
@@ -324,6 +326,10 @@ export default function DashboardPage() {
   const [patientPopoverOpen, setPatientPopoverOpen] = useState(false);
   const [patientSearch, setPatientSearch] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Nouvel acte sheet
+  const [newActeSheetOpen, setNewActeSheetOpen] = useState(false);
+  const [selectedPatientForActe, setSelectedPatientForActe] = useState<string | null>(null);
+  const [actePatientPopoverOpen, setActePatientPopoverOpen] = useState(false);
   const [preferences, setPreferences] = useState<DashboardPreferences>(loadPreferences);
   const [newRdvData, setNewRdvData] = useState({
     patientId: "",
@@ -886,12 +892,90 @@ export default function DashboardPage() {
                 <Badge variant="secondary" className="text-xs">
                   {surgeryImplants.length} implants
                 </Badge>
-                <Link href="/actes">
-                  <Button size="sm" variant="outline" data-testid="button-new-acte-dashboard">
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Nouvel acte
-                  </Button>
-                </Link>
+                <Sheet open={newActeSheetOpen} onOpenChange={(open) => {
+                  setNewActeSheetOpen(open);
+                  if (!open) {
+                    setSelectedPatientForActe(null);
+                  }
+                }}>
+                  <SheetTrigger asChild>
+                    <Button size="sm" data-testid="button-new-acte-dashboard">
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Nouvel acte
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent className="sm:max-w-lg overflow-y-auto">
+                    <SheetHeader>
+                      <SheetTitle>Nouvel acte chirurgical</SheetTitle>
+                    </SheetHeader>
+                    <div className="py-4 space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Patient</label>
+                        <Popover open={actePatientPopoverOpen} onOpenChange={setActePatientPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={actePatientPopoverOpen}
+                              className="w-full justify-between"
+                              data-testid="select-patient-acte-trigger"
+                            >
+                              {selectedPatientForActe
+                                ? patients?.find((p) => p.id === selectedPatientForActe)
+                                  ? `${patients.find((p) => p.id === selectedPatientForActe)?.prenom} ${patients.find((p) => p.id === selectedPatientForActe)?.nom}`
+                                  : "Sélectionner un patient..."
+                                : "Sélectionner un patient..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[350px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Rechercher un patient..." data-testid="input-search-patient-acte" />
+                              <CommandList>
+                                <CommandEmpty>Aucun patient trouvé.</CommandEmpty>
+                                <CommandGroup>
+                                  <ScrollArea className="h-[200px]">
+                                    {patients?.map((patient) => (
+                                      <CommandItem
+                                        key={patient.id}
+                                        value={`${patient.prenom} ${patient.nom}`}
+                                        onSelect={() => {
+                                          setSelectedPatientForActe(patient.id);
+                                          setActePatientPopoverOpen(false);
+                                        }}
+                                        data-testid={`select-patient-acte-${patient.id}`}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            selectedPatientForActe === patient.id ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        {patient.prenom} {patient.nom}
+                                      </CommandItem>
+                                    ))}
+                                  </ScrollArea>
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      
+                      {selectedPatientForActe && (
+                        <OperationForm 
+                          patientId={selectedPatientForActe}
+                          onSuccess={() => {
+                            setNewActeSheetOpen(false);
+                            setSelectedPatientForActe(null);
+                            queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+                            queryClient.invalidateQueries({ queryKey: ["/api/surgery-implants"] });
+                          }}
+                        />
+                      )}
+                    </div>
+                  </SheetContent>
+                </Sheet>
               </div>
             </CardHeader>
             <CardContent>
