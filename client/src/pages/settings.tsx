@@ -829,68 +829,77 @@ function IntegrationsSection() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4 flex-1">
+          <CardContent className="flex-1 flex flex-col justify-end">
             {googleLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <RefreshCw className="w-4 h-4 animate-spin" />
                 Chargement...
               </div>
             ) : googleStatus?.connected ? (
-              <>
-                {googleStatus.email && (
-                  <div>
-                    <Label className="text-muted-foreground text-xs">Compte connecté</Label>
-                    <p className="font-medium text-xs">{googleStatus.email}</p>
-                  </div>
-                )}
-                
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <Label className="text-xs">Synchronisation automatique</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Les rendez-vous sont synchronisés automatiquement
-                    </p>
-                  </div>
-                  <Switch
-                    checked={googleStatus.integration?.isEnabled ?? false}
-                    onCheckedChange={(checked) => toggleSyncMutation.mutate(checked)}
-                    disabled={toggleSyncMutation.isPending}
-                    data-testid="switch-google-sync"
-                  />
-                </div>
+              <div className="space-y-3">
+                <Collapsible>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full justify-between text-xs text-muted-foreground hover:text-foreground" data-testid="button-toggle-google-details">
+                      <span>Voir les détails</span>
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-3 pt-3 border-t mt-2">
+                    {googleStatus.email && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Compte connecté</Label>
+                        <p className="font-medium text-xs">{googleStatus.email}</p>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <Label className="text-xs">Synchronisation automatique</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Sync activée
+                        </p>
+                      </div>
+                      <Switch
+                        checked={googleStatus.integration?.isEnabled ?? false}
+                        onCheckedChange={(checked) => toggleSyncMutation.mutate(checked)}
+                        disabled={toggleSyncMutation.isPending}
+                        data-testid="switch-google-sync"
+                      />
+                    </div>
 
-                {googleStatus.integration?.targetCalendarName && (
-                  <div>
-                    <Label className="text-muted-foreground text-xs">Calendrier cible</Label>
-                    <p className="font-medium text-xs flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      {googleStatus.integration.targetCalendarName}
-                    </p>
-                  </div>
-                )}
+                    {googleStatus.integration?.targetCalendarName && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Calendrier cible</Label>
+                        <p className="font-medium text-xs flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          {googleStatus.integration.targetCalendarName}
+                        </p>
+                      </div>
+                    )}
 
-                {googleStatus.integration?.lastSyncAt && (
-                  <div>
-                    <Label className="text-muted-foreground text-xs">Dernière synchronisation</Label>
-                    <p className="text-xs">
-                      {new Date(googleStatus.integration.lastSyncAt).toLocaleString("fr-FR")}
-                    </p>
-                  </div>
-                )}
+                    {googleStatus.integration?.lastSyncAt && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Dernière synchronisation</Label>
+                        <p className="text-xs">
+                          {new Date(googleStatus.integration.lastSyncAt).toLocaleString("fr-FR")}
+                        </p>
+                      </div>
+                    )}
 
-                {googleStatus.integration?.syncErrorCount && googleStatus.integration.syncErrorCount > 0 && (
-                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                    <AlertCircle className="w-4 h-4" />
-                    <span className="text-xs">{googleStatus.integration.syncErrorCount} erreurs de synchronisation</span>
-                  </div>
-                )}
+                    {googleStatus.integration?.syncErrorCount && googleStatus.integration.syncErrorCount > 0 && (
+                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                        <AlertCircle className="w-4 h-4" />
+                        <span className="text-xs">{googleStatus.integration.syncErrorCount} erreurs</span>
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
 
-                <Separator />
-
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2">
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1"
                     onClick={() => syncNowMutation.mutate()}
                     disabled={syncNowMutation.isPending}
                     data-testid="button-sync-now"
@@ -900,20 +909,20 @@ function IntegrationsSection() {
                     ) : (
                       <RefreshCw className="w-4 h-4 mr-2" />
                     )}
-                    Synchroniser maintenant
+                    Synchroniser
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1"
                     onClick={() => disconnectGoogleMutation.mutate()}
                     disabled={disconnectGoogleMutation.isPending}
-                    className="text-destructive"
                     data-testid="button-disconnect-google"
                   >
                     Déconnecter
                   </Button>
                 </div>
-              </>
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center flex-1 space-y-3">
                 {!googleStatus?.configured && (
