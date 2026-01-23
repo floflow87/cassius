@@ -55,11 +55,11 @@ export function OnboardingChecklist() {
   return (
     <Card className="border-primary/20 bg-primary/5">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 relative z-10">
           <button 
             type="button"
             onClick={toggleOpen}
-            className="flex items-center gap-2 hover-elevate rounded p-1 -m-1" 
+            className="flex items-center gap-2 rounded p-1 -m-1" 
             data-testid="button-toggle-onboarding"
           >
             {isOpen ? (
@@ -72,13 +72,16 @@ export function OnboardingChecklist() {
               <span className="text-sm text-muted-foreground ml-2">({progress}%)</span>
             )}
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative z-20">
             <Button 
               type="button"
               variant="ghost" 
               size="sm"
               className="text-xs text-muted-foreground italic font-light"
-              onClick={handleDismiss}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDismiss();
+              }}
               disabled={isPending}
               data-testid="button-dismiss-onboarding"
             >
@@ -88,7 +91,8 @@ export function OnboardingChecklist() {
             <Button 
               size="sm" 
               data-testid="button-resume-onboarding"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 console.log("Navigating to onboarding step:", resumeTargetStep);
                 window.location.href = `/onboarding?step=${resumeTargetStep}`;
               }}
