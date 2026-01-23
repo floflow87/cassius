@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOnboarding, ONBOARDING_STEPS } from "@/hooks/use-onboarding";
 import { apiRequest } from "@/lib/queryClient";
@@ -592,6 +592,7 @@ function DocumentsStep({ onComplete, onSkip }: { onComplete: (patch: Partial<Onb
 
 export default function OnboardingPage() {
   const [location, setLocation] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
   const { 
     state, 
@@ -609,17 +610,17 @@ export default function OnboardingPage() {
   
   // Handle URL step parameter to navigate directly to a specific step
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(searchString);
     const stepParam = urlParams.get('step');
     if (stepParam && state && !isLoading) {
       const targetStep = parseInt(stepParam, 10);
       if (!isNaN(targetStep) && targetStep >= 0 && targetStep <= 7 && targetStep !== state.currentStep) {
         goToStep(targetStep);
         // Clear the step parameter from URL after navigating
-        window.history.replaceState({}, '', '/onboarding');
+        setLocation('/onboarding', { replace: true });
       }
     }
-  }, [state, isLoading, goToStep]);
+  }, [searchString, state, isLoading, goToStep, setLocation]);
   
   useEffect(() => {
     if (isCompleted) {
