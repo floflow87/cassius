@@ -6732,26 +6732,57 @@ export async function registerRoutes(
 
     try {
       // Try to get existing state
-      let state = await db
-        .select()
-        .from(onboardingState)
-        .where(eq(onboardingState.organisationId, organisationId))
-        .then(rows => rows[0]);
+      let state: any = null;
+      try {
+        state = await db
+          .select()
+          .from(onboardingState)
+          .where(eq(onboardingState.organisationId, organisationId))
+          .then(rows => rows[0]);
+      } catch (selectErr: any) {
+        console.error("[Onboarding] Error selecting state (table may not exist):", selectErr.message);
+        // Return a default state if table doesn't exist
+        return res.json({
+          id: null,
+          organisationId,
+          currentStep: 0,
+          completedSteps: {},
+          skippedSteps: {},
+          data: {},
+          status: "IN_PROGRESS",
+          dismissed: false,
+        });
+      }
 
       // If no state exists, create one
       if (!state) {
-        const [newState] = await db
-          .insert(onboardingState)
-          .values({
+        try {
+          const [newState] = await db
+            .insert(onboardingState)
+            .values({
+              organisationId,
+              currentStep: 0,
+              completedSteps: "{}",
+              skippedSteps: "{}",
+              data: "{}",
+              status: "IN_PROGRESS",
+            })
+            .returning();
+          state = newState;
+        } catch (insertErr: any) {
+          console.error("[Onboarding] Error inserting state:", insertErr.message);
+          // Return a default state if insert fails
+          return res.json({
+            id: null,
             organisationId,
             currentStep: 0,
-            completedSteps: "{}",
-            skippedSteps: "{}",
-            data: "{}",
+            completedSteps: {},
+            skippedSteps: {},
+            data: {},
             status: "IN_PROGRESS",
-          })
-          .returning();
-        state = newState;
+            dismissed: false,
+          });
+        }
       }
 
       // Parse JSON fields
@@ -6793,15 +6824,38 @@ export async function registerRoutes(
         });
       }
 
-      // Get existing state
-      let state = await db
-        .select()
-        .from(onboardingState)
-        .where(eq(onboardingState.organisationId, organisationId))
-        .then(rows => rows[0]);
+      // Get existing state (with fallback if table doesn't exist)
+      let state: any = null;
+      try {
+        state = await db
+          .select()
+          .from(onboardingState)
+          .where(eq(onboardingState.organisationId, organisationId))
+          .then(rows => rows[0]);
+      } catch (selectErr: any) {
+        console.error("[Onboarding PATCH] Error selecting state:", selectErr.message);
+        return res.status(503).json({ error: "Base de données temporairement indisponible" });
+      }
 
+      // Create state if it doesn't exist
       if (!state) {
-        return res.status(404).json({ error: "Onboarding state not found" });
+        try {
+          const [newState] = await db
+            .insert(onboardingState)
+            .values({
+              organisationId,
+              currentStep: 0,
+              completedSteps: "{}",
+              skippedSteps: "{}",
+              data: "{}",
+              status: "IN_PROGRESS",
+            })
+            .returning();
+          state = newState;
+        } catch (insertErr: any) {
+          console.error("[Onboarding PATCH] Error creating state:", insertErr.message);
+          return res.status(503).json({ error: "Impossible de créer l'état d'onboarding" });
+        }
       }
 
       // Parse existing JSON fields
