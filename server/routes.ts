@@ -6605,7 +6605,17 @@ export async function registerRoutes(
       const onboardingData = state ? JSON.parse(state.data || "{}") as OnboardingData & { manuallyCompleted?: Record<string, boolean> } : {};
       const manuallyCompleted = onboardingData.manuallyCompleted || {};
 
-      // Run all count queries in parallel for performance
+      // Run count queries with individual error handling for robustness
+      const safeCount = async (queryFn: () => Promise<any>, label: string): Promise<number> => {
+        try {
+          const result = await queryFn();
+          return Number(result[0]?.count || 0);
+        } catch (err: any) {
+          console.error(`[Onboarding Checklist] Error counting ${label}:`, err.message);
+          return 0;
+        }
+      };
+
       const [
         userCount,
         patientCount,
@@ -6617,15 +6627,15 @@ export async function registerRoutes(
         calendarIntegration,
         notificationEnabledCount
       ] = await Promise.all([
-        db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(operations).where(eq(operations.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(surgeryImplants).where(eq(surgeryImplants.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(visites).where(and(eq(visites.organisationId, organisationId), sql`${visites.isq} IS NOT NULL`)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(appointments).where(eq(appointments.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(documents).where(eq(documents.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select().from(calendarIntegrations).where(eq(calendarIntegrations.organisationId, organisationId)).then(rows => rows[0]),
-        db.select({ count: sql<number>`count(*)` }).from(notificationPreferences).where(and(eq(notificationPreferences.organisationId, organisationId), eq(notificationPreferences.inAppEnabled, true))).then(r => Number(r[0]?.count || 0))
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.organisationId, organisationId)), "users"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.organisationId, organisationId)), "patients"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(operations).where(eq(operations.organisationId, organisationId)), "operations"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(surgeryImplants).where(eq(surgeryImplants.organisationId, organisationId)), "surgeryImplants"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(visites).where(and(eq(visites.organisationId, organisationId), sql`${visites.isq} IS NOT NULL`)), "visites"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(appointments).where(eq(appointments.organisationId, organisationId)), "appointments"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(documents).where(eq(documents.organisationId, organisationId)), "documents"),
+        db.select().from(calendarIntegrations).where(eq(calendarIntegrations.organisationId, organisationId)).then(rows => rows[0]).catch(() => null),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(notificationPreferences).where(and(eq(notificationPreferences.organisationId, organisationId), eq(notificationPreferences.inAppEnabled, true))), "notificationPreferences")
       ]);
 
       // Build checklist items (real data OR manually marked as complete)
