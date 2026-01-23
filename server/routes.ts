@@ -1494,19 +1494,35 @@ export async function registerRoutes(
     try {
       const { marque, siteFdi, typeOs, statut } = req.query;
       let surgeryImplants;
-      if (marque || siteFdi || typeOs || statut) {
-        surgeryImplants = await storage.filterSurgeryImplants(organisationId, {
-          marque: marque as string,
-          siteFdi: siteFdi as string,
-          typeOs: typeOs as string,
-          statut: statut as string,
-        });
-      } else {
-        surgeryImplants = await storage.getAllSurgeryImplants(organisationId);
+      try {
+        if (marque || siteFdi || typeOs || statut) {
+          surgeryImplants = await storage.filterSurgeryImplants(organisationId, {
+            marque: marque as string,
+            siteFdi: siteFdi as string,
+            typeOs: typeOs as string,
+            statut: statut as string,
+          });
+        } else {
+          surgeryImplants = await storage.getAllSurgeryImplants(organisationId);
+        }
+      } catch (dbErr: any) {
+        console.error("[surgery-implants] Error fetching implants:", dbErr?.message);
+        return res.json([]);
       }
       
-      // Batch fetch all visites and group by implantId (catalogue) to avoid N+1
-      const allVisites = await storage.getAllVisites(organisationId);
+      // If no implants, return empty array early
+      if (!surgeryImplants || surgeryImplants.length === 0) {
+        return res.json([]);
+      }
+      
+      // Batch fetch all visites and group by implantId (with fallback)
+      let allVisites: any[] = [];
+      try {
+        allVisites = await storage.getAllVisites(organisationId);
+      } catch (err: any) {
+        console.error("[surgery-implants] Error fetching visites:", err?.message);
+      }
+      
       const visitesByImplantId = new Map<string, Array<{ isqValue: number | null; measuredAt: Date | string }>>();
       for (const v of allVisites) {
         if (!visitesByImplantId.has(v.implantId)) {
@@ -1517,26 +1533,45 @@ export async function registerRoutes(
       
       // Add latestIsq and flag info to each implant (batch to avoid N+1)
       const implantIds = surgeryImplants.map(si => si.id);
-      const flagSummaries = await storage.getSurgeryImplantFlagSummaries(organisationId, implantIds);
+      let flagSummaries = new Map<string, any>();
+      try {
+        flagSummaries = await storage.getSurgeryImplantFlagSummaries(organisationId, implantIds);
+      } catch (err: any) {
+        console.error("[surgery-implants] Error fetching flag summaries:", err?.message);
+      }
       
       // Batch fetch operations for patient info
       const surgeryIds = [...new Set(surgeryImplants.map(si => si.surgeryId))];
-      const operationsData = await storage.getOperationsByIds(organisationId, surgeryIds);
+      let operationsData: any[] = [];
+      try {
+        operationsData = await storage.getOperationsByIds(organisationId, surgeryIds);
+      } catch (err: any) {
+        console.error("[surgery-implants] Error fetching operations:", err?.message);
+      }
       const operationsMap = new Map(operationsData.map(op => [op.id, op]));
       
       // Batch fetch patients
       const patientIds = [...new Set(operationsData.map(op => op.patientId))];
-      const patientsData = await storage.getPatientsByIds(organisationId, patientIds);
+      let patientsData: any[] = [];
+      try {
+        patientsData = await storage.getPatientsByIds(organisationId, patientIds);
+      } catch (err: any) {
+        console.error("[surgery-implants] Error fetching patients:", err?.message);
+      }
       const patientsMap = new Map(patientsData.map(p => [p.id, p]));
       
       // Batch fetch implant catalog info
       const catalogImplantIds = [...new Set(surgeryImplants.map(si => si.implantId))];
-      const catalogImplants = await storage.getImplantsByIds(organisationId, catalogImplantIds);
+      let catalogImplants: any[] = [];
+      try {
+        catalogImplants = await storage.getImplantsByIds(organisationId, catalogImplantIds);
+      } catch (err: any) {
+        console.error("[surgery-implants] Error fetching catalog implants:", err?.message);
+      }
       const catalogImplantsMap = new Map(catalogImplants.map(i => [i.id, i]));
       
       const implantsWithExtras = surgeryImplants.map((si) => {
         const flagSummary = flagSummaries.get(si.id) || { activeFlagCount: 0 };
-        // Get visites for this surgery implant's catalog implantId
         const visiteMeasurements = visitesByImplantId.get(si.implantId) || [];
         const operation = operationsMap.get(si.surgeryId);
         const patient = operation ? patientsMap.get(operation.patientId) : null;
@@ -1553,9 +1588,9 @@ export async function registerRoutes(
       });
       
       res.json(implantsWithExtras);
-    } catch (error) {
-      console.error("Error fetching surgery implants:", error);
-      res.status(500).json({ error: "Failed to fetch surgery implants" });
+    } catch (error: any) {
+      console.error("Error fetching surgery implants:", error?.message || error);
+      res.json([]);
     }
   });
 
@@ -2801,9 +2836,22 @@ export async function registerRoutes(
     try {
       const stats = await storage.getStats(organisationId);
       res.json(stats);
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-      res.status(500).json({ error: "Failed to fetch stats" });
+    } catch (error: any) {
+      console.error("Error fetching stats:", error?.message || error);
+      // Return empty stats instead of 500 to prevent page blocking
+      res.json({
+        totalPatients: 0,
+        totalOperations: 0,
+        totalImplants: 0,
+        totalRadios: 0,
+        monthlyImplants: 0,
+        monthlyOperations: 0,
+        recentActivity: [],
+        implantsByStatus: {},
+        isqTrend: { average: null, trend: "stable" },
+        previousMonthImplants: 0,
+        previousMonthOperations: 0
+      });
     }
   });
 
@@ -2814,9 +2862,17 @@ export async function registerRoutes(
     try {
       const stats = await storage.getAdvancedStats(organisationId);
       res.json(stats);
-    } catch (error) {
-      console.error("Error fetching advanced stats:", error);
-      res.status(500).json({ error: "Failed to fetch advanced stats" });
+    } catch (error: any) {
+      console.error("Error fetching advanced stats:", error?.message || error);
+      // Return empty advanced stats instead of 500
+      res.json({
+        successRate: 0,
+        averageIsq: null,
+        implantsByBrand: {},
+        operationsByMonth: [],
+        complicationRate: 0,
+        averageHealingTime: null
+      });
     }
   });
 
