@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Check, ChevronDown, ChevronRight, Circle, SkipForward, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
 
 export function OnboardingChecklist() {
   const { toast } = useToast();
@@ -86,16 +85,15 @@ export function OnboardingChecklist() {
               <EyeOff className="w-3.5 h-3.5 mr-1" />
               Ne plus afficher
             </Button>
-            <Link href={`/onboarding?step=${resumeTargetStep}`}>
+            <a href={`/onboarding?step=${resumeTargetStep}`} data-testid="button-resume-onboarding">
               <Button 
                 type="button"
                 size="sm" 
-                data-testid="button-resume-onboarding"
               >
                 Reprendre
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
-            </Link>
+            </a>
           </div>
         </div>
       </CardHeader>
@@ -115,10 +113,10 @@ export function OnboardingChecklist() {
               const skipped = isStepSkipped(step.id);
               
               return (
-                <Link 
+                <a 
                   key={step.id}
                   href={`/onboarding?step=${step.id}`}
-                  className="w-full flex items-center gap-2 text-sm py-1 cursor-pointer hover-elevate rounded px-2 -mx-2 text-left"
+                  className="w-full flex items-center gap-2 text-sm py-1 cursor-pointer hover-elevate rounded px-2 -mx-2 text-left no-underline"
                   data-testid={`onboarding-step-${step.id}`}
                 >
                   {completed ? (
@@ -134,7 +132,7 @@ export function OnboardingChecklist() {
                   {!step.required && !completed && !skipped && (
                     <span className="text-xs text-muted-foreground">(optionnel)</span>
                   )}
-                </Link>
+                </a>
               );
             })}
           </div>
