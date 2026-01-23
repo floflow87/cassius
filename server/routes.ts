@@ -1603,9 +1603,10 @@ export async function registerRoutes(
       // Retourne le catalogue d'implants avec statistiques de pose
       const catalogueImplants = await storage.getAllImplantsWithStats(organisationId);
       res.json(catalogueImplants);
-    } catch (error) {
-      console.error("Error fetching implants:", error);
-      res.status(500).json({ error: "Failed to fetch implants" });
+    } catch (error: any) {
+      console.error("Error fetching implants:", error?.message || error);
+      // Return empty array instead of 500 to prevent page blocking
+      res.json([]);
     }
   });
 

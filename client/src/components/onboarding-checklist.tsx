@@ -21,7 +21,11 @@ export function OnboardingChecklist() {
     isPending
   } = useOnboarding();
   
+  // Debug logging
+  console.log("OnboardingChecklist render:", { isLoading, isCompleted, isDismissed, stateExists: !!state });
+  
   if (isLoading || isCompleted || isDismissed) {
+    console.log("OnboardingChecklist not rendering because:", { isLoading, isCompleted, isDismissed });
     return null;
   }
   
