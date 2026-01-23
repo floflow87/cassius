@@ -34,7 +34,10 @@ export function OnboardingChecklist() {
     if (step !== undefined) {
       setLocation(`/onboarding?step=${step}`);
     } else {
-      setLocation("/onboarding");
+      // Find first incomplete step
+      const firstIncomplete = ONBOARDING_STEPS.find(s => !isStepCompleted(s.id) && !isStepSkipped(s.id));
+      const targetStep = firstIncomplete ? firstIncomplete.id : 1;
+      setLocation(`/onboarding?step=${targetStep}`);
     }
   };
 
