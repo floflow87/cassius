@@ -86,14 +86,15 @@ export function OnboardingChecklist() {
               Ne plus afficher
             </Button>
             <Button 
-              asChild
               size="sm" 
               data-testid="button-resume-onboarding"
+              onClick={() => {
+                console.log("Navigating to onboarding step:", resumeTargetStep);
+                window.location.href = `/onboarding?step=${resumeTargetStep}`;
+              }}
             >
-              <a href={`/onboarding?step=${resumeTargetStep}`}>
-                Reprendre
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </a>
+              Reprendre
+              <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           </div>
         </div>
