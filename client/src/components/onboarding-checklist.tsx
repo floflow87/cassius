@@ -31,16 +31,14 @@ export function OnboardingChecklist() {
   const progress = getProgress();
   
   const handleResumeOnboarding = (step?: number) => {
-    if (step !== undefined) {
-      console.log("[Onboarding] Navigating to step:", step);
-      setLocation(`/onboarding?step=${step}`);
-    } else {
-      // Find first incomplete step
-      const firstIncomplete = ONBOARDING_STEPS.find(s => !isStepCompleted(s.id) && !isStepSkipped(s.id));
-      const targetStep = firstIncomplete ? firstIncomplete.id : 1;
-      console.log("[Onboarding] Resume clicked, first incomplete:", firstIncomplete, "navigating to step:", targetStep);
-      setLocation(`/onboarding?step=${targetStep}`);
-    }
+    const targetStep = step !== undefined 
+      ? step 
+      : (ONBOARDING_STEPS.find(s => !isStepCompleted(s.id) && !isStepSkipped(s.id))?.id || 1);
+    
+    console.log("[Onboarding] Resume clicked, navigating to step:", targetStep);
+    
+    // Use window.location for guaranteed navigation
+    window.location.href = `/onboarding?step=${targetStep}`;
   };
 
   const handleDismiss = async () => {
