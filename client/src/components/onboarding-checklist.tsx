@@ -89,7 +89,15 @@ export function OnboardingChecklist() {
                 <EyeOff className="w-3.5 h-3.5 mr-1" />
                 Ne plus afficher
               </Button>
-              <Button size="sm" onClick={() => handleResumeOnboarding()} data-testid="button-resume-onboarding">
+              <Button 
+                size="sm" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleResumeOnboarding();
+                }} 
+                data-testid="button-resume-onboarding"
+              >
                 Reprendre
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
