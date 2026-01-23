@@ -32,11 +32,13 @@ export function OnboardingChecklist() {
   
   const handleResumeOnboarding = (step?: number) => {
     if (step !== undefined) {
+      console.log("[Onboarding] Navigating to step:", step);
       setLocation(`/onboarding?step=${step}`);
     } else {
       // Find first incomplete step
       const firstIncomplete = ONBOARDING_STEPS.find(s => !isStepCompleted(s.id) && !isStepSkipped(s.id));
       const targetStep = firstIncomplete ? firstIncomplete.id : 1;
+      console.log("[Onboarding] Resume clicked, first incomplete:", firstIncomplete, "navigating to step:", targetStep);
       setLocation(`/onboarding?step=${targetStep}`);
     }
   };

@@ -604,15 +604,24 @@ function OnboardingSettingsSection() {
   );
 
   const handleResumeFirstIncomplete = () => {
+    console.log("[Settings] handleResumeFirstIncomplete called, checklist:", checklist);
     // Find first incomplete item with a wizard step
     const firstIncomplete = checklist?.items.find((item: any) => !item.completed && item.wizardStep !== null);
+    console.log("[Settings] First incomplete with wizardStep:", firstIncomplete);
     if (firstIncomplete && firstIncomplete.wizardStep !== null) {
+      console.log("[Settings] Navigating to /onboarding?step=" + firstIncomplete.wizardStep);
       setLocation(`/onboarding?step=${firstIncomplete.wizardStep}`);
     } else {
       // Fallback to first incomplete item's actionUrl
       const anyIncomplete = checklist?.items.find((item: any) => !item.completed);
+      console.log("[Settings] Fallback - any incomplete:", anyIncomplete);
       if (anyIncomplete) {
+        console.log("[Settings] Navigating to:", anyIncomplete.actionUrl);
         setLocation(anyIncomplete.actionUrl);
+      } else {
+        // If no incomplete items, go to onboarding step 1
+        console.log("[Settings] No incomplete items, going to /onboarding?step=1");
+        setLocation("/onboarding?step=1");
       }
     }
   };
