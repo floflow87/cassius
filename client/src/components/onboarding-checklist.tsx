@@ -85,15 +85,16 @@ export function OnboardingChecklist() {
               <EyeOff className="w-3.5 h-3.5 mr-1" />
               Ne plus afficher
             </Button>
-            <a href={`/onboarding?step=${resumeTargetStep}`} data-testid="button-resume-onboarding">
-              <Button 
-                type="button"
-                size="sm" 
-              >
+            <Button 
+              asChild
+              size="sm" 
+              data-testid="button-resume-onboarding"
+            >
+              <a href={`/onboarding?step=${resumeTargetStep}`}>
                 Reprendre
                 <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </a>
+              </a>
+            </Button>
           </div>
         </div>
       </CardHeader>
