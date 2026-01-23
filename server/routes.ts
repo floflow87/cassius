@@ -7079,15 +7079,49 @@ export async function registerRoutes(
     }
 
     try {
-      // Get existing state
-      let state = await db
-        .select()
-        .from(onboardingState)
-        .where(eq(onboardingState.organisationId, organisationId))
-        .then(rows => rows[0]);
+      // Safe count helper
+      const safeCount = async (queryFn: () => Promise<any>, label: string): Promise<number> => {
+        try {
+          const result = await queryFn();
+          return Number(result[0]?.count || 0);
+        } catch (err: any) {
+          console.error(`[Mark-done] Error counting ${label}:`, err.message);
+          return 0;
+        }
+      };
 
+      // Get existing state (with fallback)
+      let state: any = null;
+      try {
+        state = await db
+          .select()
+          .from(onboardingState)
+          .where(eq(onboardingState.organisationId, organisationId))
+          .then(rows => rows[0]);
+      } catch (selectErr: any) {
+        console.error("[Mark-done] Error selecting state:", selectErr.message);
+        return res.status(503).json({ error: "Base de données temporairement indisponible" });
+      }
+
+      // Create state if not exists
       if (!state) {
-        return res.status(404).json({ error: "Onboarding state not found" });
+        try {
+          const [newState] = await db
+            .insert(onboardingState)
+            .values({
+              organisationId,
+              currentStep: 0,
+              completedSteps: "{}",
+              skippedSteps: "{}",
+              data: "{}",
+              status: "IN_PROGRESS",
+            })
+            .returning();
+          state = newState;
+        } catch (insertErr: any) {
+          console.error("[Mark-done] Error creating state:", insertErr.message);
+          return res.status(503).json({ error: "Impossible de créer l'état d'onboarding" });
+        }
       }
 
       // Store manual completion overrides in onboardingState.data.manuallyCompleted
@@ -7096,15 +7130,20 @@ export async function registerRoutes(
       manuallyCompleted[itemId] = true;
       onboardingData.manuallyCompleted = manuallyCompleted;
 
-      await db
-        .update(onboardingState)
-        .set({
-          data: JSON.stringify(onboardingData),
-          updatedAt: new Date(),
-        })
-        .where(eq(onboardingState.organisationId, organisationId));
+      try {
+        await db
+          .update(onboardingState)
+          .set({
+            data: JSON.stringify(onboardingData),
+            updatedAt: new Date(),
+          })
+          .where(eq(onboardingState.organisationId, organisationId));
+      } catch (updateErr: any) {
+        console.error("[Mark-done] Error updating state:", updateErr.message);
+        return res.status(503).json({ error: "Impossible de mettre à jour" });
+      }
 
-      // Re-fetch checklist to check if all items are now complete
+      // Re-fetch checklist to check if all items are now complete (with safe counts)
       const [
         userCount,
         patientCount,
@@ -7116,15 +7155,15 @@ export async function registerRoutes(
         calendarIntegration,
         notificationEnabledCount
       ] = await Promise.all([
-        db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(operations).where(eq(operations.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(surgeryImplants).where(eq(surgeryImplants.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(visites).where(and(eq(visites.organisationId, organisationId), sql`${visites.isq} IS NOT NULL`)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(appointments).where(eq(appointments.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select({ count: sql<number>`count(*)` }).from(documents).where(eq(documents.organisationId, organisationId)).then(r => Number(r[0]?.count || 0)),
-        db.select().from(calendarIntegrations).where(eq(calendarIntegrations.organisationId, organisationId)).then(rows => rows[0]),
-        db.select({ count: sql<number>`count(*)` }).from(notificationPreferences).where(and(eq(notificationPreferences.organisationId, organisationId), eq(notificationPreferences.inAppEnabled, true))).then(r => Number(r[0]?.count || 0))
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.organisationId, organisationId)), "users"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(patients).where(eq(patients.organisationId, organisationId)), "patients"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(operations).where(eq(operations.organisationId, organisationId)), "operations"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(surgeryImplants).where(eq(surgeryImplants.organisationId, organisationId)), "surgeryImplants"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(visites).where(and(eq(visites.organisationId, organisationId), sql`${visites.isq} IS NOT NULL`)), "visites"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(appointments).where(eq(appointments.organisationId, organisationId)), "appointments"),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(documents).where(eq(documents.organisationId, organisationId)), "documents"),
+        db.select().from(calendarIntegrations).where(eq(calendarIntegrations.organisationId, organisationId)).then(rows => rows[0]).catch(() => null),
+        safeCount(() => db.select({ count: sql<number>`count(*)` }).from(notificationPreferences).where(and(eq(notificationPreferences.organisationId, organisationId), eq(notificationPreferences.inAppEnabled, true))), "notificationPreferences")
       ]);
 
       // Calculate completion with manual overrides
