@@ -1,0 +1,65 @@
+Tu es un développeur fullstack senior. Objectif : intégrer Resend (plan gratuit) dans mon projet Replit (Node/TS) pour envoyer des emails transactionnels (ex: “Nouveau rendez-vous planifié”), avec un template HTML propre (padding, carte, bouton) + une version texte.
+
+Contexte
+- J’ai déjà un système de notifications in-app.
+- Je veux envoyer certains événements via email via Resend.
+- J’ai déjà un domaine configuré sur Resend (DNS OK) et j’ai une clé API.
+
+À faire (étapes)
+1) Installer Resend
+- Ajouter la dépendance officielle : `resend`
+- Vérifier la compatibilité Node/TS.
+
+2) Variables d’environnement
+- Lire `RESEND_API_KEY`
+- Définir `EMAIL_FROM` (ex: "Cassius <no-reply@MONDOMAINE>") dans env
+- Option : `APP_BASE_URL` pour générer les liens
+
+3) Créer un module mailer
+- Créer `server/src/lib/mailer.ts` (ou équivalent)
+- Exporter une fonction générique `sendEmail({ to, subject, html, text })`
+- Gérer les erreurs proprement (try/catch + logs)
+- Timeout / retry simple (optionnel)
+
+4) Créer un template email “Nouveau rendez-vous planifié”
+- Créer `server/src/emails/new-appointment.ts` qui retourne `{ subject, html, text }`
+- Le template doit inclure :
+  - prénom du destinataire
+  - prénom + nom du patient
+  - intitulé / contexte du RDV
+  - date (format lisible FR) + heure (et fin si dispo)
+  - “créé par”
+  - bouton CTA couleur #3C83F6 + gros padding + carte
+  - lien fallback en clair
+  - footer : “Cassius — Le compagnon des chirurgiens-dentistes”
+- Ajouter des fallbacks si données manquantes (“—”)
+
+5) Point d’entrée backend
+- Créer une route POST sécurisée (cookie auth) :
+  - `POST /api/notifications/email/test` (pour tester)
+  - et/ou `POST /api/appointments/:id/email` (pour le vrai flux)
+- Cette route :
+  - récupère l’appointment + patient + user
+  - construit les variables du template
+  - envoie via `mailer.sendEmail`
+  - retourne `{ ok: true, messageId }`
+
+6) Tests
+- Ajouter une commande ou un script de test :
+  - appel curl/postman de la route test
+- Vérifier :
+  - email reçu
+  - HTML propre
+  - aucun undefined
+  - logs propres en cas d’échec
+
+Contraintes / bonnes pratiques
+- Ne pas casser l’existant.
+- TypeScript strict si possible.
+- Ne pas hardcoder de secrets.
+- Ajouter une petite doc `docs/email-resend.md` (setup + env vars + test).
+
+Livrables attendus
+- fichiers ajoutés/modifiés
+- instructions exactes pour configurer les env vars dans Replit
+- une route de test fonctionnelle + exemple de payload
