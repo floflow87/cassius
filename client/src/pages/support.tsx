@@ -254,7 +254,7 @@ export default function SupportPage() {
           <h1 className="text-2xl font-bold mb-3" data-testid="support-title">
             Centre d'aide Cassius
           </h1>
-          <p className="text-muted-foreground text-sm max-w-2xl mx-auto">
+          <p className="text-muted-foreground text-xs max-w-2xl mx-auto">
             Tout ce qu'il faut pour utiliser Cassius efficacement au quotidien, du premier patient au suivi clinique avancé.
           </p>
         </div>
@@ -264,7 +264,7 @@ export default function SupportPage() {
           <Input
             type="text"
             placeholder="Rechercher dans l'aide..."
-            className="pl-10 bg-white dark:bg-white dark:text-gray-900"
+            className="pl-10 bg-white dark:bg-white dark:text-gray-900 text-sm placeholder:text-xs"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             data-testid="support-search"
@@ -324,7 +324,7 @@ export default function SupportPage() {
                     <div className="p-2 rounded-lg bg-muted">
                       {section.icon}
                     </div>
-                    <span className="font-medium">{section.title}</span>
+                    <span className="font-medium text-sm">{section.title}</span>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pb-4">

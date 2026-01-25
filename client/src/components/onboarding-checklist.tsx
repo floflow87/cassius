@@ -1,10 +1,16 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useOnboarding, ONBOARDING_STEPS } from "@/hooks/use-onboarding";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Check, ChevronDown, ChevronRight, Circle, SkipForward, EyeOff } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Circle, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+
+interface UserInfo {
+  id: string;
+  username: string;
+  nom: string | null;
+  prenom: string | null;
+}
 
 export function OnboardingChecklist() {
   const { toast } = useToast();
@@ -20,6 +26,10 @@ export function OnboardingChecklist() {
     dismissOnboarding,
     isPending
   } = useOnboarding();
+
+  const { data: user } = useQuery<UserInfo>({
+    queryKey: ["/api/auth/user"],
+  });
   
   if (isLoading || isCompleted || isDismissed) {
     return null;
@@ -48,102 +58,90 @@ export function OnboardingChecklist() {
     }
   };
   
-  const toggleOpen = () => {
-    setIsOpen(!isOpen);
-  };
+  const userName = user?.prenom || user?.username || "vous";
   
   return (
-    <Card className="border-primary/20 bg-primary/5">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-4 relative z-10">
-          <button 
-            type="button"
-            onClick={toggleOpen}
-            className="flex items-center gap-2 rounded p-1 -m-1" 
-            data-testid="button-toggle-onboarding"
-          >
-            {isOpen ? (
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            )}
-            <CardTitle className="text-base">Configuration en cours</CardTitle>
-            {!isOpen && (
-              <span className="text-sm text-muted-foreground ml-2">({progress}%)</span>
-            )}
-          </button>
-          <div className="flex items-center gap-2 relative z-20">
-            <Button 
-              type="button"
-              variant="ghost" 
-              size="sm"
-              className="text-xs text-muted-foreground italic font-light"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDismiss();
-              }}
-              disabled={isPending}
-              data-testid="button-dismiss-onboarding"
-            >
-              <EyeOff className="w-3.5 h-3.5 mr-1" />
-              Ne plus afficher
-            </Button>
-            <Button 
-              size="sm" 
-              data-testid="button-resume-onboarding"
-              onClick={(e) => {
-                e.stopPropagation();
-                console.log("Navigating to onboarding step:", resumeTargetStep);
-                window.location.href = `/onboarding?step=${resumeTargetStep}`;
-              }}
-            >
-              Reprendre
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
+    <div className="rounded-xl overflow-hidden shadow-lg border border-blue-200 bg-white dark:bg-gray-900 dark:border-blue-800">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white"
+        data-testid="button-toggle-onboarding"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-white/20 text-xs font-bold">
+            {progress}%
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm">Commencez ici {userName}</span>
+            <Sparkles className="w-4 h-4" />
           </div>
         </div>
-      </CardHeader>
+        {isOpen ? (
+          <ChevronUp className="w-5 h-5" />
+        ) : (
+          <ChevronDown className="w-5 h-5" />
+        )}
+      </button>
+      
       {isOpen && (
-        <CardContent className="space-y-4 pt-0">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Progression</span>
-              <span className="font-medium">{progress}%</span>
-            </div>
-            <Progress value={progress} className="h-2" />
-          </div>
+        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          {ONBOARDING_STEPS.map((step) => {
+            const completed = isStepCompleted(step.id);
+            const skipped = isStepSkipped(step.id);
+            
+            return (
+              <a 
+                key={step.id}
+                href={`/onboarding?step=${step.id}`}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800",
+                  completed && "bg-gray-50/50 dark:bg-gray-800/50"
+                )}
+                data-testid={`onboarding-step-${step.id}`}
+              >
+                <div className={cn(
+                  "flex items-center justify-center w-6 h-6 rounded-full shrink-0",
+                  completed 
+                    ? "bg-green-500 text-white" 
+                    : "border-2 border-gray-300 dark:border-gray-600"
+                )}>
+                  {completed && <Check className="w-4 h-4" />}
+                </div>
+                <span className={cn(
+                  "text-sm",
+                  completed 
+                    ? "text-gray-400 line-through dark:text-gray-500" 
+                    : skipped 
+                      ? "text-gray-400 dark:text-gray-500"
+                      : "text-gray-700 dark:text-gray-200"
+                )}>
+                  {step.title}
+                </span>
+              </a>
+            );
+          })}
           
-          <div className="space-y-1">
-            {ONBOARDING_STEPS.map((step) => {
-              const completed = isStepCompleted(step.id);
-              const skipped = isStepSkipped(step.id);
-              
-              return (
-                <a 
-                  key={step.id}
-                  href={`/onboarding?step=${step.id}`}
-                  className="w-full flex items-center gap-2 text-sm py-1 cursor-pointer hover-elevate rounded px-2 -mx-2 text-left no-underline"
-                  data-testid={`onboarding-step-${step.id}`}
-                >
-                  {completed ? (
-                    <Check className="w-4 h-4 text-green-500" />
-                  ) : skipped ? (
-                    <SkipForward className="w-4 h-4 text-muted-foreground" />
-                  ) : (
-                    <Circle className="w-4 h-4 text-muted-foreground" />
-                  )}
-                  <span className={completed ? "text-muted-foreground line-through" : skipped ? "text-muted-foreground" : ""}>
-                    {step.title}
-                  </span>
-                  {!step.required && !completed && !skipped && (
-                    <span className="text-xs text-muted-foreground">(optionnel)</span>
-                  )}
-                </a>
-              );
-            })}
+          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={handleDismiss}
+              disabled={isPending}
+              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              data-testid="button-dismiss-onboarding"
+            >
+              Ne plus afficher
+            </button>
+            <a
+              href={`/onboarding?step=${resumeTargetStep}`}
+              className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              data-testid="button-resume-onboarding"
+            >
+              Reprendre →
+            </a>
           </div>
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </div>
   );
 }
