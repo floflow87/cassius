@@ -251,10 +251,10 @@ export default function SupportPage() {
     <ScrollArea className="h-full">
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold mb-3" data-testid="support-title">
+          <h1 className="text-2xl font-bold mb-3" data-testid="support-title">
             Centre d'aide Cassius
           </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-muted-foreground text-sm max-w-2xl mx-auto">
             Tout ce qu'il faut pour utiliser Cassius efficacement au quotidien, du premier patient au suivi clinique avancé.
           </p>
         </div>
@@ -264,7 +264,7 @@ export default function SupportPage() {
           <Input
             type="text"
             placeholder="Rechercher dans l'aide..."
-            className="pl-10"
+            className="pl-10 bg-white dark:bg-white dark:text-gray-900"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             data-testid="support-search"
@@ -279,8 +279,8 @@ export default function SupportPage() {
                   <MessageCircle className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold mb-1">Besoin d'aide ?</h2>
-                  <p className="text-muted-foreground text-sm">
+                  <h2 className="text-base font-semibold mb-1">Besoin d'aide ?</h2>
+                  <p className="text-muted-foreground text-xs">
                     Notre équipe est disponible pour vous accompagner dans l'utilisation de Cassius.
                   </p>
                   <div className="flex flex-wrap gap-3 mt-3">
@@ -329,23 +329,23 @@ export default function SupportPage() {
                 </AccordionTrigger>
                 <AccordionContent className="pb-4">
                   <div className="pl-12 space-y-4">
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p className="text-muted-foreground text-xs leading-relaxed">
                       {section.description}
                     </p>
                     <ul className="space-y-2">
                       {section.points.map((point, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm">
-                          <span className="text-primary mt-1">•</span>
+                        <li key={idx} className="flex items-start gap-2 text-xs">
+                          <span className="text-primary mt-0.5">•</span>
                           <span>{point}</span>
                         </li>
                       ))}
                     </ul>
                     {section.subsections?.map((sub, idx) => (
                       <div key={idx} className="mt-4">
-                        <h4 className="font-medium text-sm mb-2">{sub.title}</h4>
+                        <h4 className="font-medium text-xs mb-2">{sub.title}</h4>
                         <div className="flex flex-wrap gap-2">
                           {sub.items.map((item, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">
+                            <Badge key={i} variant="outline" className="text-[10px]">
                               {item}
                             </Badge>
                           ))}
@@ -360,7 +360,7 @@ export default function SupportPage() {
         )}
 
         <div className="mt-10">
-          <h2 className="text-lg font-semibold mb-4">Glossaire</h2>
+          <h2 className="text-base font-semibold mb-4">Glossaire</h2>
           <Accordion type="single" collapsible className="space-y-2" data-testid="glossary-accordion">
             {glossaryTerms.map((item) => (
               <AccordionItem
@@ -370,10 +370,10 @@ export default function SupportPage() {
                 data-testid={`glossary-${item.term.toLowerCase()}`}
               >
                 <AccordionTrigger className="hover:no-underline py-3">
-                  <span className="font-medium text-sm">{item.term}</span>
+                  <span className="font-medium text-xs">{item.term}</span>
                 </AccordionTrigger>
                 <AccordionContent className="pb-3">
-                  <p className="text-muted-foreground text-sm">{item.definition}</p>
+                  <p className="text-muted-foreground text-xs">{item.definition}</p>
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -381,10 +381,10 @@ export default function SupportPage() {
         </div>
 
         <footer className="mt-16 pt-8 border-t text-center">
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-xs">
             Cassius — Le compagnon des chirurgiens-dentistes
           </p>
-          <p className="text-muted-foreground/60 text-xs mt-1">
+          <p className="text-muted-foreground/60 text-[10px] mt-1">
             Documentation Cassius v1.0
           </p>
         </footer>
