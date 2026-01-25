@@ -15,13 +15,15 @@ export function useCurrentUser() {
   const { data: user, isLoading, error } = useQuery<CurrentUser>({
     queryKey: ["/api/settings/profile"],
     staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 
   const isAdmin = user?.role === "ADMIN";
   const isChirurgien = user?.role === "CHIRURGIEN";
   const isAssistant = user?.role === "ASSISTANT";
-  const canDelete = user?.role === "ADMIN" || user?.role === "CHIRURGIEN";
-  const canEdit = user?.role === "ADMIN" || user?.role === "CHIRURGIEN";
+  // Default to true during loading to avoid blocking UI
+  const canDelete = isLoading ? true : (user?.role === "ADMIN" || user?.role === "CHIRURGIEN");
+  const canEdit = isLoading ? true : (user?.role === "ADMIN" || user?.role === "CHIRURGIEN");
 
   return {
     user,
