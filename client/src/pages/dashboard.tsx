@@ -322,7 +322,6 @@ function AppointmentItem({ date, title, patientName, patientId, type, time }: Ap
 }
 
 export default function DashboardPage() {
-  console.log("DashboardPage rendering...");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [patientPopoverOpen, setPatientPopoverOpen] = useState(false);
   const [patientSearch, setPatientSearch] = useState("");
