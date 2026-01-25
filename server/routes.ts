@@ -602,9 +602,19 @@ export async function registerRoutes(
         topFlag: flagSummary.topFlag,
         activeFlagCount: flagSummary.activeFlagCount,
       });
-    } catch (error) {
-      console.error("Error fetching patient:", error);
-      res.status(500).json({ error: "Failed to fetch patient" });
+    } catch (error: any) {
+      console.error("[PATIENT DETAIL ERROR]", {
+        patientId: req.params.id,
+        organisationId,
+        errorMessage: error?.message,
+        errorStack: error?.stack,
+        errorCode: error?.code,
+      });
+      res.status(500).json({ 
+        error: "Failed to fetch patient", 
+        details: error?.message,
+        code: error?.code,
+      });
     }
   });
 
