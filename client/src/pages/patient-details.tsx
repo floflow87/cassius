@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -185,6 +186,7 @@ export default function PatientDetailsPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { toast } = useToast();
+  const { canDelete, canEdit } = useCurrentUser();
   const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
 
   const { data: patient, isLoading } = useQuery<PatientWithDetails>({
@@ -2832,14 +2834,16 @@ export default function PatientDetailsPage() {
                                     <Pencil className="h-4 w-4 mr-2" />
                                     Modifier
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={() => setDeleteNoteId(note.id)} 
-                                    className="text-destructive"
-                                    data-testid={`button-delete-note-${note.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Supprimer
-                                  </DropdownMenuItem>
+                                  {canDelete && (
+                                    <DropdownMenuItem 
+                                      onClick={() => setDeleteNoteId(note.id)} 
+                                      className="text-destructive"
+                                      data-testid={`button-delete-note-${note.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Supprimer
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>

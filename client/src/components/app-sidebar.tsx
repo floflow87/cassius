@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
 import { FaFolder, FaCalendarAlt } from "react-icons/fa";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
 import logoFull from "@assets/logo_Cassius_Plan_de_travail_1_copie_Plan_de_travail_1_copie_2_1767822114601.png";
@@ -31,6 +32,7 @@ type MenuItem = {
   url: string;
   icon?: string;
   reactIcon?: typeof FaFolder;
+  hideForAssistant?: boolean;
 };
 
 const menuItems: MenuItem[] = [
@@ -40,12 +42,13 @@ const menuItems: MenuItem[] = [
   { title: "Actes", url: "/actes", icon: actesIcon },
   { title: "Documents", url: "/documents", reactIcon: FaFolder },
   { title: "Calendrier", url: "/calendar", reactIcon: FaCalendarAlt },
-  { title: "Statistiques", url: "/stats", icon: statsIcon },
+  { title: "Statistiques", url: "/stats", icon: statsIcon, hideForAssistant: true },
 ];
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { state, open, setOpen } = useSidebar();
+  const { isAssistant } = useCurrentUser();
   const isExpanded = state === "expanded";
 
   const handleToggle = () => {
@@ -93,7 +96,9 @@ export function AppSidebar() {
           <hr className="border-t border-white/20" />
         </div>
         <SidebarMenu className="gap-1 px-3 pt-2">
-          {menuItems.map((item) => {
+          {menuItems
+            .filter(item => !(item.hideForAssistant && isAssistant))
+            .map((item) => {
             const active = isActive(item.url);
             
             const linkContent = (

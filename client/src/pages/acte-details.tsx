@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute, useLocation } from "wouter";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   ArrowLeft,
   Calendar,

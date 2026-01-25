@@ -73,6 +73,15 @@ function getOrganisationId(req: Request, res: Response): string | null {
   return organisationId;
 }
 
+function requireNonAssistant(req: Request, res: Response): boolean {
+  const role = req.jwtUser?.role;
+  if (role === "ASSISTANT") {
+    res.status(403).json({ error: "Les assistants ne peuvent pas effectuer cette action" });
+    return false;
+  }
+  return true;
+}
+
 type ImplantWithStats = {
   id: string;
   marque: string;
@@ -661,6 +670,7 @@ export async function registerRoutes(
   app.delete("/api/patients/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const deleted = await storage.deletePatient(organisationId, req.params.id);
@@ -1105,6 +1115,7 @@ export async function registerRoutes(
   app.delete("/api/operations/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const deleted = await storage.deleteOperation(organisationId, req.params.id);
@@ -1242,6 +1253,7 @@ export async function registerRoutes(
   app.delete("/api/catalog-implants/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const deleted = await storage.deleteImplant(organisationId, req.params.id);
@@ -1364,6 +1376,7 @@ export async function registerRoutes(
   app.delete("/api/surgery-implants", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const { ids } = req.body;
@@ -1790,6 +1803,7 @@ export async function registerRoutes(
   app.delete("/api/radios/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       // Get radio to find file path for deletion
@@ -1879,6 +1893,7 @@ export async function registerRoutes(
   app.delete("/api/radios/:radioId/notes/:noteId", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const deleted = await storage.deleteRadioNote(organisationId, req.params.noteId);
@@ -2589,6 +2604,7 @@ export async function registerRoutes(
   app.delete("/api/documents/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       // Get document to find file path for deletion
@@ -2782,6 +2798,7 @@ export async function registerRoutes(
   app.delete("/api/visites/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const visiteId = req.params.id;
@@ -2833,6 +2850,7 @@ export async function registerRoutes(
   app.get("/api/stats", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const stats = await storage.getStats(organisationId);
@@ -2859,6 +2877,7 @@ export async function registerRoutes(
   app.get("/api/stats/advanced", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const stats = await storage.getAdvancedStats(organisationId);
@@ -2880,6 +2899,7 @@ export async function registerRoutes(
   app.get("/api/stats/clinical", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const { from, to, implantModelId, patientIds, operationIds, implantType } = req.query;
@@ -2900,6 +2920,7 @@ export async function registerRoutes(
   app.get("/api/stats/patients", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const stats = await storage.getPatientStats(organisationId);
@@ -2967,6 +2988,7 @@ export async function registerRoutes(
   app.delete("/api/notes/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const { id } = req.params;
@@ -3031,6 +3053,7 @@ export async function registerRoutes(
   app.delete("/api/rendez-vous/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const { id } = req.params;
@@ -3279,6 +3302,7 @@ export async function registerRoutes(
   app.delete("/api/appointments/:id", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const { id } = req.params;
@@ -3518,6 +3542,7 @@ export async function registerRoutes(
   app.delete("/api/appointments/:id/radios/:radioId", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
+    if (!requireNonAssistant(req, res)) return;
 
     try {
       const { id: appointmentId, radioId } = req.params;

@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { format, subMonths, differenceInYears } from "date-fns";
 import { fr } from "date-fns/locale";
 import { motion } from "framer-motion";
@@ -121,6 +123,15 @@ type SearchSuggestion = {
 };
 
 export default function StatsPage() {
+  const [, navigate] = useLocation();
+  const { isAssistant, isLoading: userLoading } = useCurrentUser();
+  
+  useEffect(() => {
+    if (!userLoading && isAssistant) {
+      navigate("/");
+    }
+  }, [isAssistant, userLoading, navigate]);
+  
   const [activeTab, setActiveTab] = useState("patient");
   const [period, setPeriod] = useState("3m");
   const [customFrom, setCustomFrom] = useState<Date>();

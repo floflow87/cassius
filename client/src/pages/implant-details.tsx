@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute, useLocation } from "wouter";
 import { useState } from "react";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   ArrowLeft,
   Activity,
@@ -134,6 +135,7 @@ export default function ImplantDetailsPage() {
   const implantId = params?.implantId;
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { canDelete } = useCurrentUser();
 
   const [addISQSheetOpen, setAddISQSheetOpen] = useState(false);
   const [editPoseInfoSheetOpen, setEditPoseInfoSheetOpen] = useState(false);
@@ -1089,16 +1091,18 @@ export default function ImplantDetailsPage() {
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive"
-                                onClick={() => handleDeleteIsq(point)}
-                                disabled={deleteIsqMutation.isPending}
-                                data-testid={`button-delete-isq-${index}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              {canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive"
+                                  onClick={() => handleDeleteIsq(point)}
+                                  disabled={deleteIsqMutation.isPending}
+                                  data-testid={`button-delete-isq-${index}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1273,7 +1277,7 @@ export default function ImplantDetailsPage() {
             Actes chirurgicaux avec cet implant
           </CardTitle>
           <div className="flex items-center gap-2">
-            {selectedActs.length > 0 && (
+            {selectedActs.length > 0 && canDelete && (
               <Button
                 variant="destructive"
                 size="sm"
