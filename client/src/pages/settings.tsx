@@ -73,6 +73,7 @@ interface UserProfile {
   role: "ADMIN" | "CHIRURGIEN" | "ASSISTANT";
   organisationId: string | null;
   organisationNom?: string;
+  wasInvited?: boolean;
 }
 
 interface Collaborator {
@@ -164,6 +165,7 @@ export default function SettingsPage() {
   });
 
   const userIsAdmin = profile?.role === "ADMIN";
+  const userWasInvited = profile?.wasInvited === true;
 
   if (profileLoading) {
     return (
@@ -183,7 +185,7 @@ export default function SettingsPage() {
               { value: "notifications", label: "Notifications", icon: Bell, show: true },
               { value: "collaborators", label: "Collaborateurs", icon: Users, show: userIsAdmin },
               { value: "organization", label: "Organisation", icon: Building2, show: userIsAdmin },
-              { value: "integrations", label: "Intégrations", icon: Link2, show: true },
+              { value: "integrations", label: "Intégrations", icon: Link2, show: !userWasInvited },
             ].filter(tab => tab.show).map((tab) => (
               <button
                 key={tab.value}
@@ -210,7 +212,7 @@ export default function SettingsPage() {
             {profile ? (
               <div className="space-y-6">
                 <SecuritySection profile={profile} onProfileUpdate={() => queryClient.invalidateQueries({ queryKey: ["/api/settings/profile"] })} />
-                <OnboardingSettingsSection />
+                {!userWasInvited && <OnboardingSettingsSection />}
               </div>
             ) : (
               <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -236,9 +238,11 @@ export default function SettingsPage() {
             </TabsContent>
           )}
           
-          <TabsContent value="integrations">
-            <IntegrationsSection />
-          </TabsContent>
+          {!userWasInvited && (
+            <TabsContent value="integrations">
+              <IntegrationsSection />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>

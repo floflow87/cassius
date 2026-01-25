@@ -5151,6 +5151,7 @@ export async function registerRoutes(
         role: user.role,
         organisationId: user.organisationId,
         organisationNom,
+        wasInvited: user.wasInvited ?? false,
       });
     } catch (error: any) {
       console.error("[SETTINGS] Error getting profile:", error);
@@ -5648,7 +5649,7 @@ export async function registerRoutes(
       const hashedPassword = scryptSync(password, salt, 64).toString('hex');
       const passwordWithSalt = `${hashedPassword}.${salt}`;
       
-      // Create user
+      // Create user (marked as invited)
       const newUser = await storage.createUser({
         username: invitation.email,
         password: passwordWithSalt,
@@ -5656,6 +5657,7 @@ export async function registerRoutes(
         organisationId: invitation.organisationId,
         nom: nom || invitation.nom || null,
         prenom: prenom || invitation.prenom || null,
+        wasInvited: true,
       });
       
       // Mark invitation as accepted

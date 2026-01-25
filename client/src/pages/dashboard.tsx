@@ -1196,8 +1196,12 @@ export default function DashboardPage() {
         </Sheet>
       </div>
 
-      <OnboardingChecklist />
-      <SetupChecklist />
+      {!user?.wasInvited && (
+        <>
+          <OnboardingChecklist />
+          <SetupChecklist />
+        </>
+      )}
 
       {/* Dynamic block rendering based on user preferences */}
       {visibleBlocksInOrder.map((blockId, index) => {

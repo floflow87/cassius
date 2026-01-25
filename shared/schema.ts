@@ -386,6 +386,7 @@ export const users = pgTable("users", {
   prenom: text("prenom"),
   emailVerified: boolean("email_verified").default(false),
   emailVerifiedAt: timestamp("email_verified_at"),
+  wasInvited: boolean("was_invited").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

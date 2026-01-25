@@ -24,6 +24,7 @@ declare global {
       nom: string | null;
       prenom: string | null;
       organisationId: string | null;
+      wasInvited: boolean;
     }
   }
 }
@@ -87,6 +88,7 @@ export function setupAuth(app: Express): void {
           nom: user.nom,
           prenom: user.prenom,
           organisationId: user.organisationId,
+          wasInvited: user.wasInvited ?? false,
         });
       } catch (error) {
         return done(error);
@@ -111,6 +113,7 @@ export function setupAuth(app: Express): void {
         nom: user.nom,
         prenom: user.prenom,
         organisationId: user.organisationId,
+        wasInvited: user.wasInvited ?? false,
       });
     } catch (error) {
       done(error);
