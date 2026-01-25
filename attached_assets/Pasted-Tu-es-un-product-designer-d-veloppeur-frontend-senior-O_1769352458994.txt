@@ -1,0 +1,82 @@
+Tu es un product designer + développeur frontend senior.
+Objectif : créer une page “Help Center / Support” pour Cassius, très soignée visuellement, simple à lire et orientée usage métier (chirurgiens-dentistes).
+
+Contexte
+- Cassius est une application SaaS pour implantologistes.
+- Il existe déjà une documentation fonctionnelle structurée (modules : dashboard, patients, implants, actes, calendrier, notifications, statistiques, etc.).
+- Cette page Help Center doit transformer cette documentation en une expérience claire, rassurante et agréable.
+- La page doit être accessible depuis la sidebar, intitulée “Support”, placée juste au-dessus de “Paramètres”.
+
+Contraintes UX
+- Ton professionnel, calme, médical, premium (pas “tech doc”).
+- Lisible rapidement, sections bien aérées.
+- Utiliser des cartes, accordéons, ancres, titres clairs.
+- Mobile friendly.
+- Pas de surcharge : on privilégie la clarté.
+
+Structure attendue de la page
+
+1) Header
+- Titre : “Centre d’aide Cassius”
+- Sous-titre : “Trouvez rapidement comment utiliser Cassius au quotidien”
+- Option : barre de recherche locale (filtre les sections / titres)
+
+2) Sections principales (sous forme de cartes ou accordéons)
+Créer une section par grand thème :
+- Bien démarrer avec Cassius
+- Tableau de bord
+- Patients
+- Actes chirurgicaux
+- Catalogue d’implants
+- Implants posés & suivi ISQ
+- Calendrier & rendez-vous
+- Documents & radiographies
+- Notifications & alertes
+- Statistiques & rapports
+- Équipe, rôles & sécurité
+- Import & partage
+- Support & assistance
+
+Chaque section doit contenir :
+- Une courte phrase explicative (1–2 lignes max)
+- Une liste de points clés (pas de longs paragraphes)
+- Un ton simple, métier, non technique
+
+3) Section “Support & assistance” (mise en avant)
+- Carte ou bloc distinct visuellement
+- Contenu :
+  - “Besoin d’aide ?”
+  - Chat en direct via Crisp
+  - Accès à la documentation
+  - Contact support email
+- Bouton CTA : “Contacter le support”
+
+4) Glossaire (option accordéon)
+- Définitions courtes : ISQ, ostéointégration, flag, digest, multi-tenant
+
+5) Footer discret
+- “Cassius — Le compagnon des chirurgiens-dentistes”
+- Mention : “Documentation Cassius v1.0”
+
+À exclure explicitement
+- Ne pas afficher les raccourcis clavier :
+  - “N : Nouveau patient”
+  - “R : Nouveau rendez-vous”
+
+Implémentation technique attendue
+- Créer une nouvelle page : `/support` ou `/help`
+- Ajouter l’entrée “Support” dans la sidebar juste au-dessus de “Paramètres”
+- Utiliser les composants UI existants (Card, Accordion, Typography, etc.)
+- Prévoir une structure facilement extensible (ajout d’articles plus tard)
+- Aucun hardcoding de texte dans la sidebar (configurable)
+
+Livrable
+- Code de la page Support
+- Ajout dans la navigation sidebar
+- Structure claire, commentée
+- UI propre, cohérente avec Cassius
+
+Important
+- Ne pas créer une FAQ brute.
+- Ne pas créer une doc technique.
+- Créer un véritable Help Center orienté usage et sérénité utilisateur.

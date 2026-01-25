@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
 import { FaFolder, FaCalendarAlt } from "react-icons/fa";
 
 import logoIcon from "@assets/logo_Cassius_1765878309061.png";
@@ -148,6 +148,41 @@ export function AppSidebar() {
 
       <SidebarFooter className="bg-sidebar px-3 py-2 pb-4 mt-auto rounded-b-[15px]">
         <SidebarMenu className="gap-1">
+          {/* Support link */}
+          <SidebarMenuItem className="px-0">
+            {isExpanded ? (
+              <a
+                href="/support"
+                onClick={handleNavClick("/support")}
+                className={`flex h-10 items-center justify-start px-3 gap-3 transition-all ${
+                  isActive("/support") ? "bg-sidebar-accent rounded-[50px]" : "bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] rounded-md"
+                }`}
+                data-testid="link-support"
+              >
+                <HelpCircle className="h-[18px] w-[18px] text-white shrink-0" />
+                <span className={`text-xs truncate ${isActive("/support") ? 'font-medium text-white' : 'font-light text-white/80'}`}>
+                  Support
+                </span>
+              </a>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href="/support"
+                    onClick={handleNavClick("/support")}
+                    className="flex h-10 items-center justify-center w-full rounded-md bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] transition-all"
+                    data-testid="link-support"
+                  >
+                    <HelpCircle className="h-[18px] w-[18px] text-white" />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
+                  Support
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </SidebarMenuItem>
+          
           {/* Settings button with toggle */}
           <SidebarMenuItem className="px-0">
             <div className="flex items-center gap-1">

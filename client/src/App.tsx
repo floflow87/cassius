@@ -33,6 +33,7 @@ import ImportPatientsPage from "@/pages/import-patients";
 import NotificationsPage from "@/pages/notifications";
 import PublicSharePage from "@/pages/public-share";
 import OnboardingPage from "@/pages/onboarding";
+import SupportPage from "@/pages/support";
 import { apiRequest } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -211,6 +212,7 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/settings/integrations">
         <Redirect to="/settings?tab=integrations" />
       </Route>
+      <Route path="/support" component={SupportPage} />
       <Route path="/settings/google-calendar" component={GoogleCalendarPage} />
       <Route path="/settings/:section" component={SettingsPage} />
       <Route path="/settings" component={SettingsPage} />

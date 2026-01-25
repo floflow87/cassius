@@ -1,0 +1,296 @@
+Tu es un product designer senior et un développeur frontend expérimenté.
+Objectif : créer une page “Support” / “Help Center” très belle, lisible, rassurante et orientée usage métier pour l’application Cassius (SaaS pour implantologistes).
+
+⚠️ IMPORTANT
+- Tous les textes ci-dessous doivent être affichés tels quels (pas de reformulation).
+- Cette page n’est pas une documentation technique mais un centre d’aide métier.
+- Le ton doit être professionnel, médical, calme, premium.
+- La page est accessible depuis la sidebar sous le libellé “Support”, juste au-dessus de “Paramètres”.
+
+---
+
+## 1) Header de la page
+
+Titre principal :
+Centre d’aide Cassius
+
+Sous-titre :
+Tout ce qu’il faut pour utiliser Cassius efficacement au quotidien, du premier patient au suivi clinique avancé.
+
+Option UX :
+- Ajouter une barre de recherche locale permettant de filtrer les sections par mot-clé.
+
+---
+
+## 2) Section : Bien démarrer avec Cassius
+
+Titre :
+Bien démarrer avec Cassius
+
+Texte :
+Cassius est une plateforme conçue pour accompagner les chirurgiens-dentistes dans la gestion complète de leur activité d’implantologie.  
+Elle centralise les patients, les actes, les implants, les rendez-vous, les documents et le suivi clinique dans un environnement sécurisé et structuré.
+
+Points clés :
+- Centralisation de toutes les données cliniques
+- Suivi structuré des implants et des mesures ISQ
+- Réduction des oublis grâce aux alertes automatiques
+- Gain de temps au quotidien pour le cabinet
+
+---
+
+## 3) Section : Tableau de bord
+
+Titre :
+Tableau de bord
+
+Texte :
+Le tableau de bord vous offre une vision immédiate de l’activité de votre cabinet.  
+Il met en avant les informations essentielles pour piloter votre journée et identifier les situations nécessitant une attention particulière.
+
+Points clés :
+- Statistiques principales : patients actifs, implants posés, taux de succès
+- Prochains rendez-vous avec accès rapide aux dossiers patients
+- Patients à surveiller (ISQ bas, complications, suivis manqués)
+- Derniers implants posés avec mesures ISQ
+- Personnalisation complète des blocs affichés
+
+---
+
+## 4) Section : Patients
+
+Titre :
+Gestion des patients
+
+Texte :
+Chaque patient dispose d’un dossier complet, structuré et évolutif, permettant un suivi clinique précis et sécurisé dans le temps.
+
+Sous-sections affichées :
+- Informations personnelles et médicales
+- Historique clinique sous forme de timeline
+- Implants posés et suivi ISQ
+- Radiographies et documents
+- Notes médicales confidentielles
+
+Statuts patient disponibles :
+- En suivi
+- Succès
+- Complication
+- Échec
+
+---
+
+## 5) Section : Actes chirurgicaux
+
+Titre :
+Actes chirurgicaux
+
+Texte :
+Les actes chirurgicaux permettent de documenter précisément chaque intervention réalisée au cabinet, avec un lien direct vers les implants posés et le suivi post-opératoire.
+
+Points clés :
+- Création d’actes par patient
+- Association des implants posés
+- Observations pré et post-opératoires
+- Historique complet des interventions
+
+Types d’actes pris en charge :
+- Pose d’implant simple ou multiple
+- Extraction avec implant immédiat
+- Reprise d’implant
+- Chirurgie guidée
+- Greffe osseuse
+- Régénération osseuse guidée (ROG)
+
+---
+
+## 6) Section : Catalogue d’implants
+
+Titre :
+Catalogue d’implants
+
+Texte :
+Le catalogue d’implants centralise l’ensemble des références utilisées au cabinet afin d’assurer une traçabilité et une analyse clinique cohérentes.
+
+Informations disponibles :
+- Marque et fabricant
+- Référence produit
+- Dimensions et type de connexion
+- Historique d’utilisation
+- Statistiques de succès par modèle
+
+---
+
+## 7) Section : Implants posés & suivi ISQ
+
+Titre :
+Implants posés et suivi ISQ
+
+Texte :
+Chaque implant posé dispose d’un suivi individualisé, incluant l’historique des mesures ISQ et l’analyse de la stabilité dans le temps.
+
+Interprétation des valeurs ISQ :
+- Supérieur à 70 : excellente stabilité
+- Entre 65 et 70 : bonne stabilité
+- Entre 55 et 65 : stabilité moyenne nécessitant une surveillance
+- Inférieur à 55 : alerte clinique
+
+Tendances détectées :
+- Croissante
+- Stable
+- Décroissante
+
+Cassius génère automatiquement des alertes en cas de situation à risque.
+
+---
+
+## 8) Section : Calendrier & rendez-vous
+
+Titre :
+Calendrier et rendez-vous
+
+Texte :
+Cassius intègre un calendrier complet permettant la planification et le suivi des rendez-vous du cabinet, avec une synchronisation possible avec Google Calendar.
+
+Fonctionnalités principales :
+- Vues jour, semaine et mois
+- Création de rendez-vous associés aux patients
+- Statuts : à venir, terminé, annulé
+- Synchronisation bidirectionnelle avec Google Calendar
+
+---
+
+## 9) Section : Documents & radiographies
+
+Titre :
+Documents et radiographies
+
+Texte :
+Cassius permet le stockage sécurisé des documents médicaux et des radiographies, directement associés aux dossiers patients.
+
+Fonctionnalités :
+- Upload par glisser-déposer
+- Formats supportés : JPEG, PNG, PDF, DICOM
+- Visualisation plein écran
+- Ajout de notes et annotations
+- Classement par patient et par date
+
+---
+
+## 10) Section : Notifications & alertes
+
+Titre :
+Notifications et alertes
+
+Texte :
+Le système de notifications de Cassius vous aide à ne manquer aucun événement important, qu’il soit clinique, organisationnel ou lié à l’activité de l’équipe.
+
+Types de notifications :
+- Alertes cliniques (ISQ, complications)
+- Rappels de rendez-vous
+- Activité de l’équipe
+- Importations de données
+- Messages système
+
+Les préférences sont configurables par utilisateur.
+
+---
+
+## 11) Section : Statistiques & rapports
+
+Titre :
+Statistiques et rapports
+
+Texte :
+Les tableaux de bord statistiques offrent une analyse détaillée de l’activité du cabinet et des résultats cliniques.
+
+Indicateurs disponibles :
+- Nombre de patients
+- Nombre d’implants posés
+- Taux de succès global
+- Taux de complications
+- Évolution des mesures ISQ
+
+Les filtres peuvent être enregistrés pour un accès rapide.
+
+---
+
+## 12) Section : Équipe, rôles & sécurité
+
+Titre :
+Équipe, rôles et sécurité
+
+Texte :
+Cassius permet une gestion fine des accès utilisateurs afin de garantir la sécurité des données et le respect des rôles au sein du cabinet.
+
+Rôles disponibles :
+- Administrateur
+- Chirurgien
+- Assistant
+
+Fonctionnalités de sécurité :
+- Isolation complète des données par cabinet
+- Historique des connexions
+- Gestion des sessions actives
+
+---
+
+## 13) Section : Import & partage
+
+Titre :
+Import et partage de données
+
+Texte :
+Cassius facilite l’importation de patients existants ainsi que le partage sécurisé d’informations avec des confrères.
+
+Fonctionnalités :
+- Import CSV ou Excel avec aperçu
+- Liens de partage sécurisés
+- Durée de validité configurable
+- Protection par mot de passe optionnelle
+
+---
+
+## 14) Section : Support & assistance (mise en avant visuelle)
+
+Titre :
+Besoin d’aide ?
+
+Texte :
+Notre équipe est disponible pour vous accompagner dans l’utilisation de Cassius.
+
+Options de support :
+- Chat en direct via Crisp
+- Documentation intégrée
+- Contact par email
+
+Bouton CTA :
+Contacter le support
+
+---
+
+## 15) Glossaire (accordéon)
+
+Inclure les définitions suivantes :
+- ISQ : Implant Stability Quotient, mesure de la stabilité d’un implant
+- Ostéointégration : processus de fusion entre l’implant et l’os
+- Flag : alerte clinique automatique
+- Digest : résumé périodique envoyé par email
+- Multi-tenant : isolation des données par organisation
+
+---
+
+## Footer
+
+Texte :
+Cassius — Le compagnon des chirurgiens-dentistes  
+Documentation Cassius v1.0
+
+---
+
+## Contraintes techniques
+- Créer la page /support ou /help
+- Ajouter l’entrée “Support” dans la sidebar au-dessus de “Paramètres”
+- Utiliser les composants UI existants
+- Prévoir une structure extensible pour de futurs articles
+- Aucune mention des raccourcis clavier “N” ou “R”
