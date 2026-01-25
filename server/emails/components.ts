@@ -14,6 +14,20 @@ export function button(text: string, url: string): string {
   `;
 }
 
+export function buttonCentered(text: string, url: string): string {
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 24px auto; width: 100%;">
+      <tr>
+        <td align="center">
+          <a href="${url}" class="btn" style="display: inline-block; background-color: ${COLORS.primary}; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 15px; padding: 14px 28px; border-radius: 6px;">
+            ${text}
+          </a>
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
 export function linkFallback(url: string, label?: string): string {
   return `
     <div class="link-fallback" style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px; padding: 16px; margin: 24px 0; word-break: break-all;">

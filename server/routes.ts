@@ -5355,6 +5355,8 @@ export async function registerRoutes(
         inviterName,
         role,
         expiresAt,
+        inviteeFirstName: prenom || undefined,
+        inviteeLastName: nom || undefined,
       });
       
       // Log to email outbox
