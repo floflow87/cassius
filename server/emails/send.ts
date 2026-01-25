@@ -16,6 +16,7 @@ interface CredentialsResult {
 
 async function getCredentials(): Promise<CredentialsResult | null> {
   try {
+    // Try connector first
     const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
     const xReplitToken = process.env.REPL_IDENTITY 
       ? 'repl ' + process.env.REPL_IDENTITY 
@@ -23,32 +24,47 @@ async function getCredentials(): Promise<CredentialsResult | null> {
       ? 'depl ' + process.env.WEB_REPL_RENEWAL 
       : null;
 
-    if (!xReplitToken || !hostname) {
-      console.log('[Email] Resend connector not available (no token/hostname)');
-      return null;
-    }
-
-    connectionSettings = await fetch(
-      'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
-      {
-        headers: {
-          'Accept': 'application/json',
-          'X_REPLIT_TOKEN': xReplitToken
+    if (xReplitToken && hostname) {
+      connectionSettings = await fetch(
+        'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
+        {
+          headers: {
+            'Accept': 'application/json',
+            'X_REPLIT_TOKEN': xReplitToken
+          }
         }
-      }
-    ).then(res => res.json()).then(data => data.items?.[0]);
+      ).then(res => res.json()).then(data => data.items?.[0]);
 
-    if (!connectionSettings || (!connectionSettings.settings?.api_key)) {
-      console.log('[Email] Resend not configured (no API key)');
-      return null;
+      if (connectionSettings?.settings?.api_key) {
+        console.log('[Email] Using Resend connector credentials');
+        return { 
+          apiKey: connectionSettings.settings.api_key, 
+          fromEmail: connectionSettings.settings.from_email || 'noreply@cassiuspro.com' 
+        };
+      }
     }
     
-    return { 
-      apiKey: connectionSettings.settings.api_key, 
-      fromEmail: connectionSettings.settings.from_email || 'noreply@cassiuspro.com' 
-    };
+    // Fallback to environment variable
+    if (process.env.RESEND_API_KEY) {
+      console.log('[Email] Using RESEND_API_KEY environment variable');
+      return {
+        apiKey: process.env.RESEND_API_KEY,
+        fromEmail: 'noreply@cassiuspro.com'
+      };
+    }
+    
+    console.log('[Email] No Resend credentials available (connector or env var)');
+    return null;
   } catch (error) {
     console.log('[Email] Error getting Resend credentials:', error);
+    // Still try fallback on error
+    if (process.env.RESEND_API_KEY) {
+      console.log('[Email] Using RESEND_API_KEY fallback after error');
+      return {
+        apiKey: process.env.RESEND_API_KEY,
+        fromEmail: 'noreply@cassiuspro.com'
+      };
+    }
     return null;
   }
 }
