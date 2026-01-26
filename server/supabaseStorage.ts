@@ -16,24 +16,32 @@ function getSupabaseClient(): SupabaseClient {
   }
 
   // Support both standard names and Render production names
-  // Validate that URLs start with http:// or https://
+  // IMPORTANT: URL and key must come from the SAME Supabase project
   let supabaseUrl: string | undefined;
-  if (isValidHttpUrl(process.env.SUPABASE_API_URL_PROD)) {
-    supabaseUrl = process.env.SUPABASE_API_URL_PROD;
-  } else if (isValidHttpUrl(process.env.SUPABASE_URL)) {
-    supabaseUrl = process.env.SUPABASE_URL;
-  }
+  let supabaseServiceRoleKey: string | undefined;
+  let source: string = 'NONE';
 
-  const supabaseServiceRoleKey = process.env.SUPABASE_API_SERVICE_ROLE_KEY_PROD || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Try production pair first (both must be valid)
+  if (isValidHttpUrl(process.env.SUPABASE_API_URL_PROD) && process.env.SUPABASE_API_SERVICE_ROLE_KEY_PROD) {
+    supabaseUrl = process.env.SUPABASE_API_URL_PROD;
+    supabaseServiceRoleKey = process.env.SUPABASE_API_SERVICE_ROLE_KEY_PROD;
+    source = 'PROD';
+  } 
+  // Fall back to standard pair
+  else if (isValidHttpUrl(process.env.SUPABASE_URL) && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    supabaseUrl = process.env.SUPABASE_URL;
+    supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    source = 'STANDARD';
+  }
 
   if (!supabaseUrl || !supabaseServiceRoleKey) {
-    console.error('[STORAGE] Missing Supabase config. SUPABASE_URL:', supabaseUrl ? 'valid' : 'missing/invalid', 
-      'SUPABASE_API_URL_PROD:', process.env.SUPABASE_API_URL_PROD ? 'exists but invalid' : 'missing',
-      'Service key:', supabaseServiceRoleKey ? 'exists' : 'missing');
-    throw new Error('Valid SUPABASE_URL (starting with http/https) and SUPABASE_SERVICE_ROLE_KEY are required for file storage');
+    console.error('[STORAGE] Missing Supabase config. Need matching URL+KEY pair.',
+      'SUPABASE_URL valid:', isValidHttpUrl(process.env.SUPABASE_URL),
+      'SUPABASE_API_URL_PROD valid:', isValidHttpUrl(process.env.SUPABASE_API_URL_PROD));
+    throw new Error('Valid SUPABASE_URL and matching SUPABASE_SERVICE_ROLE_KEY are required for file storage');
   }
 
-  console.log('[STORAGE] Using Supabase URL:', supabaseUrl.substring(0, 30) + '...');
+  console.log('[STORAGE] Using Supabase config from:', source, '| URL:', supabaseUrl.substring(0, 30) + '...');
 
   supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
