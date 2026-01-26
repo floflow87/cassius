@@ -5,19 +5,35 @@ const SIGNED_URL_EXPIRY = 3600; // 1 hour in seconds
 
 let supabaseClient: SupabaseClient | null = null;
 
+function isValidHttpUrl(str: string | undefined): boolean {
+  if (!str) return false;
+  return str.startsWith('http://') || str.startsWith('https://');
+}
+
 function getSupabaseClient(): SupabaseClient {
   if (supabaseClient) {
     return supabaseClient;
   }
 
   // Support both standard names and Render production names
-  const supabaseUrl = process.env.SUPABASE_API_URL_PROD || process.env.SUPABASE_URL;
+  // Validate that URLs start with http:// or https://
+  let supabaseUrl: string | undefined;
+  if (isValidHttpUrl(process.env.SUPABASE_API_URL_PROD)) {
+    supabaseUrl = process.env.SUPABASE_API_URL_PROD;
+  } else if (isValidHttpUrl(process.env.SUPABASE_URL)) {
+    supabaseUrl = process.env.SUPABASE_URL;
+  }
+
   const supabaseServiceRoleKey = process.env.SUPABASE_API_SERVICE_ROLE_KEY_PROD || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseServiceRoleKey) {
-    console.error('[STORAGE] Missing Supabase config. Available env vars:', Object.keys(process.env).filter(k => k.includes('SUPABASE')));
-    throw new Error('SUPABASE_URL/SUPABASE_API_URL_PROD and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_API_SERVICE_ROLE_KEY_PROD are required for file storage');
+    console.error('[STORAGE] Missing Supabase config. SUPABASE_URL:', supabaseUrl ? 'valid' : 'missing/invalid', 
+      'SUPABASE_API_URL_PROD:', process.env.SUPABASE_API_URL_PROD ? 'exists but invalid' : 'missing',
+      'Service key:', supabaseServiceRoleKey ? 'exists' : 'missing');
+    throw new Error('Valid SUPABASE_URL (starting with http/https) and SUPABASE_SERVICE_ROLE_KEY are required for file storage');
   }
+
+  console.log('[STORAGE] Using Supabase URL:', supabaseUrl.substring(0, 30) + '...');
 
   supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
