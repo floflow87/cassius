@@ -1042,9 +1042,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Operation not found" });
       }
       res.json(operation);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching operation:", error);
-      res.status(500).json({ error: "Failed to fetch operation" });
+      res.status(500).json({ 
+        error: "Failed to fetch operation",
+        details: error?.message || String(error),
+        code: error?.code
+      });
     }
   });
 
@@ -1499,12 +1503,16 @@ export async function registerRoutes(
       const data = insertImplantSchema.parse(req.body);
       const implant = await storage.createImplant(organisationId, data);
       res.status(201).json(implant);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors });
       }
       console.error("Error creating implant:", error);
-      res.status(500).json({ error: "Failed to create implant" });
+      res.status(500).json({ 
+        error: "Failed to create implant",
+        details: error?.message || String(error),
+        code: error?.code
+      });
     }
   });
 
