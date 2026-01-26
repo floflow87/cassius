@@ -189,9 +189,10 @@ export default function PatientDetailsPage() {
   const { canDelete, canEdit } = useCurrentUser();
   const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
 
-  const { data: patient, isLoading } = useQuery<PatientWithDetails>({
+  const { data: patient, isLoading, error: patientError } = useQuery<PatientWithDetails>({
     queryKey: ["/api/patients", patientId],
     enabled: !!patientId,
+    retry: false,
   });
 
   // Query for all patient flags (including implant-level flags)
@@ -1222,13 +1223,20 @@ export default function PatientDetailsPage() {
     return <PatientDetailsSkeleton />;
   }
 
-  if (!patient) {
+  if (!patient || patientError) {
     return (
       <div className="p-6">
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <User className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Patient non trouvé</h3>
+            <h3 className="text-lg font-medium mb-2">
+              {patientError ? "Erreur de chargement" : "Patient non trouvé"}
+            </h3>
+            {patientError && (
+              <p className="text-sm text-destructive mb-4 max-w-md text-center">
+                {(patientError as any)?.message || String(patientError)}
+              </p>
+            )}
             <Link href="/patients">
               <Button variant="outline">Retour à la liste</Button>
             </Link>
