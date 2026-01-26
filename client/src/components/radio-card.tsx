@@ -23,7 +23,10 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { RadioDrawer } from "@/components/radio-drawer";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
@@ -228,6 +231,10 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-4xl p-0">
+          <VisuallyHidden>
+            <DialogTitle>{radio.title || `Radio ${typeLabels[radio.type]}`}</DialogTitle>
+            <DialogDescription>Aperçu de la radiographie</DialogDescription>
+          </VisuallyHidden>
           <div className="relative">
             {getImageUrl() && !imageError ? (
               <img
