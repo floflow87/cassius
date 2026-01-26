@@ -10,11 +10,13 @@ function getSupabaseClient(): SupabaseClient {
     return supabaseClient;
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Support both standard names and Render production names
+  const supabaseUrl = process.env.SUPABASE_API_URL_PROD || process.env.SUPABASE_URL;
+  const supabaseServiceRoleKey = process.env.SUPABASE_API_SERVICE_ROLE_KEY_PROD || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseServiceRoleKey) {
-    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for file storage');
+    console.error('[STORAGE] Missing Supabase config. Available env vars:', Object.keys(process.env).filter(k => k.includes('SUPABASE')));
+    throw new Error('SUPABASE_URL/SUPABASE_API_URL_PROD and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_API_SERVICE_ROLE_KEY_PROD are required for file storage');
   }
 
   supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
