@@ -87,7 +87,7 @@ export default function ActeDetailsPage() {
   const [addImplantOpen, setAddImplantOpen] = useState(false);
   const [editingImplant, setEditingImplant] = useState<SurgeryImplantWithDetails | null>(null);
 
-  const { data: operation, isLoading } = useQuery<OperationDetail>({
+  const { data: operation, isLoading, isError, error } = useQuery<OperationDetail>({
     queryKey: ["/api/operations", acteId],
     enabled: !!acteId,
   });
@@ -110,13 +110,19 @@ export default function ActeDetailsPage() {
     );
   }
 
-  if (!operation) {
+  if (isError || !operation) {
+    const errorMessage = error?.message || "Acte non trouvé";
     return (
       <div className="p-6">
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Stethoscope className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">Acte non trouvé</h3>
+            {isError && (
+              <p className="text-sm text-destructive mb-4 max-w-md text-center font-mono bg-destructive/10 p-2 rounded">
+                {errorMessage}
+              </p>
+            )}
             <Link href="/actes">
               <Button variant="outline">Retour aux actes</Button>
             </Link>
