@@ -1715,6 +1715,7 @@ export async function registerRoutes(
 
     try {
       const radio = await storage.getRadio(organisationId, req.params.id);
+      console.log("[RADIO SIGNED-URL] Radio:", req.params.id, "filePath:", radio?.filePath, "url:", radio?.url);
       if (!radio) {
         return res.status(404).json({ error: "Radio not found" });
       }
@@ -1730,6 +1731,7 @@ export async function registerRoutes(
         return res.json({ signedUrl });
       }
       
+      console.log("[RADIO SIGNED-URL] No file for radio:", req.params.id, "filePath:", radio.filePath, "url:", radio.url);
       res.status(400).json({ error: "No file associated with this radio" });
     } catch (error) {
       console.error("Error getting signed URL:", error);
@@ -1760,12 +1762,16 @@ export async function registerRoutes(
     const userId = req.jwtUser?.userId;
 
     try {
+      console.log("[RADIO CREATE] Request body:", JSON.stringify(req.body, null, 2));
       const data = insertRadioSchema.parse(req.body);
+      console.log("[RADIO CREATE] Parsed data:", JSON.stringify(data, null, 2));
       const radioData = {
         ...data,
         createdBy: userId || null,
       };
+      console.log("[RADIO CREATE] Radio data to insert:", JSON.stringify(radioData, null, 2));
       const radio = await storage.createRadio(organisationId, radioData);
+      console.log("[RADIO CREATE] Created radio:", JSON.stringify(radio, null, 2));
       
       // Send notification about new radio to other team members
       if (userId && data.patientId) {
@@ -1830,18 +1836,22 @@ export async function registerRoutes(
     if (!requireNonAssistant(req, res)) return;
 
     try {
+      console.log("[RADIO DELETE] Deleting radio:", req.params.id);
       // Get radio to find file path for deletion
       const radio = await storage.getRadio(organisationId, req.params.id);
+      console.log("[RADIO DELETE] Found radio:", JSON.stringify(radio, null, 2));
       if (!radio) {
+        console.log("[RADIO DELETE] Radio not found");
         return res.status(404).json({ error: "Radio not found" });
       }
 
       // Delete from Supabase Storage if configured
       if (radio.filePath && supabaseStorage.isStorageConfigured()) {
         try {
+          console.log("[RADIO DELETE] Deleting file from storage:", radio.filePath);
           await supabaseStorage.deleteFile(radio.filePath);
         } catch (err) {
-          console.error("Failed to delete file from storage:", err);
+          console.error("[RADIO DELETE] Failed to delete file from storage:", err);
           // Continue to delete database record even if storage deletion fails
         }
       }
