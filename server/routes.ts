@@ -1794,7 +1794,13 @@ export async function registerRoutes(
         return res.status(400).json({ error: error.errors });
       }
       console.error("Error creating radio:", error);
-      res.status(500).json({ error: "Failed to create radio" });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const errCode = (error as any)?.code || 'UNKNOWN';
+      res.status(500).json({ 
+        error: "Failed to create radio", 
+        details: errMsg,
+        code: errCode
+      });
     }
   });
 
