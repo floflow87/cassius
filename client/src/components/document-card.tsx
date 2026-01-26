@@ -62,20 +62,32 @@ export function DocumentCard({ document, patientId }: DocumentCardProps) {
   const [renameError, setRenameError] = useState("");
   const [freshSignedUrl, setFreshSignedUrl] = useState<string | null>(null);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
+  const [urlLoadFailed, setUrlLoadFailed] = useState(false);
 
   // Auto-fetch signed URL when signedUrl is null but filePath exists
   useEffect(() => {
-    if (document.filePath && !document.signedUrl && !freshSignedUrl && !isLoadingUrl) {
+    if (document.filePath && !document.signedUrl && !freshSignedUrl && !isLoadingUrl && !urlLoadFailed) {
+      setIsLoadingUrl(true);
       fetch(`/api/documents/${document.id}/signed-url`, { credentials: "include" })
-        .then(res => res.ok ? res.json() : null)
+        .then(res => {
+          if (!res.ok) {
+            setUrlLoadFailed(true);
+            return null;
+          }
+          return res.json();
+        })
         .then(data => {
           if (data?.signedUrl) {
             setFreshSignedUrl(data.signedUrl);
           }
         })
-        .catch(err => console.error("Failed to load document URL:", err));
+        .catch(err => {
+          console.error("Failed to load document URL:", err);
+          setUrlLoadFailed(true);
+        })
+        .finally(() => setIsLoadingUrl(false));
     }
-  }, [document.id, document.filePath, document.signedUrl, freshSignedUrl, isLoadingUrl]);
+  }, [document.id, document.filePath, document.signedUrl, freshSignedUrl, isLoadingUrl, urlLoadFailed]);
 
   const refreshSignedUrl = async (): Promise<string | null> => {
     if (!document.filePath) return null;

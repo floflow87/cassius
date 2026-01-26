@@ -47,23 +47,33 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
   const [imageError, setImageError] = useState(false);
   const [freshSignedUrl, setFreshSignedUrl] = useState<string | null>(null);
   const [thumbnailLoading, setThumbnailLoading] = useState(false);
+  const [urlLoadFailed, setUrlLoadFailed] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
-    if (radio.filePath && !radio.signedUrl && !radio.url && !freshSignedUrl && !thumbnailLoading) {
+    if (radio.filePath && !radio.signedUrl && !radio.url && !freshSignedUrl && !thumbnailLoading && !urlLoadFailed) {
       setThumbnailLoading(true);
       fetch(`/api/radios/${radio.id}/signed-url`, { credentials: "include" })
-        .then(res => res.ok ? res.json() : null)
+        .then(res => {
+          if (!res.ok) {
+            setUrlLoadFailed(true);
+            return null;
+          }
+          return res.json();
+        })
         .then(data => {
           if (data?.signedUrl) {
             setFreshSignedUrl(data.signedUrl);
           }
         })
-        .catch(err => console.error("Failed to load thumbnail URL:", err))
+        .catch(err => {
+          console.error("Failed to load thumbnail URL:", err);
+          setUrlLoadFailed(true);
+        })
         .finally(() => setThumbnailLoading(false));
     }
-  }, [radio.id, radio.filePath, radio.signedUrl, radio.url, freshSignedUrl, thumbnailLoading]);
+  }, [radio.id, radio.filePath, radio.signedUrl, radio.url, freshSignedUrl, thumbnailLoading, urlLoadFailed]);
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
