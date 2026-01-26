@@ -272,7 +272,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
     onSuccess: () => {
       onProfileUpdate();
       setIsEditingProfile(false);
-      toast({ title: "Profil mis à jour" });
+      toast({ title: "Profil mis à jour", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
@@ -300,7 +300,7 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
       });
     },
     onSuccess: () => {
-      toast({ title: "Mot de passe modifié", description: "Votre mot de passe a été mis à jour avec succès." });
+      toast({ title: "Mot de passe modifié", description: "Votre mot de passe a été mis à jour avec succès.", variant: "success" });
       setShowPasswordDialog(false);
       form.reset();
     },
@@ -769,7 +769,7 @@ function IntegrationsSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
-      toast({ title: "Google Calendar déconnecté" });
+      toast({ title: "Google Calendar déconnecté", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
@@ -782,7 +782,7 @@ function IntegrationsSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/google/status"] });
-      toast({ title: "Synchronisation démarrée" });
+      toast({ title: "Synchronisation démarrée", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
@@ -977,7 +977,7 @@ function CollaboratorsSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/collaborators"] });
-      toast({ title: "Collaborateur invité", description: "Un email d'invitation a été envoyé au collaborateur." });
+      toast({ title: "Collaborateur invité", description: "Un email d'invitation a été envoyé au collaborateur.", variant: "success" });
       setShowInviteSheet(false);
       form.reset();
     },
@@ -992,7 +992,7 @@ function CollaboratorsSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/collaborators"] });
-      toast({ title: "Rôle mis à jour" });
+      toast({ title: "Rôle mis à jour", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
@@ -1005,7 +1005,7 @@ function CollaboratorsSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/collaborators"] });
-      toast({ title: "Collaborateur supprimé" });
+      toast({ title: "Collaborateur supprimé", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
@@ -1281,7 +1281,7 @@ function OrganizationSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/organisation"] });
-      toast({ title: "Organisation mise à jour" });
+      toast({ title: "Organisation mise à jour", variant: "success" });
       setIsEditing(false);
     },
     onError: (error: Error) => {
