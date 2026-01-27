@@ -102,7 +102,7 @@ function AuditHistoryContent({
   maxItems?: number;
 }) {
   const { data: logs, isLoading } = useQuery<AuditLog[]>({
-    queryKey: ['/api/audit', entityType, entityId],
+    queryKey: [`/api/audit/${entityType}/${entityId}`],
     enabled: !!entityId,
   });
 

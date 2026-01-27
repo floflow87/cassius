@@ -45,6 +45,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardSkeleton } from "@/components/page-skeletons";
 import { Button } from "@/components/ui/button";
 import {
@@ -420,8 +421,8 @@ export default function DashboardPage() {
     },
   });
 
-  const { data: recentActivities } = useQuery<any[]>({
-    queryKey: ["/api/audit-logs/recent"],
+  const { data: recentActivities, isLoading: loadingActivities } = useQuery<any[]>({
+    queryKey: ["/api/audit/recent"],
   });
 
   const filteredPatients = patients?.filter(p => 
@@ -1156,7 +1157,7 @@ export default function DashboardPage() {
         );
       case "recent-activities":
         return (
-          <Card key={blockId}>
+          <Card key={blockId} data-testid="card-recent-activities">
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <CardTitle className="text-sm flex items-center gap-2">
                 <History className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
@@ -1164,7 +1165,13 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {recentActivities && recentActivities.length > 0 ? (
+              {loadingActivities ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : recentActivities && recentActivities.length > 0 ? (
                 <div className="space-y-2">
                   {recentActivities.slice(0, 5).map((activity: any) => {
                     const actionIcons: Record<string, any> = {
@@ -1193,7 +1200,7 @@ export default function DashboardPage() {
                       APPOINTMENT: "Rendez-vous",
                     };
                     return (
-                      <div key={activity.id} className="flex items-center gap-3 p-2 rounded-md hover-elevate">
+                      <div key={activity.id} className="flex items-center gap-3 p-2 rounded-md hover-elevate" data-testid={`activity-item-${activity.id}`}>
                         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center">
                           {actionIcons[activity.action] || <FileCheck className="h-3 w-3" />}
                         </div>
