@@ -959,8 +959,14 @@ function CollaboratorsSection() {
     queryKey: ["/api/settings/profile"],
   });
 
-  const { data: collaborators = [], isLoading } = useQuery<Collaborator[]>({
+  const { data: collaboratorsData = [], isLoading } = useQuery<Collaborator[]>({
     queryKey: ["/api/settings/collaborators"],
+  });
+
+  const collaborators = [...collaboratorsData].sort((a, b) => {
+    if (a.isOwner && !b.isOwner) return -1;
+    if (!a.isOwner && b.isOwner) return 1;
+    return 0;
   });
 
   const form = useForm<z.infer<typeof inviteSchema>>({
