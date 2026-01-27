@@ -1598,7 +1598,7 @@ function NotificationsSection() {
     
     const newCatPrefs: TypePreferences = {};
     typesInCategory.forEach(type => {
-      newCatPrefs[type] = { inApp: enabled, email: false };
+      newCatPrefs[type] = { inApp: enabled, email: enabled };
     });
     
     setLocalPrefs(prev => ({
@@ -1610,7 +1610,9 @@ function NotificationsSection() {
       category,
       updates: { 
         disabledTypes: enabled ? [] : typesInCategory,
-        inAppEnabled: enabled
+        disabledEmailTypes: enabled ? [] : typesInCategory,
+        inAppEnabled: enabled,
+        emailEnabled: enabled
       }
     });
   };
