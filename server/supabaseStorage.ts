@@ -219,7 +219,10 @@ export async function deleteFiles(filePaths: string[]): Promise<void> {
  * Check if Supabase Storage is configured
  */
 export function isStorageConfigured(): boolean {
-  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  // Check for either standard or production variable pairs
+  const hasStandard = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const hasProd = !!(isValidHttpUrl(process.env.SUPABASE_API_URL_PROD) && process.env.SUPABASE_API_SERVICE_ROLE_KEY_PROD);
+  return hasStandard || hasProd;
 }
 
 /**
