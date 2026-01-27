@@ -165,6 +165,7 @@ export default function SettingsPage() {
   });
 
   const userIsAdmin = profile?.role === "ADMIN";
+  const userIsAssistant = profile?.role === "ASSISTANT";
   const userWasInvited = profile?.wasInvited === true;
 
   if (profileLoading) {
@@ -185,7 +186,7 @@ export default function SettingsPage() {
               { value: "notifications", label: "Notifications", icon: Bell, show: true },
               { value: "collaborators", label: "Collaborateurs", icon: Users, show: userIsAdmin },
               { value: "organization", label: "Organisation", icon: Building2, show: userIsAdmin },
-              { value: "integrations", label: "Intégrations", icon: Link2, show: !userWasInvited },
+              { value: "integrations", label: "Intégrations", icon: Link2, show: !userWasInvited && !userIsAssistant },
             ].filter(tab => tab.show).map((tab) => (
               <button
                 key={tab.value}

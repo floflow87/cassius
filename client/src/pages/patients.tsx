@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { 
   Plus, 
   Search, 
@@ -238,6 +239,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
   const [upcomingExpanded, setUpcomingExpanded] = useState(true);
   const [pastExpanded, setPastExpanded] = useState(true);
   const { toast } = useToast();
+  const { canDelete } = useCurrentUser();
   const [viewMode, setViewMode] = useState<"table" | "cards">(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_VIEW_MODE);
@@ -969,15 +971,17 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                 <SelectItem value="ARCHIVE" data-testid="select-status-archive">Archivé</SelectItem>
               </SelectContent>
             </Select>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setShowBulkDeleteDialog(true)}
-              data-testid="button-bulk-delete-patients"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Supprimer
-            </Button>
+            {canDelete && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowBulkDeleteDialog(true)}
+                data-testid="button-bulk-delete-patients"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

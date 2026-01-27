@@ -29,6 +29,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import type { CalendarAppointment, CalendarFilters, Patient } from "@shared/types";
 import type { AppointmentWithDetails, GoogleCalendarEvent, SyncConflict } from "@shared/schema";
 
@@ -640,6 +641,7 @@ interface AppointmentDrawerProps {
 
 function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: AppointmentDrawerProps) {
   const { toast } = useToast();
+  const { canDelete } = useCurrentUser();
   const [isEditing, setIsEditing] = useState(false);
   
   const { data: appointment, isLoading } = useQuery<AppointmentWithDetails>({
@@ -1119,15 +1121,17 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
                   <Copy className="h-4 w-4 mr-2" />
                   Dupliquer
                 </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => deleteMutation.mutate()}
-                  disabled={deleteMutation.isPending}
-                  data-testid="button-delete-appointment"
-                >
-                  Supprimer
-                </Button>
+                {canDelete && (
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => deleteMutation.mutate()}
+                    disabled={deleteMutation.isPending}
+                    data-testid="button-delete-appointment"
+                  >
+                    Supprimer
+                  </Button>
+                )}
               </div>
             </div>
           </div>

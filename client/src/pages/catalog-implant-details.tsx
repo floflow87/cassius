@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { useState, useEffect } from "react";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   ArrowLeft,
   Activity,
@@ -56,6 +57,7 @@ export default function CatalogImplantDetailsPage() {
   const implantId = params?.id;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { canDelete } = useCurrentUser();
 
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -407,7 +409,7 @@ export default function CatalogImplantDetailsPage() {
               <FileText className="h-4 w-4" />
               Actes chirurgicaux avec cet implant
             </CardTitle>
-            {selectedActs.length > 0 && (
+            {selectedActs.length > 0 && canDelete && (
               <Button
                 variant="destructive"
                 size="sm"

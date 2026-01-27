@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { motion } from "framer-motion";
 import { 
   ArrowUpDown,
@@ -202,6 +203,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   const [surgeryImplantFilters, setSurgeryImplantFilters] = useState<SurgeryImplantFilterGroup | null>(null);
   const [implantCurrentPage, setImplantCurrentPage] = useState(1);
   const { toast } = useToast();
+  const { canDelete } = useCurrentUser();
 
   // Implant table state
   const [implantColumns, setImplantColumns] = useState<ImplantColumnConfig[]>(() => {
@@ -962,15 +964,17 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             {activeTab === "actes" && selectedIds.size > 0 && (
           <>
             <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setShowBulkDeleteDialog(true)}
-              data-testid="button-bulk-delete"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Supprimer
-            </Button>
+            {canDelete && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowBulkDeleteDialog(true)}
+                data-testid="button-bulk-delete"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -1183,13 +1187,15 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                                     <Eye className="h-4 w-4 mr-2" />
                                     Voir
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={(e) => { e.stopPropagation(); setOperationToDelete(op); }}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Supprimer
-                                  </DropdownMenuItem>
+                                  {canDelete && (
+                                    <DropdownMenuItem 
+                                      onClick={(e) => { e.stopPropagation(); setOperationToDelete(op); }}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Supprimer
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </td>

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
@@ -204,6 +205,7 @@ function FileRow({
   onToggleSelect,
   onNavigateToPatient,
   onNavigateToOperation,
+  canDelete = true,
 }: { 
   file: UnifiedFile;
   onView: () => void;
@@ -214,6 +216,7 @@ function FileRow({
   onToggleSelect: () => void;
   onNavigateToPatient?: () => void;
   onNavigateToOperation?: () => void;
+  canDelete?: boolean;
 }) {
   const isRadio = file.sourceType === 'radio';
   
@@ -317,14 +320,18 @@ function FileRow({
             <Edit2 className="h-4 w-4 mr-2" />
             {isRadio ? "Modifier" : "Renommer"}
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem 
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Supprimer
-          </DropdownMenuItem>
+          {canDelete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -342,6 +349,7 @@ function FileGridItem({
   onNavigateToPatient,
   onNavigateToOperation,
   thumbnailUrl,
+  canDelete = true,
 }: { 
   file: UnifiedFile;
   onView: () => void;
@@ -353,6 +361,7 @@ function FileGridItem({
   onNavigateToPatient?: () => void;
   onNavigateToOperation?: () => void;
   thumbnailUrl?: string;
+  canDelete?: boolean;
 }) {
   const isRadio = file.sourceType === 'radio';
   const isImage = file.mimeType?.startsWith('image/');
@@ -407,14 +416,18 @@ function FileGridItem({
               <Edit2 className="h-4 w-4 mr-2" />
               {isRadio ? "Modifier" : "Renommer"}
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Supprimer
-            </DropdownMenuItem>
+            {canDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Supprimer
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -456,6 +469,7 @@ function FileGridItem({
 
 export default function DocumentsPage() {
   const { toast } = useToast();
+  const { canDelete } = useCurrentUser();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPath, setCurrentPath] = useState<FolderPath[]>([
@@ -962,6 +976,7 @@ export default function DocumentsPage() {
                   onToggleSelect={() => toggleFileSelection(`${file.sourceType}-${file.id}`)}
                   onNavigateToPatient={file.patientId ? () => setLocation(`/patients/${file.patientId}`) : undefined}
                   onNavigateToOperation={file.operationId && file.operationId.trim() !== '' ? () => setLocation(`/actes/${file.operationId}`) : undefined}
+                  canDelete={canDelete}
                 />
               ))}
             </div>
@@ -988,6 +1003,7 @@ export default function DocumentsPage() {
                     onToggleSelect={() => toggleFileSelection(`${file.sourceType}-${file.id}`)}
                     onNavigateToPatient={file.patientId ? () => setLocation(`/patients/${file.patientId}`) : undefined}
                     onNavigateToOperation={file.operationId && file.operationId.trim() !== '' ? () => setLocation(`/actes/${file.operationId}`) : undefined}
+                    canDelete={canDelete}
                   />
                 ))}
               </div>

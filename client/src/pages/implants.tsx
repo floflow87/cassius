@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { motion } from "framer-motion";
 import { 
   Plus, 
@@ -78,6 +79,7 @@ interface ImplantsPageProps {
 export default function ImplantsPage({ searchQuery: externalSearchQuery, setSearchQuery: externalSetSearchQuery }: ImplantsPageProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { canDelete } = useCurrentUser();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [implantType, setImplantType] = useState<"implants" | "mini">("implants");
@@ -432,16 +434,18 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
         {selectedIds.size > 0 && (
           <>
             <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setShowBulkDeleteDialog(true)}
-              disabled={bulkDeleteMutation.isPending}
-              data-testid="button-bulk-delete"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Supprimer
-            </Button>
+            {canDelete && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowBulkDeleteDialog(true)}
+                disabled={bulkDeleteMutation.isPending}
+                data-testid="button-bulk-delete"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
