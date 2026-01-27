@@ -66,9 +66,9 @@ import { db, pool, testConnection, getDbEnv, getDbConnectionInfo } from "./db";
 import { eq, sql, and, inArray, notInArray, desc } from "drizzle-orm";
 
 function getOrganisationId(req: Request, res: Response): string | null {
-  const organisationId = req.jwtUser?.organisationId;
+  const organisationId = req.jwtUser?.organisationId || (req.user as any)?.organisationId;
   if (!organisationId) {
-    res.status(400).json({ error: "Organisation manquante dans le token" });
+    res.status(401).json({ error: "Accès non autorisé", message: "Authentification requise (session ou JWT)" });
     return null;
   }
   return organisationId;

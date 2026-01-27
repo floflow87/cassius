@@ -1162,7 +1162,7 @@ function CollaboratorsSection() {
               Chargement...
             </div>
           ) : collaborators.length === 0 ? (
-            <p className="text-muted-foreground py-4">Aucun collaborateur trouvé.</p>
+            <p className="text-muted-foreground text-xs py-4">Aucun collaborateur trouvé.</p>
           ) : (
             <div className="space-y-2">
               {collaborators.map((collab) => (
