@@ -45,6 +45,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PatientDetailsSkeleton } from "@/components/page-skeletons";
 import { FlagList, CompactFlagList, TopFlagSummary, FlagsTooltipBadge } from "@/components/flag-badge";
+import { AuditHistory } from "@/components/audit-history";
 import type { Flag } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -2313,6 +2314,13 @@ export default function PatientDetailsPage() {
                   )}
                 </CardContent>
               </Card>
+
+              <AuditHistory
+                entityType="PATIENT"
+                entityId={patient.id}
+                title="Historique du patient"
+                maxItems={5}
+              />
             </div>
           </div>
         </TabsContent>
