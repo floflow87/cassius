@@ -5,6 +5,7 @@ import { createServer, type Server } from "http";
 import { storage, computeLatestIsq } from "./storage";
 import { requireJwtOrSession } from "./jwtMiddleware";
 import * as supabaseStorage from "./supabaseStorage";
+import * as patientImport from "./patientImport";
 import { createDocumentsRouter } from "./modules/documents/routes";
 import { setStorageProvider as setDocumentsStorageProvider } from "./modules/documents/service";
 import { getTopSlowestEndpoints, getTopDbHeavyEndpoints, getAllStats, clearStats } from "./instrumentation";
@@ -4983,8 +4984,6 @@ export async function registerRoutes(
   // ========================================
   // CSV Patient Import endpoints
   // ========================================
-  
-  const patientImport = await import("./patientImport");
   
   // Helper to check if import tables exist
   async function checkImportTablesExist(): Promise<boolean> {
