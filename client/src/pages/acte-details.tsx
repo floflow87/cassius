@@ -43,6 +43,7 @@ import { OperationEditForm } from "@/components/operation-edit-form";
 import { SurgeryImplantEditSheet } from "@/components/surgery-implant-edit-sheet";
 import { SurgeryImplantAddSheet } from "@/components/surgery-implant-add-sheet";
 import { SurgeryTimeline } from "@/components/surgery-timeline";
+import { AuditHistory } from "@/components/audit-history";
 import type { OperationDetail, SurgeryImplantWithDetails } from "@shared/types";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" | "success" }> = {
@@ -514,6 +515,13 @@ export default function ActeDetailsPage() {
           <SurgeryTimeline operationId={operation.id} patientId={operation.patient.id} />
         </CardContent>
       </Card>
+
+      <AuditHistory
+        entityType="OPERATION"
+        entityId={operation.id}
+        title="Historique de l'acte"
+        maxItems={5}
+      />
 
       <Dialog open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
         <DialogContent className="max-w-lg">
