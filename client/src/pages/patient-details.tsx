@@ -236,8 +236,9 @@ export default function PatientDetailsPage() {
     },
     onSuccess: () => {
       setDeletePatientDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      toast({ title: "Patient supprimé", description: "Le patient a été supprimé avec succès." });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/search"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      toast({ title: "Patient supprimé", description: "Le patient a été supprimé avec succès.", variant: "success" });
       setLocation("/patients");
     },
     onError: () => {
