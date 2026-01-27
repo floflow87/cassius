@@ -183,10 +183,28 @@ export function setupAuth(app: Express): void {
     });
   });
 
-  app.get("/api/auth/user", (req, res) => {
+  app.get("/api/auth/user", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: "Non authentifié" });
     }
+    
+    // Fetch fresh user data from database to get updated role
+    const sessionUser = req.user as Express.User;
+    if (sessionUser?.id) {
+      const freshUser = await storage.getUserById(sessionUser.id);
+      if (freshUser) {
+        return res.json({
+          id: freshUser.id,
+          username: freshUser.username,
+          nom: freshUser.nom,
+          prenom: freshUser.prenom,
+          role: freshUser.role,
+          organisationId: freshUser.organisationId,
+          wasInvited: freshUser.wasInvited,
+        });
+      }
+    }
+    
     res.json(req.user);
   });
 
