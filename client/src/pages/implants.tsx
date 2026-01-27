@@ -415,6 +415,31 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
 
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6">
+      <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit mb-4" data-testid="tabs-implants-page">
+        {[
+          { value: "implants" as const, label: "Implants" },
+          { value: "mini" as const, label: "Mini-implants" },
+        ].map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setImplantType(tab.value)}
+            className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
+              implantType === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+            }`}
+            data-testid={tab.value === "implants" ? "tab-implants" : "tab-mini-implants"}
+          >
+            {implantType === tab.value && (
+              <motion.div
+                layoutId="catalog-implant-type-indicator"
+                className="absolute inset-0 bg-primary rounded-full"
+                transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+              />
+            )}
+            <span className="relative z-10">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center gap-4 mb-5">
         <CassiusSearchInput
           placeholder="Rechercher par marque ou reference..."
@@ -424,6 +449,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           className="max-w-2xl"
           data-testid="input-search-implants"
         />
+        <span className="text-xs italic text-muted-foreground">{totalImplants} implant{totalImplants > 1 ? "s" : ""}</span>
         
         <ImplantsAdvancedFilterDrawer
           filters={advancedFilters}
@@ -482,35 +508,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
         </Sheet>
       </div>
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full">
-            {[
-              { value: "implants" as const, label: "Implants" },
-              { value: "mini" as const, label: "Mini-implants" },
-            ].map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setImplantType(tab.value)}
-                className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${
-                  implantType === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
-                }`}
-                data-testid={tab.value === "implants" ? "tab-implants" : "tab-mini-implants"}
-              >
-                {implantType === tab.value && (
-                  <motion.div
-                    layoutId="catalog-implant-type-indicator"
-                    className="absolute inset-0 bg-primary rounded-full"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
-                  />
-                )}
-                <span className="relative z-10">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-          <span className="text-xs italic text-muted-foreground">{totalImplants} implant{totalImplants > 1 ? "s" : ""}</span>
-        </div>
-
+      <div className="flex items-center justify-end mb-4">
         <ImplantFilterChips
           filters={advancedFilters}
           onRemoveFilter={(ruleId) => {

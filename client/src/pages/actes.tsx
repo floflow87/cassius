@@ -908,84 +908,83 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "actes" | "implants")} className="w-full">
-        <div className="flex items-center justify-between gap-4 mb-5">
-          <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit" data-testid="tabs-actes-page">
-            {[
-              { value: "actes" as const, label: "Actes", icon: Stethoscope },
-              { value: "implants" as const, label: "Implants posés", icon: Activity },
-            ].map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setActiveTab(tab.value)}
-                className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 flex items-center gap-2 ${
-                  activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
-                }`}
-                data-testid={`tab-${tab.value}`}
-              >
-                {activeTab === tab.value && (
-                  <motion.div
-                    layoutId="actes-tab-indicator"
-                    className="absolute inset-0 bg-primary rounded-full"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
-                  />
-                )}
-                <tab.icon className="h-4 w-4 relative z-10" />
-                <span className="relative z-10">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <CassiusSearchInput 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher..."
-              icon={<Search className="h-4 w-4" />}
-              className="max-w-lg"
-              data-testid="input-search-actes"
-            />
-            
-            {activeTab === "actes" && (
-              <ActesAdvancedFilterDrawer
-                filters={advancedFilters}
-                onFiltersChange={setAdvancedFilters}
-                activeFilterCount={advancedFilters?.rules.length || 0}
-              />
-            )}
-
-            {activeTab === "implants" && (
-              <SurgeryImplantsFilterDrawer
-                filters={surgeryImplantFilters}
-                onFiltersChange={setSurgeryImplantFilters}
-                activeFilterCount={surgeryImplantFilters?.rules.length || 0}
-              />
-            )}
-            
-            {activeTab === "actes" && selectedIds.size > 0 && (
-          <>
-            <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
-            {canDelete && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowBulkDeleteDialog(true)}
-                data-testid="button-bulk-delete"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedIds(new Set())}
-              data-testid="button-clear-selection"
+        <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit mb-4" data-testid="tabs-actes-page">
+          {[
+            { value: "actes" as const, label: "Actes", icon: Stethoscope },
+            { value: "implants" as const, label: "Implants posés", icon: Activity },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value)}
+              className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 flex items-center gap-2 ${
+                activeTab === tab.value ? "text-white" : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid={`tab-${tab.value}`}
             >
-              <X className="h-4 w-4 mr-2" />
-              Annuler
-            </Button>
-          </>
-        )}
+              {activeTab === tab.value && (
+                <motion.div
+                  layoutId="actes-tab-indicator"
+                  className="absolute inset-0 bg-primary rounded-full"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                />
+              )}
+              <tab.icon className="h-4 w-4 relative z-10" />
+              <span className="relative z-10">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+        
+        <div className="flex items-center gap-4 mb-5">
+          <CassiusSearchInput 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Rechercher..."
+            icon={<Search className="h-4 w-4" />}
+            className="max-w-lg"
+            data-testid="input-search-actes"
+          />
+          
+          {activeTab === "actes" && (
+            <ActesAdvancedFilterDrawer
+              filters={advancedFilters}
+              onFiltersChange={setAdvancedFilters}
+              activeFilterCount={advancedFilters?.rules.length || 0}
+            />
+          )}
+
+          {activeTab === "implants" && (
+            <SurgeryImplantsFilterDrawer
+              filters={surgeryImplantFilters}
+              onFiltersChange={setSurgeryImplantFilters}
+              activeFilterCount={surgeryImplantFilters?.rules.length || 0}
+            />
+          )}
+          
+          {activeTab === "actes" && selectedIds.size > 0 && (
+            <>
+              <span className="text-sm font-medium">{selectedIds.size} sélectionné{selectedIds.size > 1 ? "s" : ""}</span>
+              {canDelete && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowBulkDeleteDialog(true)}
+                  data-testid="button-bulk-delete"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Supprimer
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+                data-testid="button-clear-selection"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Annuler
+              </Button>
+            </>
+          )}
         
         <Sheet open={sheetOpen} onOpenChange={(open) => {
           setSheetOpen(open);
@@ -1070,7 +1069,6 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             </div>
           </SheetContent>
         </Sheet>
-          </div>
         </div>
 
         <TabsContent value="actes" className="mt-0">
