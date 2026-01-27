@@ -387,6 +387,7 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").default(false),
   emailVerifiedAt: timestamp("email_verified_at"),
   wasInvited: boolean("was_invited").default(false),
+  isOwner: boolean("is_owner").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1703,3 +1704,68 @@ export const SYSTEM_STATUS_REASONS = {
     { code: "FAILURE_MOBILITY", label: "Mobilité irréversible" },
   ],
 } as const;
+
+// Audit Log System
+export const auditActionEnum = pgEnum("audit_action", [
+  "CREATE",
+  "UPDATE",
+  "DELETE",
+  "VIEW",
+  "ARCHIVE",
+  "RESTORE",
+]);
+
+export const auditEntityTypeEnum = pgEnum("audit_entity_type", [
+  "PATIENT",
+  "OPERATION",
+  "SURGERY_IMPLANT",
+  "CATALOG_IMPLANT",
+  "APPOINTMENT",
+  "DOCUMENT",
+  "RADIO",
+]);
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  entityType: auditEntityTypeEnum("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  action: auditActionEnum("action").notNull(),
+  details: text("details"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("audit_logs_org_idx").on(table.organisationId),
+  entityIdx: index("audit_logs_entity_idx").on(table.entityType, table.entityId),
+  userIdx: index("audit_logs_user_idx").on(table.userId),
+  createdAtIdx: index("audit_logs_created_at_idx").on(table.createdAt),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  organisation: one(organisations, {
+    fields: [auditLogs.organisationId],
+    references: [organisations.id],
+  }),
+  user: one(users, {
+    fields: [auditLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+
+export type AuditLogWithUser = AuditLog & {
+  user?: {
+    id: string;
+    nom: string | null;
+    prenom: string | null;
+    username: string;
+  } | null;
+};

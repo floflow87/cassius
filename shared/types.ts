@@ -441,6 +441,7 @@ export interface CreateUserInput {
   nom?: string | null;
   prenom?: string | null;
   organisationId?: string | null;
+  isOwner?: boolean;
 }
 
 export interface LoginInput {

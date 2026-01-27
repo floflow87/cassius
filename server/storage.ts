@@ -19,6 +19,7 @@ import {
   emailTokens,
   invitations,
   emailOutbox,
+  auditLogs,
   type Patient,
   type InsertPatient,
   type Operation,
@@ -57,6 +58,9 @@ import {
   type DocumentWithDetails,
   calendarIntegrations,
   type CalendarIntegration,
+  type AuditLog,
+  type InsertAuditLog,
+  type AuditLogWithUser,
   type InsertCalendarIntegration,
   type GoogleCalendarEvent,
   type SyncConflict,
@@ -220,6 +224,11 @@ export interface IStorage {
   createOrganisation(data: InsertOrganisation): Promise<Organisation>;
   getOrganisationById(id: string): Promise<Organisation | undefined>;
   updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; telephone: string; timezone: string }>): Promise<Organisation | undefined>;
+
+  // Audit Log methods
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(organisationId: string, limit?: number): Promise<AuditLogWithUser[]>;
+  getEntityAuditLogs(organisationId: string, entityType: string, entityId: string): Promise<AuditLogWithUser[]>;
 
   // Note methods
   getPatientNotes(organisationId: string, patientId: string): Promise<(Note & { user: { nom: string | null; prenom: string | null } })[]>;
@@ -2344,6 +2353,7 @@ export class DatabaseStorage implements IStorage {
       nom: data.nom || null,
       prenom: data.prenom || null,
       organisationId: data.organisationId || null,
+      isOwner: data.isOwner || false,
     }).returning();
     return user;
   }
@@ -2378,6 +2388,71 @@ export class DatabaseStorage implements IStorage {
   async updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; telephone: string; timezone: string }>): Promise<Organisation | undefined> {
     const [org] = await db.update(organisations).set(data as any).where(eq(organisations.id, id)).returning();
     return org;
+  }
+
+  // ========== AUDIT LOGS ==========
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [auditLog] = await db.insert(auditLogs).values(log).returning();
+    return auditLog;
+  }
+
+  async getAuditLogs(organisationId: string, limit: number = 10): Promise<AuditLogWithUser[]> {
+    const logs = await db
+      .select({
+        id: auditLogs.id,
+        organisationId: auditLogs.organisationId,
+        userId: auditLogs.userId,
+        entityType: auditLogs.entityType,
+        entityId: auditLogs.entityId,
+        action: auditLogs.action,
+        details: auditLogs.details,
+        metadata: auditLogs.metadata,
+        createdAt: auditLogs.createdAt,
+        user: {
+          id: users.id,
+          nom: users.nom,
+          prenom: users.prenom,
+          username: users.username,
+        },
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .where(eq(auditLogs.organisationId, organisationId))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit);
+    return logs;
+  }
+
+  async getEntityAuditLogs(organisationId: string, entityType: string, entityId: string): Promise<AuditLogWithUser[]> {
+    const logs = await db
+      .select({
+        id: auditLogs.id,
+        organisationId: auditLogs.organisationId,
+        userId: auditLogs.userId,
+        entityType: auditLogs.entityType,
+        entityId: auditLogs.entityId,
+        action: auditLogs.action,
+        details: auditLogs.details,
+        metadata: auditLogs.metadata,
+        createdAt: auditLogs.createdAt,
+        user: {
+          id: users.id,
+          nom: users.nom,
+          prenom: users.prenom,
+          username: users.username,
+        },
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .where(
+        and(
+          eq(auditLogs.organisationId, organisationId),
+          eq(auditLogs.entityType, entityType as any),
+          eq(auditLogs.entityId, entityId)
+        )
+      )
+      .orderBy(desc(auditLogs.createdAt));
+    return logs;
   }
 
   // ========== NOTES ==========
