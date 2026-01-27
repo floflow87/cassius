@@ -10,6 +10,15 @@ function isValidHttpUrl(str: string | undefined): boolean {
   return str.startsWith('http://') || str.startsWith('https://');
 }
 
+/**
+ * Normalize Supabase URL - remove .storage if present
+ * The Supabase client needs the project URL (xxx.supabase.co), not the storage URL (xxx.storage.supabase.co)
+ */
+function normalizeSupabaseUrl(url: string): string {
+  // Remove .storage from URL if present (e.g., xxx.storage.supabase.co -> xxx.supabase.co)
+  return url.replace('.storage.supabase.co', '.supabase.co');
+}
+
 function getSupabaseClient(): SupabaseClient {
   if (supabaseClient) {
     return supabaseClient;
@@ -23,13 +32,13 @@ function getSupabaseClient(): SupabaseClient {
 
   // Try production pair first (both must be valid)
   if (isValidHttpUrl(process.env.SUPABASE_API_URL_PROD) && process.env.SUPABASE_API_SERVICE_ROLE_KEY_PROD) {
-    supabaseUrl = process.env.SUPABASE_API_URL_PROD;
+    supabaseUrl = normalizeSupabaseUrl(process.env.SUPABASE_API_URL_PROD!);
     supabaseServiceRoleKey = process.env.SUPABASE_API_SERVICE_ROLE_KEY_PROD;
     source = 'PROD';
   } 
   // Fall back to standard pair
   else if (isValidHttpUrl(process.env.SUPABASE_URL) && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    supabaseUrl = process.env.SUPABASE_URL;
+    supabaseUrl = normalizeSupabaseUrl(process.env.SUPABASE_URL!);
     supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     source = 'STANDARD';
   }
