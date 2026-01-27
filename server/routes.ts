@@ -5326,6 +5326,7 @@ export async function registerRoutes(
           role: u.role,
           status: 'ACTIVE' as const,
           type: 'user' as const,
+          isOwner: u.isOwner || false,
         })),
         ...invitations.filter(inv => inv.status === 'PENDING').map(inv => ({
           id: inv.id,
@@ -5337,6 +5338,7 @@ export async function registerRoutes(
           status: 'PENDING' as const,
           type: 'invitation' as const,
           expiresAt: inv.expiresAt,
+          isOwner: false,
         })),
       ];
       
@@ -5480,6 +5482,11 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Collaborateur non trouvé" });
       }
       
+      // Prevent changing the owner's role - they must always remain admin
+      if (user.isOwner) {
+        return res.status(400).json({ error: "Impossible de modifier le rôle du propriétaire du compte" });
+      }
+      
       // Prevent removing the last admin
       if (user.role === "ADMIN" && role !== "ADMIN") {
         const admins = await storage.getUsersByOrganisation(organisationId);
@@ -5535,6 +5542,11 @@ export async function registerRoutes(
       // First try to find as user
       const user = await storage.getUserById(id);
       if (user && user.organisationId === organisationId) {
+        // Prevent deleting the owner
+        if (user.isOwner) {
+          return res.status(400).json({ error: "Impossible de supprimer le propriétaire du compte" });
+        }
+        
         // Prevent removing the last admin
         if (user.role === "ADMIN") {
           const admins = await storage.getUsersByOrganisation(organisationId);

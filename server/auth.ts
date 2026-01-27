@@ -311,7 +311,7 @@ export function setupAuth(app: Express): void {
         nom: organisationName,
       });
 
-      // 2. Créer l'utilisateur ADMIN rattaché à cette organisation
+      // 2. Créer l'utilisateur ADMIN rattaché à cette organisation (marqué comme owner)
       const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
         username,
@@ -320,6 +320,7 @@ export function setupAuth(app: Express): void {
         prenom: prenom || null,
         role: "ADMIN",
         organisationId: organisation.id,
+        isOwner: true,
       });
 
       // 3. Générer le JWT avec organisationId

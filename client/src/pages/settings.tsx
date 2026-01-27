@@ -86,6 +86,7 @@ interface Collaborator {
   status: "ACTIVE" | "PENDING";
   type: "user" | "invitation";
   expiresAt?: string;
+  isOwner?: boolean;
 }
 
 interface Organisation {
@@ -1189,22 +1190,28 @@ function CollaboratorsSection() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Select
-                      defaultValue={collab.role}
-                      onValueChange={(role) => updateRoleMutation.mutate({ id: collab.id, role })}
-                      disabled={collab.type === "invitation"}
-                    >
-                      <SelectTrigger className="w-32 h-8 text-xs" data-testid={`select-role-${collab.id}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ADMIN" className="text-xs">Administrateur</SelectItem>
-                        <SelectItem value="CHIRURGIEN" className="text-xs">Collaborateur</SelectItem>
-                        <SelectItem value="ASSISTANT" className="text-xs">Assistant</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {/* Hide delete button for current user (type=user and same id) */}
-                    {!(collab.type === "user" && collab.id === currentUser?.id) && (
+                    {collab.isOwner ? (
+                      <Badge variant="default" className="text-xs">
+                        Propriétaire
+                      </Badge>
+                    ) : (
+                      <Select
+                        defaultValue={collab.role}
+                        onValueChange={(role) => updateRoleMutation.mutate({ id: collab.id, role })}
+                        disabled={collab.type === "invitation"}
+                      >
+                        <SelectTrigger className="w-32 h-8 text-xs" data-testid={`select-role-${collab.id}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ADMIN" className="text-xs">Administrateur</SelectItem>
+                          <SelectItem value="CHIRURGIEN" className="text-xs">Collaborateur</SelectItem>
+                          <SelectItem value="ASSISTANT" className="text-xs">Assistant</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {/* Hide delete button for current user (type=user and same id) or owner */}
+                    {!(collab.type === "user" && collab.id === currentUser?.id) && !collab.isOwner && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
