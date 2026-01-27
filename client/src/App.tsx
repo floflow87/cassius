@@ -35,6 +35,7 @@ import PublicSharePage from "@/pages/public-share";
 import OnboardingPage from "@/pages/onboarding";
 import SupportPage from "@/pages/support";
 import { apiRequest } from "@/lib/queryClient";
+import { useOnboarding } from "@/hooks/use-onboarding";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -233,6 +234,7 @@ const getInitialSidebarState = () => {
 function AuthenticatedApp() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarState);
+  const [location, setLocation] = useLocation();
 
   const { data: user, isLoading, refetch } = useQuery<UserInfo>({
     queryKey: ["/api/auth/user"],
@@ -243,6 +245,21 @@ function AuthenticatedApp() {
     queryKey: ["/api/patients"],
     enabled: !!user,
   });
+
+  // Check onboarding status for new users
+  const { state: onboardingState, isLoading: onboardingLoading } = useOnboarding();
+  
+  // Redirect to onboarding if needed (new user with incomplete onboarding)
+  useEffect(() => {
+    if (user && onboardingState && !onboardingLoading) {
+      const needsOnboarding = onboardingState.status === "IN_PROGRESS" && !onboardingState.dismissed;
+      const isOnOnboardingPage = location === "/onboarding";
+      
+      if (needsOnboarding && !isOnOnboardingPage) {
+        setLocation("/onboarding");
+      }
+    }
+  }, [user, onboardingState, onboardingLoading, location, setLocation]);
 
   const handleLogout = async () => {
     try {
