@@ -423,6 +423,7 @@ export default function DashboardPage() {
 
   const { data: recentActivities, isLoading: loadingActivities } = useQuery<any[]>({
     queryKey: ["/api/audit/recent"],
+    retry: false,
   });
 
   const filteredPatients = patients?.filter(p => 

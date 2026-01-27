@@ -61,8 +61,11 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
       return response.json();
     },
     onSuccess: () => {
-      // Vider tout le cache pour éviter les données stale
-      queryClient.clear();
+      // Invalider les données qui pourraient être stale (pas l'auth)
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
       toast({
         title: "Compte créé",
         description: "Bienvenue sur Cassius",

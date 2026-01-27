@@ -56,8 +56,11 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       return response.json();
     },
     onSuccess: () => {
-      // Vider tout le cache pour éviter les données stale d'un autre utilisateur
-      queryClient.clear();
+      // Invalider les données qui pourraient être stale (pas l'auth)
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/flags"] });
       toast({
         title: "Connexion réussie",
         description: "Bienvenue sur Cassius",
