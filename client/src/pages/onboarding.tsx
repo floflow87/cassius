@@ -275,7 +275,7 @@ function TeamStep({ onComplete, onSkip }: { onComplete: () => void; onSkip: () =
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ASSISTANT">Assistant</SelectItem>
-                <SelectItem value="CHIRURGIEN">Chirurgien</SelectItem>
+                <SelectItem value="CHIRURGIEN">Collaborateur</SelectItem>
                 <SelectItem value="ADMIN">Administrateur</SelectItem>
               </SelectContent>
             </Select>
@@ -356,7 +356,7 @@ function DataStep({ onComplete }: { onComplete: (patch: Partial<OnboardingData>)
   };
   
   const handleImport = () => {
-    setLocation("/settings/import");
+    setLocation("/patients/import");
   };
   
   return (
@@ -459,7 +459,7 @@ function CalendarStep({ onComplete, onSkip }: { onComplete: (patch: Partial<Onbo
   const [, setLocation] = useLocation();
   
   const handleGoToSettings = () => {
-    setLocation("/settings/calendar");
+    setLocation("/settings?tab=integrations");
   };
   
   return (
@@ -504,7 +504,7 @@ function NotificationsStep({ onComplete, onSkip }: { onComplete: (patch: Partial
   const [, setLocation] = useLocation();
   
   const handleGoToSettings = () => {
-    setLocation("/settings/notifications");
+    setLocation("/settings?tab=notifications");
   };
   
   return (
@@ -719,7 +719,26 @@ export default function OnboardingPage() {
       case 7:
         return <DocumentsStep onComplete={(patch) => handleComplete(7, patch)} onSkip={() => handleSkip(7)} />;
       default:
-        return null;
+        // Écran de fin - rediriger vers le dashboard
+        return (
+          <div className="space-y-6 text-center py-8">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                <Check className="w-8 h-8 text-green-600" />
+              </div>
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold">Configuration terminée !</h2>
+              <p className="text-muted-foreground mt-2">
+                Votre espace Cassius est prêt à être utilisé.
+              </p>
+            </div>
+            <Button onClick={() => setLocation("/dashboard")} data-testid="button-go-dashboard">
+              Accéder au tableau de bord
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        );
     }
   };
   
