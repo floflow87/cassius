@@ -17,6 +17,13 @@ import {
   Loader2,
   Settings,
   GripVertical,
+  History,
+  User as UserIcon,
+  Pencil,
+  Trash2,
+  Eye,
+  ArchiveRestore,
+  FileCheck,
 } from "lucide-react";
 import {
   DndContext,
@@ -72,6 +79,7 @@ const DASHBOARD_BLOCKS = [
   { id: "rdv-upcoming", label: "Rendez-vous à venir" },
   { id: "alerts", label: "Patients à surveiller" },
   { id: "recent-implants", label: "Implants récents avec ISQ" },
+  { id: "recent-activities", label: "Activités récentes" },
 ] as const;
 
 type BlockId = typeof DASHBOARD_BLOCKS[number]["id"];
@@ -82,7 +90,7 @@ interface DashboardPreferences {
 }
 
 const DEFAULT_PREFERENCES: DashboardPreferences = {
-  blockOrder: ["stats-primary", "stats-secondary", "rdv-upcoming", "alerts", "recent-implants"],
+  blockOrder: ["stats-primary", "stats-secondary", "rdv-upcoming", "alerts", "recent-implants", "recent-activities"],
   hiddenBlocks: [],
 };
 
@@ -410,6 +418,10 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error("Failed to fetch flags");
       return res.json();
     },
+  });
+
+  const { data: recentActivities } = useQuery<any[]>({
+    queryKey: ["/api/audit-logs/recent"],
   });
 
   const filteredPatients = patients?.filter(p => 
@@ -1139,6 +1151,79 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
+            </CardContent>
+          </Card>
+        );
+      case "recent-activities":
+        return (
+          <Card key={blockId}>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <History className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                Activités récentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {recentActivities && recentActivities.length > 0 ? (
+                <div className="space-y-2">
+                  {recentActivities.slice(0, 5).map((activity: any) => {
+                    const actionIcons: Record<string, any> = {
+                      CREATE: <Plus className="h-3 w-3 text-green-600" />,
+                      UPDATE: <Pencil className="h-3 w-3 text-blue-600" />,
+                      DELETE: <Trash2 className="h-3 w-3 text-red-600" />,
+                      VIEW: <Eye className="h-3 w-3 text-gray-600" />,
+                      ARCHIVE: <ArchiveRestore className="h-3 w-3 text-amber-600" />,
+                      RESTORE: <ArchiveRestore className="h-3 w-3 text-green-600" />,
+                    };
+                    const actionLabels: Record<string, string> = {
+                      CREATE: "Création",
+                      UPDATE: "Modification",
+                      DELETE: "Suppression",
+                      VIEW: "Consultation",
+                      ARCHIVE: "Archivage",
+                      RESTORE: "Restauration",
+                    };
+                    const entityLabels: Record<string, string> = {
+                      PATIENT: "Patient",
+                      OPERATION: "Acte",
+                      SURGERY_IMPLANT: "Implant posé",
+                      CATALOG_IMPLANT: "Implant catalogue",
+                      DOCUMENT: "Document",
+                      RADIO: "Radiographie",
+                      APPOINTMENT: "Rendez-vous",
+                    };
+                    return (
+                      <div key={activity.id} className="flex items-center gap-3 p-2 rounded-md hover-elevate">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+                          {actionIcons[activity.action] || <FileCheck className="h-3 w-3" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium">
+                              {actionLabels[activity.action] || activity.action}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] px-1 py-0">
+                              {entityLabels[activity.entityType] || activity.entityType}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <UserIcon className="h-2.5 w-2.5" />
+                            <span>{activity.userName || "Système"}</span>
+                            <span>•</span>
+                            <span>
+                              {format(new Date(activity.createdAt), "dd/MM à HH:mm", { locale: fr })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  Aucune activité récente
+                </p>
+              )}
             </CardContent>
           </Card>
         );
