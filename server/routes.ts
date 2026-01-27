@@ -4039,7 +4039,7 @@ export async function registerRoutes(
 
     try {
       const { id } = req.params;
-      const userId = req.jwtUser?.id;
+      const userId = req.jwtUser?.id || (req.user as any)?.id;
       if (!userId) {
         return res.status(400).json({ error: "User ID required" });
       }
@@ -5101,7 +5101,7 @@ export async function registerRoutes(
   app.post("/api/import/patients/upload", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
-    const userId = req.jwtUser?.id || null;
+    const userId = req.jwtUser?.id || (req.user as any)?.id || null;
     
     try {
       const tablesExist = await checkImportTablesExist();
@@ -6251,8 +6251,8 @@ export async function registerRoutes(
   // POST /api/auth/send-verification - Send email verification
   app.post("/api/auth/send-verification", requireJwtOrSession, async (req, res) => {
     try {
-      const userId = req.jwtUser?.id;
-      const email = req.jwtUser?.username;
+      const userId = req.jwtUser?.id || (req.user as any)?.id;
+      const email = req.jwtUser?.username || (req.user as any)?.username;
       
       if (!userId || !email) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -6359,7 +6359,7 @@ export async function registerRoutes(
   // GET /api/auth/email-status - Get current email verification status
   app.get("/api/auth/email-status", requireJwtOrSession, async (req, res) => {
     try {
-      const userId = req.jwtUser?.id;
+      const userId = req.jwtUser?.id || (req.user as any)?.id;
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
       }
