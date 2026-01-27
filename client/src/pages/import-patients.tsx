@@ -399,15 +399,22 @@ export default function ImportPatientsPage() {
   };
 
   const handleStartImport = () => {
-    if (jobId) {
-      console.log("[IMPORT] handleStartImport called with jobId:", jobId);
-      setImportStarted(false);
-      setError(null);
-      setStep("import");
-    } else {
+    if (!jobId) {
       console.error("[IMPORT] handleStartImport called but jobId is null");
       setError("Erreur: Identifiant de job manquant. Veuillez recommencer l'import.");
+      return;
     }
+    
+    if (!validationResult) {
+      console.error("[IMPORT] handleStartImport called but validation not complete");
+      setError("Erreur: La validation n'est pas terminée. Veuillez d'abord valider le fichier.");
+      return;
+    }
+    
+    console.log("[IMPORT] handleStartImport called with jobId:", jobId, "validationResult:", validationResult.status);
+    setImportStarted(false);
+    setError(null);
+    setStep("import");
   };
 
   const handleDownloadTemplate = (variant: "empty" | "example") => {

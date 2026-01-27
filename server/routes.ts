@@ -5218,7 +5218,9 @@ export async function registerRoutes(
       const statsWithMapping = { ...stats, mapping: customMapping || null };
       
       // Update job status with stats and mapping
+      console.log(`[IMPORT] Updating job ${jobId} status to "validated"...`);
       await patientImport.updateImportJobStatus(jobId, "validated", statsWithMapping);
+      console.log(`[IMPORT] Job ${jobId} status updated to "validated" successfully`);
       
       // Return summary with sample rows
       const sampleOk = rowResults.filter(r => r.result.status === "ok").slice(0, 3);
@@ -5270,12 +5272,20 @@ export async function registerRoutes(
       }
       
       const job = await patientImport.getImportJob(jobId);
+      console.log(`[IMPORT] Run requested for job ${jobId}, current status: ${job?.status}`);
+      
       if (!job || job.organisationId !== organisationId) {
+        console.log(`[IMPORT] Job not found or org mismatch. Job exists: ${!!job}, orgId: ${organisationId}`);
         return res.status(404).json({ error: "Import job not found" });
       }
       
       if (job.status !== "validated") {
-        return res.status(400).json({ error: "Job must be validated before running" });
+        console.log(`[IMPORT] Job ${jobId} has status "${job.status}" but needs "validated"`);
+        return res.status(400).json({ 
+          error: "Job must be validated before running",
+          currentStatus: job.status,
+          message: `Le job a le status "${job.status}" mais doit être "validated" pour être exécuté. Veuillez d'abord valider le fichier.`
+        });
       }
       
       // Update status to running
