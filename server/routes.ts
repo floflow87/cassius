@@ -14,6 +14,7 @@ import * as emailService from "./emailService";
 import { sendEmail, getPreviewHtml, getBaseUrl, TemplateName } from "./emails";
 import { randomBytes, scryptSync } from "crypto";
 import notificationService from "./notifications/notificationService";
+import { auditService, type AuditEntityType } from "./auditService";
 import {
   insertPatientSchema,
   insertOperationSchema,
@@ -625,6 +626,20 @@ export async function registerRoutes(
     try {
       const data = insertPatientSchema.parse(req.body);
       const patient = await storage.createPatient(organisationId, data);
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "PATIENT",
+          entityId: patient.id,
+          action: "CREATE",
+          details: `Patient ${patient.prenom || ''} ${patient.nom || ''} créé`,
+        }).catch(err => console.error("[Audit] Failed to log patient creation:", err));
+      }
+      
       res.status(201).json(patient);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -667,6 +682,20 @@ export async function registerRoutes(
         }
       }
       
+      // Audit log
+      if (userId) {
+        const changedFields = Object.keys(data);
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "PATIENT",
+          entityId: patient.id,
+          action: "UPDATE",
+          details: `Patient ${patient.prenom || ''} ${patient.nom || ''} modifié`,
+          metadata: { changedFields },
+        }).catch(err => console.error("[Audit] Failed to log patient update:", err));
+      }
+      
       res.json(patient);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -687,6 +716,20 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Patient not found" });
       }
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "PATIENT",
+          entityId: req.params.id,
+          action: "DELETE",
+          details: "Patient supprimé",
+        }).catch(err => console.error("[Audit] Failed to log patient deletion:", err));
+      }
+      
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting patient:", error);
@@ -1116,6 +1159,20 @@ export async function registerRoutes(
         console.error("[Onboarding] Error auto-completing step 4:", onboardingError);
       }
 
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "OPERATION",
+          entityId: operation.id,
+          action: "CREATE",
+          details: `Opération ${operation.typeIntervention} créée`,
+          metadata: { implantCount: createdSurgeryImplants.length },
+        }).catch(err => console.error("[Audit] Failed to log operation creation:", err));
+      }
+      
       res.status(201).json({ ...operation, surgeryImplants: createdSurgeryImplants });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1136,6 +1193,20 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Operation not found" });
       }
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "OPERATION",
+          entityId: req.params.id,
+          action: "DELETE",
+          details: "Opération supprimée",
+        }).catch(err => console.error("[Audit] Failed to log operation deletion:", err));
+      }
+      
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting operation:", error);
@@ -1175,6 +1246,20 @@ export async function registerRoutes(
 
       if (!updated) {
         return res.status(404).json({ error: "Operation not found" });
+      }
+
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "OPERATION",
+          entityId: updated.id,
+          action: "UPDATE",
+          details: "Opération modifiée",
+          metadata: { changedFields: Object.keys(validatedUpdates) },
+        }).catch(err => console.error("[Audit] Failed to log operation update:", err));
       }
 
       res.json(updated);
@@ -1398,6 +1483,22 @@ export async function registerRoutes(
         return res.status(400).json({ error: "IDs array is required" });
       }
       const deletedCount = await storage.deleteSurgeryImplants(organisationId, ids);
+      
+      // Audit log for each deleted implant
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        for (const id of ids) {
+          auditService.log({
+            organisationId,
+            userId,
+            entityType: "SURGERY_IMPLANT",
+            entityId: id,
+            action: "DELETE",
+            details: "Implant posé supprimé",
+          }).catch(err => console.error("[Audit] Failed to log surgery implant deletion:", err));
+        }
+      }
+      
       res.json({ deleted: deletedCount });
     } catch (error) {
       console.error("Error deleting surgery implants:", error);
@@ -1413,6 +1514,20 @@ export async function registerRoutes(
     try {
       const data = insertSurgeryImplantSchema.parse(req.body);
       const surgeryImplant = await storage.createSurgeryImplant(organisationId, data);
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "SURGERY_IMPLANT",
+          entityId: surgeryImplant.id,
+          action: "CREATE",
+          details: `Implant posé en position ${surgeryImplant.position || 'N/A'}`,
+        }).catch(err => console.error("[Audit] Failed to log surgery implant creation:", err));
+      }
+      
       res.status(201).json(surgeryImplant);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1441,6 +1556,20 @@ export async function registerRoutes(
         runFlagDetection(organisationId).catch(err => 
           console.error("Flag detection failed:", err)
         );
+      }
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "SURGERY_IMPLANT",
+          entityId: updated.id,
+          action: "UPDATE",
+          details: `Implant posé modifié`,
+          metadata: { changedFields: Object.keys(req.body), hasIsqUpdate },
+        }).catch(err => console.error("[Audit] Failed to log surgery implant update:", err));
       }
       
       res.json(updated);
@@ -1502,6 +1631,20 @@ export async function registerRoutes(
     try {
       const data = insertImplantSchema.parse(req.body);
       const implant = await storage.createImplant(organisationId, data);
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "CATALOG_IMPLANT",
+          entityId: implant.id,
+          action: "CREATE",
+          details: `Implant catalogue ${implant.marque || ''} ${implant.reference || ''} créé`,
+        }).catch(err => console.error("[Audit] Failed to log catalog implant creation:", err));
+      }
+      
       res.status(201).json(implant);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -7477,6 +7620,50 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Des données existent déjà dans cette organisation" });
       }
       console.error("[Onboarding] Error generating demo data:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // =====================================================
+  // AUDIT LOGS ENDPOINTS
+  // =====================================================
+
+  // Get recent activity for dashboard
+  app.get("/api/audit/recent", requireJwtOrSession, async (req: Request, res: Response) => {
+    const organisationId = (req as any).organisationId;
+    if (!organisationId) {
+      return res.status(401).json({ error: "Non authentifié" });
+    }
+    
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const logs = await auditService.getRecentActivity(organisationId, limit);
+      res.json(logs);
+    } catch (error: any) {
+      console.error("[AUDIT] Error fetching recent activity:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get audit history for a specific entity
+  app.get("/api/audit/:entityType/:entityId", requireJwtOrSession, async (req: Request, res: Response) => {
+    const organisationId = (req as any).organisationId;
+    if (!organisationId) {
+      return res.status(401).json({ error: "Non authentifié" });
+    }
+    
+    try {
+      const { entityType, entityId } = req.params;
+      const validTypes: AuditEntityType[] = ["PATIENT", "OPERATION", "SURGERY_IMPLANT", "CATALOG_IMPLANT", "DOCUMENT", "RADIO", "APPOINTMENT"];
+      
+      if (!validTypes.includes(entityType as AuditEntityType)) {
+        return res.status(400).json({ error: "Type d'entité invalide" });
+      }
+      
+      const logs = await auditService.getEntityHistory(organisationId, entityType as AuditEntityType, entityId);
+      res.json(logs);
+    } catch (error: any) {
+      console.error("[AUDIT] Error fetching entity history:", error);
       res.status(500).json({ error: error.message });
     }
   });
