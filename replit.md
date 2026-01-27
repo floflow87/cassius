@@ -351,6 +351,12 @@ Les alertes sont recalculées à chaque :
 ## Changelog Récent
 
 ### Janvier 2026
+- **Système d'audit complet** : Traçabilité de toutes les modifications (patients, opérations, implants)
+  - Service backend `auditService.ts` avec logging automatique
+  - Composant `AuditHistory` réutilisable avec icônes et badges
+  - Historique affiché sur fiches patient, implant, acte
+  - Card "Activités récentes" sur le dashboard avec drag-and-drop
+- **Protection du rôle propriétaire** : Le premier utilisateur (owner) ne peut plus voir son rôle modifié ou être supprimé
 - Bouton de synchronisation Google Calendar directe
 - Correction du mapping notifications/flags
 - Gestion des RDV sans patient valide sur le dashboard
