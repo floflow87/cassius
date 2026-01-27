@@ -446,7 +446,7 @@ export default function ImplantsPage({ searchQuery: externalSearchQuery, setSear
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           icon={<Search className="h-4 w-4" />}
-          className="max-w-2xl"
+          className="max-w-sm"
           data-testid="input-search-implants"
         />
         <span className="text-xs italic text-muted-foreground">{totalImplants} implant{totalImplants > 1 ? "s" : ""}</span>

@@ -1962,8 +1962,8 @@ export default function PatientDetailsPage() {
                   
                   {canDelete && (
                     <Button 
-                      variant="ghost" 
-                      className="w-full justify-start gap-3 text-destructive"
+                      variant="destructive" 
+                      className="w-full justify-start gap-3"
                       onClick={() => setDeletePatientDialogOpen(true)}
                       disabled={!patientId}
                       data-testid="button-delete-patient"

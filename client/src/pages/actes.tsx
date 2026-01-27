@@ -940,7 +940,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Rechercher..."
             icon={<Search className="h-4 w-4" />}
-            className="max-w-lg"
+            className="max-w-sm"
             data-testid="input-search-actes"
           />
           
