@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ImplantDetailsSkeleton } from "@/components/page-skeletons";
+import { AuditHistory } from "@/components/audit-history";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1423,6 +1424,14 @@ export default function ImplantDetailsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Historique des modifications */}
+      <AuditHistory
+        entityType="SURGERY_IMPLANT"
+        entityId={implantId || ""}
+        title="Historique de l'implant"
+        maxItems={5}
+      />
 
       {/* Delete ISQ Confirmation Dialog */}
       <AlertDialog open={deleteIsqDialogOpen} onOpenChange={setDeleteIsqDialogOpen}>
