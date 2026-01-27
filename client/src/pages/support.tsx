@@ -182,11 +182,34 @@ const helpSections: HelpSection[] = [
       "Isolation complète des données par cabinet",
       "Historique des connexions",
       "Gestion des sessions actives",
+      "Protection du rôle propriétaire (non modifiable)",
     ],
     subsections: [
       {
-        title: "Rôles disponibles",
-        items: ["Administrateur", "Chirurgien", "Assistant"],
+        title: "Collaborateur (Chirurgien)",
+        items: [
+          "Peut créer, modifier et consulter les patients, actes et implants",
+          "Peut ajouter des rendez-vous et des radiographies",
+          "Accès complet aux fonctionnalités cliniques",
+        ],
+      },
+      {
+        title: "Assistant",
+        items: [
+          "Peut consulter les informations des patients et des actes",
+          "Peut gérer les rendez-vous du calendrier",
+          "Accès limité aux fonctionnalités administratives",
+          "Ne peut pas supprimer de données",
+        ],
+      },
+      {
+        title: "Admin (Administrateur)",
+        items: [
+          "Toutes les permissions du Collaborateur",
+          "Peut gérer les membres de l'équipe (inviter, modifier les rôles, supprimer)",
+          "Accès aux paramètres du cabinet et aux intégrations",
+          "Peut configurer les préférences de l'organisation",
+        ],
       },
     ],
   },

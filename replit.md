@@ -78,6 +78,29 @@ cassius/
 
 ---
 
+## Rôles et Permissions
+
+### Collaborateur (Chirurgien)
+- Peut créer, modifier et consulter les patients, actes et implants
+- Peut ajouter des rendez-vous et des radiographies
+- Accès complet aux fonctionnalités cliniques
+
+### Assistant
+- Peut consulter les informations des patients et des actes
+- Peut gérer les rendez-vous du calendrier
+- Accès limité aux fonctionnalités administratives
+- Ne peut pas supprimer de données
+
+### Admin (Administrateur)
+- Toutes les permissions du Collaborateur
+- Peut gérer les membres de l'équipe (inviter, modifier les rôles, supprimer)
+- Accès aux paramètres du cabinet et aux intégrations
+- Peut configurer les préférences de l'organisation
+
+> **Note** : Le premier utilisateur créé lors de l'inscription est automatiquement marqué comme "Propriétaire" et son rôle Admin ne peut pas être modifié.
+
+---
+
 ## Modèle de Données
 
 ### Tables Principales
