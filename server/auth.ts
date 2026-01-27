@@ -209,11 +209,10 @@ export function setupAuth(app: Express): void {
   });
 
   app.post("/api/auth/register", async (req, res) => {
-    const DEFAULT_ORG_ID = "default-org-001";
-    authLog("/api/auth/register", "START", { organisationId: DEFAULT_ORG_ID });
+    authLog("/api/auth/register", "START");
     
     try {
-      const { username, password, nom, prenom } = req.body;
+      const { username, password, nom, prenom, organisationName } = req.body;
       authLog("/api/auth/register", "VALIDATING", { username, hasNom: !!nom, hasPrenom: !!prenom });
 
       if (!username || !password) {
@@ -233,16 +232,23 @@ export function setupAuth(app: Express): void {
         return res.status(400).json({ error: "Ce nom d'utilisateur existe déjà" });
       }
 
-      const hashedPassword = await hashPassword(password);
-      authLog("/api/auth/register", "CREATING_USER", { username, organisationId: DEFAULT_ORG_ID });
+      // Créer une nouvelle organisation pour le nouvel utilisateur
+      const orgName = organisationName || `Cabinet de ${prenom || username}`;
+      authLog("/api/auth/register", "CREATING_ORGANISATION", { orgName });
+      const organisation = await storage.createOrganisation({ nom: orgName });
       
+      const hashedPassword = await hashPassword(password);
+      authLog("/api/auth/register", "CREATING_USER", { username, organisationId: organisation.id });
+      
+      // Le créateur de compte est toujours Admin et propriétaire
       const user = await storage.createUser({
         username,
         password: hashedPassword,
         nom: nom || null,
         prenom: prenom || null,
-        role: "ASSISTANT",
-        organisationId: DEFAULT_ORG_ID,
+        role: "ADMIN",
+        organisationId: organisation.id,
+        isOwner: true,
       });
 
       authLog("/api/auth/register", "USER_CREATED", { userId: user.id });
