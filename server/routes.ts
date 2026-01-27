@@ -6870,8 +6870,8 @@ export async function registerRoutes(
     try {
       const organisationId = getOrganisationId(req, res);
       if (!organisationId) return;
-      const userId = req.jwtUser?.userId;
-      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+      const userId = req.jwtUser?.userId || (req.user as any)?.id;
+      if (!userId) return res.status(401).json({ error: "Accès non autorisé", message: "Authentification requise (session ou JWT)" });
 
       const preferences = await notificationService.getUserPreferences(userId, organisationId);
       res.json(preferences);
@@ -6886,8 +6886,8 @@ export async function registerRoutes(
     try {
       const organisationId = getOrganisationId(req, res);
       if (!organisationId) return;
-      const userId = req.jwtUser?.userId;
-      if (!userId) return res.status(401).json({ error: "Utilisateur non authentifie" });
+      const userId = req.jwtUser?.userId || (req.user as any)?.id;
+      if (!userId) return res.status(401).json({ error: "Accès non autorisé", message: "Authentification requise (session ou JWT)" });
 
       const { category } = req.params;
       const { frequency, inAppEnabled, emailEnabled, digestTime, disabledTypes, disabledEmailTypes } = req.body;
@@ -6909,7 +6909,7 @@ export async function registerRoutes(
   // Manual digest trigger (admin only - requires CHIRURGIEN or ADMIN role)
   app.post("/api/admin/digest/daily", requireJwtOrSession, async (req, res) => {
     try {
-      const userRole = req.jwtUser?.role;
+      const userRole = req.jwtUser?.role || (req.user as any)?.role;
       if (!userRole || !["CHIRURGIEN", "ADMIN"].includes(userRole)) {
         return res.status(403).json({ error: "Acces refuse - Administrateur requis" });
       }
