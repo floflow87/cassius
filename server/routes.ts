@@ -1338,6 +1338,20 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Implant not found" });
       }
       
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "CATALOG_IMPLANT",
+          entityId: updated.id,
+          action: "UPDATE",
+          details: `Implant modifié : ${updated.marque} ${updated.referenceFabricant || ''}`,
+          metadata: { updatedFields: Object.keys(validatedUpdates) },
+        });
+      }
+      
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1359,6 +1373,20 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Implant not found" });
       }
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "CATALOG_IMPLANT",
+          entityId: req.params.id,
+          action: "DELETE",
+          details: "Implant supprimé du catalogue",
+        });
+      }
+      
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting implant:", error);
@@ -1916,6 +1944,19 @@ export async function registerRoutes(
       const radio = await storage.createRadio(organisationId, radioData);
       console.log("[RADIO CREATE] Created radio:", JSON.stringify(radio, null, 2));
       
+      // Audit log
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "RADIO",
+          entityId: radio.id,
+          action: "CREATE",
+          details: `Radio ajoutée : ${radio.title || radio.type}`,
+          metadata: { type: radio.type, patientId: radio.patientId },
+        });
+      }
+      
       // Send notification about new radio to other team members
       if (userId && data.patientId) {
         const patient = await storage.getPatient(organisationId, data.patientId);
@@ -1966,6 +2007,21 @@ export async function registerRoutes(
       if (!radio) {
         return res.status(404).json({ error: "Radio not found" });
       }
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "RADIO",
+          entityId: radio.id,
+          action: "UPDATE",
+          details: `Radio modifiée : ${title}`,
+          metadata: { updatedFields: ["title"] },
+        });
+      }
+      
       res.json(radio);
     } catch (error) {
       console.error("Error updating radio:", error);
@@ -2003,6 +2059,20 @@ export async function registerRoutes(
       const deleted = await storage.deleteRadio(organisationId, req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Radio not found" });
+      }
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "RADIO",
+          entityId: req.params.id,
+          action: "DELETE",
+          details: `Radio supprimée : ${radio.title || radio.type}`,
+          metadata: { patientId: radio.patientId },
+        });
       }
 
       res.status(204).send();
@@ -2155,6 +2225,18 @@ export async function registerRoutes(
         evidence,
         changedByUserId: userId,
       });
+      
+      // Audit log for status change
+      auditService.log({
+        organisationId,
+        userId,
+        entityType: "SURGERY_IMPLANT",
+        entityId: req.params.implantId,
+        action: "UPDATE",
+        details: `Statut modifié : ${fromStatus || 'N/A'} → ${toStatus}`,
+        metadata: { fromStatus, toStatus, reasonId, reasonFreeText },
+      });
+      
       res.status(201).json(history);
     } catch (error) {
       console.error("Error changing implant status:", error);
@@ -2746,6 +2828,19 @@ export async function registerRoutes(
         }
       }
       
+      // Audit log
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "DOCUMENT",
+          entityId: doc.id,
+          action: "CREATE",
+          details: `Document ajouté : ${doc.title || doc.fileName}`,
+          metadata: { patientId: doc.patientId, category: doc.category },
+        });
+      }
+      
       res.status(201).json(doc);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2767,6 +2862,21 @@ export async function registerRoutes(
       if (!doc) {
         return res.status(404).json({ error: "Document not found" });
       }
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "DOCUMENT",
+          entityId: doc.id,
+          action: "UPDATE",
+          details: `Document modifié : ${doc.title || doc.fileName}`,
+          metadata: { updatedFields: Object.keys(updates) },
+        });
+      }
+      
       res.json(doc);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -3138,6 +3248,18 @@ export async function registerRoutes(
 
       const noteData = insertNoteSchema.parse({ ...req.body, patientId });
       const note = await storage.createNote(organisationId, userId, noteData);
+      
+      // Audit log for patient note
+      auditService.log({
+        organisationId,
+        userId,
+        entityType: "PATIENT",
+        entityId: patientId,
+        action: "UPDATE",
+        details: "Note ajoutée",
+        metadata: { noteId: note.id },
+      });
+      
       res.status(201).json(note);
     } catch (error) {
       console.error("Error creating note:", error);
@@ -3155,6 +3277,21 @@ export async function registerRoutes(
       if (!note) {
         return res.status(404).json({ error: "Note not found" });
       }
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId && note.patientId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "PATIENT",
+          entityId: note.patientId,
+          action: "UPDATE",
+          details: "Note modifiée",
+          metadata: { noteId: note.id },
+        });
+      }
+      
       res.json(note);
     } catch (error) {
       console.error("Error updating note:", error);
@@ -3417,6 +3554,19 @@ export async function registerRoutes(
         }).catch(err => console.error("[Notification] Appointment created notification failed:", err));
       }
       
+      // Audit log
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "APPOINTMENT",
+          entityId: appointment.id,
+          action: "CREATE",
+          details: `RDV créé : ${appointment.title || appointment.type}`,
+          metadata: { patientId, type: appointment.type, dateStart: appointment.dateStart },
+        });
+      }
+      
       res.status(201).json(appointment);
     } catch (error) {
       console.error("Error creating appointment:", error);
@@ -3467,6 +3617,17 @@ export async function registerRoutes(
           actorName,
           contextLabel: appointment.description || '',
         }).catch(err => console.error("[Notification] Appointment updated notification failed:", err));
+        
+        // Audit log
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "APPOINTMENT",
+          entityId: appointment.id,
+          action: "UPDATE",
+          details: `RDV modifié : ${appointment.title || appointment.type}`,
+          metadata: { patientId: appointment.patientId, updatedFields: Object.keys(updateData) },
+        });
       }
       
       res.json(appointment);
@@ -3492,6 +3653,19 @@ export async function registerRoutes(
       runFlagDetection(organisationId).catch(err => 
         console.error("Flag detection failed after appointment deletion:", err)
       );
+      
+      // Audit log
+      const userId = req.jwtUser?.userId;
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "APPOINTMENT",
+          entityId: id,
+          action: "DELETE",
+          details: "RDV supprimé",
+        });
+      }
       
       res.json({ success: true });
     } catch (error) {
@@ -3638,6 +3812,17 @@ export async function registerRoutes(
       // Recalculate flags and get suggestions
       const flags = await storage.calculateIsqFlags(organisationId, surgeryImplantId);
       const suggestions = await storage.generateStatusSuggestions(organisationId, surgeryImplantId, flags);
+
+      // Audit log for ISQ measurement
+      auditService.log({
+        organisationId,
+        userId,
+        entityType: "SURGERY_IMPLANT",
+        entityId: surgeryImplantId,
+        action: "UPDATE",
+        details: `Mesure ISQ ajoutée : ${isqValue}`,
+        metadata: { appointmentId, isqValue, measurementType },
+      });
 
       res.status(201).json({
         measurement,

@@ -511,17 +511,20 @@ export default function ActeDetailsPage() {
             Historique
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           <SurgeryTimeline operationId={operation.id} patientId={operation.patient.id} />
+          
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Journal des modifications</h4>
+            <AuditHistory
+              entityType="OPERATION"
+              entityId={operation.id}
+              showCard={false}
+              maxItems={5}
+            />
+          </div>
         </CardContent>
       </Card>
-
-      <AuditHistory
-        entityType="OPERATION"
-        entityId={operation.id}
-        title="Historique de l'acte"
-        maxItems={5}
-      />
 
       <Dialog open={radioDialogOpen} onOpenChange={setRadioDialogOpen}>
         <DialogContent className="max-w-lg">

@@ -601,13 +601,14 @@ export default function CatalogImplantDetailsPage() {
           </CardContent>
         </Card>
 
-        <AuditHistory
-          entityType="CATALOG_IMPLANT"
-          entityId={implantId || ""}
-          title="Historique de l'implant"
-          maxItems={5}
-        />
-      </div>
+        </div>
+
+      <AuditHistory
+        entityType="CATALOG_IMPLANT"
+        entityId={implantId || ""}
+        title="Historique de l'implant"
+        maxItems={5}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link, useRoute } from "wouter";
+import { Link, useRoute, useLocation } from "wouter";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { motion } from "framer-motion";
 import {
@@ -180,11 +180,13 @@ const OPERATION_SORT_KEY = "cassius_patient_operations_sort";
 
 export default function PatientDetailsPage() {
   const [, params] = useRoute("/patients/:id");
+  const [, setLocation] = useLocation();
   const patientId = params?.id;
   const [operationDialogOpen, setOperationDialogOpen] = useState(false);
   const [radioDialogOpen, setRadioDialogOpen] = useState(false);
   const [docDialogOpen, setDocDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deletePatientDialogOpen, setDeletePatientDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { toast } = useToast();
   const { canDelete, canEdit } = useCurrentUser();
@@ -223,6 +225,23 @@ export default function PatientDetailsPage() {
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de modifier le statut.", variant: "destructive" });
+    },
+  });
+
+  // Mutation pour supprimer le patient
+  const deletePatientMutation = useMutation({
+    mutationFn: async () => {
+      if (!patientId) throw new Error("Patient ID manquant");
+      await apiRequest("DELETE", `/api/patients/${patientId}`);
+    },
+    onSuccess: () => {
+      setDeletePatientDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      toast({ title: "Patient supprimé", description: "Le patient a été supprimé avec succès." });
+      setLocation("/patients");
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de supprimer le patient.", variant: "destructive" });
     },
   });
 
@@ -1939,6 +1958,19 @@ export default function PatientDetailsPage() {
                       </div>
                     </SheetContent>
                   </Sheet>
+                  
+                  {canDelete && (
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start gap-3 text-destructive"
+                      onClick={() => setDeletePatientDialogOpen(true)}
+                      disabled={!patientId}
+                      data-testid="button-delete-patient"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Supprimer le patient
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -3015,6 +3047,29 @@ export default function PatientDetailsPage() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de confirmation suppression patient */}
+      <AlertDialog open={deletePatientDialogOpen} onOpenChange={setDeletePatientDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce patient ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Toutes les données associées au patient seront définitivement supprimées : actes chirurgicaux, implants, rendez-vous, radiographies, documents et notes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-patient">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletePatientMutation.mutate()}
+              className="bg-destructive text-destructive-foreground"
+              disabled={deletePatientMutation.isPending || !patientId}
+              data-testid="button-confirm-delete-patient"
+            >
+              {deletePatientMutation.isPending ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
