@@ -660,7 +660,7 @@ function AppointmentDrawer({ appointmentId, open, onClose, onUpdated }: Appointm
       title: "",
       type: "CONSULTATION",
       status: "UPCOMING",
-      color: null,
+      color: "#93c5fd", // Default to sky blue (first color in panel)
       dateStart: "",
       timeStart: "09:00",
       timeEnd: "",
@@ -1191,7 +1191,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
       patientId: "",
       title: "",
       type: "CONSULTATION",
-      color: null,
+      color: "#93c5fd", // Default to sky blue (first color in panel)
       dateStart: defaultDate ? format(defaultDate, "yyyy-MM-dd") : "",
       timeStart: defaultDate ? format(defaultDate, "HH:mm") : "09:00",
       description: "",
@@ -1205,7 +1205,7 @@ function QuickCreateDialog({ open, onClose, defaultDate, onCreated }: QuickCreat
         patientId: "",
         title: "",
         type: "CONSULTATION",
-        color: null,
+        color: "#93c5fd", // Default to sky blue (first color in panel)
         dateStart: format(defaultDate, "yyyy-MM-dd"),
         timeStart: format(defaultDate, "HH:mm"),
         description: "",
