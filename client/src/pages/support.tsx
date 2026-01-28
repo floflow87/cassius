@@ -211,6 +211,14 @@ const helpSections: HelpSection[] = [
           "Peut configurer les préférences de l'organisation",
         ],
       },
+      {
+        title: "Suppression de compte",
+        items: [
+          "Utilisateur standard : seul son compte est supprimé, les autres données de l'organisation restent",
+          "Propriétaire avec d'autres membres : la suppression est refusée (il doit d'abord supprimer les autres membres ou transférer la propriété)",
+          "Propriétaire seul : le compte ET toutes les données de l'organisation sont supprimés définitivement",
+        ],
+      },
     ],
   },
   {
