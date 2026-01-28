@@ -1462,6 +1462,7 @@ const NOTIFICATION_TYPES: NotificationTypeInfo[] = [
   { type: "PATIENT_UPDATED", label: "Patient modifié", description: "Notification quand un dossier patient est modifié", category: "TEAM_ACTIVITY" },
   { type: "DOCUMENT_ADDED", label: "Document ajouté", description: "Notification lors de l'ajout d'un document", category: "TEAM_ACTIVITY" },
   { type: "RADIO_ADDED", label: "Radio ajoutée", description: "Notification lors de l'ajout d'une radiographie", category: "TEAM_ACTIVITY" },
+  { type: "NOTE_ADDED", label: "Note ajoutée", description: "Notification lors de l'ajout d'une note sur un dossier patient", category: "TEAM_ACTIVITY" },
   { type: "NEW_MEMBER_JOINED", label: "Nouveau membre", description: "Notification quand un collaborateur rejoint l'équipe", category: "TEAM_ACTIVITY" },
   { type: "ROLE_CHANGED", label: "Rôle modifié", description: "Notification quand un rôle est modifié", category: "TEAM_ACTIVITY" },
   { type: "INVITATION_SENT", label: "Invitation envoyée", description: "Confirmation d'envoi d'invitation", category: "TEAM_ACTIVITY" },
@@ -1613,7 +1614,7 @@ function NotificationsSection() {
         disabledEmailTypes: enabled ? [] : typesInCategory,
         inAppEnabled: enabled,
         emailEnabled: enabled
-      }
+      } as any
     });
   };
 

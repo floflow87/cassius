@@ -31,6 +31,7 @@ import { RadioDrawer } from "@/components/radio-drawer";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import type { Radio } from "@shared/types";
 
 interface RadioCardProps {
@@ -46,6 +47,8 @@ const typeLabels: Record<string, string> = {
 
 export function RadioCard({ radio, patientId }: RadioCardProps) {
   const { toast } = useToast();
+  const { user } = useCurrentUser();
+  const canDelete = user?.role !== "ASSISTANT";
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [freshSignedUrl, setFreshSignedUrl] = useState<string | null>(null);
@@ -215,14 +218,16 @@ export function RadioCard({ radio, patientId }: RadioCardProps) {
                   <Download className="h-4 w-4 mr-2" />
                   Telecharger
                 </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setDeleteDialogOpen(true)} 
-                  className="text-destructive"
-                  data-testid={`menu-delete-radio-${radio.id}`}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Supprimer
-                </DropdownMenuItem>
+                {canDelete && (
+                  <DropdownMenuItem 
+                    onClick={() => setDeleteDialogOpen(true)} 
+                    className="text-destructive"
+                    data-testid={`menu-delete-radio-${radio.id}`}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Supprimer
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

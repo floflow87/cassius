@@ -299,6 +299,16 @@ async function sendImmediateEmailNotification(notification: Notification, userId
         );
         break;
       
+      case 'NOTE_ADDED':
+        await sendNotificationEmail(
+          user.username,
+          firstName,
+          'Note ajoutée',
+          `Une note a été ajoutée pour un patient${metadata.notePreview ? `: "${metadata.notePreview.substring(0, 100)}..."` : "."}`,
+          deepLink
+        );
+        break;
+      
       case 'APPOINTMENT_CREATED':
         await sendAppointmentCreatedEmail(
           user.username,
@@ -1104,6 +1114,30 @@ export const notificationEvents = {
       entityId: params.patientId,
       actorUserId: params.actorUserId,
       metadata: { radioType: params.radioType },
+    });
+  },
+
+  // Activity: Note added
+  async onNoteAdded(params: {
+    organisationId: string;
+    recipientUserId: string;
+    actorUserId: string;
+    patientId: string;
+    patientName: string;
+    notePreview?: string;
+  }) {
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ACTIVITY",
+      type: "NOTE_ADDED",
+      severity: "INFO",
+      title: `Note ajoutée`,
+      body: `Note ajoutée pour ${params.patientName}${params.notePreview ? `: "${params.notePreview.substring(0, 50)}..."` : "."}`,
+      entityType: "PATIENT",
+      entityId: params.patientId,
+      actorUserId: params.actorUserId,
+      metadata: { notePreview: params.notePreview },
     });
   },
 

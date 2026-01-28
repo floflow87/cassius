@@ -2140,6 +2140,28 @@ export async function registerRoutes(
         return res.status(400).json({ error: "body is required" });
       }
       const note = await storage.createRadioNote(organisationId, userId, req.params.radioId, body.trim());
+      
+      // Notify other team members about new radio note
+      const radio = await storage.getRadio(organisationId, req.params.radioId);
+      if (radio && radio.patientId) {
+        const patient = await storage.getPatient(organisationId, radio.patientId);
+        const patientName = patient ? `${patient.prenom || ''} ${patient.nom || ''}`.trim() : "Patient";
+        const orgUsers = await storage.getUsersByOrganisation(organisationId);
+        
+        for (const user of orgUsers) {
+          if (user.id !== userId) {
+            notificationService.notificationEvents.onNoteAdded({
+              organisationId,
+              recipientUserId: user.id,
+              actorUserId: userId,
+              patientId: radio.patientId,
+              patientName,
+              notePreview: body.trim().substring(0, 100),
+            }).catch(err => console.error("[Notification] Radio note notification failed:", err));
+          }
+        }
+      }
+      
       res.status(201).json(note);
     } catch (error) {
       console.error("Error creating radio note:", error);
@@ -3289,6 +3311,24 @@ export async function registerRoutes(
         details: "Note ajoutée",
         metadata: { noteId: note.id },
       });
+      
+      // Notify other team members about new note
+      const patient = await storage.getPatient(organisationId, patientId);
+      const patientName = patient ? `${patient.prenom || ''} ${patient.nom || ''}`.trim() : "Patient";
+      const orgUsers = await storage.getUsersByOrganisation(organisationId);
+      
+      for (const user of orgUsers) {
+        if (user.id !== userId) {
+          notificationService.notificationEvents.onNoteAdded({
+            organisationId,
+            recipientUserId: user.id,
+            actorUserId: userId,
+            patientId,
+            patientName,
+            notePreview: note.body?.substring(0, 100),
+          }).catch(err => console.error("[Notification] Note added notification failed:", err));
+        }
+      }
       
       res.status(201).json(note);
     } catch (error) {
