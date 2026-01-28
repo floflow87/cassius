@@ -3557,7 +3557,7 @@ export async function registerRoutes(
       // Send notification about new appointment with patient name
       if (userId) {
         const patient = await storage.getPatient(organisationId, patientId);
-        const currentUser = await storage.getUser(userId!);
+        const currentUser = await storage.getUserById(userId!);
         const actorName = currentUser ? `${currentUser.prenom} ${currentUser.nom}`.trim() || currentUser.username : 'Un membre';
         const dateHuman = format(appointment.dateStart, "EEEE d MMMM yyyy", { locale: fr });
         const timeStart = format(appointment.dateStart, "HH:mm", { locale: fr });
@@ -3622,7 +3622,7 @@ export async function registerRoutes(
       const userId = getUserId(req);
       if (userId && appointment.patientId) {
         const patient = await storage.getPatient(organisationId, appointment.patientId);
-        const currentUser = await storage.getUser(userId!);
+        const currentUser = await storage.getUserById(userId!);
         const actorName = currentUser ? `${currentUser.prenom} ${currentUser.nom}`.trim() || currentUser.username : 'Un membre';
         const dateHuman = format(appointment.dateStart, "EEEE d MMMM yyyy", { locale: fr });
         const timeStart = format(appointment.dateStart, "HH:mm", { locale: fr });
