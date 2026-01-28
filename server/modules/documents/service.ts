@@ -18,9 +18,11 @@ export function setStorageProvider(provider: StorageProvider) {
 
 function getStorage(): StorageProvider {
   if (!storageProvider) {
+    console.error("[Documents] Storage provider not set");
     throw new Error("Storage provider not configured. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.");
   }
   if (!storageProvider.isStorageConfigured()) {
+    console.error("[Documents] Storage not configured - missing env vars");
     throw new Error("Supabase Storage is not properly configured. Check environment variables.");
   }
   return storageProvider;
