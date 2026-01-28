@@ -846,8 +846,9 @@ export default function PatientDetailsPage() {
       });
     },
     onSuccess: async () => {
+      // Force immediate refetch of notes to ensure display
       await queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/patients", patientId, "notes"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/patients", patientId, "notes"], type: 'active' });
       setNoteContent("");
       setSelectedTag(null);
       toast({ title: "Note ajoutée", description: "La note a été créée avec succès.", variant: "success" });
@@ -2859,14 +2860,14 @@ export default function PatientDetailsPage() {
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-[10px]">{authorName}</span>
+                                  <span className="font-medium text-sm">{authorName}</span>
                                   {tagConfig && (
-                                    <Badge variant="secondary" className={`text-[9px] ${tagConfig.className}`}>
+                                    <Badge variant="secondary" className={`text-[10px] ${tagConfig.className}`}>
                                       {tagConfig.label}
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-[9px] text-muted-foreground mb-2">
+                                <p className="text-xs text-muted-foreground mb-2">
                                   {formatNoteDatetime(note.createdAt)}
                                 </p>
                                 <p className="text-[12px] text-foreground whitespace-pre-wrap">
