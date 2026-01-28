@@ -188,73 +188,80 @@ export function AppSidebar() {
             )}
           </SidebarMenuItem>
           
-          {/* Settings button with toggle */}
+          {/* Settings button */}
           <SidebarMenuItem className="px-0">
-            <div className="flex items-center gap-1">
-              {isExpanded ? (
-                <a
-                  href="/settings"
-                  onClick={handleNavClick("/settings")}
-                  className={`flex-1 flex h-10 items-center justify-start px-3 gap-3 transition-all ${
-                    isActive("/settings") ? "bg-sidebar-accent rounded-[50px]" : "bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] rounded-md"
-                  }`}
-                  data-testid="link-settings"
-                >
-                  <img 
-                    src={settingsIcon} 
-                    alt="Paramètres"
-                    className="h-[18px] w-auto brightness-0 invert shrink-0"
-                  />
-                  <span className={`text-xs truncate ${isActive("/settings") ? 'font-medium text-white' : 'font-light text-white/80'}`}>
-                    Paramètres
-                  </span>
-                </a>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <a
-                      href="/settings"
-                      onClick={handleNavClick("/settings")}
-                      className="flex-1 flex h-10 items-center justify-center rounded-md bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] transition-all"
-                      data-testid="link-settings"
-                    >
-                      <img 
-                        src={settingsIcon} 
-                        alt="Paramètres"
-                        className="h-[18px] w-auto brightness-0 invert"
-                      />
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
-                    Paramètres
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              
-              {/* Toggle button */}
+            {isExpanded ? (
+              <a
+                href="/settings"
+                onClick={handleNavClick("/settings")}
+                className={`flex h-10 items-center justify-start px-3 gap-3 transition-all ${
+                  isActive("/settings") ? "bg-sidebar-accent rounded-[50px]" : "bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] rounded-md"
+                }`}
+                data-testid="link-settings"
+              >
+                <img 
+                  src={settingsIcon} 
+                  alt="Paramètres"
+                  className="h-[18px] w-auto brightness-0 invert shrink-0"
+                />
+                <span className={`text-xs truncate ${isActive("/settings") ? 'font-medium text-white' : 'font-light text-white/80'}`}>
+                  Paramètres
+                </span>
+              </a>
+            ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleToggle}
-                    className="shrink-0 hover:bg-white/10"
-                    aria-expanded={isExpanded}
-                    aria-label={isExpanded ? "Réduire le menu" : "Agrandir le menu"}
-                    data-testid="button-toggle-sidebar"
+                  <a
+                    href="/settings"
+                    onClick={handleNavClick("/settings")}
+                    className="flex h-10 items-center justify-center rounded-md bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] transition-all"
+                    data-testid="link-settings"
                   >
-                    {isExpanded ? (
-                      <ChevronLeft className="h-4 w-4 text-white" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-white" />
-                    )}
-                  </Button>
+                    <img 
+                      src={settingsIcon} 
+                      alt="Paramètres"
+                      className="h-[18px] w-auto brightness-0 invert"
+                    />
+                  </a>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
-                  {isExpanded ? "Réduire le menu" : "Agrandir le menu"}
+                  Paramètres
                 </TooltipContent>
               </Tooltip>
-            </div>
+            )}
+          </SidebarMenuItem>
+          
+          {/* Toggle sidebar button - separate line */}
+          <SidebarMenuItem className="px-0">
+            {isExpanded ? (
+              <button
+                onClick={handleToggle}
+                className="flex h-10 w-full items-center justify-start px-3 gap-3 transition-all bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] rounded-md"
+                aria-expanded={isExpanded}
+                data-testid="button-toggle-sidebar"
+              >
+                <ChevronLeft className="h-[18px] w-[18px] text-white/80 shrink-0" />
+                <span className="text-xs font-light text-white/80 italic truncate">
+                  Réduire le menu
+                </span>
+              </button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleToggle}
+                    className="flex h-10 w-full items-center justify-center rounded-md bg-transparent hover:bg-sidebar-accent/50 hover:rounded-[50px] transition-all"
+                    aria-expanded={isExpanded}
+                    data-testid="button-toggle-sidebar"
+                  >
+                    <ChevronRight className="h-[18px] w-[18px] text-white/80" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
+                  Agrandir le menu
+                </TooltipContent>
+              </Tooltip>
+            )}
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
