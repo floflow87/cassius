@@ -1273,7 +1273,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-lg font-black text-primary" data-testid="text-welcome-title">
+        <h1 className="text-lg font-medium text-primary" data-testid="text-welcome-title">
           Bienvenue {getUserFirstName()}
         </h1>
         <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>

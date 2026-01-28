@@ -597,6 +597,9 @@ function DeleteAccountSection({ profile }: { profile: UserProfile }) {
           <Input
             value={confirmationPhrase}
             onChange={(e) => setConfirmationPhrase(e.target.value)}
+            onPaste={(e) => e.preventDefault()}
+            onCopy={(e) => e.preventDefault()}
+            onCut={(e) => e.preventDefault()}
             placeholder={REQUIRED_PHRASE}
             className="border-destructive/30 focus-visible:ring-destructive/30 placeholder:text-[10px]"
             data-testid="input-delete-confirmation"
