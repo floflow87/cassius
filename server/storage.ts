@@ -1062,10 +1062,10 @@ export class DatabaseStorage implements IStorage {
 
     // Fetch radios and visites in parallel
     const [operationRadios, operationVisites] = await Promise.all([
-      // Get radios for this patient
+      // Get radios for this specific operation (not all patient radios)
       db.select().from(radios)
         .where(and(
-          eq(radios.patientId, operation.patientId),
+          eq(radios.operationId, id),
           eq(radios.organisationId, organisationId)
         ))
         .orderBy(desc(radios.date)),
