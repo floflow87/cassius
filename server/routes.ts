@@ -2311,11 +2311,21 @@ export async function registerRoutes(
 
       // Fetch status history, measurements, and visites to check for applied suggestions
       // Note: visites are linked to catalog implant.id, not surgeryImplant.id
-      const [statusHistory, measurements, visites] = await Promise.all([
-        storage.getImplantStatusHistory(organisationId, surgeryImplantId),
-        storage.getImplantMeasurements(organisationId, surgeryImplantId),
-        storage.getImplantVisites(organisationId, implant.implantId), // Use catalog implant ID for visites
-      ]);
+      // Wrap in try/catch to handle missing tables gracefully (e.g., in production)
+      let statusHistory: any[] = [];
+      let measurements: any[] = [];
+      let visites: any[] = [];
+      
+      try {
+        [statusHistory, measurements, visites] = await Promise.all([
+          storage.getImplantStatusHistory(organisationId, surgeryImplantId).catch(() => []),
+          storage.getImplantMeasurements(organisationId, surgeryImplantId).catch(() => []),
+          storage.getImplantVisites(organisationId, implant.implantId).catch(() => []), // Use catalog implant ID for visites
+        ]);
+      } catch (e) {
+        // Tables may not exist yet, continue with empty arrays
+        console.warn("[status-suggestions] Error fetching auxiliary data:", e);
+      }
 
       // Get last status change date
       const lastStatusChange = statusHistory.length > 0 ? new Date(statusHistory[0].changedAt) : null;
