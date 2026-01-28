@@ -69,6 +69,15 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { DocumentUploadForm } from "@/components/document-upload-form";
 import { RadioDrawer } from "@/components/radio-drawer";
 import type { DocumentWithDetails, Patient, Radio } from "@shared/schema";
@@ -871,19 +880,77 @@ export default function DocumentsPage() {
               </div>
             )}
             
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-48 placeholder-xs"
-                data-testid="input-search-documents"
-              />
-            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher un patient, document..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 w-64 text-xs"
+                    data-testid="input-search-documents"
+                  />
+                </div>
+              </PopoverTrigger>
+              {searchQuery.length > 1 && (
+                <PopoverContent className="w-64 p-0" align="start">
+                  <Command>
+                    <CommandList>
+                      <CommandEmpty className="py-2 px-3 text-xs text-muted-foreground">Aucun résultat</CommandEmpty>
+                      {patientsData && patientsData.filter((p: Patient) => 
+                        `${p.prenom} ${p.nom}`.toLowerCase().includes(searchQuery.toLowerCase())
+                      ).slice(0, 5).length > 0 && (
+                        <CommandGroup heading="Patients">
+                          {patientsData.filter((p: Patient) => 
+                            `${p.prenom} ${p.nom}`.toLowerCase().includes(searchQuery.toLowerCase())
+                          ).slice(0, 5).map((p: Patient) => (
+                            <CommandItem
+                              key={p.id}
+                              value={`${p.prenom} ${p.nom}`}
+                              onSelect={() => {
+                                setSearchQuery(`${p.prenom} ${p.nom}`);
+                                setCurrentPath([
+                                  { type: 'root', name: 'Documents' },
+                                  { type: 'patients', name: 'Par patient' },
+                                  { type: 'patient', id: p.id, name: `${p.prenom} ${p.nom}` }
+                                ]);
+                              }}
+                              className="text-xs cursor-pointer"
+                            >
+                              <User className="h-3 w-3 mr-2" />
+                              {p.prenom} {p.nom}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {filesData?.files && filesData.files.filter(f => 
+                        f.title.toLowerCase().includes(searchQuery.toLowerCase())
+                      ).slice(0, 5).length > 0 && (
+                        <CommandGroup heading="Documents & Radios">
+                          {filesData.files.filter(f => 
+                            f.title.toLowerCase().includes(searchQuery.toLowerCase())
+                          ).slice(0, 5).map(f => (
+                            <CommandItem
+                              key={f.id}
+                              value={f.title}
+                              onSelect={() => setSearchQuery(f.title)}
+                              className="text-xs cursor-pointer"
+                            >
+                              {f.sourceType === 'radio' ? <Image className="h-3 w-3 mr-2" /> : <FileText className="h-3 w-3 mr-2" />}
+                              <span className="truncate">{f.title}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              )}
+            </Popover>
             
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-              <SelectTrigger className="w-28" data-testid="select-sort">
+              <SelectTrigger className="w-28 text-xs" data-testid="select-sort">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

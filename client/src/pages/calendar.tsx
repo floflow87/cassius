@@ -1494,6 +1494,9 @@ export default function CalendarPage() {
   const [googleEventDrawerId, setGoogleEventDrawerId] = useState<string | null>(null);
   const [googleEventDrawerOpen, setGoogleEventDrawerOpen] = useState(false);
   
+  // Sidebar collapsed state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [quickCreateDate, setQuickCreateDate] = useState<Date | null>(null);
   
@@ -2007,23 +2010,33 @@ export default function CalendarPage() {
   
   return (
     <div className="flex h-full" data-testid="calendar-page">
-      <CalendarSidebar
-        selectedDate={selectedDate}
-        onDateSelect={handleMiniCalendarSelect}
-        appointments={appointments}
-        filters={filters}
-        onFiltersChange={setFilters}
-        sourceFilter={sourceFilter}
-        onSourceFilterChange={setSourceFilter}
-        showGoogleEvents={showGoogleEvents}
-        onShowGoogleEventsChange={setShowGoogleEvents}
-        conflictsCount={conflicts.length}
-        googleConnected={!!googleStatus?.connected}
-      />
+      {!sidebarCollapsed && (
+        <CalendarSidebar
+          selectedDate={selectedDate}
+          onDateSelect={handleMiniCalendarSelect}
+          appointments={appointments}
+          filters={filters}
+          onFiltersChange={setFilters}
+          sourceFilter={sourceFilter}
+          onSourceFilterChange={setSourceFilter}
+          showGoogleEvents={showGoogleEvents}
+          onShowGoogleEventsChange={setShowGoogleEvents}
+          conflictsCount={conflicts.length}
+          googleConnected={!!googleStatus?.connected}
+        />
+      )}
       
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between gap-4 p-4 border-b bg-background shrink-0">
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              data-testid="button-toggle-sidebar"
+            >
+              {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
             <Button variant="outline" size="sm" className="bg-white dark:bg-zinc-900" onClick={goToToday} data-testid="button-today">
               Aujourd&apos;hui
             </Button>

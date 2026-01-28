@@ -1155,32 +1155,32 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <h3 className="font-medium text-foreground">
+                        <h3 className="text-sm font-medium text-foreground">
                           {patient.prenom} {patient.nom}
                         </h3>
-                        <p className="text-xs text-muted-foreground">{displayId}</p>
+                        <p className="text-[10px] text-muted-foreground">{displayId}</p>
                       </div>
                       <CassiusBadge status={status}>
                         {getStatusLabel(status)}
                       </CassiusBadge>
                     </div>
                     
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-2 text-xs">
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5" />
+                        <Calendar className="h-3 w-3" />
                         <span>{formatDateWithAge(patient.dateNaissance)}</span>
                       </div>
                       
                       {patient.telephone && (
                         <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-3.5 w-3.5" />
+                          <Phone className="h-3 w-3" />
                           <span>{formatPhoneNumber(patient.telephone)}</span>
                         </div>
                       )}
                       
                       {patient.email && (
                         <div className="flex items-center gap-2 text-muted-foreground">
-                          <Mail className="h-3.5 w-3.5" />
+                          <Mail className="h-3 w-3" />
                           <span className="truncate">{patient.email}</span>
                         </div>
                       )}
