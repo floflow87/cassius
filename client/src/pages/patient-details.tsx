@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute, useLocation } from "wouter";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { motion } from "framer-motion";
 import {
@@ -1496,11 +1498,24 @@ export default function PatientDetailsPage() {
             {!appointmentsLoading && (() => {
               // Determine follow-up status: upcoming takes priority, then most recent completed/cancelled
               if (upcomingAppointments.length > 0) {
+                const nextAppointment = upcomingAppointments[0];
+                const appointmentDate = new Date(nextAppointment.dateStart);
+                const dateLabel = format(appointmentDate, "EEEE d MMMM yyyy", { locale: fr });
+                const timeLabel = format(appointmentDate, "HH:mm", { locale: fr });
                 return (
-                  <Badge className="bg-[#EFF6FF] text-blue-700 text-[10px] gap-1" data-testid="badge-followup-status">
-                    <Calendar className="w-3 h-3" />
-                    À venir
-                  </Badge>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge className="bg-[#EFF6FF] text-blue-700 text-[10px] gap-1 cursor-help" data-testid="badge-followup-status">
+                        <Calendar className="w-3 h-3" />
+                        À venir
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-white text-foreground border shadow-md">
+                      <p className="font-medium">{nextAppointment.title || nextAppointment.type}</p>
+                      <p className="text-xs capitalize">{dateLabel}</p>
+                      <p className="text-xs">à {timeLabel}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 );
               }
               if (completedAppointments.length > 0) {
