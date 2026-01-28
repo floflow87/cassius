@@ -41,10 +41,23 @@ const appointmentStatuses: { value: AppointmentStatus; label: string }[] = [
   { value: "CANCELLED", label: "Annulé" },
 ];
 
+const appointmentColors = [
+  { value: "#93c5fd", label: "Bleu", class: "bg-blue-300" },
+  { value: "#86efac", label: "Vert", class: "bg-green-300" },
+  { value: "#fca5a5", label: "Rouge", class: "bg-red-300" },
+  { value: "#fde047", label: "Jaune", class: "bg-yellow-300" },
+  { value: "#fdba74", label: "Orange", class: "bg-orange-300" },
+  { value: "#d1d5db", label: "Gris", class: "bg-gray-300" },
+  { value: "#c4b5fd", label: "Violet", class: "bg-violet-300" },
+  { value: "#f9a8d4", label: "Rose", class: "bg-pink-300" },
+  { value: "#5eead4", label: "Turquoise", class: "bg-teal-300" },
+];
+
 const formSchema = z.object({
   title: z.string().min(1, "Le titre est requis"),
   type: z.enum(["CONSULTATION", "SUIVI", "CHIRURGIE", "CONTROLE", "URGENCE", "AUTRE"]),
   status: z.enum(["UPCOMING", "COMPLETED", "CANCELLED"]),
+  color: z.string().nullable().optional(),
   dateStart: z.string().min(1, "La date est requise"),
   timeStart: z.string().min(1, "L'heure est requise"),
   description: z.string().optional(),
@@ -95,6 +108,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
       title: appointment?.title || "",
       type: appointment?.type || "CONSULTATION",
       status: appointment?.status || "UPCOMING",
+      color: (appointment as { color?: string | null })?.color || null,
       dateStart: appointment?.dateStart ? formatDateForInput(appointment.dateStart) : new Date().toISOString().split("T")[0],
       timeStart: appointment?.dateStart ? formatTimeForInput(appointment.dateStart) : "09:00",
       description: appointment?.description || "",
@@ -113,6 +127,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
         title: data.title,
         type: data.type,
         status: data.status,
+        color: data.color || null,
         dateStart,
         description: data.description || null,
         isq: data.isq,
@@ -145,6 +160,7 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
         title: data.title,
         type: data.type,
         status: data.status,
+        color: data.color || null,
         dateStart,
         description: data.description || null,
         isq: data.isq,
@@ -258,6 +274,31 @@ export function AppointmentForm({ patientId, appointment, onSuccess }: Appointme
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="color"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Couleur (optionnel)</FormLabel>
+              <div className="flex flex-wrap gap-2">
+                {appointmentColors.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => field.onChange(field.value === c.value ? null : c.value)}
+                    className={`w-7 h-7 rounded-full border-2 transition-all ${c.class} ${
+                      field.value === c.value ? "border-foreground ring-2 ring-foreground/20 scale-110" : "border-transparent hover:scale-105"
+                    }`}
+                    title={c.label}
+                    data-testid={`color-${c.value}`}
+                  />
+                ))}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {showImplantSelector && (
           <FormField
