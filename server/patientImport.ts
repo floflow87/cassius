@@ -169,7 +169,35 @@ export function mapCSVRow(row: CSVRow, customMapping?: ColumnMapping, debug = fa
   
   for (const [csvKey, value] of Object.entries(row)) {
     // Use custom mapping if provided, otherwise auto-detect
-    const mappedKey = customMapping ? customMapping[csvKey] : findFieldMapping(csvKey);
+    let mappedKey: keyof NormalizedPatient | null = null;
+    
+    if (customMapping) {
+      // Try exact match first
+      mappedKey = customMapping[csvKey] || null;
+      
+      // If no exact match, try trimmed key
+      if (!mappedKey) {
+        const trimmedKey = csvKey.trim();
+        mappedKey = customMapping[trimmedKey] || null;
+      }
+      
+      // If still no match, try to find by normalized name in mapping keys
+      if (!mappedKey) {
+        const normalizedCsvKey = normalizeColumnName(csvKey);
+        for (const [mapKey, mapValue] of Object.entries(customMapping)) {
+          if (normalizeColumnName(mapKey) === normalizedCsvKey && mapValue) {
+            mappedKey = mapValue as keyof NormalizedPatient;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Fall back to auto-detect if custom mapping didn't work
+    if (!mappedKey) {
+      mappedKey = findFieldMapping(csvKey);
+    }
+    
     if (mappedKey && value) {
       (result as any)[mappedKey] = value;
     }
@@ -562,10 +590,22 @@ export async function executeImport(
   console.log(`[IMPORT] Executing import for job ${jobId} with ${customMapping ? 'custom' : 'auto'} mapping`);
   if (!customMapping) {
     console.warn(`[IMPORT] No custom mapping found in stats. Stats keys: ${Object.keys(storedStats).join(', ')}`);
+  } else {
+    console.log(`[IMPORT] Custom mapping: ${JSON.stringify(customMapping)}`);
   }
   
   // Parse CSV with the stored mapping
-  const csvRows = parseCSV(csvContent);
+  const csvRows = parseCSV(csvContent, true); // Enable debug for first row
+  
+  // Log first row to debug
+  if (csvRows.length > 0) {
+    console.log(`[IMPORT] First CSV row keys: ${Object.keys(csvRows[0]).join(', ')}`);
+    console.log(`[IMPORT] First CSV row sample: ${JSON.stringify(csvRows[0])}`);
+    
+    // Test mapping on first row
+    const testResult = normalizeRow(csvRows[0], customMapping, true);
+    console.log(`[IMPORT] First row validation result: ${testResult.status}, errors: ${JSON.stringify(testResult.errors)}`);
+  }
   
   const stats: ImportStats = {
     total: csvRows.length,
