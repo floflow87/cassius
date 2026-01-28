@@ -264,9 +264,14 @@ function AuthenticatedApp() {
   const handleLogout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
-      // Clear user data immediately to trigger unauthenticated state
-      queryClient.setQueryData(["/api/auth/user"], null);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Clear ALL cached data to prevent data leakage between accounts
+      queryClient.clear();
+      // Also clear localStorage items that are user-specific
+      localStorage.removeItem("cassius_patients_sort");
+      localStorage.removeItem("cassius_patients_columns_order");
+      localStorage.removeItem("cassius_patients_view_mode");
+      localStorage.removeItem("cassius_checklist_open");
+      localStorage.removeItem("cassius_dashboard_layout");
     } catch (error) {
       console.error("Logout error:", error);
     }
