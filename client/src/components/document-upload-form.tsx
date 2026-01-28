@@ -290,9 +290,26 @@ export function DocumentUploadForm({
         fileName: file.name,
         mimeType: file.type,
       });
+      
+      // Check if response is OK before parsing JSON
+      if (!urlRes.ok) {
+        const errorText = await urlRes.text().catch(() => "Unknown error");
+        console.error("Upload URL request failed:", urlRes.status, errorText);
+        throw new Error(`Erreur serveur: ${urlRes.status}`);
+      }
+      
+      // Check content type before parsing
+      const contentType = urlRes.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await urlRes.text();
+        console.error("Expected JSON but got:", contentType, text.substring(0, 200));
+        throw new Error("Réponse serveur invalide");
+      }
+      
       const urlData = await urlRes.json();
       
       if (!urlData.signedUrl || !urlData.filePath) {
+        console.error("Missing signedUrl or filePath in response:", urlData);
         throw new Error("Impossible d'obtenir l'URL d'upload");
       }
 
