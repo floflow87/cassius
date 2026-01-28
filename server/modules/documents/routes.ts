@@ -66,8 +66,9 @@ export function createDocumentsRouter(
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors });
       }
-      logger.error("Error creating upload URL", { error: (error as Error).message });
-      res.status(500).json({ error: "Failed to create upload URL" });
+      const errorMessage = (error as Error).message || "Unknown error";
+      logger.error("Error creating upload URL", { error: errorMessage });
+      res.status(500).json({ error: "Failed to create upload URL", details: errorMessage });
     }
   });
 
