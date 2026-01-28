@@ -3621,8 +3621,21 @@ export async function registerRoutes(
         console.error("Flag detection failed after appointment update:", err)
       );
       
-      // Send notification about updated appointment
+      // Audit log - always log
       const userId = getUserId(req);
+      if (userId) {
+        auditService.log({
+          organisationId,
+          userId,
+          entityType: "APPOINTMENT",
+          entityId: appointment.id,
+          action: "UPDATE",
+          details: `RDV modifié : ${appointment.title || appointment.type}`,
+          metadata: { patientId: appointment.patientId, updatedFields: Object.keys(updateData) },
+        }).catch(err => console.error("[Audit] Failed to log appointment update:", err));
+      }
+      
+      // Send notification about updated appointment
       if (userId && appointment.patientId) {
         const patient = await storage.getPatient(organisationId, appointment.patientId);
         const currentUser = await storage.getUserById(userId!);
@@ -3647,17 +3660,6 @@ export async function registerRoutes(
           actorName,
           contextLabel: appointment.description || '',
         }).catch(err => console.error("[Notification] Appointment updated notification failed:", err));
-        
-        // Audit log
-        auditService.log({
-          organisationId,
-          userId,
-          entityType: "APPOINTMENT",
-          entityId: appointment.id,
-          action: "UPDATE",
-          details: `RDV modifié : ${appointment.title || appointment.type}`,
-          metadata: { patientId: appointment.patientId, updatedFields: Object.keys(updateData) },
-        });
       }
       
       res.json(appointment);
