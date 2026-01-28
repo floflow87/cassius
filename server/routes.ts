@@ -7895,10 +7895,8 @@ export async function registerRoutes(
 
   // Get recent activity for dashboard
   app.get("/api/audit/recent", requireJwtOrSession, async (req: Request, res: Response) => {
-    const organisationId = (req as any).organisationId;
-    if (!organisationId) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
     
     try {
       const limit = parseInt(req.query.limit as string) || 10;
@@ -7912,10 +7910,8 @@ export async function registerRoutes(
 
   // Get audit history for a specific entity
   app.get("/api/audit/:entityType/:entityId", requireJwtOrSession, async (req: Request, res: Response) => {
-    const organisationId = (req as any).organisationId;
-    if (!organisationId) {
-      return res.status(401).json({ error: "Non authentifié" });
-    }
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
     
     try {
       const { entityType, entityId } = req.params;

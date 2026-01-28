@@ -14,9 +14,12 @@ interface AuditLog {
   details: string | null;
   metadata: string | null;
   createdAt: string;
-  userName: string | null;
-  userPrenom: string | null;
-  userNom: string | null;
+  user: {
+    id: string;
+    nom: string | null;
+    prenom: string | null;
+    username: string | null;
+  } | null;
 }
 
 interface AuditHistoryProps {
@@ -59,9 +62,9 @@ function AuditLogItem({ log }: { log: AuditLog }) {
   const label = actionLabels[log.action] || log.action;
   const colorClass = actionColors[log.action] || "bg-gray-100 text-gray-700";
   
-  const userName = log.userPrenom && log.userNom
-    ? `${log.userPrenom} ${log.userNom}`
-    : log.userName || "Utilisateur inconnu";
+  const userName = log.user?.prenom && log.user?.nom
+    ? `${log.user.prenom} ${log.user.nom}`
+    : log.user?.username || "Utilisateur inconnu";
 
   return (
     <div className="flex items-start gap-3 py-2 border-b last:border-b-0 border-border/50">
