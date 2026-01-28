@@ -2564,7 +2564,7 @@ export default function PatientDetailsPage() {
                         className="border-b border-border-gray/50 last:border-b-0 hover:bg-muted/30 transition-colors cursor-pointer"
                         data-testid={`row-operation-${operation.id}`}
                         onClick={() => {
-                          window.location.href = `/patients/${patient.id}/operations/${operation.id}`;
+                          window.location.href = `/actes/${operation.id}`;
                         }}
                       >
                         {operationColumns.map((column) => (
