@@ -1813,19 +1813,54 @@ export default function CalendarPage() {
   
   const handleEventDrop = useCallback((info: EventDropArg) => {
     const { event } = info;
+    
+    // Round minutes to nearest 00, 15, 30, or 45
+    const roundToQuarter = (date: Date): Date => {
+      const rounded = new Date(date);
+      const minutes = rounded.getMinutes();
+      const roundedMinutes = Math.round(minutes / 15) * 15;
+      rounded.setMinutes(roundedMinutes % 60);
+      // If rounded to 60, add an hour
+      if (roundedMinutes === 60) {
+        rounded.setHours(rounded.getHours() + 1);
+      }
+      rounded.setSeconds(0, 0);
+      return rounded;
+    };
+    
+    const roundedStart = roundToQuarter(event.start!);
+    const roundedEnd = event.end ? roundToQuarter(event.end) : undefined;
+    
     updateMutation.mutate({
       id: event.id,
-      dateStart: event.start!,
-      dateEnd: event.end || undefined,
+      dateStart: roundedStart,
+      dateEnd: roundedEnd,
     });
   }, [updateMutation]);
   
   const handleEventResize = useCallback((info: EventResizeDoneArg) => {
     const { event } = info;
+    
+    // Round minutes to nearest 00, 15, 30, or 45
+    const roundToQuarter = (date: Date): Date => {
+      const rounded = new Date(date);
+      const minutes = rounded.getMinutes();
+      const roundedMinutes = Math.round(minutes / 15) * 15;
+      rounded.setMinutes(roundedMinutes % 60);
+      if (roundedMinutes === 60) {
+        rounded.setHours(rounded.getHours() + 1);
+      }
+      rounded.setSeconds(0, 0);
+      return rounded;
+    };
+    
+    const roundedStart = roundToQuarter(event.start!);
+    const roundedEnd = event.end ? roundToQuarter(event.end) : undefined;
+    
     updateMutation.mutate({
       id: event.id,
-      dateStart: event.start!,
-      dateEnd: event.end || undefined,
+      dateStart: roundedStart,
+      dateEnd: roundedEnd,
     });
   }, [updateMutation]);
   
