@@ -35,11 +35,13 @@ export const ONBOARDING_STEPS = [
   { id: 7, title: "Documents", description: "Uploadez un premier document", required: false },
 ];
 
-export function useOnboarding() {
+export function useOnboarding(options?: { enabled?: boolean }) {
   const queryClient = useQueryClient();
+  const enabled = options?.enabled ?? true;
 
   const { data: state, isLoading, error, refetch } = useQuery<OnboardingStateResponse>({
     queryKey: ["/api/onboarding"],
+    enabled,
   });
 
   const patchMutation = useMutation({

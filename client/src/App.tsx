@@ -246,8 +246,8 @@ function AuthenticatedApp() {
     enabled: !!user,
   });
 
-  // Check onboarding status for new users
-  const { state: onboardingState, isLoading: onboardingLoading } = useOnboarding();
+  // Check onboarding status for new users (only when authenticated)
+  const { state: onboardingState, isLoading: onboardingLoading } = useOnboarding({ enabled: !!user });
   
   // Redirect to onboarding if needed (new user with incomplete onboarding)
   useEffect(() => {
