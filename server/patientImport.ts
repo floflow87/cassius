@@ -650,42 +650,36 @@ export async function executeImport(
         // Find matching patient now (during import, not validation)
         const match = await findMatchingPatient(organisationId, normalized);
         
+        // Build patient data object, only including defined fields
+        const patientData: Record<string, any> = {
+          nom: normalized.nom,
+          prenom: normalized.prenom,
+        };
+        
+        // Only add optional fields if they have values
+        if (normalized.fileNumber) patientData.fileNumber = normalized.fileNumber;
+        if (normalized.ssn) patientData.ssn = normalized.ssn;
+        if (normalized.dateNaissance) patientData.dateNaissance = normalized.dateNaissance;
+        if (normalized.sexe) patientData.sexe = normalized.sexe;
+        if (normalized.telephone) patientData.telephone = normalized.telephone;
+        if (normalized.email) patientData.email = normalized.email;
+        if (normalized.addressFull) patientData.addressFull = normalized.addressFull;
+        if (normalized.codePostal) patientData.codePostal = normalized.codePostal;
+        if (normalized.ville) patientData.ville = normalized.ville;
+        if (normalized.pays) patientData.pays = normalized.pays;
+        
         if (match.patientId) {
           // Update existing patient
           await db
             .update(patients)
-            .set({
-              fileNumber: normalized.fileNumber,
-              ssn: normalized.ssn,
-              nom: normalized.nom,
-              prenom: normalized.prenom,
-              dateNaissance: normalized.dateNaissance,
-              sexe: normalized.sexe,
-              telephone: normalized.telephone,
-              email: normalized.email,
-              addressFull: normalized.addressFull,
-              codePostal: normalized.codePostal,
-              ville: normalized.ville,
-              pays: normalized.pays,
-            })
+            .set(patientData)
             .where(eq(patients.id, match.patientId));
           stats.toUpdate++;
         } else {
           // Create new patient
           await db.insert(patients).values({
             organisationId,
-            fileNumber: normalized.fileNumber,
-            ssn: normalized.ssn,
-            nom: normalized.nom,
-            prenom: normalized.prenom,
-            dateNaissance: normalized.dateNaissance,
-            sexe: normalized.sexe,
-            telephone: normalized.telephone,
-            email: normalized.email,
-            addressFull: normalized.addressFull,
-            codePostal: normalized.codePostal,
-            ville: normalized.ville,
-            pays: normalized.pays,
+            ...patientData,
           });
           stats.toCreate++;
         }
