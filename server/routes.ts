@@ -6018,6 +6018,81 @@ export async function registerRoutes(
     }
   });
   
+  // DELETE /api/settings/account - Delete own account
+  app.delete("/api/settings/account", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+      
+      const { confirmationPhrase } = req.body;
+      if (confirmationPhrase !== "supprimer mon compte") {
+        return res.status(400).json({ error: "Phrase de confirmation incorrecte" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+      
+      // Check if user is owner
+      if (user.isOwner) {
+        // Get all users in organisation
+        const orgUsers = await storage.getUsersByOrganisation(organisationId);
+        
+        if (orgUsers.length > 1) {
+          // Owner cannot delete account if there are other users
+          return res.status(400).json({ 
+            error: "Vous êtes le propriétaire de l'organisation. Vous devez d'abord supprimer tous les autres membres ou transférer la propriété avant de supprimer votre compte." 
+          });
+        }
+        
+        // Owner is alone - delete entire organisation and all its data
+        console.log(`[SETTINGS] Deleting organisation ${organisationId} and all data (owner leaving)`);
+        
+        // Delete all organisation data in order (respecting foreign key constraints)
+        await storage.deleteOrganisationData(organisationId);
+        
+        // Clear session/JWT
+        if (req.session) {
+          req.session.destroy((err: any) => {
+            if (err) console.error("[SETTINGS] Error destroying session:", err);
+          });
+        }
+        
+        return res.json({ 
+          success: true, 
+          message: "Votre compte et toutes les données de l'organisation ont été supprimés.",
+          organisationDeleted: true
+        });
+      }
+      
+      // Non-owner user - just delete the user account
+      console.log(`[SETTINGS] Deleting user account ${userId}`);
+      await storage.deleteUser(userId);
+      
+      // Clear session/JWT
+      if (req.session) {
+        req.session.destroy((err: any) => {
+          if (err) console.error("[SETTINGS] Error destroying session:", err);
+        });
+      }
+      
+      return res.json({ 
+        success: true, 
+        message: "Votre compte a été supprimé.",
+        organisationDeleted: false
+      });
+    } catch (error: any) {
+      console.error("[SETTINGS] Error deleting account:", error);
+      res.status(500).json({ error: "Erreur lors de la suppression du compte" });
+    }
+  });
+  
   // PUT /api/settings/organisation - Update organisation (admin only)
   app.put("/api/settings/organisation", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

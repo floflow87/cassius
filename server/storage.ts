@@ -225,6 +225,7 @@ export interface IStorage {
   createOrganisation(data: InsertOrganisation): Promise<Organisation>;
   getOrganisationById(id: string): Promise<Organisation | undefined>;
   updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; telephone: string; timezone: string }>): Promise<Organisation | undefined>;
+  deleteOrganisationData(organisationId: string): Promise<boolean>;
 
   // Audit Log methods
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
@@ -2419,6 +2420,65 @@ export class DatabaseStorage implements IStorage {
   async updateOrganisation(id: string, data: Partial<{ nom: string; adresse: string; telephone: string; timezone: string }>): Promise<Organisation | undefined> {
     const [org] = await db.update(organisations).set(data as any).where(eq(organisations.id, id)).returning();
     return org;
+  }
+  
+  async deleteOrganisationData(organisationId: string): Promise<boolean> {
+    // Delete all organisation data in proper order (respecting foreign key constraints)
+    // Use transactions to ensure atomicity
+    await db.transaction(async (tx) => {
+      // 1. Delete notifications
+      await tx.delete(notifications).where(eq(notifications.organisationId, organisationId));
+      
+      // 2. Delete flags
+      await tx.delete(flags).where(eq(flags.organisationId, organisationId));
+      
+      // 3. Delete audit logs
+      await tx.delete(auditLogs).where(eq(auditLogs.organisationId, organisationId));
+      
+      // 4. Delete notes
+      await tx.delete(notes).where(eq(notes.organisationId, organisationId));
+      
+      // 5. Delete documents
+      await tx.delete(documents).where(eq(documents.organisationId, organisationId));
+      
+      // 6. Delete radios
+      await tx.delete(radios).where(eq(radios.organisationId, organisationId));
+      
+      // 7. Delete appointments
+      await tx.delete(appointments).where(eq(appointments.organisationId, organisationId));
+      
+      // 8. Delete surgery_implants (via operations)
+      const ops = await tx.select({ id: operations.id }).from(operations).where(eq(operations.organisationId, organisationId));
+      for (const op of ops) {
+        await tx.delete(surgeryImplants).where(eq(surgeryImplants.operationId, op.id));
+      }
+      
+      // 9. Delete operations
+      await tx.delete(operations).where(eq(operations.organisationId, organisationId));
+      
+      // 10. Delete patients
+      await tx.delete(patients).where(eq(patients.organisationId, organisationId));
+      
+      // 11. Delete implants (catalog)
+      await tx.delete(implants).where(eq(implants.organisationId, organisationId));
+      
+      // 12. Delete calendar integrations
+      await tx.delete(calendarIntegrations).where(eq(calendarIntegrations.organisationId, organisationId));
+      
+      // 13. Delete notification preferences
+      await tx.delete(notificationPreferences).where(eq(notificationPreferences.organisationId, organisationId));
+      
+      // 14. Delete invitations
+      await tx.delete(invitations).where(eq(invitations.organisationId, organisationId));
+      
+      // 15. Delete users
+      await tx.delete(users).where(eq(users.organisationId, organisationId));
+      
+      // 16. Finally delete organisation
+      await tx.delete(organisations).where(eq(organisations.id, organisationId));
+    });
+    
+    return true;
   }
 
   // ========== AUDIT LOGS ==========

@@ -528,7 +528,129 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
           </Sheet>
         </CardContent>
       </Card>
+
+      <DeleteAccountSection profile={profile} />
     </div>
+  );
+}
+
+function DeleteAccountSection({ profile }: { profile: UserProfile }) {
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [confirmationPhrase, setConfirmationPhrase] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
+  const REQUIRED_PHRASE = "supprimer mon compte";
+  const isPhraseValid = confirmationPhrase.toLowerCase().trim() === REQUIRED_PHRASE;
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", "/api/settings/account", {
+        confirmationPhrase: confirmationPhrase.toLowerCase().trim(),
+      });
+    },
+    onSuccess: async (response) => {
+      const data = await response.json();
+      toast({ 
+        title: "Compte supprimé", 
+        description: data.message,
+        variant: "success" 
+      });
+      setShowDeleteDialog(false);
+      // Redirect to login page
+      window.location.href = "/login";
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Erreur", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  return (
+    <Card className="border-destructive/50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 font-semibold text-sm text-destructive">
+          <Trash2 className="w-4 h-4" />
+          Supprimer mon compte
+        </CardTitle>
+        <CardDescription className="font-light text-xs">
+          Cette action est irréversible. Toutes vos données seront définitivement supprimées.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-destructive font-light">
+              Une fois votre compte supprimé, il est impossible de revenir en arrière. Veuillez en être certain.
+            </p>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label className="text-xs font-light">
+            Pour confirmer, tapez <span className="font-medium text-destructive">{REQUIRED_PHRASE}</span> ci-dessous
+          </Label>
+          <Input
+            value={confirmationPhrase}
+            onChange={(e) => setConfirmationPhrase(e.target.value)}
+            placeholder={REQUIRED_PHRASE}
+            className="border-destructive/30 focus-visible:ring-destructive/30"
+            data-testid="input-delete-confirmation"
+          />
+        </div>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="destructive"
+              disabled={!isPhraseValid}
+              className="w-full"
+              data-testid="button-delete-account"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Supprimer mon compte
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="w-5 h-5" />
+                Confirmation de suppression
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>Êtes-vous absolument certain de vouloir supprimer votre compte ?</p>
+                <p className="font-medium">Cette action est irréversible et entraînera :</p>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  <li>La suppression définitive de votre compte utilisateur</li>
+                  <li>La perte de toutes vos préférences et paramètres</li>
+                  <li>Si vous êtes le seul membre de l'organisation, toutes les données de l'organisation seront également supprimées</li>
+                </ul>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteAccountMutation.mutate()}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={deleteAccountMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteAccountMutation.isPending ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 mr-2" />
+                )}
+                Oui, supprimer mon compte
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
   );
 }
 
