@@ -934,6 +934,8 @@ export default function PatientDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "timeline"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/audit/recent"] });
       setEditDialogOpen(false);
       toast({
         title: "Patient mis à jour",
@@ -956,6 +958,8 @@ export default function PatientDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "timeline"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/audit/recent"] });
       setMedicalDialogOpen(false);
       toast({
         title: "Contexte médical mis à jour",

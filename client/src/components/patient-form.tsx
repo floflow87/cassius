@@ -61,6 +61,7 @@ export function PatientForm({ onSuccess }: PatientFormProps) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/onboarding/checklist"] });
       toast({
         title: "Patient créé",
         description: "Le patient a été ajouté avec succès.",

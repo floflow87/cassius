@@ -1341,6 +1341,16 @@ export default function DashboardPage() {
             </div>
           );
         }
+        
+        // Render recent-activities in half-width
+        if (blockId === "recent-activities") {
+          return (
+            <div key={`${blockId}-grid`} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {renderBlock(blockId)}
+            </div>
+          );
+        }
+        
         return renderBlock(blockId);
       })}
 
