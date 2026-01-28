@@ -1480,22 +1480,48 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const [surgeryImplant, flagSummary, visitMeasurements] = await Promise.all([
-        storage.getSurgeryImplantWithDetails(organisationId, req.params.id),
-        storage.getSurgeryImplantFlagSummary(organisationId, req.params.id),
-        storage.getImplantMeasurements(organisationId, req.params.id),
-      ]);
+      // Fetch surgery implant details first
+      let surgeryImplant;
+      try {
+        surgeryImplant = await storage.getSurgeryImplantWithDetails(organisationId, req.params.id);
+      } catch (err: any) {
+        console.error("[surgery-implants/:id] Error fetching surgery implant details:", err?.message || err);
+        throw err;
+      }
+      
       if (!surgeryImplant) {
         return res.status(404).json({ error: "Implant not found" });
       }
+
+      // Fetch flag summary and measurements with error protection
+      let flagSummary: { topFlag?: any; activeFlagCount: number } = { topFlag: undefined, activeFlagCount: 0 };
+      let visitMeasurements: any[] = [];
+      
+      try {
+        flagSummary = await storage.getSurgeryImplantFlagSummary(organisationId, req.params.id);
+      } catch (err: any) {
+        console.error("[surgery-implants/:id] Error fetching flag summary:", err?.message || err);
+      }
+      
+      try {
+        visitMeasurements = await storage.getImplantMeasurements(organisationId, req.params.id);
+      } catch (err: any) {
+        // Table might not exist in production yet
+        if (err?.code === "42P01") {
+          console.warn("[surgery-implants/:id] implant_measurements table does not exist, returning empty array");
+        } else {
+          console.error("[surgery-implants/:id] Error fetching measurements:", err?.message || err);
+        }
+      }
+
       res.json({
         ...surgeryImplant,
         latestIsq: computeLatestIsq(surgeryImplant, visitMeasurements),
         topFlag: flagSummary.topFlag,
         activeFlagCount: flagSummary.activeFlagCount,
       });
-    } catch (error) {
-      console.error("Error fetching surgery implant:", error);
+    } catch (error: any) {
+      console.error("Error fetching surgery implant:", error?.message || error);
       res.status(500).json({ error: "Failed to fetch surgery implant" });
     }
   });
