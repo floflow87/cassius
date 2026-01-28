@@ -1831,6 +1831,13 @@ export class DatabaseStorage implements IStorage {
       implantsByStatus[status] = (implantsByStatus[status] || 0) + 1;
     });
 
+    // Count radios by type
+    const radiosByType: Record<string, number> = {};
+    allRadios.forEach((radio) => {
+      const type = radio.typeRadio || "RETROALVEOLAIRE";
+      radiosByType[type] = (radiosByType[type] || 0) + 1;
+    });
+
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
@@ -1870,6 +1877,7 @@ export class DatabaseStorage implements IStorage {
       previousMonthOperations,
       previousMonthPatients,
       implantsByStatus,
+      radiosByType,
       recentOperations: allOperations.slice(0, 10),
     };
   }

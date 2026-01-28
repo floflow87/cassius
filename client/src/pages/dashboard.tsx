@@ -616,7 +616,7 @@ export default function DashboardPage() {
                   return visitDate.toDateString() === today.toDateString();
                 }).length },
                 { label: "Cette semaine", value: upcomingVisites.length },
-                { label: "À planifier", value: Math.max(0, 15 - upcomingVisites.length) },
+                { label: "Total planifiées", value: upcomingVisites.length },
               ]}
             />
             <SecondaryStatCard
@@ -624,9 +624,9 @@ export default function DashboardPage() {
               icon={<FileImage className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
               iconBgColor="bg-orange-100 dark:bg-orange-900/30"
               stats={[
-                { label: "CBCT", value: Math.floor((stats?.totalRadios || 0) * 0.1) },
-                { label: "Panoramiques", value: Math.floor((stats?.totalRadios || 0) * 0.25) },
-                { label: "Post-op", value: Math.floor((stats?.totalRadios || 0) * 0.65) },
+                { label: "CBCT", value: stats?.radiosByType?.["CBCT"] || 0 },
+                { label: "Panoramiques", value: stats?.radiosByType?.["PANORAMIQUE"] || 0 },
+                { label: "Rétroalvéolaires", value: stats?.radiosByType?.["RETROALVEOLAIRE"] || 0 },
               ]}
             />
             <SecondaryStatCard

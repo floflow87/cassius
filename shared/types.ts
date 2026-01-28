@@ -262,6 +262,7 @@ export interface DashboardStats {
   previousMonthOperations: number;
   previousMonthPatients: number;
   implantsByStatus: Record<string, number>;
+  radiosByType?: Record<string, number>;
   recentOperations: Operation[];
 }
 
