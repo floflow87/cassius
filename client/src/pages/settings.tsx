@@ -598,23 +598,23 @@ function DeleteAccountSection({ profile }: { profile: UserProfile }) {
             value={confirmationPhrase}
             onChange={(e) => setConfirmationPhrase(e.target.value)}
             placeholder={REQUIRED_PHRASE}
-            className="border-destructive/30 focus-visible:ring-destructive/30"
+            className="border-destructive/30 focus-visible:ring-destructive/30 placeholder:text-[10px]"
             data-testid="input-delete-confirmation"
           />
         </div>
 
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogTrigger asChild>
-            <Button
-              variant="destructive"
-              disabled={!isPhraseValid}
-              className="w-full"
-              data-testid="button-delete-account"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Supprimer mon compte
-            </Button>
-          </AlertDialogTrigger>
+        <div className="flex justify-end">
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                disabled={!isPhraseValid}
+                data-testid="button-delete-account"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Supprimer mon compte
+              </Button>
+            </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-destructive">
@@ -649,6 +649,7 @@ function DeleteAccountSection({ profile }: { profile: UserProfile }) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        </div>
       </CardContent>
     </Card>
   );
