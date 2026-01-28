@@ -287,20 +287,33 @@ export function RadioUploadForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Lier à une opération (optionnel)</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ""}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une opération" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {operations.map((op) => (
-                      <SelectItem key={op.id} value={op.id}>
-                        {formatDate(op.dateOperation)} - {op.typeIntervention.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Sélectionner une opération" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {operations.map((op) => (
+                        <SelectItem key={op.id} value={op.id}>
+                          {formatDate(op.dateOperation)} - {op.typeIntervention.replace(/_/g, " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {field.value && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => field.onChange("")}
+                      data-testid="button-clear-operation"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -319,20 +332,33 @@ export function RadioUploadForm({
               return (
                 <FormItem>
                   <FormLabel>Lier à un implant (optionnel)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un implant" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {validSurgeryImplants.map((surgeryImp) => (
-                        <SelectItem key={surgeryImp.id} value={surgeryImp.implantId}>
-                          Site {surgeryImp.siteFdi} - {surgeryImp.implant.marque} ({surgeryImp.implant.diametre}x{surgeryImp.implant.longueur}mm)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Sélectionner un implant" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {validSurgeryImplants.map((surgeryImp) => (
+                          <SelectItem key={surgeryImp.id} value={surgeryImp.implantId}>
+                            Site {surgeryImp.siteFdi} - {surgeryImp.implant.marque} ({surgeryImp.implant.diametre}x{surgeryImp.implant.longueur}mm)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {field.value && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => field.onChange("")}
+                        data-testid="button-clear-implant"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                   <FormMessage />
                 </FormItem>
               );
