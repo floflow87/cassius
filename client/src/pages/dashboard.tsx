@@ -18,12 +18,13 @@ import {
   Settings,
   GripVertical,
   History,
-  User as UserIcon,
-  Pencil,
+  UserCircle,
+  FileEdit,
   Trash2,
   Eye,
-  ArchiveRestore,
-  FileCheck,
+  Archive,
+  RotateCcw,
+  Clock,
 } from "lucide-react";
 import {
   DndContext,
@@ -1175,13 +1176,13 @@ export default function DashboardPage() {
               ) : recentActivities && recentActivities.length > 0 ? (
                 <div className="space-y-2">
                   {recentActivities.slice(0, 5).map((activity: any) => {
-                    const actionIcons: Record<string, any> = {
-                      CREATE: <Plus className="h-3 w-3 text-green-600" />,
-                      UPDATE: <Pencil className="h-3 w-3 text-blue-600" />,
-                      DELETE: <Trash2 className="h-3 w-3 text-red-600" />,
-                      VIEW: <Eye className="h-3 w-3 text-gray-600" />,
-                      ARCHIVE: <ArchiveRestore className="h-3 w-3 text-amber-600" />,
-                      RESTORE: <ArchiveRestore className="h-3 w-3 text-green-600" />,
+                    const actionIconComponents: Record<string, any> = {
+                      CREATE: Plus,
+                      UPDATE: FileEdit,
+                      DELETE: Trash2,
+                      VIEW: Eye,
+                      ARCHIVE: Archive,
+                      RESTORE: RotateCcw,
                     };
                     const actionLabels: Record<string, string> = {
                       CREATE: "Création",
@@ -1191,36 +1192,46 @@ export default function DashboardPage() {
                       ARCHIVE: "Archivage",
                       RESTORE: "Restauration",
                     };
-                    const entityLabels: Record<string, string> = {
-                      PATIENT: "Patient",
-                      OPERATION: "Acte",
-                      SURGERY_IMPLANT: "Implant posé",
-                      CATALOG_IMPLANT: "Implant catalogue",
-                      DOCUMENT: "Document",
-                      RADIO: "Radiographie",
-                      APPOINTMENT: "Rendez-vous",
+                    const actionColors: Record<string, string> = {
+                      CREATE: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+                      UPDATE: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+                      DELETE: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+                      VIEW: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
+                      ARCHIVE: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+                      RESTORE: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
                     };
+                    
+                    const userName = activity.user?.prenom && activity.user?.nom
+                      ? `${activity.user.prenom} ${activity.user.nom}`
+                      : activity.user?.username || "Utilisateur inconnu";
+                    
+                    const ActionIcon = actionIconComponents[activity.action] || History;
+                    const label = actionLabels[activity.action] || activity.action;
+                    const colorClass = actionColors[activity.action] || "bg-gray-100 text-gray-700";
+                    
                     return (
-                      <div key={activity.id} className="flex items-center gap-3 p-2 rounded-md hover-elevate" data-testid={`activity-item-${activity.id}`}>
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center">
-                          {actionIcons[activity.action] || <FileCheck className="h-3 w-3" />}
+                      <div key={activity.id} className="flex items-start gap-3 py-2 border-b last:border-b-0 border-border/50" data-testid={`activity-item-${activity.id}`}>
+                        <div className={`p-1.5 rounded-full ${colorClass}`}>
+                          <ActionIcon className="w-3 h-3" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium">
-                              {actionLabels[activity.action] || activity.action}
-                            </span>
-                            <Badge variant="outline" className="text-[10px] px-1 py-0">
-                              {entityLabels[activity.entityType] || activity.entityType}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="text-[10px] font-normal">
+                              {label}
                             </Badge>
-                          </div>
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                            <UserIcon className="h-2.5 w-2.5" />
-                            <span>{activity.userName || "Système"}</span>
-                            <span>•</span>
-                            <span>
-                              {format(new Date(activity.createdAt), "dd/MM à HH:mm", { locale: fr })}
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <UserCircle className="w-3 h-3" />
+                              {userName}
                             </span>
+                          </div>
+                          {activity.details && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {activity.details}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+                            <Clock className="w-2.5 h-2.5" />
+                            {format(new Date(activity.createdAt), "dd MMM yyyy à HH:mm", { locale: fr })}
                           </div>
                         </div>
                       </div>

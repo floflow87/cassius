@@ -1292,7 +1292,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                           <tr 
                             key={si.id} 
                             className="border-b border-border-gray hover-elevate cursor-pointer"
-                            onClick={() => si.patient?.id && setLocation(`/patients/${si.patient.id}`)}
+                            onClick={() => si.patient?.id && setLocation(`/patients/${si.patient.id}/implants/${si.id}`)}
                             data-testid={`row-implant-${si.id}`}
                           >
                             {implantColumns.map((column) => (

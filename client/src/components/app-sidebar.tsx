@@ -233,6 +233,9 @@ export function AppSidebar() {
           
           {/* Toggle sidebar button - separate line */}
           <SidebarMenuItem className="px-0">
+            {isExpanded && (
+              <div className="w-full h-px bg-white/20 mb-2" />
+            )}
             {isExpanded ? (
               <button
                 onClick={handleToggle}
@@ -240,8 +243,8 @@ export function AppSidebar() {
                 aria-expanded={isExpanded}
                 data-testid="button-toggle-sidebar"
               >
-                <ChevronLeft className="h-[18px] w-[18px] text-white/80 shrink-0" />
-                <span className="text-xs font-light text-white/80 italic truncate">
+                <ChevronLeft className="h-[18px] w-[18px] text-primary shrink-0" />
+                <span className="text-xs font-light text-primary italic truncate">
                   Réduire le menu
                 </span>
               </button>
