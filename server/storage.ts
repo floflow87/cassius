@@ -1371,23 +1371,34 @@ export class DatabaseStorage implements IStorage {
 
     const { surgeryImplant, implant, surgery, patient } = joinedData[0];
 
-    // Parallel fetch for visites, radios, and measurements (using catalog implant.id and surgeryImplant.id)
+    // Parallel fetch for visites and radios (using catalog implant.id)
     const t2 = Date.now();
-    const [implantVisites, implantRadios, implantMeasurementsData] = await Promise.all([
+    const [implantVisites, implantRadios] = await Promise.all([
       db.select().from(visites)
         .where(and(eq(visites.implantId, implant.id), eq(visites.organisationId, organisationId)))
         .orderBy(desc(visites.date)),
       db.select().from(radios)
         .where(and(eq(radios.implantId, implant.id), eq(radios.organisationId, organisationId)))
         .orderBy(desc(radios.date)),
-      db.select().from(implantMeasurements)
-        .where(and(eq(implantMeasurements.surgeryImplantId, surgeryImplant.id), eq(implantMeasurements.organisationId, organisationId)))
-        .orderBy(desc(implantMeasurements.measuredAt)),
     ]);
     const d2 = Date.now() - t2;
 
+    // Fetch measurements separately with error protection (table may not exist in production)
+    let implantMeasurementsData: any[] = [];
+    try {
+      implantMeasurementsData = await db.select().from(implantMeasurements)
+        .where(and(eq(implantMeasurements.surgeryImplantId, surgeryImplant.id), eq(implantMeasurements.organisationId, organisationId)))
+        .orderBy(desc(implantMeasurements.measuredAt));
+    } catch (err: any) {
+      if (err?.code === "42P01") {
+        console.warn("[IMPLANT-DETAIL] implant_measurements table does not exist, returning empty array");
+      } else {
+        console.error("[IMPLANT-DETAIL] Error fetching measurements:", err?.message || err);
+      }
+    }
+
     const total = Date.now() - start;
-    console.log(`[IMPLANT-DETAIL] id=${id} total=${total}ms join=${d1}ms visites+radios+measurements=${d2}ms visites=${implantVisites.length} radios=${implantRadios.length} measurements=${implantMeasurementsData.length}`);
+    console.log(`[IMPLANT-DETAIL] id=${id} total=${total}ms join=${d1}ms visites+radios=${d2}ms visites=${implantVisites.length} radios=${implantRadios.length} measurements=${implantMeasurementsData.length}`);
 
     return {
       ...surgeryImplant,
