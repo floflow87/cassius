@@ -146,6 +146,7 @@ export interface IStorage {
     organisationId: string,
     operationData: InsertOperation,
     implantsData: Array<{
+      implantId?: string; // Use existing catalog implant if provided
       typeImplant?: "IMPLANT" | "MINI_IMPLANT";
       marque: string;
       referenceFabricant?: string | null;
@@ -1155,6 +1156,7 @@ export class DatabaseStorage implements IStorage {
     organisationId: string,
     operationData: InsertOperation,
     implantsData: Array<{
+      implantId?: string; // Use existing catalog implant if provided
       typeImplant?: "IMPLANT" | "MINI_IMPLANT";
       marque: string;
       referenceFabricant?: string | null;
@@ -1180,20 +1182,30 @@ export class DatabaseStorage implements IStorage {
 
       const createdSurgeryImplants: SurgeryImplant[] = [];
       for (const implantData of implantsData) {
-        const [implant] = await tx.insert(implants).values({
-          organisationId,
-          typeImplant: implantData.typeImplant || "IMPLANT",
-          marque: implantData.marque,
-          referenceFabricant: implantData.referenceFabricant || null,
-          diametre: implantData.diametre,
-          longueur: implantData.longueur,
-          lot: implantData.lot || null,
-        }).returning();
+        let catalogImplantId: string;
+        
+        // If implantId is provided, use existing catalog implant
+        // Otherwise, create a new catalog implant (legacy behavior for manual entry)
+        if (implantData.implantId) {
+          catalogImplantId = implantData.implantId;
+        } else {
+          // Create new catalog implant only if no existing implantId is provided
+          const [newImplant] = await tx.insert(implants).values({
+            organisationId,
+            typeImplant: implantData.typeImplant || "IMPLANT",
+            marque: implantData.marque,
+            referenceFabricant: implantData.referenceFabricant || null,
+            diametre: implantData.diametre,
+            longueur: implantData.longueur,
+            lot: implantData.lot || null,
+          }).returning();
+          catalogImplantId = newImplant.id;
+        }
 
         const [surgeryImplant] = await tx.insert(surgeryImplants).values({
           organisationId,
           surgeryId: operation.id,
-          implantId: implant.id,
+          implantId: catalogImplantId,
           siteFdi: implantData.siteFdi,
           positionImplant: implantData.positionImplant as any || null,
           typeOs: implantData.typeOs as any || null,

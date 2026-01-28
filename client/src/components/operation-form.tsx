@@ -191,6 +191,8 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
         );
         return {
           ...implant,
+          // Pass the existing catalog implantId so the backend reuses it
+          implantId: implant.catalogImplantId,
           marque: catalogImplant?.marque || "",
           referenceFabricant: catalogImplant?.referenceFabricant || "",
           diametre: catalogImplant?.diametre || 0,

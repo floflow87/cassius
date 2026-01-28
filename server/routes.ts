@@ -1099,6 +1099,9 @@ export async function registerRoutes(
   const operationWithImplantsSchema = insertOperationSchema.extend({
     implants: z.array(
       z.object({
+        // If implantId is provided, use existing catalog implant
+        implantId: z.string().optional(),
+        // Otherwise, these fields are used to create a new catalog implant
         typeImplant: z.enum(["IMPLANT", "MINI_IMPLANT"]).optional().default("IMPLANT"),
         marque: z.string(),
         referenceFabricant: z.string().optional(),
