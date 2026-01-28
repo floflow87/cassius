@@ -845,8 +845,9 @@ export default function PatientDetailsPage() {
         tag: data.tag,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "notes"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/patients", patientId, "notes"] });
       setNoteContent("");
       setSelectedTag(null);
       toast({ title: "Note ajoutée", description: "La note a été créée avec succès.", variant: "success" });
