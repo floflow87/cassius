@@ -293,7 +293,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         return column;
       }
     } catch {}
-    return null;
+    return "patient"; // Default sort by patient name
   });
 
   const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
@@ -304,7 +304,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         return direction;
       }
     } catch {}
-    return null;
+    return "asc"; // Default ascending order
   });
 
   const [draggedColumn, setDraggedColumn] = useState<ColumnId | null>(null);
@@ -493,13 +493,15 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
       
       switch (sortColumn) {
         case "patient":
-          comparison = `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`);
+          comparison = `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`, 'fr', { sensitivity: 'base' });
           break;
         case "dateNaissance":
-          comparison = new Date(a.dateNaissance).getTime() - new Date(b.dateNaissance).getTime();
+          const dateNaissA = a.dateNaissance ? new Date(a.dateNaissance).getTime() : 0;
+          const dateNaissB = b.dateNaissance ? new Date(b.dateNaissance).getTime() : 0;
+          comparison = dateNaissA - dateNaissB;
           break;
         case "contact":
-          comparison = (a.telephone || "").localeCompare(b.telephone || "");
+          comparison = (a.telephone || "").localeCompare(b.telephone || "", 'fr', { sensitivity: 'base' });
           break;
         case "implants":
           comparison = (implantCounts?.[a.id] || 0) - (implantCounts?.[b.id] || 0);
