@@ -2703,8 +2703,6 @@ export async function registerRoutes(
     }
   });
 
-  // DEPRECATED: Continue disabling /api/documents routes
-  if (false) {
   // Get signed upload URL for client-side document upload
   app.post("/api/documents/upload-url", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -2743,7 +2741,6 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to get upload URL" });
     }
   });
-  } // End of second deprecated block
 
   // Get all documents for a patient (signed URLs fetched on-demand) - KEEP ACTIVE
   app.get("/api/patients/:patientId/documents", requireJwtOrSession, async (req, res) => {
