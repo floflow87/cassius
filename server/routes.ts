@@ -3662,7 +3662,7 @@ export async function registerRoutes(
       );
       
       // Audit log - always log
-      const userId = getUserId(req);
+      const userId = req.jwtUser?.userId;
       if (userId) {
         auditService.log({
           organisationId,
