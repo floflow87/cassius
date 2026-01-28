@@ -96,11 +96,16 @@ const DEFAULT_PREFERENCES: DashboardPreferences = {
   hiddenBlocks: [],
 };
 
-const STORAGE_KEY = "cassius-dashboard-preferences";
+const STORAGE_KEY_PREFIX = "cassius-dashboard-preferences";
 
-function loadPreferences(): DashboardPreferences {
+function getStorageKey(userId: string): string {
+  return `${STORAGE_KEY_PREFIX}-${userId}`;
+}
+
+function loadPreferences(userId?: string): DashboardPreferences {
+  if (!userId) return DEFAULT_PREFERENCES;
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(getStorageKey(userId));
     if (stored) {
       const parsed = JSON.parse(stored);
       return {
@@ -114,9 +119,10 @@ function loadPreferences(): DashboardPreferences {
   return DEFAULT_PREFERENCES;
 }
 
-function savePreferences(prefs: DashboardPreferences) {
+function savePreferences(prefs: DashboardPreferences, userId?: string) {
+  if (!userId) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    localStorage.setItem(getStorageKey(userId), JSON.stringify(prefs));
   } catch (e) {
     console.error("Failed to save dashboard preferences:", e);
   }
@@ -340,7 +346,24 @@ export default function DashboardPage() {
   const [newActeSheetOpen, setNewActeSheetOpen] = useState(false);
   const [selectedPatientForActe, setSelectedPatientForActe] = useState<string | null>(null);
   const [actePatientPopoverOpen, setActePatientPopoverOpen] = useState(false);
-  const [preferences, setPreferences] = useState<DashboardPreferences>(loadPreferences);
+  
+  // User query first - needed for per-user preferences
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+  
+  // Per-user dashboard preferences
+  const [preferences, setPreferences] = useState<DashboardPreferences>(DEFAULT_PREFERENCES);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  
+  // Load preferences when user is available
+  useEffect(() => {
+    if (user?.id && !prefsLoaded) {
+      setPreferences(loadPreferences(user.id));
+      setPrefsLoaded(true);
+    }
+  }, [user?.id, prefsLoaded]);
+  
   const [newRdvData, setNewRdvData] = useState({
     patientId: "",
     titre: "",
@@ -369,7 +392,7 @@ export default function DashboardPage() {
       const newOrder = arrayMove(preferences.blockOrder, oldIndex, newIndex);
       const newPrefs = { ...preferences, blockOrder: newOrder };
       setPreferences(newPrefs);
-      savePreferences(newPrefs);
+      savePreferences(newPrefs, user?.id);
     }
   };
 
@@ -380,7 +403,7 @@ export default function DashboardPage() {
       : [...preferences.hiddenBlocks, blockId];
     const newPrefs = { ...preferences, hiddenBlocks: newHidden };
     setPreferences(newPrefs);
-    savePreferences(newPrefs);
+    savePreferences(newPrefs, user?.id);
   };
 
   // Check if block is visible
@@ -389,10 +412,6 @@ export default function DashboardPage() {
   // Get visible blocks in order
   const visibleBlocksInOrder = preferences.blockOrder.filter(id => isBlockVisible(id));
 
-  const { data: user } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-  });
-  
   const { data: stats, isLoading: loadingStats } = useQuery<BasicStats>({
     queryKey: ["/api/stats"],
   });
@@ -1254,7 +1273,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-lg font-medium" data-testid="text-welcome-title">
+        <h1 className="text-lg font-black text-primary" data-testid="text-welcome-title">
           Bienvenue {getUserFirstName()}
         </h1>
         <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
@@ -1308,51 +1327,45 @@ export default function DashboardPage() {
       )}
 
       {/* Dynamic block rendering based on user preferences */}
-      {visibleBlocksInOrder.map((blockId, index) => {
-        // Group rdv-upcoming and alerts in a 2-column grid
-        if (blockId === "rdv-upcoming" || blockId === "alerts") {
-          // Find if both are visible and consecutive
-          const otherBlockId = blockId === "rdv-upcoming" ? "alerts" : "rdv-upcoming";
-          const otherIndex = visibleBlocksInOrder.indexOf(otherBlockId);
-          const bothVisible = otherIndex !== -1;
-          const areConsecutive = bothVisible && Math.abs(otherIndex - index) === 1;
+      {(() => {
+        // Half-width blocks that can be paired together
+        const halfWidthBlocks = ["rdv-upcoming", "alerts", "recent-activities"];
+        const rendered = new Set<string>();
+        
+        return visibleBlocksInOrder.map((blockId, index) => {
+          // Skip if already rendered as part of a pair
+          if (rendered.has(blockId)) return null;
           
-          // If both are consecutive, only render grid on the first one
-          if (areConsecutive && index > otherIndex) {
-            return null; // Skip, already rendered in the grid
-          }
-          
-          if (areConsecutive) {
-            // Render both in a grid
-            const firstBlock = index < otherIndex ? blockId : otherBlockId;
-            const secondBlock = index < otherIndex ? otherBlockId : blockId;
+          // Check if this is a half-width block
+          if (halfWidthBlocks.includes(blockId)) {
+            // Look for the next visible half-width block to pair with
+            const nextBlock = visibleBlocksInOrder[index + 1];
+            const canPair = nextBlock && halfWidthBlocks.includes(nextBlock) && !rendered.has(nextBlock);
+            
+            if (canPair) {
+              // Mark both as rendered
+              rendered.add(blockId);
+              rendered.add(nextBlock);
+              return (
+                <div key={`${blockId}-${nextBlock}-grid`} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {renderBlock(blockId)}
+                  {renderBlock(nextBlock)}
+                </div>
+              );
+            }
+            
+            // Render single half-width block
+            rendered.add(blockId);
             return (
-              <div key="rdv-alerts-grid" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {renderBlock(firstBlock)}
-                {renderBlock(secondBlock)}
+              <div key={`${blockId}-grid`} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {renderBlock(blockId)}
               </div>
             );
           }
           
-          // Render single block in a half-width grid (allows empty space beside)
-          return (
-            <div key={`${blockId}-grid`} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {renderBlock(blockId)}
-            </div>
-          );
-        }
-        
-        // Render recent-activities in half-width
-        if (blockId === "recent-activities") {
-          return (
-            <div key={`${blockId}-grid`} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {renderBlock(blockId)}
-            </div>
-          );
-        }
-        
-        return renderBlock(blockId);
-      })}
+          return renderBlock(blockId);
+        });
+      })()}
 
     </div>
   );
