@@ -2868,7 +2868,7 @@ export default function PatientDetailsPage() {
                                 <p className="text-[9px] text-muted-foreground mb-2">
                                   {formatNoteDatetime(note.createdAt)}
                                 </p>
-                                <p className="text-[10px] text-foreground whitespace-pre-wrap">
+                                <p className="text-[12px] text-foreground whitespace-pre-wrap">
                                   {note.contenu}
                                 </p>
                               </div>
