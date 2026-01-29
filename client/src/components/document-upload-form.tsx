@@ -116,32 +116,14 @@ export function DocumentUploadForm({
 
   const documentMutation = useMutation({
     mutationFn: async (data: DocumentFormData) => {
-      // Direct fetch to bypass any caching issues
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-        },
-        body: JSON.stringify({ ...data, patientId }),
-        credentials: "include",
+      // Use apiRequest which handles credentials properly
+      const res = await apiRequest("POST", "/api/documents", {
+        ...data,
+        patientId,
       });
       
-      if (!res.ok) {
-        const errorText = await res.text().catch(() => "Unknown error");
-        console.error("Document API error:", res.status, errorText);
-        throw new Error(`Erreur ${res.status}: ${errorText}`);
-      }
-      
-      const contentType = res.headers.get("content-type");
-      console.log("Document response content-type:", contentType, "status:", res.status);
-      
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await res.text();
-        console.error("Expected JSON, got:", contentType, text.substring(0, 500));
-        throw new Error("Réponse serveur invalide");
-      }
-      
+      // The response should be JSON - if we get here, res.ok is true
+      // apiRequest already checks for errors
       return res.json();
     },
     onSuccess: () => {
@@ -176,14 +158,7 @@ export function DocumentUploadForm({
         mimeType: data.mimeType,
         sizeBytes: data.sizeBytes,
       });
-      const resClone = res.clone();
-      try {
-        return await res.json();
-      } catch (e) {
-        const rawText = await resClone.text();
-        console.error("Radio mutation JSON parse failed:", e, "Raw:", rawText.substring(0, 500));
-        throw new Error("Erreur serveur: réponse invalide");
-      }
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "radios"] });
