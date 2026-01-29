@@ -120,7 +120,14 @@ export function DocumentUploadForm({
         ...data,
         patientId,
       });
-      return res.json();
+      const resClone = res.clone();
+      try {
+        return await res.json();
+      } catch (e) {
+        const rawText = await resClone.text();
+        console.error("Document mutation JSON parse failed:", e, "Raw:", rawText.substring(0, 500));
+        throw new Error("Erreur serveur: réponse invalide");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "documents"] });
@@ -154,7 +161,14 @@ export function DocumentUploadForm({
         mimeType: data.mimeType,
         sizeBytes: data.sizeBytes,
       });
-      return res.json();
+      const resClone = res.clone();
+      try {
+        return await res.json();
+      } catch (e) {
+        const rawText = await resClone.text();
+        console.error("Radio mutation JSON parse failed:", e, "Raw:", rawText.substring(0, 500));
+        throw new Error("Erreur serveur: réponse invalide");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "radios"] });
