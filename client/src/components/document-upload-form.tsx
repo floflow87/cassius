@@ -116,18 +116,33 @@ export function DocumentUploadForm({
 
   const documentMutation = useMutation({
     mutationFn: async (data: DocumentFormData) => {
-      const res = await apiRequest("POST", "/api/documents", {
-        ...data,
-        patientId,
+      // Direct fetch to bypass any caching issues
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+        },
+        body: JSON.stringify({ ...data, patientId }),
+        credentials: "include",
       });
-      const resClone = res.clone();
-      try {
-        return await res.json();
-      } catch (e) {
-        const rawText = await resClone.text();
-        console.error("Document mutation JSON parse failed:", e, "Raw:", rawText.substring(0, 500));
-        throw new Error("Erreur serveur: réponse invalide");
+      
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => "Unknown error");
+        console.error("Document API error:", res.status, errorText);
+        throw new Error(`Erreur ${res.status}: ${errorText}`);
       }
+      
+      const contentType = res.headers.get("content-type");
+      console.log("Document response content-type:", contentType, "status:", res.status);
+      
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await res.text();
+        console.error("Expected JSON, got:", contentType, text.substring(0, 500));
+        throw new Error("Réponse serveur invalide");
+      }
+      
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "documents"] });
