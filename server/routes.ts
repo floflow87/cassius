@@ -2900,6 +2900,8 @@ export async function registerRoutes(
         });
       }
       
+      console.log("[DEBUG] Creating document response:", { docId: doc?.id, docTitle: doc?.title });
+      res.setHeader('X-API-Response', 'true');
       res.status(201).json(doc);
     } catch (error) {
       if (error instanceof z.ZodError) {

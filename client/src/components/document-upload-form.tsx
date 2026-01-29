@@ -122,8 +122,22 @@ export function DocumentUploadForm({
         patientId,
       });
       
-      // The response should be JSON - if we get here, res.ok is true
-      // apiRequest already checks for errors
+      // Debug: Check if response came from our API
+      const apiResponse = res.headers.get('X-API-Response');
+      const contentType = res.headers.get('content-type');
+      console.log("[DEBUG] Document POST response:", { 
+        status: res.status, 
+        apiResponse, 
+        contentType,
+        url: res.url 
+      });
+      
+      if (!apiResponse) {
+        const text = await res.text();
+        console.error("[DEBUG] Not from API, got:", text.substring(0, 300));
+        throw new Error("Réponse invalide - pas de notre API");
+      }
+      
       return res.json();
     },
     onSuccess: () => {
