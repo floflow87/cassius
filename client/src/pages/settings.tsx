@@ -48,7 +48,9 @@ import {
   ChevronRight,
   Circle,
   SkipForward,
-  Sparkles
+  Sparkles,
+  FileText,
+  ShieldCheck
 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -156,7 +158,7 @@ export default function SettingsPage() {
   
   useEffect(() => {
     const newTab = urlParams.get("tab");
-    if (newTab && ["security", "notifications", "collaborators", "organization", "integrations"].includes(newTab)) {
+    if (newTab && ["security", "notifications", "privacy", "collaborators", "organization", "integrations"].includes(newTab)) {
       setActiveTab(newTab);
     }
   }, [searchString]);
@@ -185,6 +187,7 @@ export default function SettingsPage() {
             {[
               { value: "security", label: "Informations & Sécurité", icon: Shield, show: true },
               { value: "notifications", label: "Notifications", icon: Bell, show: true },
+              { value: "privacy", label: "Confidentialité", icon: ShieldCheck, show: true },
               { value: "collaborators", label: "Collaborateurs", icon: Users, show: userIsAdmin },
               { value: "organization", label: "Organisation", icon: Building2, show: userIsAdmin },
               { value: "integrations", label: "Intégrations", icon: Link2, show: !userWasInvited && !userIsAssistant },
@@ -226,6 +229,17 @@ export default function SettingsPage() {
           
           <TabsContent value="notifications">
             <NotificationsSection />
+          </TabsContent>
+          
+          <TabsContent value="privacy">
+            {profile ? (
+              <PrivacySection profile={profile} />
+            ) : (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                Chargement...
+              </div>
+            )}
           </TabsContent>
           
           {userIsAdmin && (
@@ -528,7 +542,176 @@ function SecuritySection({ profile, onProfileUpdate }: { profile: UserProfile; o
           </Sheet>
         </CardContent>
       </Card>
+    </div>
+  );
+}
 
+function PrivacySection({ profile }: { profile: UserProfile }) {
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+
+  return (
+    <div className="space-y-6">
+      {/* Conformité et protection des données */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 font-semibold text-sm">
+            <ShieldCheck className="w-4 h-4" />
+            Conformité et protection des données
+          </CardTitle>
+          <CardDescription className="font-light text-xs">
+            Découvrez comment nous protégeons vos données et respectons votre vie privée.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Dialog open={showPrivacyPolicy} onOpenChange={setShowPrivacyPolicy}>
+            <DialogTrigger asChild>
+              <Button variant="outline" data-testid="button-privacy-policy">
+                <FileText className="w-4 h-4 mr-2" />
+                Lire notre politique de confidentialité
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
+                  Politique de confidentialité
+                </DialogTitle>
+              </DialogHeader>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <h2 className="text-lg font-semibold text-primary mt-4">Notre engagement pour la confidentialité et la protection des données</h2>
+                
+                <p className="text-muted-foreground italic">
+                  Chez Cassius, la confidentialité n'est pas une option.<br />
+                  C'est un principe fondateur, une responsabilité éthique et une exigence absolue.
+                </p>
+                
+                <p className="text-sm">
+                  Nous accompagnons des professionnels de santé dans le suivi clinique de leurs patients. À ce titre, nous manipulons des données sensibles, parfois critiques, qui exigent un niveau d'exigence maximal en matière de sécurité, de confidentialité et de conformité réglementaire.
+                </p>
+                
+                <p className="text-sm">
+                  Ce manifeste décrit nos engagements concrets, les principes qui guident nos choix techniques, et les droits dont vous disposez.
+                </p>
+
+                <h3 className="text-base font-semibold mt-6">1. Une approche fondée sur la confiance et la responsabilité</h3>
+                <p className="text-sm">
+                  <strong>Les données que vous confiez à Cassius ne nous appartiennent pas.</strong><br />
+                  Elles restent la propriété exclusive des professionnels et des organisations qui les utilisent.
+                </p>
+                <p className="text-sm">Notre rôle est de :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>les héberger de manière sécurisée,</li>
+                  <li>les traiter uniquement dans le cadre des fonctionnalités prévues,</li>
+                  <li>garantir leur intégrité, leur confidentialité et leur disponibilité,</li>
+                  <li>et ne jamais en faire un usage détourné.</li>
+                </ul>
+                <p className="text-sm font-medium">Aucune exploitation commerciale des données médicales n'est réalisée, directement ou indirectement.</p>
+
+                <h3 className="text-base font-semibold mt-6">2. Données collectées : sobriété et finalité claire</h3>
+                <p className="text-sm">Cassius applique un principe strict de <strong>minimisation des données</strong>.</p>
+                <p className="text-sm">Nous ne collectons que les informations strictement nécessaires au bon fonctionnement de l'application, notamment :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>données d'identification des utilisateurs professionnels,</li>
+                  <li>données organisationnelles (cabinet, structure, rôles),</li>
+                  <li>données cliniques saisies volontairement par les praticiens (patients, implants, suivis, mesures ISQ, documents, rendez-vous),</li>
+                  <li>données techniques indispensables à la sécurité et à la traçabilité (logs, horodatages, historiques).</li>
+                </ul>
+                <p className="text-sm font-medium">Aucune donnée n'est collectée à l'insu de l'utilisateur.</p>
+
+                <h3 className="text-base font-semibold mt-6">3. Données de santé : un niveau de protection renforcé</h3>
+                <p className="text-sm">Les données de santé sont considérées comme <strong>hautement sensibles</strong>.</p>
+                <p className="text-sm">À ce titre, Cassius met en œuvre :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>une séparation stricte des données par organisation (multi-tenant sécurisé),</li>
+                  <li>des contrôles d'accès fins basés sur les rôles (RBAC),</li>
+                  <li>une traçabilité complète des actions (audit trail),</li>
+                  <li>une protection renforcée contre les accès non autorisés.</li>
+                </ul>
+                <p className="text-sm font-medium">Les données de santé ne sont jamais utilisées à des fins publicitaires, marketing ou statistiques externes sans anonymisation complète.</p>
+
+                <h3 className="text-base font-semibold mt-6">4. Hébergement et sécurité technique</h3>
+                <p className="text-sm">Les données sont hébergées sur des infrastructures sécurisées, conformes aux standards de l'industrie.</p>
+                <p className="text-sm">Cassius applique notamment :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>chiffrement des communications (HTTPS / TLS),</li>
+                  <li>chiffrement des données au repos lorsque possible,</li>
+                  <li>sauvegardes régulières,</li>
+                  <li>mécanismes de redondance,</li>
+                  <li>surveillance des accès et des anomalies,</li>
+                  <li>mises à jour de sécurité continues.</li>
+                </ul>
+
+                <h3 className="text-base font-semibold mt-6">5. Accès aux données et contrôle utilisateur</h3>
+                <p className="text-sm">Chaque utilisateur n'accède qu'aux données auxquelles son rôle l'autorise.</p>
+                <p className="text-sm">Les administrateurs d'organisation peuvent :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>gérer les accès et les rôles,</li>
+                  <li>contrôler les utilisateurs actifs,</li>
+                  <li>révoquer des accès à tout moment.</li>
+                </ul>
+
+                <h3 className="text-base font-semibold mt-6">6. Respect du RGPD et des réglementations en vigueur</h3>
+                <p className="text-sm">Cassius est conçu pour respecter les principes du <strong>Règlement Général sur la Protection des Données (RGPD)</strong>, notamment :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>Licéité, loyauté et transparence</li>
+                  <li>Limitation des finalités</li>
+                  <li>Minimisation des données</li>
+                  <li>Exactitude</li>
+                  <li>Limitation de la conservation</li>
+                  <li>Intégrité et confidentialité</li>
+                </ul>
+                <p className="text-sm mt-2">Les utilisateurs disposent notamment des droits suivants :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>droit d'accès à leurs données,</li>
+                  <li>droit de rectification,</li>
+                  <li>droit à la limitation du traitement,</li>
+                  <li>droit à l'effacement lorsque la loi le permet,</li>
+                  <li>droit à la portabilité des données.</li>
+                </ul>
+
+                <h3 className="text-base font-semibold mt-6">7. Conservation et suppression des données</h3>
+                <p className="text-sm">Les données sont conservées :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>aussi longtemps que nécessaire à l'usage professionnel,</li>
+                  <li>conformément aux obligations légales et médicales applicables,</li>
+                  <li>ou selon les paramètres définis par l'organisation utilisatrice.</li>
+                </ul>
+                <p className="text-sm font-medium">Aucune donnée n'est conservée indéfiniment sans justification.</p>
+
+                <h3 className="text-base font-semibold mt-6">8. Partage et sous-traitants</h3>
+                <p className="text-sm">Cassius s'appuie sur des prestataires techniques reconnus (hébergement, authentification, communication), sélectionnés pour leur niveau de sécurité et leur conformité réglementaire.</p>
+                <p className="text-sm">Ces prestataires :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>n'accèdent aux données que lorsque cela est strictement nécessaire,</li>
+                  <li>sont soumis à des obligations contractuelles strictes,</li>
+                  <li>ne peuvent pas exploiter les données pour leur propre compte.</li>
+                </ul>
+
+                <h3 className="text-base font-semibold mt-6">9. Support et confidentialité</h3>
+                <p className="text-sm">Lorsque vous contactez le support Cassius :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>seules les informations nécessaires au diagnostic sont consultées,</li>
+                  <li>l'accès aux données est limité et temporaire,</li>
+                  <li>aucune action n'est réalisée sans votre accord ou votre demande explicite.</li>
+                </ul>
+                <p className="text-sm font-medium">La confidentialité s'applique aussi au support.</p>
+
+                <h3 className="text-base font-semibold mt-6">10. Une démarche d'amélioration continue</h3>
+                <p className="text-sm">La sécurité et la confidentialité ne sont pas des états figés.</p>
+                <p className="text-sm">Cassius s'engage à :</p>
+                <ul className="text-sm list-disc pl-5 space-y-1">
+                  <li>améliorer continuellement ses mécanismes de protection,</li>
+                  <li>auditer régulièrement ses pratiques,</li>
+                  <li>adapter ses procédures aux évolutions réglementaires,</li>
+                  <li>intégrer la sécurité dès la conception des nouvelles fonctionnalités (privacy by design).</li>
+                </ul>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
+
+      {/* Supprimer mon compte */}
       <DeleteAccountSection profile={profile} />
     </div>
   );
