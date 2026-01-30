@@ -64,7 +64,7 @@ import type {
 } from "@shared/types";
 import { z } from "zod";
 import { db, pool, testConnection, getDbEnv, getDbConnectionInfo } from "./db";
-import { eq, sql, and, inArray, notInArray, desc } from "drizzle-orm";
+import { eq, sql, and, inArray, notInArray, desc, asc } from "drizzle-orm";
 
 function getOrganisationId(req: Request, res: Response): string | null {
   const organisationId = req.jwtUser?.organisationId || (req.user as any)?.organisationId;
