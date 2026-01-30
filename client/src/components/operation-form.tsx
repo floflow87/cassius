@@ -59,6 +59,8 @@ const implantSchema = z.object({
 });
 
 const protheseSchema = z.object({
+  marque: z.string().optional(),
+  referenceFabricant: z.string().optional(),
   typeProthese: z.enum(["vissee", "scellee"]),
   quantite: z.enum(["unitaire", "plurale"]),
   mobilite: z.enum(["amovible", "fixe"]),
@@ -107,6 +109,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
   const { toast } = useToast();
   const [accordionValue, setAccordionValue] = useState<string[]>(["procedure"]);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
+  const [protheseMarqueOpen, setProtheseMarqueOpen] = useState(false);
 
   const { data: catalogImplants = [], isLoading: isCatalogLoading, isError: isCatalogError } = useQuery<Implant[]>({
     queryKey: ["/api/implants"],
@@ -733,6 +736,102 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
 
               {watchHasProthese && (
                 <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="prothese.marque"
+                    render={({ field }) => {
+                      const catalogProtheses = catalogImplants.filter(i => i.typeImplant === "PROTHESE");
+                      const uniqueBrands = Array.from(new Set(catalogProtheses.map(p => p.marque))).sort();
+                      
+                      if (uniqueBrands.length === 0) {
+                        return (
+                          <FormItem>
+                            <FormLabel>Marque</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Saisir la marque..." 
+                                {...field} 
+                                value={field.value || ""}
+                                data-testid="input-marque-prothese"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }
+                      
+                      return (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Marque</FormLabel>
+                          <Popover open={protheseMarqueOpen} onOpenChange={setProtheseMarqueOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn(
+                                    "justify-between",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                  data-testid="select-marque-prothese"
+                                >
+                                  {field.value || "Sélectionner une marque..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[300px] p-0">
+                              <Command>
+                                <CommandInput placeholder="Rechercher une marque..." />
+                                <CommandList>
+                                  <CommandEmpty>Aucune marque trouvée</CommandEmpty>
+                                  <CommandGroup heading="Marques du catalogue">
+                                    {uniqueBrands.map((brand) => (
+                                      <CommandItem
+                                        key={brand}
+                                        value={brand}
+                                        onSelect={() => {
+                                          field.onChange(brand);
+                                          setProtheseMarqueOpen(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            field.value === brand ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        {brand}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="prothese.referenceFabricant"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Référence fabricant</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Référence..." 
+                            {...field} 
+                            value={field.value || ""}
+                            data-testid="input-reference-prothese"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="prothese.typeProthese"
