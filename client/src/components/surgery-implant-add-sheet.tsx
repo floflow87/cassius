@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2, Search } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +38,7 @@ export function SurgeryImplantAddSheet({
   onSuccess,
 }: SurgeryImplantAddSheetProps) {
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [selectedImplantId, setSelectedImplantId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -57,15 +57,20 @@ export function SurgeryImplantAddSheet({
     enabled: open,
   });
 
-  const filteredImplants = catalogImplants.filter((implant) => {
-    const search = searchTerm.toLowerCase();
-    return (
-      implant.marque.toLowerCase().includes(search) ||
-      implant.referenceFabricant?.toLowerCase().includes(search) ||
-      `${implant.diametre}`.includes(search) ||
-      `${implant.longueur}`.includes(search)
-    );
-  });
+  const brands = useMemo(() => {
+    const uniqueBrands = Array.from(new Set(catalogImplants.map((i) => i.marque)));
+    return uniqueBrands.sort((a, b) => a.localeCompare(b));
+  }, [catalogImplants]);
+
+  const dimensionsForBrand = useMemo(() => {
+    if (!selectedBrand) return [];
+    return catalogImplants
+      .filter((i) => i.marque === selectedBrand)
+      .sort((a, b) => {
+        if (a.diametre !== b.diametre) return a.diametre - b.diametre;
+        return a.longueur - b.longueur;
+      });
+  }, [catalogImplants, selectedBrand]);
 
   const selectedImplant = catalogImplants.find((i) => i.id === selectedImplantId);
 
@@ -110,7 +115,7 @@ export function SurgeryImplantAddSheet({
   });
 
   const resetForm = () => {
-    setSearchTerm("");
+    setSelectedBrand(null);
     setSelectedImplantId(null);
     setFormData({
       siteFdi: "",
@@ -122,6 +127,11 @@ export function SurgeryImplantAddSheet({
       isqPose: "",
       statut: "EN_SUIVI",
     });
+  };
+
+  const handleBrandChange = (brand: string) => {
+    setSelectedBrand(brand);
+    setSelectedImplantId(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -139,49 +149,51 @@ export function SurgeryImplantAddSheet({
           <SheetTitle>Ajouter un implant</SheetTitle>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div className="space-y-2">
-            <Label>Sélectionner un implant du catalogue</Label>
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par marque, référence..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-                data-testid="input-search-implant"
-              />
-            </div>
-          </div>
-
           {loadingCatalog ? (
             <div className="flex justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
           ) : (
-            <div className="max-h-48 overflow-y-auto border rounded-md">
-              {filteredImplants.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Aucun implant trouvé
-                </p>
-              ) : (
-                filteredImplants.map((implant) => (
-                  <div
-                    key={implant.id}
-                    className={`p-3 cursor-pointer border-b last:border-b-0 hover-elevate ${
-                      selectedImplantId === implant.id ? "bg-primary/10" : ""
-                    }`}
-                    onClick={() => setSelectedImplantId(implant.id)}
-                    data-testid={`option-implant-${implant.id}`}
-                  >
-                    <p className="text-sm font-medium">{implant.marque}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {implant.diametre}mm x {implant.longueur}mm
-                      {implant.referenceFabricant && ` - ${implant.referenceFabricant}`}
-                    </p>
-                  </div>
-                ))
+            <>
+              <div className="space-y-2">
+                <Label>Marque</Label>
+                <Select value={selectedBrand || ""} onValueChange={handleBrandChange}>
+                  <SelectTrigger data-testid="select-brand">
+                    <SelectValue placeholder="Sélectionner une marque" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand} value={brand} data-testid={`option-brand-${brand}`}>
+                        {brand}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedBrand && (
+                <div className="space-y-2">
+                  <Label>Dimensions</Label>
+                  <Select value={selectedImplantId || ""} onValueChange={setSelectedImplantId}>
+                    <SelectTrigger data-testid="select-dimensions">
+                      <SelectValue placeholder="Sélectionner les dimensions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dimensionsForBrand.map((implant) => (
+                        <SelectItem 
+                          key={implant.id} 
+                          value={implant.id}
+                          data-testid={`option-dimension-${implant.id}`}
+                        >
+                          {implant.diametre}mm x {implant.longueur}mm
+                          {implant.referenceFabricant && ` (${implant.referenceFabricant})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
-            </div>
+            </>
           )}
 
           {selectedImplant && (

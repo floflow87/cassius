@@ -1291,10 +1291,31 @@ export default function PatientDetailsPage() {
     title: string;
     description?: string;
     badges?: string[];
+    siteBadges?: string[];
     badgeClassName?: string;
     radioId?: string;
     documentId?: string;
   }
+
+  const getSiteBadgeColor = (siteFdi: string): string => {
+    const siteNum = parseInt(siteFdi, 10);
+    if (isNaN(siteNum) || siteNum < 1 || siteNum > 48) {
+      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+    }
+    if (siteNum <= 8) {
+      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
+    } else if (siteNum <= 16) {
+      return "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300";
+    } else if (siteNum <= 24) {
+      return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300";
+    } else if (siteNum <= 32) {
+      return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
+    } else if (siteNum <= 40) {
+      return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300";
+    } else {
+      return "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300";
+    }
+  };
 
   const timelineEvents: TimelineEvent[] = [];
 
@@ -1305,7 +1326,7 @@ export default function PatientDetailsPage() {
       type: "operation",
       title: getInterventionLabel(op.typeIntervention),
       description: op.notesPerop || `${op.surgeryImplants?.length || 0} implant(s)`,
-      badges: op.surgeryImplants?.slice(0, 3).map(imp => `Site ${imp.siteFdi}`),
+      siteBadges: op.surgeryImplants?.map(imp => imp.siteFdi),
     });
   });
 
@@ -2131,6 +2152,19 @@ export default function PatientDetailsPage() {
                                       {event.description}
                                     </p>
                                   ) : null}
+                                  {event.siteBadges && event.siteBadges.length > 0 && (
+                                    <div className="flex gap-1.5 mt-2 flex-wrap">
+                                      {event.siteBadges.map((site, i) => (
+                                        <Badge 
+                                          key={i} 
+                                          variant="outline" 
+                                          className={`text-[10px] border-0 ${getSiteBadgeColor(site)}`}
+                                        >
+                                          {site}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
                                   {event.badges && event.badges.length > 0 && (
                                     <div className="flex gap-2 mt-2 flex-wrap">
                                       {event.badges.map((badge, i) => (

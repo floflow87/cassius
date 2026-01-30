@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import {
   Sidebar,
@@ -14,7 +15,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle, Sparkles } from "lucide-react";
+import { PatchNotesDialog } from "@/components/patch-notes-dialog";
 import { FaFolder, FaCalendarAlt } from "react-icons/fa";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
@@ -50,6 +52,7 @@ export function AppSidebar() {
   const { state, open, setOpen } = useSidebar();
   const { isAssistant } = useCurrentUser();
   const isExpanded = state === "expanded";
+  const [patchNotesOpen, setPatchNotesOpen] = useState(false);
 
   const handleToggle = () => {
     setOpen(!open);
@@ -153,6 +156,37 @@ export function AppSidebar() {
 
       <SidebarFooter className="bg-sidebar px-3 py-2 pb-4 mt-auto rounded-b-[15px]">
         <SidebarMenu className="gap-1">
+          {/* Nouveautés link */}
+          <SidebarMenuItem className="px-0">
+            {isExpanded ? (
+              <button
+                onClick={() => setPatchNotesOpen(true)}
+                className="flex h-10 w-full items-center justify-start px-3 gap-3 transition-all bg-transparent rounded-md hover-elevate"
+                data-testid="button-patch-notes"
+              >
+                <Sparkles className="h-[18px] w-[18px] text-white shrink-0" />
+                <span className="text-xs font-light text-white/80 truncate">
+                  Nouveautés
+                </span>
+              </button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setPatchNotesOpen(true)}
+                    className="flex h-10 w-full items-center justify-center rounded-md bg-transparent transition-all hover-elevate"
+                    data-testid="button-patch-notes"
+                  >
+                    <Sparkles className="h-[18px] w-[18px] text-white" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-gray-900 text-white border-gray-800">
+                  Nouveautés
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </SidebarMenuItem>
+
           {/* Support link */}
           <SidebarMenuItem className="px-0">
             {isExpanded ? (
@@ -268,6 +302,8 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+
+      <PatchNotesDialog open={patchNotesOpen} onOpenChange={setPatchNotesOpen} />
     </Sidebar>
   );
 }
