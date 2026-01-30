@@ -1077,15 +1077,6 @@ export default function ImplantDetailsPage() {
                       />
                     </div>
                   </div>
-                  {currentCalculatedISQ !== null && (
-                    <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
-                      <span className="text-xs text-muted-foreground">ISQ moyen pondéré</span>
-                      <span className="text-lg font-bold text-blue-600">{currentCalculatedISQ}</span>
-                    </div>
-                  )}
-                  <p className="text-[10px] text-muted-foreground">
-                    Formule : (V×2 + M + D) / nombre de valeurs saisies
-                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Notes (optionnel)</Label>
@@ -1096,11 +1087,21 @@ export default function ImplantDetailsPage() {
                     data-testid="input-isq-notes" 
                   />
                 </div>
-                <div className="pt-4">
+                <div className="flex items-center justify-between pt-4 gap-3">
+                  {currentCalculatedISQ !== null ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">ISQ calculé :</span>
+                      <span className="text-lg font-bold text-primary">{currentCalculatedISQ}</span>
+                      <Badge className={getISQBadge(currentCalculatedISQ).className}>
+                        {getISQBadge(currentCalculatedISQ).label}
+                      </Badge>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Saisissez au moins une valeur</span>
+                  )}
                   <Button 
-                    className="w-full" 
                     onClick={handleSaveIsq}
-                    disabled={createIsqMutation.isPending}
+                    disabled={createIsqMutation.isPending || currentCalculatedISQ === null}
                     data-testid="button-save-isq"
                   >
                     {createIsqMutation.isPending ? "Enregistrement..." : "Enregistrer"}
