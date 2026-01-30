@@ -1559,50 +1559,27 @@ export default function PatientDetailsPage() {
                 </Tooltip>
               );
             })()}
-            {/* Follow-up status badge */}
-            {!appointmentsLoading && (() => {
-              // Determine follow-up status: upcoming takes priority, then most recent completed/cancelled
-              if (upcomingAppointments.length > 0) {
-                const nextAppointment = upcomingAppointments[0];
-                const appointmentDate = new Date(nextAppointment.dateStart);
-                const dateLabel = format(appointmentDate, "EEEE d MMMM yyyy", { locale: fr });
-                const timeLabel = format(appointmentDate, "HH:mm", { locale: fr });
-                return (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge className="bg-[#EFF6FF] text-blue-700 text-[10px] gap-1 cursor-help" data-testid="badge-followup-status">
-                        <Calendar className="w-3 h-3" />
-                        À venir
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent className="bg-white text-foreground border shadow-md">
-                      <p className="font-medium">{nextAppointment.title || nextAppointment.type}</p>
-                      <p className="text-xs capitalize">{dateLabel}</p>
-                      <p className="text-xs">à {timeLabel}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              }
-              if (completedAppointments.length > 0) {
-                const lastAppointment = completedAppointments[0];
-                if (lastAppointment.status === "COMPLETED") {
-                  return (
-                    <Badge className="bg-[#DCFCE7] text-green-700 text-[10px] gap-1" data-testid="badge-followup-status">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Terminé
+            {/* Follow-up status badge - only show for upcoming appointments */}
+            {!appointmentsLoading && upcomingAppointments.length > 0 && (() => {
+              const nextAppointment = upcomingAppointments[0];
+              const appointmentDate = new Date(nextAppointment.dateStart);
+              const dateLabel = format(appointmentDate, "EEEE d MMMM yyyy", { locale: fr });
+              const timeLabel = format(appointmentDate, "HH:mm", { locale: fr });
+              return (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge className="bg-[#EFF6FF] text-blue-700 text-[10px] gap-1 cursor-help" data-testid="badge-followup-status">
+                      <Calendar className="w-3 h-3" />
+                      À venir
                     </Badge>
-                  );
-                }
-                if (lastAppointment.status === "CANCELLED") {
-                  return (
-                    <Badge className="bg-[#FEF2F2] text-red-700 text-[10px] gap-1" data-testid="badge-followup-status">
-                      <XCircle className="w-3 h-3" />
-                      Annulé
-                    </Badge>
-                  );
-                }
-              }
-              return null;
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-white text-foreground border shadow-md">
+                    <p className="font-medium">{nextAppointment.title || nextAppointment.type}</p>
+                    <p className="text-xs capitalize">{dateLabel}</p>
+                    <p className="text-xs">à {timeLabel}</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
             })()}
           </div>
           <p className="text-xs text-muted-foreground">
