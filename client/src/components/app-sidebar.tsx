@@ -161,7 +161,7 @@ export function AppSidebar() {
             {isExpanded ? (
               <button
                 onClick={() => setPatchNotesOpen(true)}
-                className="flex h-10 w-full items-center justify-start px-3 gap-3 transition-all bg-transparent rounded-md hover-elevate"
+                className="flex h-10 w-full items-center justify-start px-3 gap-3 transition-all bg-transparent rounded-md hover:bg-sidebar-accent/50 hover:rounded-[50px]"
                 data-testid="button-patch-notes"
               >
                 <Sparkles className="h-[18px] w-[18px] text-white shrink-0" />
@@ -174,7 +174,7 @@ export function AppSidebar() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setPatchNotesOpen(true)}
-                    className="flex h-10 w-full items-center justify-center rounded-md bg-transparent transition-all hover-elevate"
+                    className="flex h-10 w-full items-center justify-center rounded-md bg-transparent transition-all hover:bg-sidebar-accent/50 hover:rounded-[50px]"
                     data-testid="button-patch-notes"
                   >
                     <Sparkles className="h-[18px] w-[18px] text-white" />

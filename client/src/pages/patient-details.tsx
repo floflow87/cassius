@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { getSiteBadgeColor } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute, useLocation } from "wouter";
@@ -152,6 +152,9 @@ const defaultImplantColumns: ImplantColumnConfig[] = [
   { id: "situation", label: "Situation", width: "min-w-28", sortable: true },
   { id: "operation", label: "Opération", width: "min-w-32", sortable: true },
 ];
+
+// Columns to hide when viewing protheses only
+const prothesesExcludedColumns: ImplantColumnId[] = ["flag", "greffe", "dimensions", "chirurgie", "miseEnCharge", "typeOs", "isq"];
 
 const IMPLANT_VIEW_MODE_KEY = "cassius_patient_implants_view_mode";
 const IMPLANT_COLUMNS_KEY = "cassius_patient_implants_columns";
@@ -444,6 +447,14 @@ export default function PatientDetailsPage() {
     if (implantTypeFilter === "all") return true;
     return si.implant?.typeImplant === implantTypeFilter;
   });
+
+  // Filter columns based on the active filter (hide some columns for protheses)
+  const effectiveImplantColumns = useMemo(() => {
+    if (implantTypeFilter === "PROTHESE") {
+      return implantColumns.filter(c => !prothesesExcludedColumns.includes(c.id));
+    }
+    return implantColumns;
+  }, [implantColumns, implantTypeFilter]);
 
   // Implant table handlers
   const handleImplantSort = useCallback((columnId: ImplantColumnId) => {
@@ -1196,8 +1207,11 @@ export default function PatientDetailsPage() {
   const renderImplantCellContent = useCallback((columnId: ImplantColumnId, surgeryImplant: SurgeryImplantWithVisites) => {
     switch (columnId) {
       case "site":
+        if (!surgeryImplant.siteFdi) return <span className="text-muted-foreground text-xs">-</span>;
         return (
-          <span className="font-mono font-medium text-xs">{surgeryImplant.siteFdi || "-"}</span>
+          <Badge className="bg-gradient-to-r from-teal-500 to-emerald-500 text-white border-0 font-mono text-[10px] font-medium">
+            {surgeryImplant.siteFdi}
+          </Badge>
         );
       case "marque":
         return (
@@ -1325,12 +1339,23 @@ export default function PatientDetailsPage() {
   const timelineEvents: TimelineEvent[] = [];
 
   sortedOperations.forEach((op) => {
+    // Count implants, mini-implants and protheses separately for better wording
+    const implantCount = op.surgeryImplants?.filter(si => si.implant?.typeImplant === "IMPLANT").length || 0;
+    const miniImplantCount = op.surgeryImplants?.filter(si => si.implant?.typeImplant === "MINI_IMPLANT").length || 0;
+    const protheseCount = op.surgeryImplants?.filter(si => si.implant?.typeImplant === "PROTHESE").length || 0;
+    
+    const descriptionParts: string[] = [];
+    if (implantCount > 0) descriptionParts.push(`${implantCount} implant${implantCount > 1 ? "s" : ""}`);
+    if (miniImplantCount > 0) descriptionParts.push(`${miniImplantCount} mini-implant${miniImplantCount > 1 ? "s" : ""}`);
+    if (protheseCount > 0) descriptionParts.push(`${protheseCount} prothèse${protheseCount > 1 ? "s" : ""}`);
+    const defaultDescription = descriptionParts.length > 0 ? descriptionParts.join(", ") : "Aucun élément";
+    
     timelineEvents.push({
       id: `op-${op.id}`,
       date: new Date(op.dateOperation),
       type: "operation",
       title: getInterventionLabel(op.typeIntervention),
-      description: op.notesPerop || `${op.surgeryImplants?.length || 0} implant(s)`,
+      description: op.notesPerop || defaultDescription,
       siteBadges: op.surgeryImplants?.map(imp => imp.siteFdi),
     });
   });
@@ -2505,7 +2530,7 @@ export default function PatientDetailsPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-border-gray bg-border-gray">
-                          {implantColumns.map((column) => (
+                          {effectiveImplantColumns.map((column) => (
                             <th
                               key={column.id}
                               draggable
@@ -2542,7 +2567,7 @@ export default function PatientDetailsPage() {
                             onClick={() => window.location.href = `/patients/${patient.id}/implants/${surgeryImplant.id}`}
                             data-testid={`row-implant-${surgeryImplant.id}`}
                           >
-                            {implantColumns.map((column) => (
+                            {effectiveImplantColumns.map((column) => (
                               <td key={column.id} className={`px-4 py-3 ${column.width || ""}`}>
                                 {renderImplantCellContent(column.id, surgeryImplant)}
                               </td>
