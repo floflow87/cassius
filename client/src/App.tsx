@@ -17,6 +17,7 @@ import PatientReportPage from "@/pages/patient-report";
 import DashboardPage from "@/pages/dashboard";
 import StatsPage from "@/pages/stats";
 import ImplantsPage from "@/pages/implants";
+import ProthesesPage from "@/pages/protheses";
 import ActesPage from "@/pages/actes";
 import ActeDetailsPage from "@/pages/acte-details";
 import DocumentsPage from "@/pages/documents";
@@ -75,6 +76,9 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
     }
     if (location === "/implants" || location.startsWith("/implants/")) {
       return { title: "Implants", subtitle: null };
+    }
+    if (location === "/protheses" || location.startsWith("/protheses/")) {
+      return { title: "Prothèses", subtitle: null };
     }
     if (location === "/dashboard" || location === "/") {
       return { title: "Tableau de bord", subtitle: null };
@@ -201,6 +205,10 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
         {() => <ImplantsPage />}
       </Route>
       <Route path="/implants/:id" component={CatalogImplantDetailsPage} />
+      <Route path="/protheses">
+        {() => <ProthesesPage />}
+      </Route>
+      <Route path="/protheses/:id" component={CatalogImplantDetailsPage} />
       <Route path="/actes">
         {() => <ActesPage />}
       </Route>

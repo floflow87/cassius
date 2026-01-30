@@ -40,8 +40,9 @@ type MenuItem = {
 const menuItems: MenuItem[] = [
   { title: "Tableau de bord", url: "/dashboard", icon: homeIcon },
   { title: "Patients", url: "/patients", icon: patientIcon },
-  { title: "Implants", url: "/implants", icon: implantsIcon },
   { title: "Actes", url: "/actes", icon: actesIcon },
+  { title: "Implants", url: "/implants", icon: implantsIcon },
+  { title: "Prothèses", url: "/protheses", icon: implantsIcon },
   { title: "Documents", url: "/documents", reactIcon: FaFolder },
   { title: "Calendrier", url: "/calendar", reactIcon: FaCalendarAlt },
   { title: "Statistiques", url: "/stats", icon: statsIcon, hideForAssistant: true },

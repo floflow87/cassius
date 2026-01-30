@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { getSiteBadgeColor } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -1124,11 +1125,11 @@ export default function DashboardPage() {
                         data-testid={`implant-dashboard-${si.id}`}
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                            <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                              {si.siteFdi}
-                            </span>
-                          </div>
+                          <Badge 
+                            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xs font-medium border-0 ${getSiteBadgeColor(si.siteFdi)}`}
+                          >
+                            {si.siteFdi}
+                          </Badge>
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-medium truncate">
                               {si.patient?.prenom} {si.patient?.nom}

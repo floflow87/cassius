@@ -144,7 +144,7 @@ export function PatchNotesDialog({ trigger, open, onOpenChange }: PatchNotesDial
                   >
                     {config.label}
                   </Badge>
-                  <p className="text-sm text-foreground/90">{change.description}</p>
+                  <p className="text-xs text-foreground/90">{change.description}</p>
                 </div>
               );
             })}

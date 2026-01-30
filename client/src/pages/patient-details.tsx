@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { getSiteBadgeColor } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute, useLocation } from "wouter";
 import { format } from "date-fns";
@@ -1297,25 +1298,6 @@ export default function PatientDetailsPage() {
     documentId?: string;
   }
 
-  const getSiteBadgeColor = (siteFdi: string): string => {
-    const siteNum = parseInt(siteFdi, 10);
-    if (isNaN(siteNum) || siteNum < 1 || siteNum > 48) {
-      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
-    }
-    if (siteNum <= 8) {
-      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
-    } else if (siteNum <= 16) {
-      return "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300";
-    } else if (siteNum <= 24) {
-      return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300";
-    } else if (siteNum <= 32) {
-      return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
-    } else if (siteNum <= 40) {
-      return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300";
-    } else {
-      return "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300";
-    }
-  };
 
   const timelineEvents: TimelineEvent[] = [];
 
