@@ -138,7 +138,7 @@ export interface IStorage {
   getOperation(organisationId: string, id: string): Promise<Operation | undefined>;
   getOperationsByIds(organisationId: string, ids: string[]): Promise<Operation[]>;
   getOperationWithDetails(organisationId: string, id: string): Promise<OperationDetail | undefined>;
-  getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; successRate: number | null })[]>;
+  getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; protheseCount: number; successRate: number | null })[]>;
   createOperation(organisationId: string, operation: InsertOperation): Promise<Operation>;
   updateOperation(organisationId: string, id: string, data: Partial<InsertOperation>): Promise<Operation | undefined>;
   deleteOperation(organisationId: string, id: string): Promise<boolean>;
@@ -1106,7 +1106,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; successRate: number | null })[]> {
+  async getAllOperations(organisationId: string): Promise<(Operation & { patientNom: string; patientPrenom: string; implantCount: number; protheseCount: number; successRate: number | null })[]> {
     // Get all operations with patient info
     const operationsWithPatients = await db
       .select({
@@ -1120,26 +1120,35 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(operations.dateOperation));
     
     // Get implant counts and statuses per operation for success rate calculation
+    // Also get typeImplant to distinguish implants from protheses
     const implantData = await db
       .select({
         surgeryId: surgeryImplants.surgeryId,
         statut: surgeryImplants.statut,
+        typeImplant: implants.typeImplant,
       })
       .from(surgeryImplants)
+      .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
       .where(eq(surgeryImplants.organisationId, organisationId));
     
-    // Build maps for count and success rate
-    const countMap: Record<string, number> = {};
+    // Build maps for count and success rate (excluding protheses)
+    const implantCountMap: Record<string, number> = {};
+    const protheseCountMap: Record<string, number> = {};
     const successCountMap: Record<string, number> = {};
     for (const row of implantData) {
-      countMap[row.surgeryId] = (countMap[row.surgeryId] || 0) + 1;
-      if (row.statut === "SUCCES" || row.statut === "EN_SUIVI") {
-        successCountMap[row.surgeryId] = (successCountMap[row.surgeryId] || 0) + 1;
+      if (row.typeImplant === "PROTHESE") {
+        protheseCountMap[row.surgeryId] = (protheseCountMap[row.surgeryId] || 0) + 1;
+      } else {
+        implantCountMap[row.surgeryId] = (implantCountMap[row.surgeryId] || 0) + 1;
+        if (row.statut === "SUCCES" || row.statut === "EN_SUIVI") {
+          successCountMap[row.surgeryId] = (successCountMap[row.surgeryId] || 0) + 1;
+        }
       }
     }
     
     return operationsWithPatients.map(({ operation, patientNom, patientPrenom }) => {
-      const implantCount = countMap[operation.id] || 0;
+      const implantCount = implantCountMap[operation.id] || 0;
+      const protheseCount = protheseCountMap[operation.id] || 0;
       const successCount = successCountMap[operation.id] || 0;
       const successRate = implantCount > 0 ? Math.round((successCount / implantCount) * 100) : null;
       
@@ -1148,6 +1157,7 @@ export class DatabaseStorage implements IStorage {
         patientNom,
         patientPrenom,
         implantCount,
+        protheseCount,
         successRate,
       };
     });

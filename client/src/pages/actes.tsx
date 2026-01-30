@@ -76,6 +76,7 @@ type OperationWithDetails = Operation & {
   patientNom: string; 
   patientPrenom: string; 
   implantCount: number;
+  protheseCount: number;
   successRate: number | null;
 };
 
@@ -175,7 +176,7 @@ const STATUT_LABELS: Record<string, { label: string; className: string }> = {
 };
 
 type SortDirection = "asc" | "desc" | null;
-type ColumnId = "dateOperation" | "patient" | "typeIntervention" | "chirurgie" | "implantCount" | "greffe" | "reussite";
+type ColumnId = "dateOperation" | "patient" | "typeIntervention" | "chirurgie" | "implantCount" | "protheseCount" | "greffe" | "reussite";
 
 interface ColumnConfig {
   id: ColumnId;
@@ -185,13 +186,14 @@ interface ColumnConfig {
 }
 
 const columnWidths: Record<ColumnId, string> = {
-  dateOperation: "w-[12%]",
-  patient: "w-[18%]",
-  typeIntervention: "w-[20%]",
-  chirurgie: "w-[15%]",
-  implantCount: "w-[12%]",
-  greffe: "w-[11%]",
-  reussite: "w-[12%]",
+  dateOperation: "w-[10%]",
+  patient: "w-[16%]",
+  typeIntervention: "w-[18%]",
+  chirurgie: "w-[13%]",
+  implantCount: "w-[11%]",
+  protheseCount: "w-[11%]",
+  greffe: "w-[10%]",
+  reussite: "w-[11%]",
 };
 
 const defaultColumns: ColumnConfig[] = [
@@ -200,6 +202,7 @@ const defaultColumns: ColumnConfig[] = [
   { id: "typeIntervention", label: "Type d'intervention", sortable: true },
   { id: "chirurgie", label: "Chirurgie", sortable: true },
   { id: "implantCount", label: "Implants posés", sortable: true },
+  { id: "protheseCount", label: "Prothèses posées", sortable: true },
   { id: "greffe", label: "Greffe", sortable: true },
   { id: "reussite", label: "Réussite", sortable: true },
 ];
@@ -1185,6 +1188,12 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
       case "implantCount":
         return op.implantCount > 0 ? (
           <span className="text-muted-foreground text-xs">{op.implantCount} implant{op.implantCount > 1 ? "s" : ""}</span>
+        ) : (
+          <span className="text-muted-foreground/50 text-xs">-</span>
+        );
+      case "protheseCount":
+        return op.protheseCount > 0 ? (
+          <span className="text-muted-foreground text-xs">{op.protheseCount} prothèse{op.protheseCount > 1 ? "s" : ""}</span>
         ) : (
           <span className="text-muted-foreground/50 text-xs">-</span>
         );

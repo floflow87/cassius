@@ -44,7 +44,7 @@ import {
   operations,
 } from "@shared/schema";
 import type { PublicPatientShareData, PatientShareLinkWithDetails, OnboardingData, OnboardingState } from "@shared/schema";
-import { onboardingState, appointments, documents, notificationPreferences, calendarIntegrations, visites } from "@shared/schema";
+import { onboardingState, appointments, documents, notificationPreferences, calendarIntegrations, visites, patchNotes, patchNoteLines } from "@shared/schema";
 import type {
   Patient,
   PatientDetail,
@@ -8061,6 +8061,41 @@ export async function registerRoutes(
       res.json(logs);
     } catch (error: any) {
       console.error("[AUDIT] Error fetching entity history:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== PATCH NOTES ==========
+  // Get all patch notes with their lines (public endpoint - no auth required)
+  app.get("/api/patch-notes", async (_req: Request, res: Response) => {
+    try {
+      const notes = await db
+        .select()
+        .from(patchNotes)
+        .orderBy(desc(patchNotes.date));
+      
+      const lines = await db
+        .select()
+        .from(patchNoteLines)
+        .orderBy(asc(patchNoteLines.order));
+      
+      // Group lines by patch note
+      const linesMap: Record<string, typeof lines> = {};
+      for (const line of lines) {
+        if (!linesMap[line.patchNoteId]) {
+          linesMap[line.patchNoteId] = [];
+        }
+        linesMap[line.patchNoteId].push(line);
+      }
+      
+      const result = notes.map(note => ({
+        ...note,
+        lines: linesMap[note.id] || [],
+      }));
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("[PATCH_NOTES] Error fetching patch notes:", error);
       res.status(500).json({ error: error.message });
     }
   });
