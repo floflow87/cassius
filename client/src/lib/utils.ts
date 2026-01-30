@@ -7,8 +7,8 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getSiteBadgeColor(siteFdi: string): string {
   const siteNum = parseInt(siteFdi, 10);
-  if (isNaN(siteNum) || siteNum < 11 || siteNum > 48) {
-    return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+  if (isNaN(siteNum)) {
+    return "bg-teal-200 text-teal-800 dark:bg-teal-800/40 dark:text-teal-200";
   }
   const toothPosition = siteNum % 10;
   if (toothPosition === 1 || toothPosition === 2) {
