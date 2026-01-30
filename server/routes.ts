@@ -1119,7 +1119,10 @@ export async function registerRoutes(
       implantId: z.string(), // ID of existing catalog prothese
       siteFdi: z.string(),   // Site FDI for the prothese
     }).optional(),
-  });
+  }).refine(
+    (data) => !data.hasProthese || (data.prothese && data.prothese.implantId && data.prothese.siteFdi),
+    { message: "Une prothèse doit être sélectionnée avec un site FDI quand 'Pose de prothèse' est activé", path: ["prothese"] }
+  );
 
   app.post("/api/operations", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);

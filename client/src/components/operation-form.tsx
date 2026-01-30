@@ -87,7 +87,10 @@ const formSchema = z.object({
   implants: z.array(implantSchema).default([]),
   hasProthese: z.boolean().default(false),
   prothese: protheseSchema.optional(),
-});
+}).refine(
+  (data) => !data.hasProthese || (data.prothese && data.prothese.implantId && data.prothese.siteFdi),
+  { message: "Veuillez sélectionner une prothèse et un site FDI", path: ["prothese"] }
+);
 
 type FormData = z.infer<typeof formSchema>;
 

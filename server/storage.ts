@@ -164,10 +164,8 @@ export interface IStorage {
       notes?: string | null;
     }>,
     protheseData?: {
-      marque?: string;
-      quantite?: "unitaire" | "plurale";
-      mobilite?: "amovible" | "fixe";
-      typePilier?: "multi_unit" | "droit" | "angule";
+      implantId: string;  // ID of existing catalog prothese
+      siteFdi: string;    // Site FDI for the prothese
     }
   ): Promise<{ operation: Operation; surgeryImplants: SurgeryImplant[] }>;
 
@@ -1246,6 +1244,22 @@ export class DatabaseStorage implements IStorage {
 
       // Create prothese as surgery_implant using existing catalog prothese
       if (protheseData && protheseData.implantId) {
+        // Validate that the implantId is a PROTHESE type in the catalog
+        const [catalogItem] = await tx
+          .select()
+          .from(implants)
+          .where(and(
+            eq(implants.id, protheseData.implantId),
+            eq(implants.organisationId, organisationId)
+          ));
+        
+        if (!catalogItem) {
+          throw new Error("Prothèse non trouvée dans le catalogue");
+        }
+        if (catalogItem.typeImplant !== "PROTHESE") {
+          throw new Error("L'élément sélectionné n'est pas une prothèse");
+        }
+        
         // Use the existing catalog prothese - do NOT create a new entry
         const [protheseSurgeryImplant] = await tx.insert(surgeryImplants).values({
           organisationId,
