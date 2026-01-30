@@ -854,13 +854,24 @@ export default function DashboardPage() {
                   .slice(0, 5)
                   .map((flag) => {
                     const isIsqFlag = ['ISQ_LOW', 'ISQ_DECLINING', 'UNSTABLE_ISQ_HISTORY'].includes(flag.type);
+                    const isFollowupFlag = ['FOLLOWUP_2M', 'FOLLOWUP_4M', 'FOLLOWUP_6M', 'FOLLOWUP_12M'].includes(flag.type);
                     const isqMatch = flag.description?.match(/ISQ[^=]*=?\s*(\d+)/);
                     const isqValue = isqMatch ? isqMatch[1] : null;
+                    
+                    const getFlagLink = () => {
+                      if (flag.entityType === "OPERATION" && flag.entityId) {
+                        return `/actes/${flag.entityId}`;
+                      }
+                      if (flag.patientId) {
+                        return `/patients/${flag.patientId}`;
+                      }
+                      return "#";
+                    };
                     
                     return (
                       <Link 
                         key={flag.id} 
-                        href={flag.patientId ? `/patients/${flag.patientId}` : "#"}
+                        href={getFlagLink()}
                         className="block"
                       >
                         <div className="flex items-start gap-3 p-3 rounded-md bg-muted/30 hover-elevate cursor-pointer" data-testid={`flag-dashboard-${flag.id}`}>

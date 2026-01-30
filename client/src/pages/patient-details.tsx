@@ -201,8 +201,8 @@ export default function PatientDetailsPage() {
     retry: false,
   });
 
-  // Query for all patient flags (including implant-level flags)
-  const { data: allPatientFlagsData } = useQuery<{ patientFlags: Flag[]; implantFlagsById: Record<string, Flag[]> }>({
+  // Query for all patient flags (including implant-level and operation-level flags)
+  const { data: allPatientFlagsData } = useQuery<{ patientFlags: Flag[]; implantFlagsById: Record<string, Flag[]>; operationFlags: Flag[] }>({
     queryKey: ["/api/patients", patientId, "flags"],
     queryFn: async () => {
       const res = await fetch(`/api/patients/${patientId}/flags`, { credentials: "include" });
@@ -213,6 +213,7 @@ export default function PatientDetailsPage() {
   });
   const patientFlags = allPatientFlagsData?.patientFlags ?? [];
   const implantFlagsById = allPatientFlagsData?.implantFlagsById ?? {};
+  const operationFlags = allPatientFlagsData?.operationFlags ?? [];
 
   // Mutation pour mettre à jour le statut patient
   const updateStatusMutation = useMutation({
@@ -1486,43 +1487,53 @@ export default function PatientDetailsPage() {
                 </div>
               </PopoverContent>
             </Popover>
-            {patientFlags.length > 0 && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge 
-                    variant="secondary" 
-                    className="bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 cursor-help gap-1"
-                    data-testid="badge-patient-alerts"
-                  >
-                    <AlertTriangle className="w-3 h-3" />
-                    <span>{patientFlags.length} alerte{patientFlags.length > 1 ? 's' : ''}</span>
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-sm">
-                  <div className="space-y-2">
-                    {patientFlags.map((flag) => {
-                      const levelConfig: Record<string, { label: string; className: string }> = {
-                        CRITICAL: { label: "Critique", className: "text-red-500" },
-                        WARNING: { label: "Attention", className: "text-orange-500" },
-                        INFO: { label: "Info", className: "text-blue-500" },
-                      };
-                      const config = levelConfig[flag.level] || levelConfig.INFO;
-                      return (
-                        <div key={flag.id} className="flex items-start gap-2">
-                          <AlertTriangle className={`w-3 h-3 mt-0.5 ${config.className}`} />
-                          <div>
-                            <p className="font-medium text-sm">{flag.label}</p>
-                            {flag.description && (
-                              <p className="text-xs text-muted-foreground">{flag.description}</p>
-                            )}
+            {(() => {
+              const allPatientAlerts = [...patientFlags, ...operationFlags];
+              if (allPatientAlerts.length === 0) return null;
+              return (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge 
+                      variant="secondary" 
+                      className="bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 cursor-help gap-1"
+                      data-testid="badge-patient-alerts"
+                    >
+                      <AlertTriangle className="w-3 h-3" />
+                      <span>{allPatientAlerts.length} alerte{allPatientAlerts.length > 1 ? 's' : ''}</span>
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-sm">
+                    <div className="space-y-2">
+                      {allPatientAlerts.map((flag) => {
+                        const levelConfig: Record<string, { label: string; className: string }> = {
+                          CRITICAL: { label: "Critique", className: "text-red-500" },
+                          WARNING: { label: "Attention", className: "text-orange-500" },
+                          INFO: { label: "Info", className: "text-blue-500" },
+                        };
+                        const config = levelConfig[flag.level] || levelConfig.INFO;
+                        const isFollowupFlag = ['FOLLOWUP_2M', 'FOLLOWUP_4M', 'FOLLOWUP_6M', 'FOLLOWUP_12M'].includes(flag.type);
+                        return (
+                          <div key={flag.id} className="flex items-start gap-2">
+                            <AlertTriangle className={`w-3 h-3 mt-0.5 ${config.className}`} />
+                            <div>
+                              <p className="font-medium text-sm">{flag.label}</p>
+                              {flag.description && (
+                                <p className="text-xs text-muted-foreground">{flag.description}</p>
+                              )}
+                              {isFollowupFlag && flag.entityType === "OPERATION" && (
+                                <Link href={`/actes/${flag.entityId}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                                  Voir l'acte →
+                                </Link>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            )}
+                        );
+                      })}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })()}
             {/* Follow-up status badge */}
             {!appointmentsLoading && (() => {
               // Determine follow-up status: upcoming takes priority, then most recent completed/cancelled
@@ -2864,7 +2875,7 @@ export default function PatientDetailsPage() {
               </div>
             ) : (() => {
               const allImplantFlagsFlat = Object.values(implantFlagsById).flat();
-              const allFlags = [...patientFlags, ...allImplantFlagsFlat];
+              const allFlags = [...patientFlags, ...allImplantFlagsFlat, ...operationFlags];
               
               type TimelineItem = 
                 | { type: "note"; data: NoteWithUser; date: Date }

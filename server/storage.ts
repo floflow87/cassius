@@ -3973,7 +3973,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getPatientAllFlags(organisationId: string, patientId: string): Promise<{ patientFlags: Flag[]; implantFlagsById: Record<string, Flag[]> }> {
+  async getPatientAllFlags(organisationId: string, patientId: string): Promise<{ patientFlags: Flag[]; implantFlagsById: Record<string, Flag[]>; operationFlags: Flag[] }> {
     try {
       // Get direct patient flags
       const patientFlagsResult = await db.select().from(flags).where(and(
@@ -3990,8 +3990,17 @@ export class DatabaseStorage implements IStorage {
       
       // Get patient's surgery implant IDs (via operations) and their flags
       const implantFlagsById: Record<string, Flag[]> = {};
+      let operationFlags: Flag[] = [];
       
       if (opIds.length > 0) {
+        // Get operation flags (including follow-up reminders)
+        operationFlags = await db.select().from(flags).where(and(
+          eq(flags.organisationId, organisationId),
+          eq(flags.entityType, "OPERATION"),
+          inArray(flags.entityId, opIds),
+          sql`${flags.resolvedAt} IS NULL`
+        )).orderBy(desc(flags.createdAt));
+        
         const patientSurgeryImplants = await db.select({ id: surgeryImplants.id }).from(surgeryImplants)
           .where(and(eq(surgeryImplants.organisationId, organisationId), inArray(surgeryImplants.surgeryId, opIds)));
         const siIds = patientSurgeryImplants.map(si => si.id);
@@ -4017,10 +4026,11 @@ export class DatabaseStorage implements IStorage {
       return {
         patientFlags: patientFlagsResult,
         implantFlagsById,
+        operationFlags,
       };
     } catch (err: any) {
       if (err?.code === "42P01") {
-        return { patientFlags: [], implantFlagsById: {} };
+        return { patientFlags: [], implantFlagsById: {}, operationFlags: [] };
       }
       throw err;
     }

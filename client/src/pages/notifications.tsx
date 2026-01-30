@@ -104,13 +104,17 @@ function NotificationRow({
   const isUnread = !notification.readAt;
   
   const getEntityLink = () => {
-    if (notification.patientId) {
-      return `/patients/${notification.patientId}`;
+    if (!notification.entityType || !notification.entityId) {
+      if (notification.patientId) {
+        return `/patients/${notification.patientId}`;
+      }
+      return null;
     }
-    if (!notification.entityType || !notification.entityId) return null;
     switch (notification.entityType) {
       case "PATIENT":
         return `/patients/${notification.entityId}`;
+      case "OPERATION":
+        return `/actes/${notification.entityId}`;
       case "APPOINTMENT":
         return "/calendar";
       case "IMPORT":
@@ -118,6 +122,9 @@ function NotificationRow({
       case "DOCUMENT":
         return "/documents";
       default:
+        if (notification.patientId) {
+          return `/patients/${notification.patientId}`;
+        }
         return null;
     }
   };

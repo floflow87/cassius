@@ -114,6 +114,11 @@ export const flagTypeEnum = pgEnum("flag_type", [
   "NO_RECENT_ISQ",
   "NO_POSTOP_FOLLOWUP",
   "NO_RECENT_APPOINTMENT",
+  // Follow-up reminders
+  "FOLLOWUP_2M",
+  "FOLLOWUP_4M",
+  "FOLLOWUP_6M",
+  "FOLLOWUP_12M",
   // Info (coherence)
   "IMPLANT_NO_OPERATION",
   "MISSING_DOCUMENT",
@@ -1003,6 +1008,10 @@ export const flagTypeValues = [
   "NO_RECENT_ISQ",
   "NO_POSTOP_FOLLOWUP",
   "NO_RECENT_APPOINTMENT",
+  "FOLLOWUP_2M",
+  "FOLLOWUP_4M",
+  "FOLLOWUP_6M",
+  "FOLLOWUP_12M",
   "IMPLANT_NO_OPERATION",
   "MISSING_DOCUMENT",
   "INCOMPLETE_DATA"

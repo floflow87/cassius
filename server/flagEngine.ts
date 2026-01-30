@@ -35,6 +35,7 @@ export async function detectFlags(organisationId: string): Promise<FlagCandidate
     detectNoRecentIsq(organisationId, candidates),
     detectNoPostopFollowup(organisationId, candidates),
     detectNoRecentAppointment(organisationId, candidates),
+    detectFollowupNeeded(organisationId, candidates),
   ]);
 
   return candidates;
@@ -304,6 +305,76 @@ async function detectNoRecentAppointment(organisationId: string, candidates: Fla
         entityType: "PATIENT",
         entityId: patient.id,
       });
+    }
+  }
+}
+
+// Follow-up reminder milestones in months
+const FOLLOWUP_MILESTONES = [
+  { months: 2, type: "FOLLOWUP_2M", label: "Suivi M+2 recommandé", windowDays: 14 },
+  { months: 4, type: "FOLLOWUP_4M", label: "Suivi M+4 recommandé", windowDays: 14 },
+  { months: 6, type: "FOLLOWUP_6M", label: "Suivi M+6 recommandé", windowDays: 14 },
+  { months: 12, type: "FOLLOWUP_12M", label: "Suivi M+12 recommandé", windowDays: 30 },
+] as const;
+
+async function detectFollowupNeeded(organisationId: string, candidates: FlagCandidate[]): Promise<void> {
+  const now = new Date();
+  
+  // Get all operations with their date
+  const allOperations = await db
+    .select({
+      id: operations.id,
+      dateOperation: operations.dateOperation,
+      typeIntervention: operations.typeIntervention,
+      patientId: operations.patientId,
+      patientNom: patients.nom,
+      patientPrenom: patients.prenom,
+    })
+    .from(operations)
+    .innerJoin(patients, eq(operations.patientId, patients.id))
+    .where(eq(operations.organisationId, organisationId));
+
+  for (const op of allOperations) {
+    // Use dateOperation as the base date for milestone calculations
+    const operationDate = new Date(op.dateOperation);
+    
+    // Check if there are any appointments scheduled for this patient since the operation date
+    const appointmentsSinceOp = await db
+      .select({ id: appointments.id, dateStart: appointments.dateStart })
+      .from(appointments)
+      .where(and(
+        eq(appointments.organisationId, organisationId),
+        eq(appointments.patientId, op.patientId),
+        sql`${appointments.dateStart} >= ${op.dateOperation}::date`
+      ));
+
+    const hasAppointmentSinceOp = appointmentsSinceOp.length > 0;
+    
+    // If there are appointments since the operation, skip all follow-up alerts for this operation
+    if (hasAppointmentSinceOp) continue;
+    
+    // Check each milestone
+    for (const milestone of FOLLOWUP_MILESTONES) {
+      const milestoneDate = new Date(operationDate);
+      milestoneDate.setMonth(milestoneDate.getMonth() + milestone.months);
+      
+      // Calculate the window: from (milestoneDate - windowDays) to (milestoneDate + windowDays)
+      const windowStart = new Date(milestoneDate);
+      windowStart.setDate(windowStart.getDate() - milestone.windowDays);
+      const windowEnd = new Date(milestoneDate);
+      windowEnd.setDate(windowEnd.getDate() + milestone.windowDays);
+      
+      // Only create alert if we're within the window
+      if (now >= windowStart && now <= windowEnd) {
+        candidates.push({
+          level: "INFO",
+          type: milestone.type,
+          label: milestone.label,
+          description: `${op.patientPrenom} ${op.patientNom}: Chirurgie du ${op.dateOperation} - Aucun RDV prévu depuis l'acte`,
+          entityType: "OPERATION",
+          entityId: op.id,
+        });
+      }
     }
   }
 }
