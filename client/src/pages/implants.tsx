@@ -13,6 +13,7 @@ import {
   GripVertical,
   Trash2,
   X,
+  Star,
 } from "lucide-react";
 import { ImplantsAdvancedFilterDrawer, ImplantFilterChips, type ImplantFilterGroup } from "@/components/implants-advanced-filter-drawer";
 import { ProthesesAdvancedFilterDrawer, ProtheseFilterChips, applyProtheseFilters, type ProtheseFilterGroup } from "@/components/protheses-advanced-filter-drawer";
@@ -298,6 +299,27 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
     },
   });
 
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async ({ id, isFavorite }: { id: string; isFavorite: boolean }) => {
+      return apiRequest("PATCH", `/api/implants/${id}/favorite`, { isFavorite });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le statut favori.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggleFavorite = (e: React.MouseEvent, implant: ImplantWithStats) => {
+    e.stopPropagation();
+    toggleFavoriteMutation.mutate({ id: implant.id, isFavorite: !implant.isFavorite });
+  };
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
@@ -325,9 +347,14 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
 
   // Sort protheses
   const sortProtheses = useCallback((prothesesToSort: ImplantWithStats[]) => {
-    if (!protheseSortColumn || !protheseSortDirection) return prothesesToSort;
-
     return [...prothesesToSort].sort((a, b) => {
+      // Favorites always first
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+      
+      // Then apply column sort if any
+      if (!protheseSortColumn || !protheseSortDirection) return 0;
+      
       let comparison = 0;
       
       switch (protheseSortColumn) {
@@ -442,9 +469,14 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
   const prothesesTotalCount = implants?.filter(i => i.typeImplant === "PROTHESE").length || 0;
 
   const sortImplants = useCallback((implantsToSort: ImplantWithStats[]) => {
-    if (!sortColumn || !sortDirection) return implantsToSort;
-
     return [...implantsToSort].sort((a, b) => {
+      // Favorites always first
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+      
+      // Then apply column sort if any
+      if (!sortColumn || !sortDirection) return 0;
+      
       let comparison = 0;
       
       switch (sortColumn) {
@@ -779,6 +811,9 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
                       data-testid="checkbox-select-all-header"
                     />
                   </th>
+                  <th className="w-10 px-2 py-2">
+                    <Star className="h-4 w-4 text-muted-foreground/40" />
+                  </th>
                   {protheseColumns.map((column) => (
                     <th
                       key={column.id}
@@ -807,7 +842,7 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
               <tbody>
                 {paginatedProtheses.length === 0 ? (
                   <tr>
-                    <td colSpan={protheseColumns.length + 1} className="px-4 py-16">
+                    <td colSpan={protheseColumns.length + 2} className="px-4 py-16">
                       <div className="flex flex-col items-center justify-center">
                         <Activity className="h-12 w-12 text-muted-foreground/50 mb-4" />
                         <h3 className="text-base font-medium mb-2 text-foreground">Aucune prothèse</h3>
@@ -841,6 +876,19 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
                           data-testid={`checkbox-prothese-${prothese.id}`}
                         />
                       </td>
+                      <td className="px-2 py-3 w-10">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => handleToggleFavorite(e, prothese)}
+                          className="h-8 w-8"
+                          data-testid={`button-favorite-${prothese.id}`}
+                        >
+                          <Star 
+                            className={`h-4 w-4 ${prothese.isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"}`} 
+                          />
+                        </Button>
+                      </td>
                       {protheseColumns.map((column) => (
                         <td key={column.id} className={`px-4 py-3 ${protheseColumnWidths[column.id]}`}>
                           {renderProtheseCellContent(column.id, prothese)}
@@ -866,6 +914,9 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
                       onCheckedChange={(checked) => handleSelectAll(!!checked)}
                       data-testid="checkbox-select-all-header"
                     />
+                  </th>
+                  <th className="w-10 px-2 py-2">
+                    <Star className="h-4 w-4 text-muted-foreground/40" />
                   </th>
                   {columns.map((column) => (
                     <th
@@ -895,7 +946,7 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
               <tbody>
                 {paginatedImplants.length === 0 ? (
                   <tr>
-                    <td colSpan={columns.length + 1} className="px-4 py-16">
+                    <td colSpan={columns.length + 2} className="px-4 py-16">
                       <div className="flex flex-col items-center justify-center">
                         <Activity className="h-12 w-12 text-muted-foreground/50 mb-4" />
                         <h3 className="text-base font-medium mb-2 text-foreground">Aucun implant</h3>
@@ -928,6 +979,19 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
                           onClick={(e) => e.stopPropagation()}
                           data-testid={`checkbox-implant-${implant.id}`}
                         />
+                      </td>
+                      <td className="px-2 py-3 w-10">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => handleToggleFavorite(e, implant)}
+                          className="h-8 w-8"
+                          data-testid={`button-favorite-${implant.id}`}
+                        >
+                          <Star 
+                            className={`h-4 w-4 ${implant.isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"}`} 
+                          />
+                        </Button>
                       </td>
                       {columns.map((column) => (
                         <td key={column.id} className={`px-4 py-3 ${columnWidths[column.id]}`}>

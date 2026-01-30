@@ -197,6 +197,7 @@ export const implants = pgTable("implants", {
   longueur: real("longueur").notNull(),
   lot: text("lot"), // Numéro de lot fabricant
   notes: text("notes"), // Notes générales sur ce type d'implant
+  isFavorite: boolean("is_favorite").default(false).notNull(), // Marqué comme favori pour tri prioritaire
   // Champs spécifiques aux prothèses (optionnels, utilisés uniquement quand typeImplant = PROTHESE)
   typeProthese: typeProtheseEnum("type_prothese"), // vissée, scellée
   quantite: quantiteProtheseEnum("quantite"), // unitaire, plurale

@@ -1738,6 +1738,29 @@ export async function registerRoutes(
     }
   });
 
+  // Toggle favorite status for a catalog implant
+  app.patch("/api/implants/:id/favorite", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { isFavorite } = req.body;
+      if (typeof isFavorite !== 'boolean') {
+        return res.status(400).json({ error: "isFavorite must be a boolean" });
+      }
+      
+      const updated = await storage.updateImplantFavorite(organisationId, req.params.id, isFavorite);
+      if (!updated) {
+        return res.status(404).json({ error: "Implant not found" });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error toggling implant favorite:", error);
+      res.status(500).json({ error: "Failed to update favorite status" });
+    }
+  });
+
   // Liste tous les surgery_implants avec filtrage optionnel
   // Now includes latestIsq and flag info
   app.get("/api/surgery-implants", requireJwtOrSession, async (req, res) => {

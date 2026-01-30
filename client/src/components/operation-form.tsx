@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Plus, Trash2, Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Loader2, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Command,
@@ -443,7 +443,13 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                         <>
                                           <CommandEmpty>Aucun implant trouvé</CommandEmpty>
                                           <CommandGroup>
-                                            {catalogImplants.map((implant) => (
+                                            {[...catalogImplants].sort((a, b) => {
+                                              if (a.isFavorite && !b.isFavorite) return -1;
+                                              if (!a.isFavorite && b.isFavorite) return 1;
+                                              const labelA = `${a.marque} ${a.referenceFabricant || ""} ${a.diametre} ${a.longueur}`;
+                                              const labelB = `${b.marque} ${b.referenceFabricant || ""} ${b.diametre} ${b.longueur}`;
+                                              return labelA.localeCompare(labelB);
+                                            }).map((implant) => (
                                               <CommandItem
                                                 key={implant.id}
                                                 value={getImplantLabel(implant)}
@@ -462,7 +468,8 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                                   )}
                                                 />
                                                 <div className="flex flex-col">
-                                                  <span className="font-medium">
+                                                  <span className="font-medium flex items-center gap-1">
+                                                    {implant.isFavorite && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
                                                     {implant.marque} {implant.referenceFabricant}
                                                   </span>
                                                   <span className="text-sm text-muted-foreground">
@@ -741,7 +748,14 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                     name="prothese.marque"
                     render={({ field }) => {
                       const catalogProtheses = catalogImplants.filter(i => i.typeImplant === "PROTHESE");
-                      const uniqueBrands = Array.from(new Set(catalogProtheses.map(p => p.marque))).sort();
+                      const brandsWithFavorites = new Set(catalogProtheses.filter(p => p.isFavorite).map(p => p.marque));
+                      const uniqueBrands = Array.from(new Set(catalogProtheses.map(p => p.marque))).sort((a, b) => {
+                        const aHasFavorite = brandsWithFavorites.has(a);
+                        const bHasFavorite = brandsWithFavorites.has(b);
+                        if (aHasFavorite && !bHasFavorite) return -1;
+                        if (!aHasFavorite && bHasFavorite) return 1;
+                        return a.localeCompare(b);
+                      });
                       
                       if (uniqueBrands.length === 0) {
                         return (
@@ -801,7 +815,10 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                             field.value === brand ? "opacity-100" : "opacity-0"
                                           )}
                                         />
-                                        {brand}
+                                        <span className="flex items-center gap-1">
+                                          {brandsWithFavorites.has(brand) && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
+                                          {brand}
+                                        </span>
                                       </CommandItem>
                                     ))}
                                   </CommandGroup>

@@ -170,6 +170,7 @@ export interface IStorage {
   getImplantsByIds(organisationId: string, ids: string[]): Promise<Implant[]>;
   createImplant(organisationId: string, implant: InsertImplant): Promise<Implant>;
   updateCatalogImplant(organisationId: string, id: string, updates: Partial<InsertImplant>): Promise<Implant | undefined>;
+  updateImplantFavorite(organisationId: string, id: string, isFavorite: boolean): Promise<Implant | undefined>;
   deleteImplant(organisationId: string, id: string): Promise<boolean>;
   getAllImplants(organisationId: string): Promise<Implant[]>;
   getAllImplantsWithStats(organisationId: string): Promise<ImplantWithStats[]>;
@@ -1269,6 +1270,17 @@ export class DatabaseStorage implements IStorage {
   async updateCatalogImplant(organisationId: string, id: string, updates: Partial<InsertImplant>): Promise<Implant | undefined> {
     const [updated] = await db.update(implants)
       .set(updates)
+      .where(and(
+        eq(implants.id, id),
+        eq(implants.organisationId, organisationId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async updateImplantFavorite(organisationId: string, id: string, isFavorite: boolean): Promise<Implant | undefined> {
+    const [updated] = await db.update(implants)
+      .set({ isFavorite })
       .where(and(
         eq(implants.id, id),
         eq(implants.organisationId, organisationId)
