@@ -16,9 +16,23 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
+function calculateWeightedISQ(vestibulaire?: number, mesial?: number, distal?: number): number | undefined {
+  if (vestibulaire === undefined && mesial === undefined && distal === undefined) {
+    return undefined;
+  }
+  const v = vestibulaire ?? 0;
+  const m = mesial ?? 0;
+  const d = distal ?? 0;
+  const count = (vestibulaire !== undefined ? 2 : 0) + (mesial !== undefined ? 1 : 0) + (distal !== undefined ? 1 : 0);
+  if (count === 0) return undefined;
+  return Math.round(((vestibulaire !== undefined ? v * 2 : 0) + (mesial !== undefined ? m : 0) + (distal !== undefined ? d : 0)) / count * 10) / 10;
+}
+
 const formSchema = z.object({
   date: z.string().min(1, "La date est requise"),
-  isq: z.number().min(0).max(100).optional(),
+  isqVestibulaire: z.number().min(0).max(100).optional(),
+  isqMesial: z.number().min(0).max(100).optional(),
+  isqDistal: z.number().min(0).max(100).optional(),
   notes: z.string().optional(),
 });
 
@@ -41,10 +55,15 @@ export function VisiteForm({ implantId, patientId, onSuccess }: VisiteFormProps)
     },
   });
 
+  const watchedValues = form.watch(["isqVestibulaire", "isqMesial", "isqDistal"]);
+  const calculatedISQ = calculateWeightedISQ(watchedValues[0], watchedValues[1], watchedValues[2]);
+
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
+      const isq = calculateWeightedISQ(data.isqVestibulaire, data.isqMesial, data.isqDistal);
       const res = await apiRequest("POST", "/api/visites", {
         ...data,
+        isq,
         implantId,
         patientId,
       });
@@ -78,44 +97,103 @@ export function VisiteForm({ implantId, patientId, onSuccess }: VisiteFormProps)
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="date"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Date de la visite</FormLabel>
-                <FormControl>
-                  <Input type="date" {...field} data-testid="input-visite-date" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="isq"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Valeur ISQ</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    placeholder="Ex: 75"
-                    {...field}
-                    value={field.value ?? ""}
-                    onChange={(e) =>
-                      field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
-                    }
-                    data-testid="input-visite-isq"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <FormField
+          control={form.control}
+          name="date"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Date de la visite</FormLabel>
+              <FormControl>
+                <Input type="date" {...field} data-testid="input-visite-date" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="space-y-3">
+          <FormLabel className="text-sm font-medium">Mesures ISQ</FormLabel>
+          <div className="grid grid-cols-3 gap-3">
+            <FormField
+              control={form.control}
+              name="isqVestibulaire"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-muted-foreground">Vestibulaire (×2)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      placeholder="Ex: 75"
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(e) =>
+                        field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
+                      }
+                      data-testid="input-visite-isq-vestibulaire"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="isqMesial"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-muted-foreground">Mésial</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      placeholder="Ex: 72"
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(e) =>
+                        field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
+                      }
+                      data-testid="input-visite-isq-mesial"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="isqDistal"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-muted-foreground">Distal</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      placeholder="Ex: 70"
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(e) =>
+                        field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
+                      }
+                      data-testid="input-visite-isq-distal"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          {calculatedISQ !== undefined && (
+            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+              <span className="text-xs text-muted-foreground">ISQ calculé :</span>
+              <span className="text-sm font-semibold text-primary">{calculatedISQ}</span>
+              <span className="text-xs text-muted-foreground">(moyenne pondérée)</span>
+            </div>
+          )}
         </div>
 
         <FormField

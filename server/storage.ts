@@ -376,6 +376,9 @@ export interface IStorage {
     appointmentId: string;
     type: 'POSE' | 'FOLLOW_UP' | 'CONTROL' | 'EMERGENCY';
     isqValue: number | null;
+    isqVestibulaire?: number;
+    isqMesial?: number;
+    isqDistal?: number;
     notes?: string | null;
     measuredByUserId: string;
     measuredAt: Date;
@@ -1692,6 +1695,7 @@ export class DatabaseStorage implements IStorage {
       patientId: row.patient_id,
       operationId: row.operation_id,
       implantId: row.implant_id,
+      surgeryImplantId: row.surgery_implant_id,
       type: row.type,
       title: row.title,
       filePath: row.file_path,
@@ -4818,6 +4822,9 @@ export class DatabaseStorage implements IStorage {
     appointmentId: string;
     type: 'POSE' | 'FOLLOW_UP' | 'CONTROL' | 'EMERGENCY';
     isqValue: number | null;
+    isqVestibulaire?: number;
+    isqMesial?: number;
+    isqDistal?: number;
     notes?: string | null;
     measuredByUserId: string;
     measuredAt: Date;
@@ -4845,6 +4852,9 @@ export class DatabaseStorage implements IStorage {
       const [updated] = await db.update(implantMeasurements)
         .set({
           isqValue: data.isqValue,
+          isqVestibulaire: data.isqVestibulaire ?? null,
+          isqMesial: data.isqMesial ?? null,
+          isqDistal: data.isqDistal ?? null,
           isqStability,
           notes: data.notes || null,
           updatedAt: new Date(),
@@ -4861,6 +4871,9 @@ export class DatabaseStorage implements IStorage {
           appointmentId: data.appointmentId,
           type: data.type,
           isqValue: data.isqValue,
+          isqVestibulaire: data.isqVestibulaire ?? null,
+          isqMesial: data.isqMesial ?? null,
+          isqDistal: data.isqDistal ?? null,
           isqStability,
           notes: data.notes || null,
           measuredAt: data.measuredAt,

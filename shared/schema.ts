@@ -314,7 +314,10 @@ export const visites = pgTable("visites", {
   implantId: varchar("implant_id").notNull().references(() => implants.id, { onDelete: "cascade" }),
   patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
   date: date("date").notNull(),
-  isq: real("isq"),
+  isq: real("isq"), // Calculated weighted average: (V*2 + M + D) / 4
+  isqVestibulaire: real("isq_vestibulaire"),
+  isqMesial: real("isq_mesial"),
+  isqDistal: real("isq_distal"),
   notes: text("notes"),
   radioId: varchar("radio_id").references(() => radios.id, { onDelete: "set null" }),
 });
@@ -448,7 +451,10 @@ export const appointments = pgTable("appointments", {
   description: text("description"),
   dateStart: timestamp("date_start").notNull(),
   dateEnd: timestamp("date_end"),
-  isq: real("isq"),
+  isq: real("isq"), // Calculated weighted average: (V*2 + M + D) / 4
+  isqVestibulaire: real("isq_vestibulaire"),
+  isqMesial: real("isq_mesial"),
+  isqDistal: real("isq_distal"),
   radioId: varchar("radio_id").references(() => radios.id, { onDelete: "set null" }),
   // Custom color override (nullable - when null, uses type-based color)
   color: text("color"),
@@ -1401,7 +1407,10 @@ export const implantMeasurements = pgTable("implant_measurements", {
   surgeryImplantId: varchar("surgery_implant_id").notNull().references(() => surgeryImplants.id, { onDelete: "cascade" }),
   appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
   type: measurementTypeEnum("type").notNull(),
-  isqValue: real("isq_value"),
+  isqValue: real("isq_value"), // Calculated weighted average: (V*2 + M + D) / 4
+  isqVestibulaire: real("isq_vestibulaire"),
+  isqMesial: real("isq_mesial"),
+  isqDistal: real("isq_distal"),
   isqStability: text("isq_stability"), // low, moderate, high
   boneLossScore: integer("bone_loss_score"),
   notes: text("notes"),

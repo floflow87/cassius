@@ -3907,7 +3907,7 @@ export async function registerRoutes(
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      const { surgeryImplantId, isqValue, notes } = req.body;
+      const { surgeryImplantId, isqValue, isqVestibulaire, isqMesial, isqDistal, notes } = req.body;
       if (!surgeryImplantId || isqValue === undefined || isqValue === null) {
         return res.status(400).json({ error: "surgeryImplantId and isqValue are required" });
       }
@@ -3929,19 +3929,27 @@ export async function registerRoutes(
       };
       const measurementType = measurementTypeMap[appointment.type] || 'FOLLOW_UP';
 
-      // Upsert the measurement
+      // Upsert the measurement with 3-point ISQ values
       const measurement = await storage.upsertImplantMeasurement(organisationId, {
         surgeryImplantId,
         appointmentId,
         type: measurementType,
         isqValue: Number(isqValue),
+        isqVestibulaire: isqVestibulaire !== undefined ? Number(isqVestibulaire) : undefined,
+        isqMesial: isqMesial !== undefined ? Number(isqMesial) : undefined,
+        isqDistal: isqDistal !== undefined ? Number(isqDistal) : undefined,
         notes: notes || null,
         measuredByUserId: userId,
         measuredAt: appointment.dateStart,
       });
 
-      // Also update the appointment's ISQ field for backward compatibility
-      await storage.updateAppointment(organisationId, appointmentId, { isq: Number(isqValue) });
+      // Also update the appointment's ISQ fields for backward compatibility
+      await storage.updateAppointment(organisationId, appointmentId, { 
+        isq: Number(isqValue),
+        isqVestibulaire: isqVestibulaire !== undefined ? Number(isqVestibulaire) : undefined,
+        isqMesial: isqMesial !== undefined ? Number(isqMesial) : undefined,
+        isqDistal: isqDistal !== undefined ? Number(isqDistal) : undefined,
+      });
 
       // Recalculate flags and get suggestions
       const flags = await storage.calculateIsqFlags(organisationId, surgeryImplantId);

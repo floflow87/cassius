@@ -174,8 +174,26 @@ export function ClinicalFollowUp({
   onAction
 }: ClinicalFollowUpProps) {
   const { toast } = useToast();
-  const [isqValue, setIsqValue] = useState<string>("");
+  const [isqVestibulaire, setIsqVestibulaire] = useState<string>("");
+  const [isqMesial, setIsqMesial] = useState<string>("");
+  const [isqDistal, setIsqDistal] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  
+  const calculateWeightedISQ = (v?: number, m?: number, d?: number): number | undefined => {
+    if (v === undefined && m === undefined && d === undefined) return undefined;
+    const vVal = v ?? 0;
+    const mVal = m ?? 0;
+    const dVal = d ?? 0;
+    const count = (v !== undefined ? 2 : 0) + (m !== undefined ? 1 : 0) + (d !== undefined ? 1 : 0);
+    if (count === 0) return undefined;
+    return Math.round(((v !== undefined ? vVal * 2 : 0) + (m !== undefined ? mVal : 0) + (d !== undefined ? dVal : 0)) / count * 10) / 10;
+  };
+  
+  const parsedIsqVestibulaire = isqVestibulaire ? parseFloat(isqVestibulaire) : undefined;
+  const parsedIsqMesial = isqMesial ? parseFloat(isqMesial) : undefined;
+  const parsedIsqDistal = isqDistal ? parseFloat(isqDistal) : undefined;
+  const calculatedIsq = calculateWeightedISQ(parsedIsqVestibulaire, parsedIsqMesial, parsedIsqDistal);
+  const hasAnyIsqValue = isqVestibulaire || isqMesial || isqDistal;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [statusHistoryOpen, setStatusHistoryOpen] = useState(false);
   const [applySheetOpen, setApplySheetOpen] = useState(false);
@@ -257,17 +275,19 @@ export function ClinicalFollowUp({
   });
 
   const saveIsqMutation = useMutation({
-    mutationFn: async (data: { surgeryImplantId: string; isqValue: number; notes?: string }) => {
+    mutationFn: async (data: { surgeryImplantId: string; isqValue: number; isqVestibulaire?: number; isqMesial?: number; isqDistal?: number; notes?: string }) => {
       return apiRequest("POST", `/api/appointments/${appointmentId}/isq`, data);
     },
     onSuccess: async (response) => {
       const result = await response.json();
       toast({
-        title: "ISQ enregistre",
-        description: `Valeur ISQ ${isqValue} enregistree avec succes.`,
+        title: "ISQ enregistré",
+        description: `Valeur ISQ ${calculatedIsq} enregistrée avec succès.`,
         variant: "success",
       });
-      setIsqValue("");
+      setIsqVestibulaire("");
+      setIsqMesial("");
+      setIsqDistal("");
       setNotes("");
       refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
@@ -389,21 +409,37 @@ export function ClinicalFollowUp({
   }, [handleFileUpload]);
 
   const handleSaveIsq = () => {
-    if (!surgeryImplantId || !isqValue) return;
+    if (!surgeryImplantId || !hasAnyIsqValue) return;
     
-    const value = parseFloat(isqValue);
-    if (isNaN(value) || value < 0 || value > 100) {
+    const validateValue = (val: string | undefined): number | undefined => {
+      if (!val) return undefined;
+      const parsed = parseFloat(val);
+      if (isNaN(parsed) || parsed < 0 || parsed > 100) return undefined;
+      return parsed;
+    };
+    
+    const vValue = validateValue(isqVestibulaire);
+    const mValue = validateValue(isqMesial);
+    const dValue = validateValue(isqDistal);
+    
+    if (vValue === undefined && mValue === undefined && dValue === undefined) {
       toast({
         title: "Valeur invalide",
-        description: "L'ISQ doit etre entre 0 et 100",
+        description: "L'ISQ doit être entre 0 et 100",
         variant: "destructive",
       });
       return;
     }
+    
+    const finalIsq = calculateWeightedISQ(vValue, mValue, dValue);
+    if (finalIsq === undefined) return;
 
     saveIsqMutation.mutate({
       surgeryImplantId,
-      isqValue: value,
+      isqValue: finalIsq,
+      isqVestibulaire: vValue,
+      isqMesial: mValue,
+      isqDistal: dValue,
       notes: notes || undefined,
     });
   };
@@ -691,45 +727,86 @@ export function ClinicalFollowUp({
             <Separator />
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label htmlFor="isq-input" className="text-sm font-medium">
-                  Mesure ISQ
+                <Label className="text-sm font-medium">
+                  Mesures ISQ
                 </Label>
                 {isqRequired && !lastMeasurement && (
                   <Badge variant="secondary" className="text-xs">
                     <AlertCircle className="h-3 w-3 mr-1" />
-                    Recommande
+                    Recommandé
                   </Badge>
                 )}
                 {isqOptional && (
                   <Badge variant="outline" className="text-xs">Optionnel</Badge>
                 )}
               </div>
-              <div className="flex gap-2">
-                <Input
-                  id="isq-input"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  placeholder="0-100"
-                  value={isqValue}
-                  onChange={(e) => setIsqValue(e.target.value)}
-                  className="w-24"
-                  data-testid="input-isq-value"
-                />
-                <Button
-                  onClick={handleSaveIsq}
-                  disabled={!isqValue || saveIsqMutation.isPending}
-                  size="sm"
-                  data-testid="button-save-isq"
-                >
-                  {saveIsqMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Enregistrer"
-                  )}
-                </Button>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Vestibulaire (×2)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="0-100"
+                    value={isqVestibulaire}
+                    onChange={(e) => setIsqVestibulaire(e.target.value)}
+                    className="h-8"
+                    data-testid="input-isq-vestibulaire"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Mésial</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="0-100"
+                    value={isqMesial}
+                    onChange={(e) => setIsqMesial(e.target.value)}
+                    className="h-8"
+                    data-testid="input-isq-mesial"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Distal</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="0-100"
+                    value={isqDistal}
+                    onChange={(e) => setIsqDistal(e.target.value)}
+                    className="h-8"
+                    data-testid="input-isq-distal"
+                  />
+                </div>
               </div>
+              {calculatedIsq !== undefined && (
+                <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">ISQ calculé :</span>
+                    <span className={`text-sm font-semibold ${getIsqColor(calculatedIsq)}`}>{calculatedIsq}</span>
+                    <Badge className={`text-[10px] ${getISQBadge(calculatedIsq).className}`}>
+                      {getISQBadge(calculatedIsq).label}
+                    </Badge>
+                  </div>
+                  <Button
+                    onClick={handleSaveIsq}
+                    disabled={!hasAnyIsqValue || saveIsqMutation.isPending}
+                    size="sm"
+                    data-testid="button-save-isq"
+                  >
+                    {saveIsqMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Enregistrer"
+                    )}
+                  </Button>
+                </div>
+              )}
               <Textarea
                 placeholder="Notes (optionnel)"
                 value={notes}
