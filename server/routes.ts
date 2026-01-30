@@ -1114,15 +1114,15 @@ export async function registerRoutes(
         isqPose: z.number().optional(),
       })
     ).default([]),
-    hasProthese: z.boolean().optional().default(false),
-    prothese: z.object({
-      implantId: z.string(), // ID of existing catalog prothese
-      siteFdi: z.string(),   // Site FDI for the prothese
-    }).optional(),
-  }).refine(
-    (data) => !data.hasProthese || (data.prothese && data.prothese.implantId && data.prothese.siteFdi),
-    { message: "Une prothèse doit être sélectionnée avec un site FDI quand 'Pose de prothèse' est activé", path: ["prothese"] }
-  );
+    protheses: z.array(
+      z.object({
+        implantId: z.string(), // ID of existing catalog prothese
+        siteFdi: z.string(),   // Site FDI for the prothese
+        mobilite: z.enum(["AMOVIBLE", "FIXE"]).optional(),
+        typePilier: z.enum(["MULTI_UNIT", "DROIT", "ANGULE"]).optional(),
+      })
+    ).default([]),
+  });
 
   app.post("/api/operations", requireJwtOrSession, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
@@ -1131,14 +1131,14 @@ export async function registerRoutes(
     try {
       // Validation du body avec Zod
       const data = operationWithImplantsSchema.parse(req.body);
-      const { implants: implantData, hasProthese, prothese, ...operationData } = data;
+      const { implants: implantData, protheses: prothesesData, ...operationData } = data;
 
       // Création transactionnelle : opération + surgery_implants (atomique)
       const { operation, surgeryImplants: createdSurgeryImplants } = await storage.createOperationWithImplants(
         organisationId,
         operationData,
         implantData,
-        hasProthese && prothese ? prothese : undefined
+        prothesesData
       );
 
       // Auto-complete onboarding step 4 (first case) when operation is created

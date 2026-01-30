@@ -163,10 +163,12 @@ export interface IStorage {
       isqPose?: number | null;
       notes?: string | null;
     }>,
-    protheseData?: {
+    prothesesData?: Array<{
       implantId: string;  // ID of existing catalog prothese
       siteFdi: string;    // Site FDI for the prothese
-    }
+      mobilite?: "AMOVIBLE" | "FIXE";
+      typePilier?: "MULTI_UNIT" | "DROIT" | "ANGULE";
+    }>
   ): Promise<{ operation: Operation; surgeryImplants: SurgeryImplant[] }>;
 
   // Implant catalog methods
@@ -1190,10 +1192,12 @@ export class DatabaseStorage implements IStorage {
       isqPose?: number | null;
       notes?: string | null;
     }>,
-    protheseData?: {
+    prothesesData?: Array<{
       implantId: string;  // ID of existing catalog prothese
       siteFdi: string;    // Site FDI for the prothese
-    }
+      mobilite?: "AMOVIBLE" | "FIXE";
+      typePilier?: "MULTI_UNIT" | "DROIT" | "ANGULE";
+    }>
   ): Promise<{ operation: Operation; surgeryImplants: SurgeryImplant[] }> {
     return await db.transaction(async (tx) => {
       const [operation] = await tx.insert(operations).values({
@@ -1242,34 +1246,36 @@ export class DatabaseStorage implements IStorage {
         createdSurgeryImplants.push(surgeryImplant);
       }
 
-      // Create prothese as surgery_implant using existing catalog prothese
-      if (protheseData && protheseData.implantId) {
-        // Validate that the implantId is a PROTHESE type in the catalog
-        const [catalogItem] = await tx
-          .select()
-          .from(implants)
-          .where(and(
-            eq(implants.id, protheseData.implantId),
-            eq(implants.organisationId, organisationId)
-          ));
-        
-        if (!catalogItem) {
-          throw new Error("Prothèse non trouvée dans le catalogue");
+      // Create protheses as surgery_implants using existing catalog protheses
+      if (prothesesData && prothesesData.length > 0) {
+        for (const protheseData of prothesesData) {
+          // Validate that the implantId is a PROTHESE type in the catalog
+          const [catalogItem] = await tx
+            .select()
+            .from(implants)
+            .where(and(
+              eq(implants.id, protheseData.implantId),
+              eq(implants.organisationId, organisationId)
+            ));
+          
+          if (!catalogItem) {
+            throw new Error("Prothèse non trouvée dans le catalogue");
+          }
+          if (catalogItem.typeImplant !== "PROTHESE") {
+            throw new Error("L'élément sélectionné n'est pas une prothèse");
+          }
+          
+          // Use the existing catalog prothese - do NOT create a new entry
+          const [protheseSurgeryImplant] = await tx.insert(surgeryImplants).values({
+            organisationId,
+            surgeryId: operation.id,
+            implantId: protheseData.implantId,
+            siteFdi: protheseData.siteFdi,
+            statut: "EN_SUIVI",
+            datePose: operationData.dateOperation,
+          }).returning();
+          createdSurgeryImplants.push(protheseSurgeryImplant);
         }
-        if (catalogItem.typeImplant !== "PROTHESE") {
-          throw new Error("L'élément sélectionné n'est pas une prothèse");
-        }
-        
-        // Use the existing catalog prothese - do NOT create a new entry
-        const [protheseSurgeryImplant] = await tx.insert(surgeryImplants).values({
-          organisationId,
-          surgeryId: operation.id,
-          implantId: protheseData.implantId,
-          siteFdi: protheseData.siteFdi,
-          statut: "EN_SUIVI",
-          datePose: operationData.dateOperation,
-        }).returning();
-        createdSurgeryImplants.push(protheseSurgeryImplant);
       }
 
       return { operation, surgeryImplants: createdSurgeryImplants };

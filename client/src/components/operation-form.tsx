@@ -59,8 +59,10 @@ const implantSchema = z.object({
 });
 
 const protheseSchema = z.object({
-  implantId: z.string().min(1, "Veuillez sélectionner une prothèse du catalogue"),
-  siteFdi: z.string().min(1, "Veuillez sélectionner un site"),
+  catalogProtheseId: z.string().min(1, "Sélectionnez une prothèse du catalogue"),
+  siteFdi: z.string().min(1, "Le site FDI est requis"),
+  mobilite: z.enum(["AMOVIBLE", "FIXE"]).optional(),
+  typePilier: z.enum(["MULTI_UNIT", "DROIT", "ANGULE"]).optional(),
 });
 
 const formSchema = z.object({
@@ -85,12 +87,8 @@ const formSchema = z.object({
   notesPerop: z.string().optional(),
   observationsPostop: z.string().optional(),
   implants: z.array(implantSchema).default([]),
-  hasProthese: z.boolean().default(false),
-  prothese: protheseSchema.optional(),
-}).refine(
-  (data) => !data.hasProthese || (data.prothese && data.prothese.implantId && data.prothese.siteFdi),
-  { message: "Veuillez sélectionner une prothèse et un site FDI", path: ["prothese"] }
-);
+  protheses: z.array(protheseSchema).default([]),
+});
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -109,7 +107,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
   const { toast } = useToast();
   const [accordionValue, setAccordionValue] = useState<string[]>(["procedure"]);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
-  const [protheseMarqueOpen, setProtheseMarqueOpen] = useState(false);
+  const [openProthesePopoverIndex, setOpenProthesePopoverIndex] = useState<number | null>(null);
 
   const { data: catalogImplants = [], isLoading: isCatalogLoading, isError: isCatalogError } = useQuery<Implant[]>({
     queryKey: ["/api/implants"],
@@ -132,13 +130,18 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
       typeIntervention: "POSE_IMPLANT",
       greffeOsseuse: false,
       implants: [],
-      hasProthese: false,
+      protheses: [],
     },
   });
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "implants",
+  });
+
+  const { fields: protheseFields, append: appendProthese, remove: removeProthese } = useFieldArray({
+    control: form.control,
+    name: "protheses",
   });
 
   useEffect(() => {
@@ -156,7 +159,6 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
   }, [defaultImplant, append, fields.length]);
 
   const watchGreffeOsseuse = form.watch("greffeOsseuse");
-  const watchHasProthese = form.watch("hasProthese");
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -194,7 +196,6 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
         );
         return {
           ...implant,
-          // Pass the existing catalog implantId so the backend reuses it
           implantId: implant.catalogImplantId,
           marque: catalogImplant?.marque || "",
           referenceFabricant: catalogImplant?.referenceFabricant || "",
@@ -203,8 +204,14 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
           lot: catalogImplant?.lot || null,
         };
       }),
+      protheses: data.protheses.map((prothese) => ({
+        implantId: prothese.catalogProtheseId,
+        siteFdi: prothese.siteFdi,
+        mobilite: prothese.mobilite,
+        typePilier: prothese.typePilier,
+      })),
     };
-    mutation.mutate(enrichedData as FormData);
+    mutation.mutate(enrichedData as unknown as FormData);
   };
 
   const addImplant = () => {
@@ -219,8 +226,24 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
     setAccordionValue([...accordionValue, "implants"]);
   };
 
+  const addProthese = () => {
+    appendProthese({
+      catalogProtheseId: "",
+      siteFdi: "",
+      mobilite: undefined,
+      typePilier: undefined,
+    });
+    setAccordionValue([...accordionValue, "protheses"]);
+  };
+
   const getImplantLabel = (implant: Implant) => {
     return `${implant.marque} ${implant.referenceFabricant || ""} - Ø${implant.diametre}mm x ${implant.longueur}mm`.trim();
+  };
+
+  const getProtheseLabel = (prothese: Implant) => {
+    const parts = [prothese.marque];
+    if (prothese.quantite) parts.push(`(${prothese.quantite})`);
+    return parts.join(" ");
   };
 
   return (
@@ -624,6 +647,227 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
             </AccordionContent>
           </AccordionItem>
 
+          <AccordionItem value="protheses" className="border border-primary/20 rounded-md px-4 mb-2">
+            <AccordionTrigger className="text-sm font-medium">
+              Prothèses ({protheseFields.length})
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pt-4">
+              {protheseFields.map((field, index) => {
+                const catalogProtheses = catalogImplants.filter(i => i.typeImplant === "PROTHESE");
+                const sortedProtheses = [...catalogProtheses].sort((a, b) => {
+                  if (a.isFavorite && !b.isFavorite) return -1;
+                  if (!a.isFavorite && b.isFavorite) return 1;
+                  return a.marque.localeCompare(b.marque);
+                });
+                const selectedProthese = catalogProtheses.find(p => p.id === form.watch(`protheses.${index}.catalogProtheseId`));
+
+                return (
+                  <Card key={field.id} className="relative">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2"
+                      onClick={() => removeProthese(index)}
+                      data-testid={`button-remove-prothese-${index}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Prothèse {index + 1}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name={`protheses.${index}.catalogProtheseId`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel>Prothèse du catalogue</FormLabel>
+                              <Popover 
+                                open={openProthesePopoverIndex === index} 
+                                onOpenChange={(open) => setOpenProthesePopoverIndex(open ? index : null)}
+                              >
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      className={cn(
+                                        "justify-between",
+                                        !field.value && "text-muted-foreground"
+                                      )}
+                                      data-testid={`select-prothese-catalogue-${index}`}
+                                    >
+                                      {selectedProthese 
+                                        ? getProtheseLabel(selectedProthese)
+                                        : "Sélectionner une prothèse..."}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[350px] p-0">
+                                  <Command>
+                                    <CommandInput placeholder="Rechercher une prothèse..." />
+                                    <CommandList>
+                                      <CommandEmpty>Aucune prothèse trouvée</CommandEmpty>
+                                      <CommandGroup heading="Prothèses du catalogue">
+                                        {sortedProtheses.map((prothese) => (
+                                          <CommandItem
+                                            key={prothese.id}
+                                            value={`${prothese.marque} ${prothese.quantite || ""}`}
+                                            onSelect={() => {
+                                              field.onChange(prothese.id);
+                                              setOpenProthesePopoverIndex(null);
+                                            }}
+                                          >
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4",
+                                                field.value === prothese.id ? "opacity-100" : "opacity-0"
+                                              )}
+                                            />
+                                            <span className="flex items-center gap-1">
+                                              {prothese.isFavorite && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
+                                              {getProtheseLabel(prothese)}
+                                            </span>
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`protheses.${index}.siteFdi`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel>Site FDI</FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      className={cn(
+                                        "justify-between",
+                                        !field.value && "text-muted-foreground"
+                                      )}
+                                      data-testid={`select-prothese-site-${index}`}
+                                    >
+                                      {field.value || "Sélectionner un site..."}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0">
+                                  <Command>
+                                    <CommandInput placeholder="Rechercher..." />
+                                    <CommandList>
+                                      <CommandEmpty>Aucun site trouvé</CommandEmpty>
+                                      <CommandGroup heading="Maxillaire">
+                                        {["18", "17", "16", "15", "14", "13", "12", "11", "21", "22", "23", "24", "25", "26", "27", "28"].map((site) => (
+                                          <CommandItem
+                                            key={site}
+                                            value={site}
+                                            onSelect={() => field.onChange(site)}
+                                          >
+                                            <Check className={cn("mr-2 h-4 w-4", field.value === site ? "opacity-100" : "opacity-0")} />
+                                            {site}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                      <CommandGroup heading="Mandibule">
+                                        {["48", "47", "46", "45", "44", "43", "42", "41", "31", "32", "33", "34", "35", "36", "37", "38"].map((site) => (
+                                          <CommandItem
+                                            key={site}
+                                            value={site}
+                                            onSelect={() => field.onChange(site)}
+                                          >
+                                            <Check className={cn("mr-2 h-4 w-4", field.value === site ? "opacity-100" : "opacity-0")} />
+                                            {site}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name={`protheses.${index}.mobilite`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Mobilité</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                                <FormControl>
+                                  <SelectTrigger data-testid={`select-prothese-mobilite-${index}`}>
+                                    <SelectValue placeholder="Sélectionner..." />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="AMOVIBLE">Amovible</SelectItem>
+                                  <SelectItem value="FIXE">Fixe</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`protheses.${index}.typePilier`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Type de pilier</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                                <FormControl>
+                                  <SelectTrigger data-testid={`select-prothese-pilier-${index}`}>
+                                    <SelectValue placeholder="Sélectionner..." />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="MULTI_UNIT">Multi-unit</SelectItem>
+                                  <SelectItem value="DROIT">Droit</SelectItem>
+                                  <SelectItem value="ANGULE">Angulé</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addProthese}
+                className="w-full"
+                data-testid="button-add-prothese"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter une prothèse
+              </Button>
+            </AccordionContent>
+          </AccordionItem>
+
           <AccordionItem value="greffe" className="border border-primary/20 rounded-md px-4 mb-2">
             <AccordionTrigger className="text-sm font-medium">
               Greffe osseuse
@@ -703,189 +947,6 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                             value={field.value || ""}
                           />
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem value="prothese" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-sm font-medium">
-              Prothèse
-            </AccordionTrigger>
-            <AccordionContent className="space-y-4 pt-4">
-              <FormField
-                control={form.control}
-                name="hasProthese"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                    <div className="space-y-0.5 flex items-center gap-2">
-                      <Plus className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <FormLabel>Prothèse associée</FormLabel>
-                        <FormDescription>
-                          Indiquez si une prothèse est associée à cet acte
-                        </FormDescription>
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        data-testid="switch-prothese"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              {watchHasProthese && (
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="prothese.implantId"
-                    render={({ field }) => {
-                      const catalogProtheses = catalogImplants.filter(i => i.typeImplant === "PROTHESE");
-                      const sortedProtheses = [...catalogProtheses].sort((a, b) => {
-                        if (a.isFavorite && !b.isFavorite) return -1;
-                        if (!a.isFavorite && b.isFavorite) return 1;
-                        return a.marque.localeCompare(b.marque);
-                      });
-                      
-                      const selectedProthese = catalogProtheses.find(p => p.id === field.value);
-                      
-                      if (catalogProtheses.length === 0) {
-                        return (
-                          <FormItem className="col-span-2">
-                            <FormLabel>Prothèse du catalogue</FormLabel>
-                            <div className="text-sm text-muted-foreground p-3 border rounded-md bg-muted/50">
-                              Aucune prothèse dans le catalogue. Ajoutez d'abord une prothèse au catalogue.
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }
-                      
-                      return (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>Prothèse du catalogue</FormLabel>
-                          <Popover open={protheseMarqueOpen} onOpenChange={setProtheseMarqueOpen}>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className={cn(
-                                    "justify-between",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                  data-testid="select-prothese-catalogue"
-                                >
-                                  {selectedProthese 
-                                    ? `${selectedProthese.marque} - ${selectedProthese.quantite || ""} ${selectedProthese.mobilite || ""}`.trim()
-                                    : "Sélectionner une prothèse..."}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[350px] p-0">
-                              <Command>
-                                <CommandInput placeholder="Rechercher une prothèse..." />
-                                <CommandList>
-                                  <CommandEmpty>Aucune prothèse trouvée</CommandEmpty>
-                                  <CommandGroup heading="Prothèses du catalogue">
-                                    {sortedProtheses.map((prothese) => (
-                                      <CommandItem
-                                        key={prothese.id}
-                                        value={`${prothese.marque} ${prothese.quantite || ""} ${prothese.mobilite || ""}`}
-                                        onSelect={() => {
-                                          field.onChange(prothese.id);
-                                          setProtheseMarqueOpen(false);
-                                        }}
-                                      >
-                                        <Check
-                                          className={cn(
-                                            "mr-2 h-4 w-4",
-                                            field.value === prothese.id ? "opacity-100" : "opacity-0"
-                                          )}
-                                        />
-                                        <span className="flex items-center gap-1">
-                                          {prothese.isFavorite && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
-                                          <span>{prothese.marque}</span>
-                                          {prothese.quantite && <span className="text-muted-foreground text-xs">({prothese.quantite})</span>}
-                                          {prothese.mobilite && <span className="text-muted-foreground text-xs">{prothese.mobilite}</span>}
-                                        </span>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="prothese.siteFdi"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Site</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                className={cn(
-                                  "justify-between",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                                data-testid="select-site-prothese"
-                              >
-                                {field.value || "Sélectionner un site..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[200px] p-0">
-                            <Command>
-                              <CommandInput placeholder="Rechercher un site..." />
-                              <CommandList>
-                                <CommandEmpty>Aucun site trouvé</CommandEmpty>
-                                <CommandGroup heading="Maxillaire">
-                                  {["18", "17", "16", "15", "14", "13", "12", "11", "21", "22", "23", "24", "25", "26", "27", "28"].map((site) => (
-                                    <CommandItem
-                                      key={site}
-                                      value={site}
-                                      onSelect={() => field.onChange(site)}
-                                    >
-                                      <Check className={cn("mr-2 h-4 w-4", field.value === site ? "opacity-100" : "opacity-0")} />
-                                      {site}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                                <CommandGroup heading="Mandibule">
-                                  {["48", "47", "46", "45", "44", "43", "42", "41", "31", "32", "33", "34", "35", "36", "37", "38"].map((site) => (
-                                    <CommandItem
-                                      key={site}
-                                      value={site}
-                                      onSelect={() => field.onChange(site)}
-                                    >
-                                      <Check className={cn("mr-2 h-4 w-4", field.value === site ? "opacity-100" : "opacity-0")} />
-                                      {site}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
