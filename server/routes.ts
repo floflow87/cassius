@@ -1661,15 +1661,36 @@ export async function registerRoutes(
     try {
       const surgeryImplants = await storage.getPatientSurgeryImplants(organisationId, req.params.id);
       
+      if (!surgeryImplants || surgeryImplants.length === 0) {
+        return res.json([]);
+      }
+      
+      // Batch fetch all visites for this patient and group by implantId
+      let allVisites: any[] = [];
+      try {
+        allVisites = await storage.getPatientVisites(organisationId, req.params.id);
+      } catch (err: any) {
+        console.error("[patient-implants] Error fetching visites:", err?.message);
+      }
+      
+      const visitesByImplantId = new Map<string, Array<{ isqValue: number | null; measuredAt: Date | string }>>();
+      for (const v of allVisites) {
+        if (!visitesByImplantId.has(v.implantId)) {
+          visitesByImplantId.set(v.implantId, []);
+        }
+        visitesByImplantId.get(v.implantId)!.push({ isqValue: v.isq, measuredAt: v.date });
+      }
+      
       // Add latestIsq and flag info to each implant (batch to avoid N+1)
       const implantIds = surgeryImplants.map(si => si.id);
       const flagSummaries = await storage.getSurgeryImplantFlagSummaries(organisationId, implantIds);
       
       const implantsWithExtras = surgeryImplants.map((si) => {
         const flagSummary = flagSummaries.get(si.id) || { activeFlagCount: 0 };
+        const visiteMeasurements = visitesByImplantId.get(si.implantId) || [];
         return {
           ...si,
-          latestIsq: computeLatestIsq(si),
+          latestIsq: computeLatestIsq(si, visiteMeasurements),
           topFlag: flagSummary.topFlag,
           activeFlagCount: flagSummary.activeFlagCount,
         };

@@ -195,6 +195,7 @@ export interface IStorage {
   // Visite methods
   getVisite(organisationId: string, id: string): Promise<Visite | undefined>;
   getImplantVisites(organisationId: string, implantId: string): Promise<Visite[]>;
+  getPatientVisites(organisationId: string, patientId: string): Promise<Visite[]>;
   getAllVisites(organisationId: string): Promise<Visite[]>;
   createVisite(organisationId: string, visite: InsertVisite): Promise<Visite>;
   updateVisite(organisationId: string, id: string, updates: Partial<InsertVisite>): Promise<Visite | undefined>;
@@ -1694,6 +1695,17 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(visites)
       .where(eq(visites.organisationId, organisationId))
+      .orderBy(desc(visites.date));
+  }
+
+  async getPatientVisites(organisationId: string, patientId: string): Promise<Visite[]> {
+    return db
+      .select()
+      .from(visites)
+      .where(and(
+        eq(visites.organisationId, organisationId),
+        eq(visites.patientId, patientId)
+      ))
       .orderBy(desc(visites.date));
   }
 
