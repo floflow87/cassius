@@ -156,9 +156,34 @@ export default function ImplantDetailsPage() {
 
   const [isqFormData, setIsqFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    value: "",
+    isqVestibulaire: "",
+    isqMesial: "",
+    isqDistal: "",
     notes: "",
   });
+
+  const calculateWeightedISQ = (v: string, m: string, d: string): number | null => {
+    const vest = v ? parseFloat(v) : null;
+    const mes = m ? parseFloat(m) : null;
+    const dis = d ? parseFloat(d) : null;
+    
+    if (vest === null && mes === null && dis === null) return null;
+    
+    let sum = 0;
+    let count = 0;
+    if (vest !== null && !isNaN(vest)) { sum += vest * 2; count += 2; }
+    if (mes !== null && !isNaN(mes)) { sum += mes; count += 1; }
+    if (dis !== null && !isNaN(dis)) { sum += dis; count += 1; }
+    
+    if (count === 0) return null;
+    return Math.round((sum / count) * 10) / 10;
+  };
+
+  const currentCalculatedISQ = calculateWeightedISQ(
+    isqFormData.isqVestibulaire,
+    isqFormData.isqMesial,
+    isqFormData.isqDistal
+  );
 
   const [editingIsqPoint, setEditingIsqPoint] = useState<{
     source: "isqPose" | "isq2m" | "isq3m" | "isq6m" | "visite";
@@ -277,12 +302,15 @@ export default function ImplantDetailsPage() {
   });
 
   const createIsqMutation = useMutation({
-    mutationFn: async (data: { date: string; isq: number; notes?: string }) => {
+    mutationFn: async (data: { date: string; isq: number; isqVestibulaire?: number; isqMesial?: number; isqDistal?: number; notes?: string }) => {
       return apiRequest("POST", "/api/visites", {
         implantId: implantData?.implant?.id,
         patientId: patientId,
         date: data.date,
         isq: data.isq,
+        isqVestibulaire: data.isqVestibulaire ?? null,
+        isqMesial: data.isqMesial ?? null,
+        isqDistal: data.isqDistal ?? null,
         notes: data.notes || null,
       });
     },
@@ -294,7 +322,7 @@ export default function ImplantDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "implants"] });
       setAddISQSheetOpen(false);
-      setIsqFormData({ date: new Date().toISOString().split('T')[0], value: "", notes: "" });
+      setIsqFormData({ date: new Date().toISOString().split('T')[0], isqVestibulaire: "", isqMesial: "", isqDistal: "", notes: "" });
       toast({
         title: "Mesure enregistrée",
         description: "La mesure ISQ a été ajoutée avec succès",
@@ -429,17 +457,26 @@ export default function ImplantDetailsPage() {
   };
 
   const handleSaveIsq = () => {
-    if (!isqFormData.value) {
+    const calculatedIsq = calculateWeightedISQ(
+      isqFormData.isqVestibulaire,
+      isqFormData.isqMesial,
+      isqFormData.isqDistal
+    );
+    
+    if (calculatedIsq === null) {
       toast({
         title: "Valeur requise",
-        description: "Veuillez saisir une valeur ISQ",
+        description: "Veuillez saisir au moins une valeur ISQ",
         variant: "destructive",
       });
       return;
     }
     createIsqMutation.mutate({
       date: isqFormData.date,
-      isq: parseInt(isqFormData.value),
+      isq: Math.round(calculatedIsq),
+      isqVestibulaire: isqFormData.isqVestibulaire ? parseInt(isqFormData.isqVestibulaire) : undefined,
+      isqMesial: isqFormData.isqMesial ? parseInt(isqFormData.isqMesial) : undefined,
+      isqDistal: isqFormData.isqDistal ? parseInt(isqFormData.isqDistal) : undefined,
       notes: isqFormData.notes,
     });
   };
@@ -1000,17 +1037,55 @@ export default function ImplantDetailsPage() {
                     data-testid="input-isq-date" 
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Valeur ISQ</Label>
-                  <Input 
-                    type="number" 
-                    min="0" 
-                    max="100" 
-                    placeholder="Ex: 75" 
-                    value={isqFormData.value}
-                    onChange={(e) => setIsqFormData(prev => ({ ...prev, value: e.target.value }))}
-                    data-testid="input-isq-value" 
-                  />
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Valeurs ISQ (3 points)</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Vestibulaire (×2)</Label>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="100" 
+                        placeholder="V" 
+                        value={isqFormData.isqVestibulaire}
+                        onChange={(e) => setIsqFormData(prev => ({ ...prev, isqVestibulaire: e.target.value }))}
+                        data-testid="input-isq-vestibulaire" 
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Mesial</Label>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="100" 
+                        placeholder="M" 
+                        value={isqFormData.isqMesial}
+                        onChange={(e) => setIsqFormData(prev => ({ ...prev, isqMesial: e.target.value }))}
+                        data-testid="input-isq-mesial" 
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Distal</Label>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="100" 
+                        placeholder="D" 
+                        value={isqFormData.isqDistal}
+                        onChange={(e) => setIsqFormData(prev => ({ ...prev, isqDistal: e.target.value }))}
+                        data-testid="input-isq-distal" 
+                      />
+                    </div>
+                  </div>
+                  {currentCalculatedISQ !== null && (
+                    <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+                      <span className="text-xs text-muted-foreground">ISQ moyen pondéré</span>
+                      <span className="text-lg font-bold text-blue-600">{currentCalculatedISQ}</span>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    Formule : (V×2 + M + D) / nombre de valeurs saisies
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Notes (optionnel)</Label>
