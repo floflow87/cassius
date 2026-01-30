@@ -64,7 +64,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { cn, getSiteBadgeColor } from "@/lib/utils";
 import { OperationForm } from "@/components/operation-form";
 import { queryClient } from "@/lib/queryClient";
 import { ActesAdvancedFilterDrawer, ActeFilterChips, type ActeFilterGroup } from "@/components/actes-advanced-filter-drawer";
@@ -1046,7 +1046,14 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           </span>
         );
       case "site":
-        return <span className="font-mono font-medium text-xs">{si.siteFdi || "-"}</span>;
+        return si.siteFdi ? (
+          <Badge 
+            variant="outline" 
+            className={`text-[10px] border-0 ${getSiteBadgeColor(si.siteFdi)}`}
+          >
+            {si.siteFdi}
+          </Badge>
+        ) : <span className="text-xs text-muted-foreground">-</span>;
       case "datePose":
         return (
           <span className="text-xs text-muted-foreground">
@@ -1094,7 +1101,14 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           </span>
         );
       case "site":
-        return <span className="font-mono font-medium text-xs">{si.siteFdi || "-"}</span>;
+        return si.siteFdi ? (
+          <Badge 
+            variant="outline" 
+            className={`text-[10px] border-0 ${getSiteBadgeColor(si.siteFdi)}`}
+          >
+            {si.siteFdi}
+          </Badge>
+        ) : <span className="text-xs text-muted-foreground">-</span>;
       case "datePose":
         return (
           <span className="text-xs text-muted-foreground">

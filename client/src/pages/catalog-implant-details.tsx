@@ -54,7 +54,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 };
 
 export default function CatalogImplantDetailsPage() {
-  const [, params] = useRoute("/implants/:id");
+  const [, params] = useRoute("/catalogue/:id");
   const implantId = params?.id;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
