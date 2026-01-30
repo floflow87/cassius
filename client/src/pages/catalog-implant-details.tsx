@@ -67,7 +67,7 @@ export default function CatalogImplantDetailsPage() {
 
   // Form state for editing implant
   const [editMarque, setEditMarque] = useState("");
-  const [editTypeImplant, setEditTypeImplant] = useState<"IMPLANT" | "MINI_IMPLANT">("IMPLANT");
+  const [editTypeImplant, setEditTypeImplant] = useState<"IMPLANT" | "MINI_IMPLANT" | "PROTHESE">("IMPLANT");
   const [editReferenceFabricant, setEditReferenceFabricant] = useState("");
   const [editDiametre, setEditDiametre] = useState<number>(0);
   const [editLongueur, setEditLongueur] = useState<number>(0);
@@ -119,7 +119,7 @@ export default function CatalogImplantDetailsPage() {
   const updateMutation = useMutation({
     mutationFn: async (updates: {
       marque?: string;
-      typeImplant?: "IMPLANT" | "MINI_IMPLANT";
+      typeImplant?: "IMPLANT" | "MINI_IMPLANT" | "PROTHESE";
       referenceFabricant?: string | null;
       diametre?: number;
       longueur?: number;
@@ -218,7 +218,12 @@ export default function CatalogImplantDetailsPage() {
 
   const hasPoses = (implant.poseCount ?? 0) > 0;
   const successRate = implant.successRate ?? null;
-  const implantType = implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant";
+  const isProthese = implant.typeImplant === "PROTHESE";
+  const implantType = isProthese 
+    ? "Prothèse" 
+    : implant.typeImplant === "MINI_IMPLANT" 
+      ? "Mini-implant" 
+      : "Implant";
   const typeLabel = implant.referenceFabricant ? implant.referenceFabricant.split("-")[0] : implant.marque;
 
   const getSuccessRateColor = () => {
@@ -252,16 +257,18 @@ export default function CatalogImplantDetailsPage() {
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Ø {implant.diametre}mm × {implant.longueur}mm
-          </p>
+          {!isProthese && (
+            <p className="text-xs text-muted-foreground">
+              Ø {implant.diametre}mm × {implant.longueur}mm
+            </p>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
-            <CardTitle className="text-base">Informations de l'implant</CardTitle>
+            <CardTitle className="text-base">Informations {isProthese ? "de la prothèse" : "de l'implant"}</CardTitle>
             <Sheet open={editSheetOpen} onOpenChange={setEditSheetOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" data-testid="button-edit-implant">
@@ -270,7 +277,7 @@ export default function CatalogImplantDetailsPage() {
               </SheetTrigger>
               <SheetContent>
                 <SheetHeader>
-                  <SheetTitle>Modifier l'implant</SheetTitle>
+                  <SheetTitle>Modifier {isProthese ? "la prothèse" : "l'implant"}</SheetTitle>
                 </SheetHeader>
                 <div className="py-6 space-y-4">
                   <div className="space-y-2">
@@ -283,13 +290,14 @@ export default function CatalogImplantDetailsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Type</Label>
-                    <Select value={editTypeImplant} onValueChange={(v) => setEditTypeImplant(v as "IMPLANT" | "MINI_IMPLANT")}>
+                    <Select value={editTypeImplant} onValueChange={(v) => setEditTypeImplant(v as "IMPLANT" | "MINI_IMPLANT" | "PROTHESE")}>
                       <SelectTrigger data-testid="select-edit-type">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="IMPLANT">Implant</SelectItem>
                         <SelectItem value="MINI_IMPLANT">Mini-implant</SelectItem>
+                        <SelectItem value="PROTHESE">Prothèse</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -346,7 +354,7 @@ export default function CatalogImplantDetailsPage() {
               <div>
                 <span className="text-xs text-muted-foreground">Type</span>
                 <p className="text-sm font-medium" data-testid="text-implant-type">
-                  {implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"}
+                  {isProthese ? "Prothèse" : implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"}
                 </p>
               </div>
               <div>
@@ -355,14 +363,18 @@ export default function CatalogImplantDetailsPage() {
                   {implant.referenceFabricant || "—"}
                 </p>
               </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Diamètre</span>
-                <p className="text-sm font-medium font-mono" data-testid="text-implant-diametre">{implant.diametre} mm</p>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Longueur</span>
-                <p className="text-sm font-medium font-mono" data-testid="text-implant-longueur">{implant.longueur} mm</p>
-              </div>
+              {!isProthese && (
+                <>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Diamètre</span>
+                    <p className="text-sm font-medium font-mono" data-testid="text-implant-diametre">{implant.diametre} mm</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Longueur</span>
+                    <p className="text-sm font-medium font-mono" data-testid="text-implant-longueur">{implant.longueur} mm</p>
+                  </div>
+                </>
+              )}
               <div>
                 <span className="text-xs text-muted-foreground">Numéro de lot</span>
                 <p className="text-sm font-medium font-mono">{implant.lot || "—"}</p>

@@ -285,6 +285,8 @@ function AuthenticatedApp() {
       localStorage.removeItem("cassius_patients_view_mode");
       localStorage.removeItem("cassius_checklist_open");
       localStorage.removeItem("cassius_dashboard_layout");
+      // Redirect to auth page immediately
+      setLocation("/auth");
     } catch (error) {
       console.error("Logout error:", error);
     }

@@ -123,7 +123,7 @@ const IMPLANT_STORAGE_KEY_COLUMNS = "cassius_actes_implants_columns_order";
 const IMPLANT_STORAGE_KEY_SORT = "cassius_actes_implants_sort";
 
 // Prothese table columns
-type ProtheseColumnId = "patient" | "marque" | "typeProthese" | "typePilier" | "site" | "datePose" | "statut" | "nbPoses";
+type ProtheseColumnId = "patient" | "marque" | "typeProthese" | "typePilier" | "site" | "datePose" | "statut";
 
 interface ProtheseColumnConfig {
   id: ProtheseColumnId;
@@ -133,14 +133,13 @@ interface ProtheseColumnConfig {
 }
 
 const protheseColumnWidths: Record<ProtheseColumnId, string> = {
-  patient: "w-[15%]",
-  marque: "w-[15%]",
-  typeProthese: "w-[12%]",
-  typePilier: "w-[12%]",
-  site: "w-[10%]",
-  datePose: "w-[12%]",
-  statut: "w-[12%]",
-  nbPoses: "w-[12%]",
+  patient: "w-[16%]",
+  marque: "w-[16%]",
+  typeProthese: "w-[14%]",
+  typePilier: "w-[14%]",
+  site: "w-[12%]",
+  datePose: "w-[14%]",
+  statut: "w-[14%]",
 };
 
 const defaultProtheseColumns: ProtheseColumnConfig[] = [
@@ -151,7 +150,6 @@ const defaultProtheseColumns: ProtheseColumnConfig[] = [
   { id: "site", label: "Site", sortable: true },
   { id: "datePose", label: "Date de pose", sortable: true },
   { id: "statut", label: "Statut", sortable: true },
-  { id: "nbPoses", label: "Nb poses", sortable: false },
 ];
 
 const PROTHESE_STORAGE_KEY_COLUMNS = "cassius_actes_protheses_columns_order";
@@ -999,17 +997,9 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           aVal = a.statut || "";
           bVal = b.statut || "";
           break;
-        case "nbPoses":
-          // Number of poses is not available on individual surgery implants
-          aVal = 0;
-          bVal = 0;
-          break;
       }
       
-      if (typeof aVal === "string" && typeof bVal === "string") {
-        return protheseSortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      }
-      return protheseSortDirection === "asc" ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+      return protheseSortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
   }, [filteredProtheses, protheseSortColumn, protheseSortDirection]);
   
@@ -1066,13 +1056,6 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           <Badge variant="outline" className={statutInfo?.className || ""}>
             {statutInfo?.label || si.statut || "En suivi"}
           </Badge>
-        );
-      case "nbPoses":
-        // Display a placeholder - this would need to be calculated from catalog stats
-        return (
-          <span className="text-xs font-medium text-muted-foreground">
-            -
-          </span>
         );
       default:
         return null;

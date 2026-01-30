@@ -748,58 +748,15 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                           control={form.control}
                           name={`protheses.${index}.siteFdi`}
                           render={({ field }) => (
-                            <FormItem className="flex flex-col">
+                            <FormItem>
                               <FormLabel>Site FDI</FormLabel>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button
-                                      variant="outline"
-                                      role="combobox"
-                                      className={cn(
-                                        "justify-between",
-                                        !field.value && "text-muted-foreground"
-                                      )}
-                                      data-testid={`select-prothese-site-${index}`}
-                                    >
-                                      {field.value || "Sélectionner un site..."}
-                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[200px] p-0">
-                                  <Command>
-                                    <CommandInput placeholder="Rechercher..." />
-                                    <CommandList>
-                                      <CommandEmpty>Aucun site trouvé</CommandEmpty>
-                                      <CommandGroup heading="Maxillaire">
-                                        {["18", "17", "16", "15", "14", "13", "12", "11", "21", "22", "23", "24", "25", "26", "27", "28"].map((site) => (
-                                          <CommandItem
-                                            key={site}
-                                            value={site}
-                                            onSelect={() => field.onChange(site)}
-                                          >
-                                            <Check className={cn("mr-2 h-4 w-4", field.value === site ? "opacity-100" : "opacity-0")} />
-                                            {site}
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                      <CommandGroup heading="Mandibule">
-                                        {["48", "47", "46", "45", "44", "43", "42", "41", "31", "32", "33", "34", "35", "36", "37", "38"].map((site) => (
-                                          <CommandItem
-                                            key={site}
-                                            value={site}
-                                            onSelect={() => field.onChange(site)}
-                                          >
-                                            <Check className={cn("mr-2 h-4 w-4", field.value === site ? "opacity-100" : "opacity-0")} />
-                                            {site}
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
+                              <FormControl>
+                                <Input
+                                  placeholder="Ex: 16"
+                                  {...field}
+                                  data-testid={`input-prothese-fdi-${index}`}
+                                />
+                              </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}

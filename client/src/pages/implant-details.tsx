@@ -637,7 +637,12 @@ export default function ImplantDetailsPage() {
   const status = statusConfig[implantData.statut] || statusConfig.EN_SUIVI;
   const isqTimeline = getISQTimeline();
   const successRate = getSuccessRateFromBoneLoss(boneLossScore);
-  const implantType = implantData.implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant";
+  const isProthese = implantData.implant.typeImplant === "PROTHESE";
+  const implantType = isProthese 
+    ? "Prothèse" 
+    : implantData.implant.typeImplant === "MINI_IMPLANT" 
+      ? "Mini-implant" 
+      : "Implant";
   const typeLabel = implantData.implant.referenceFabricant ? implantData.implant.referenceFabricant.split("-")[0] : implantData.implant.marque;
 
   const getSuccessRateColor = () => {
@@ -674,16 +679,18 @@ export default function ImplantDetailsPage() {
               {status.label}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Ø {implantData.implant.diametre}mm × {implantData.implant.longueur}mm
-          </p>
+          {!isProthese && (
+            <p className="text-xs text-muted-foreground">
+              Ø {implantData.implant.diametre}mm × {implantData.implant.longueur}mm
+            </p>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-4">
-            <CardTitle className="text-sm">Informations de l'implant</CardTitle>
+            <CardTitle className="text-sm">Informations {isProthese ? "de la prothèse" : "de l'implant"}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -693,7 +700,7 @@ export default function ImplantDetailsPage() {
               </div>
               <div>
                 <span className="text-xs text-muted-foreground">Type</span>
-                <p className="text-xs font-medium" data-testid="text-implant-type">{typeLabel}</p>
+                <p className="text-xs font-medium" data-testid="text-implant-type">{isProthese ? "Prothèse" : typeLabel}</p>
               </div>
               <div>
                 <span className="text-xs text-muted-foreground">Référence fabricant</span>
@@ -701,19 +708,23 @@ export default function ImplantDetailsPage() {
                   {implantData.implant.referenceFabricant || "-"}
                 </p>
               </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Diamètre</span>
-                <p className="text-xs font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Longueur</span>
-                <p className="text-xs font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
-              </div>
+              {!isProthese && (
+                <>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Diamètre</span>
+                    <p className="text-xs font-medium font-mono" data-testid="text-implant-diametre">{implantData.implant.diametre} mm</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Longueur</span>
+                    <p className="text-xs font-medium font-mono" data-testid="text-implant-longueur">{implantData.implant.longueur} mm</p>
+                  </div>
+                </>
+              )}
             </div>
             <div className="flex justify-end mt-4 pt-4 border-t">
-              <Link href={`/implants/${implantData.implant.id}`}>
+              <Link href={`/catalogue/${implantData.implant.id}`}>
                 <span className="text-xs text-primary flex items-center cursor-pointer hover:underline" data-testid="link-view-catalog-implant">
-                  Voir l'implant catalogue
+                  Voir {isProthese ? "la prothèse" : "l'implant"} catalogue
                   <ChevronRight className="h-3.5 w-3.5 ml-1" />
                 </span>
               </Link>
