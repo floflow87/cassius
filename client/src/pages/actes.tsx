@@ -192,7 +192,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   const setSearchQuery = externalSetSearchQuery ?? setInternalSearchQuery;
   const itemsPerPage = 20;
   
-  const [activeTab, setActiveTab] = useState<"actes" | "implants">("actes");
+  const [activeTab, setActiveTab] = useState<"actes" | "implants" | "protheses">("actes");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [patientPopoverOpen, setPatientPopoverOpen] = useState(false);
@@ -330,10 +330,10 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
     queryKey: ["/api/patients"],
   });
 
-  // Query for surgery implants
+  // Query for surgery implants (for both implants and protheses tabs)
   const { data: surgeryImplants, isLoading: isLoadingImplants } = useQuery<SurgeryImplantWithDetails[]>({
     queryKey: ["/api/surgery-implants"],
-    enabled: activeTab === "implants",
+    enabled: activeTab === "implants" || activeTab === "protheses",
   });
 
   const deleteMutation = useMutation({
@@ -606,10 +606,14 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
     return <ArrowDown className="h-3 w-3 ml-1" />;
   };
 
-  // Filter and sort implants
+  // Filter and sort implants (exclude protheses)
   const filteredImplants = useMemo(() => {
     if (!surgeryImplants) return [];
-    let filtered = [...surgeryImplants];
+    // Only regular implants and mini-implants (not protheses)
+    let filtered = surgeryImplants.filter((si) => {
+      const typeImplant = si.implant?.typeImplant || "IMPLANT";
+      return typeImplant === "IMPLANT" || typeImplant === "MINI_IMPLANT";
+    });
     
     // Apply search filter
     if (searchQuery) {
@@ -765,6 +769,35 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
     implantCurrentPage * itemsPerPage
   );
 
+  // Filter protheses (only PROTHESE type)
+  const filteredProtheses = useMemo(() => {
+    if (!surgeryImplants) return [];
+    let filtered = surgeryImplants.filter((si) => {
+      return si.implant?.typeImplant === "PROTHESE";
+    });
+    
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((si) => {
+        const patientName = `${si.patient?.prenom || ""} ${si.patient?.nom || ""}`.toLowerCase();
+        const marque = (si.implant?.marque || "").toLowerCase();
+        const ref = (si.implant?.referenceFabricant || "").toLowerCase();
+        const typeProthese = (si.implant?.typeProthese || "").toLowerCase();
+        return patientName.includes(query) || marque.includes(query) || ref.includes(query) || typeProthese.includes(query);
+      });
+    }
+    
+    return filtered;
+  }, [surgeryImplants, searchQuery]);
+
+  const [protheseCurrentPage, setProtheseCurrentPage] = useState(1);
+  const protheseTotalPages = Math.ceil(filteredProtheses.length / itemsPerPage);
+  const paginatedProtheses = filteredProtheses.slice(
+    (protheseCurrentPage - 1) * itemsPerPage,
+    protheseCurrentPage * itemsPerPage
+  );
+
   const renderImplantCellContent = (columnId: ImplantColumnId, si: SurgeryImplantWithDetails) => {
     switch (columnId) {
       case "patient":
@@ -907,11 +940,12 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
 
   return (
     <div className="flex flex-col h-full overflow-auto px-6 pb-6">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "actes" | "implants")} className="w-full">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "actes" | "implants" | "protheses")} className="w-full">
         <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit mb-4" data-testid="tabs-actes-page">
           {[
             { value: "actes" as const, label: "Actes", icon: Stethoscope },
             { value: "implants" as const, label: "Implants posés", icon: Activity },
+            { value: "protheses" as const, label: "Prothèses posées", icon: Activity },
           ].map((tab) => (
             <button
               key={tab.value}
@@ -1315,6 +1349,105 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                   totalItems={sortedImplants.length}
                   itemsPerPage={itemsPerPage}
                   onPageChange={setImplantCurrentPage}
+                />
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="protheses" className="mt-0">
+          {isLoadingImplants ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs italic text-muted-foreground">{filteredProtheses.length} prothèse{filteredProtheses.length !== 1 ? "s" : ""}</span>
+              </div>
+
+              <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border-gray bg-border-gray">
+                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[180px]">Patient</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[150px]">Marque</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[120px]">Type</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[100px]">Mobilité</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[100px]">Site</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[120px]">Date pose</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[100px]">Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedProtheses.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-16">
+                            <div className="flex flex-col items-center justify-center">
+                              <Activity className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                              <h3 className="text-base font-medium mb-2 text-foreground">Aucune prothèse</h3>
+                              <p className="text-sm text-muted-foreground mb-4">
+                                {searchQuery
+                                  ? "Aucune prothèse ne correspond à votre recherche"
+                                  : "Aucune prothèse posée enregistrée"}
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedProtheses.map((si) => (
+                          <tr 
+                            key={si.id} 
+                            className="border-b border-border-gray hover-elevate cursor-pointer"
+                            onClick={() => si.patient?.id && setLocation(`/patients/${si.patient.id}/implants/${si.id}`)}
+                            data-testid={`row-prothese-${si.id}`}
+                          >
+                            <td className="px-4 py-2 text-xs w-[180px]">
+                              <span className="font-medium">
+                                {si.patient?.prenom || ""} {si.patient?.nom || ""}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 text-xs w-[150px]">
+                              <div>
+                                <div className="font-medium">{si.implant?.marque || "-"}</div>
+                                <div className="text-[10px] text-muted-foreground">{si.implant?.referenceFabricant || "-"}</div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2 text-xs w-[120px]">
+                              {si.implant?.typeProthese || "-"}
+                            </td>
+                            <td className="px-4 py-2 text-xs w-[100px]">
+                              {si.implant?.mobilite || "-"}
+                            </td>
+                            <td className="px-4 py-2 text-xs w-[100px]">
+                              <span className="font-mono font-medium">{si.siteFdi || "-"}</span>
+                            </td>
+                            <td className="px-4 py-2 text-xs w-[120px] text-muted-foreground">
+                              {si.datePose ? formatDate(si.datePose) : "-"}
+                            </td>
+                            <td className="px-4 py-2 text-xs w-[100px]">
+                              <Badge variant="outline" className={getStatusColor(si.statut || "EN_SUIVI")}>
+                                {si.statut === "EN_SUIVI" ? "En suivi" : 
+                                 si.statut === "SUCCES" ? "Succès" : 
+                                 si.statut === "ECHEC" ? "Échec" : si.statut || "En suivi"}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end mt-4">
+                <CassiusPagination
+                  currentPage={protheseCurrentPage}
+                  totalPages={protheseTotalPages}
+                  totalItems={filteredProtheses.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setProtheseCurrentPage}
                 />
               </div>
             </>

@@ -16,8 +16,7 @@ import CatalogImplantDetailsPage from "@/pages/catalog-implant-details";
 import PatientReportPage from "@/pages/patient-report";
 import DashboardPage from "@/pages/dashboard";
 import StatsPage from "@/pages/stats";
-import ImplantsPage from "@/pages/implants";
-import ProthesesPage from "@/pages/protheses";
+import CataloguePage from "@/pages/implants";
 import ActesPage from "@/pages/actes";
 import ActeDetailsPage from "@/pages/acte-details";
 import DocumentsPage from "@/pages/documents";
@@ -74,11 +73,8 @@ function PageHeader({ user, onLogout, patientCount }: PageHeaderProps) {
         subtitle: null 
       };
     }
-    if (location === "/implants" || location.startsWith("/implants/")) {
-      return { title: "Implants", subtitle: null };
-    }
-    if (location === "/protheses" || location.startsWith("/protheses/")) {
-      return { title: "Prothèses", subtitle: null };
+    if (location === "/catalogue" || location.startsWith("/catalogue/")) {
+      return { title: "Catalogue", subtitle: null };
     }
     if (location === "/dashboard" || location === "/") {
       return { title: "Tableau de bord", subtitle: null };
@@ -201,14 +197,23 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       <Route path="/patients/:patientId/implants/:implantId" component={ImplantDetailsPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/stats" component={StatsPage} />
+      <Route path="/catalogue">
+        {() => <CataloguePage />}
+      </Route>
+      <Route path="/catalogue/:id" component={CatalogImplantDetailsPage} />
+      {/* Redirects for old URLs */}
       <Route path="/implants">
-        {() => <ImplantsPage />}
+        <Redirect to="/catalogue" />
       </Route>
-      <Route path="/implants/:id" component={CatalogImplantDetailsPage} />
+      <Route path="/implants/:id">
+        {(params) => <Redirect to={`/catalogue/${params.id}`} />}
+      </Route>
       <Route path="/protheses">
-        {() => <ProthesesPage />}
+        <Redirect to="/catalogue" />
       </Route>
-      <Route path="/protheses/:id" component={CatalogImplantDetailsPage} />
+      <Route path="/protheses/:id">
+        {(params) => <Redirect to={`/catalogue/${params.id}`} />}
+      </Route>
       <Route path="/actes">
         {() => <ActesPage />}
       </Route>

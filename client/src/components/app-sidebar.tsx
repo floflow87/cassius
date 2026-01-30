@@ -41,8 +41,7 @@ const menuItems: MenuItem[] = [
   { title: "Tableau de bord", url: "/dashboard", icon: homeIcon },
   { title: "Patients", url: "/patients", icon: patientIcon },
   { title: "Actes", url: "/actes", icon: actesIcon },
-  { title: "Implants", url: "/implants", icon: implantsIcon },
-  { title: "Prothèses", url: "/protheses", icon: implantsIcon },
+  { title: "Catalogue", url: "/catalogue", icon: implantsIcon },
   { title: "Documents", url: "/documents", reactIcon: FaFolder },
   { title: "Calendrier", url: "/calendar", reactIcon: FaCalendarAlt },
   { title: "Statistiques", url: "/stats", icon: statsIcon, hideForAssistant: true },
@@ -63,8 +62,8 @@ export function AppSidebar() {
     if (url === "/patients") {
       return location === "/patients" || location.startsWith("/patients/");
     }
-    if (url === "/implants") {
-      return location === "/implants" || location.startsWith("/implants/");
+    if (url === "/catalogue") {
+      return location === "/catalogue" || location.startsWith("/catalogue/");
     }
     return location === url || location.startsWith(url + "/");
   };
