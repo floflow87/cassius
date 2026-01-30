@@ -120,6 +120,52 @@ const defaultImplantColumns: ImplantColumnConfig[] = [
 const IMPLANT_STORAGE_KEY_COLUMNS = "cassius_actes_implants_columns_order";
 const IMPLANT_STORAGE_KEY_SORT = "cassius_actes_implants_sort";
 
+// Prothese table columns
+type ProtheseColumnId = "patient" | "marque" | "typeProthese" | "typePilier" | "site" | "datePose" | "statut" | "nbPoses";
+
+interface ProtheseColumnConfig {
+  id: ProtheseColumnId;
+  label: string;
+  width?: string;
+  sortable: boolean;
+}
+
+const protheseColumnWidths: Record<ProtheseColumnId, string> = {
+  patient: "w-[15%]",
+  marque: "w-[15%]",
+  typeProthese: "w-[12%]",
+  typePilier: "w-[12%]",
+  site: "w-[10%]",
+  datePose: "w-[12%]",
+  statut: "w-[12%]",
+  nbPoses: "w-[12%]",
+};
+
+const defaultProtheseColumns: ProtheseColumnConfig[] = [
+  { id: "patient", label: "Patient", sortable: true },
+  { id: "marque", label: "Marque / Réf.", sortable: true },
+  { id: "typeProthese", label: "Type", sortable: true },
+  { id: "typePilier", label: "Type de pilier", sortable: true },
+  { id: "site", label: "Site", sortable: true },
+  { id: "datePose", label: "Date de pose", sortable: true },
+  { id: "statut", label: "Statut", sortable: true },
+  { id: "nbPoses", label: "Nb poses", sortable: false },
+];
+
+const PROTHESE_STORAGE_KEY_COLUMNS = "cassius_actes_protheses_columns_order";
+const PROTHESE_STORAGE_KEY_SORT = "cassius_actes_protheses_sort";
+
+const typeProtheseLabels: Record<string, string> = {
+  VISSEE: "Vissée",
+  SCELLEE: "Scellée",
+};
+
+const typePilierLabels: Record<string, string> = {
+  DROIT: "Droit",
+  ANGULE: "Angulé",
+  MULTI_UNIT: "Multi-unit",
+};
+
 const STATUT_LABELS: Record<string, { label: string; className: string }> = {
   EN_SUIVI: { label: "En suivi", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
   SUCCES: { label: "Succès", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
@@ -253,6 +299,56 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
   useEffect(() => {
     localStorage.setItem(IMPLANT_STORAGE_KEY_SORT, JSON.stringify({ column: implantSortColumn, direction: implantSortDirection }));
   }, [implantSortColumn, implantSortDirection]);
+
+  // Prothese table state
+  const [protheseCurrentPage, setProtheseCurrentPage] = useState(1);
+  const [protheseColumns, setProtheseColumns] = useState<ProtheseColumnConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(PROTHESE_STORAGE_KEY_COLUMNS);
+      if (saved) {
+        const savedOrder = JSON.parse(saved) as ProtheseColumnId[];
+        const validIds = new Set(defaultProtheseColumns.map(c => c.id));
+        const validSavedOrder = savedOrder.filter(id => validIds.has(id));
+        if (validSavedOrder.length === defaultProtheseColumns.length) {
+          return validSavedOrder.map(id => defaultProtheseColumns.find(c => c.id === id)!);
+        }
+      }
+    } catch {}
+    return defaultProtheseColumns;
+  });
+
+  const [protheseSortColumn, setProtheseSortColumn] = useState<ProtheseColumnId | null>(() => {
+    try {
+      const saved = localStorage.getItem(PROTHESE_STORAGE_KEY_SORT);
+      if (saved) {
+        const { column } = JSON.parse(saved);
+        return column;
+      }
+    } catch {}
+    return "datePose";
+  });
+
+  const [protheseSortDirection, setProtheseSortDirection] = useState<SortDirection>(() => {
+    try {
+      const saved = localStorage.getItem(PROTHESE_STORAGE_KEY_SORT);
+      if (saved) {
+        const { direction } = JSON.parse(saved);
+        return direction;
+      }
+    } catch {}
+    return "desc";
+  });
+
+  const [draggedProtheseColumn, setDraggedProtheseColumn] = useState<ProtheseColumnId | null>(null);
+  const [dragOverProtheseColumn, setDragOverProtheseColumn] = useState<ProtheseColumnId | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(PROTHESE_STORAGE_KEY_COLUMNS, JSON.stringify(protheseColumns.map(c => c.id)));
+  }, [protheseColumns]);
+
+  useEffect(() => {
+    localStorage.setItem(PROTHESE_STORAGE_KEY_SORT, JSON.stringify({ column: protheseSortColumn, direction: protheseSortDirection }));
+  }, [protheseSortColumn, protheseSortDirection]);
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
@@ -606,6 +702,61 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
     return <ArrowDown className="h-3 w-3 ml-1" />;
   };
 
+  // Prothese sort handler
+  const handleProtheseSort = (columnId: ProtheseColumnId) => {
+    if (protheseSortColumn === columnId) {
+      if (protheseSortDirection === "asc") {
+        setProtheseSortDirection("desc");
+      } else if (protheseSortDirection === "desc") {
+        setProtheseSortColumn(null);
+        setProtheseSortDirection(null);
+      } else {
+        setProtheseSortDirection("asc");
+      }
+    } else {
+      setProtheseSortColumn(columnId);
+      setProtheseSortDirection("asc");
+    }
+  };
+
+  // Prothese drag handlers
+  const handleProtheseDragStart = (e: React.DragEvent, columnId: ProtheseColumnId) => {
+    setDraggedProtheseColumn(columnId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleProtheseDragOver = (e: React.DragEvent, columnId: ProtheseColumnId) => {
+    e.preventDefault();
+    if (draggedProtheseColumn && draggedProtheseColumn !== columnId) {
+      setDragOverProtheseColumn(columnId);
+    }
+  };
+
+  const handleProtheseDragEnd = () => {
+    if (draggedProtheseColumn && dragOverProtheseColumn) {
+      const newColumns = [...protheseColumns];
+      const draggedIndex = newColumns.findIndex(c => c.id === draggedProtheseColumn);
+      const dropIndex = newColumns.findIndex(c => c.id === dragOverProtheseColumn);
+      if (draggedIndex !== -1 && dropIndex !== -1) {
+        const [removed] = newColumns.splice(draggedIndex, 1);
+        newColumns.splice(dropIndex, 0, removed);
+        setProtheseColumns(newColumns);
+      }
+    }
+    setDraggedProtheseColumn(null);
+    setDragOverProtheseColumn(null);
+  };
+
+  const renderProtheseSortIcon = (columnId: ProtheseColumnId) => {
+    if (protheseSortColumn !== columnId) {
+      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    }
+    if (protheseSortDirection === "asc") {
+      return <ArrowUp className="h-3 w-3 ml-1" />;
+    }
+    return <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
   // Filter and sort implants (exclude protheses)
   const filteredImplants = useMemo(() => {
     if (!surgeryImplants) return [];
@@ -791,12 +942,117 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
     return filtered;
   }, [surgeryImplants, searchQuery]);
 
-  const [protheseCurrentPage, setProtheseCurrentPage] = useState(1);
   const protheseTotalPages = Math.ceil(filteredProtheses.length / itemsPerPage);
-  const paginatedProtheses = filteredProtheses.slice(
+  
+  // Sort protheses
+  const sortedProtheses = useMemo(() => {
+    if (!protheseSortColumn || !protheseSortDirection) return filteredProtheses;
+    
+    return [...filteredProtheses].sort((a, b) => {
+      let aVal: string | number = "";
+      let bVal: string | number = "";
+      
+      switch (protheseSortColumn) {
+        case "patient":
+          aVal = `${a.patient?.nom || ""} ${a.patient?.prenom || ""}`;
+          bVal = `${b.patient?.nom || ""} ${b.patient?.prenom || ""}`;
+          break;
+        case "marque":
+          aVal = a.implant?.marque || "";
+          bVal = b.implant?.marque || "";
+          break;
+        case "typeProthese":
+          aVal = a.implant?.typeProthese || "";
+          bVal = b.implant?.typeProthese || "";
+          break;
+        case "typePilier":
+          aVal = a.implant?.typePilier || "";
+          bVal = b.implant?.typePilier || "";
+          break;
+        case "site":
+          aVal = a.siteFdi || "";
+          bVal = b.siteFdi || "";
+          break;
+        case "datePose":
+          aVal = a.datePose || "";
+          bVal = b.datePose || "";
+          break;
+        case "statut":
+          aVal = a.statut || "";
+          bVal = b.statut || "";
+          break;
+        case "nbPoses":
+          // Number of poses is not available on individual surgery implants
+          aVal = 0;
+          bVal = 0;
+          break;
+      }
+      
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return protheseSortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      return protheseSortDirection === "asc" ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+    });
+  }, [filteredProtheses, protheseSortColumn, protheseSortDirection]);
+  
+  const paginatedProtheses = sortedProtheses.slice(
     (protheseCurrentPage - 1) * itemsPerPage,
     protheseCurrentPage * itemsPerPage
   );
+
+  const renderProtheseCellContent = (columnId: ProtheseColumnId, si: SurgeryImplantWithDetails) => {
+    switch (columnId) {
+      case "patient":
+        return (
+          <span className="font-medium text-xs">
+            {si.patient?.prenom || ""} {si.patient?.nom || ""}
+          </span>
+        );
+      case "marque":
+        return (
+          <div>
+            <div className="text-xs font-medium">{si.implant?.marque || "-"}</div>
+            <div className="text-[10px] text-muted-foreground">{si.implant?.referenceFabricant || "-"}</div>
+          </div>
+        );
+      case "typeProthese":
+        return (
+          <Badge variant="outline" className="text-xs">
+            {typeProtheseLabels[si.implant?.typeProthese || ""] || si.implant?.typeProthese || "-"}
+          </Badge>
+        );
+      case "typePilier":
+        return (
+          <span className="text-xs">
+            {typePilierLabels[si.implant?.typePilier || ""] || si.implant?.typePilier || "-"}
+          </span>
+        );
+      case "site":
+        return <span className="font-mono font-medium text-xs">{si.siteFdi || "-"}</span>;
+      case "datePose":
+        return (
+          <span className="text-xs text-muted-foreground">
+            {si.datePose ? formatDate(si.datePose) : "-"}
+          </span>
+        );
+      case "statut":
+        const statutInfo = STATUT_LABELS[si.statut || "EN_SUIVI"];
+        return (
+          <Badge variant="outline" className={statutInfo?.className || ""}>
+            {statutInfo?.label || si.statut || "En suivi"}
+          </Badge>
+        );
+      case "nbPoses":
+        // Display a placeholder - this would need to be calculated from catalog stats
+        return (
+          <span className="text-xs font-medium text-muted-foreground">
+            -
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
 
   const renderImplantCellContent = (columnId: ImplantColumnId, si: SurgeryImplantWithDetails) => {
     switch (columnId) {
@@ -1363,7 +1619,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-xs italic text-muted-foreground">{filteredProtheses.length} prothèse{filteredProtheses.length !== 1 ? "s" : ""}</span>
+                <span className="text-xs italic text-muted-foreground">{sortedProtheses.length} prothèse{sortedProtheses.length !== 1 ? "s" : ""}</span>
               </div>
 
               <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
@@ -1371,19 +1627,35 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-border-gray bg-border-gray">
-                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[180px]">Patient</th>
-                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[150px]">Marque</th>
-                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[120px]">Type</th>
-                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[100px]">Mobilité</th>
-                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[100px]">Site</th>
-                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[120px]">Date pose</th>
-                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider w-[100px]">Statut</th>
+                        {protheseColumns.map((column) => (
+                          <th
+                            key={column.id}
+                            className={`text-left px-4 py-2 text-xs font-medium text-muted-foreground tracking-wider ${protheseColumnWidths[column.id]} ${dragOverProtheseColumn === column.id ? "bg-primary/10" : ""}`}
+                            draggable
+                            onDragStart={(e) => handleProtheseDragStart(e, column.id)}
+                            onDragOver={(e) => handleProtheseDragOver(e, column.id)}
+                            onDragEnd={handleProtheseDragEnd}
+                            onDrop={handleProtheseDragEnd}
+                          >
+                            <div className="flex items-center gap-1 cursor-grab active:cursor-grabbing">
+                              <GripVertical className="h-3 w-3 opacity-40" />
+                              <button
+                                onClick={() => column.sortable && handleProtheseSort(column.id)}
+                                className="flex items-center hover:text-foreground transition-colors"
+                                data-testid={`sort-prothese-${column.id}`}
+                              >
+                                {column.label}
+                                {column.sortable && renderProtheseSortIcon(column.id)}
+                              </button>
+                            </div>
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedProtheses.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-4 py-16">
+                          <td colSpan={protheseColumns.length} className="px-4 py-16">
                             <div className="flex flex-col items-center justify-center">
                               <Activity className="h-12 w-12 text-muted-foreground/50 mb-4" />
                               <h3 className="text-base font-medium mb-2 text-foreground">Aucune prothèse</h3>
@@ -1403,36 +1675,11 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                             onClick={() => si.patient?.id && setLocation(`/patients/${si.patient.id}/implants/${si.id}`)}
                             data-testid={`row-prothese-${si.id}`}
                           >
-                            <td className="px-4 py-2 text-xs w-[180px]">
-                              <span className="font-medium">
-                                {si.patient?.prenom || ""} {si.patient?.nom || ""}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2 text-xs w-[150px]">
-                              <div>
-                                <div className="font-medium">{si.implant?.marque || "-"}</div>
-                                <div className="text-[10px] text-muted-foreground">{si.implant?.referenceFabricant || "-"}</div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-2 text-xs w-[120px]">
-                              {si.implant?.typeProthese || "-"}
-                            </td>
-                            <td className="px-4 py-2 text-xs w-[100px]">
-                              {si.implant?.mobilite || "-"}
-                            </td>
-                            <td className="px-4 py-2 text-xs w-[100px]">
-                              <span className="font-mono font-medium">{si.siteFdi || "-"}</span>
-                            </td>
-                            <td className="px-4 py-2 text-xs w-[120px] text-muted-foreground">
-                              {si.datePose ? formatDate(si.datePose) : "-"}
-                            </td>
-                            <td className="px-4 py-2 text-xs w-[100px]">
-                              <Badge variant="outline" className={getStatusColor(si.statut || "EN_SUIVI")}>
-                                {si.statut === "EN_SUIVI" ? "En suivi" : 
-                                 si.statut === "SUCCES" ? "Succès" : 
-                                 si.statut === "ECHEC" ? "Échec" : si.statut || "En suivi"}
-                              </Badge>
-                            </td>
+                            {protheseColumns.map((column) => (
+                              <td key={column.id} className={`px-4 py-2 text-xs ${protheseColumnWidths[column.id]}`}>
+                                {renderProtheseCellContent(column.id, si)}
+                              </td>
+                            ))}
                           </tr>
                         ))
                       )}
@@ -1445,7 +1692,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                 <CassiusPagination
                   currentPage={protheseCurrentPage}
                   totalPages={protheseTotalPages}
-                  totalItems={filteredProtheses.length}
+                  totalItems={sortedProtheses.length}
                   itemsPerPage={itemsPerPage}
                   onPageChange={setProtheseCurrentPage}
                 />

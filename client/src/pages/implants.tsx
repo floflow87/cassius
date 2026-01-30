@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { ImplantsAdvancedFilterDrawer, ImplantFilterChips, type ImplantFilterGroup } from "@/components/implants-advanced-filter-drawer";
+import { ProthesesAdvancedFilterDrawer, ProtheseFilterChips, applyProtheseFilters, type ProtheseFilterGroup } from "@/components/protheses-advanced-filter-drawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -73,7 +74,7 @@ const STORAGE_KEY_SORT = "cassius_implants_sort";
 const STORAGE_KEY_PROTHESES_COLUMNS = "cassius_protheses_columns_order";
 const STORAGE_KEY_PROTHESES_SORT = "cassius_protheses_sort";
 
-type ProtheseColumnId = "marque" | "typeProthese" | "mobilite" | "typePilier";
+type ProtheseColumnId = "marque" | "typeProthese" | "nbPoses";
 
 interface ProtheseColumnConfig {
   id: ProtheseColumnId;
@@ -83,33 +84,20 @@ interface ProtheseColumnConfig {
 }
 
 const protheseColumnWidths: Record<ProtheseColumnId, string> = {
-  marque: "w-[30%]",
-  typeProthese: "w-[25%]",
-  mobilite: "w-[22%]",
-  typePilier: "w-[23%]",
+  marque: "w-[40%]",
+  typeProthese: "w-[35%]",
+  nbPoses: "w-[25%]",
 };
 
 const defaultProtheseColumns: ProtheseColumnConfig[] = [
   { id: "marque", label: "Marque", sortable: true },
   { id: "typeProthese", label: "Type de prothèse", sortable: true },
-  { id: "mobilite", label: "Mobilité", sortable: true },
-  { id: "typePilier", label: "Type de pilier", sortable: true },
+  { id: "nbPoses", label: "Nombre de poses", sortable: true },
 ];
 
 const typeProtheseLabels: Record<string, string> = {
   VISSEE: "Vissée",
   SCELLEE: "Scellée",
-};
-
-const mobiliteLabels: Record<string, string> = {
-  AMOVIBLE: "Amovible",
-  FIXE: "Fixe",
-};
-
-const typePilierLabels: Record<string, string> = {
-  DROIT: "Droit",
-  ANGULE: "Angulé",
-  MULTI_UNIT: "Multi-unit",
 };
 
 interface CataloguePageProps {
@@ -132,6 +120,7 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<ImplantFilterGroup | null>(null);
+  const [protheseAdvancedFilters, setProtheseAdvancedFilters] = useState<ProtheseFilterGroup | null>(null);
 
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
     try {
@@ -348,11 +337,8 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
         case "typeProthese":
           comparison = (a.typeProthese || "").localeCompare(b.typeProthese || "");
           break;
-        case "mobilite":
-          comparison = (a.mobilite || "").localeCompare(b.mobilite || "");
-          break;
-        case "typePilier":
-          comparison = (a.typePilier || "").localeCompare(b.typePilier || "");
+        case "nbPoses":
+          comparison = (a.poseCount || 0) - (b.poseCount || 0);
           break;
         default:
           comparison = 0;
@@ -441,21 +427,11 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
         ) : (
           <span className="text-xs text-muted-foreground">-</span>
         );
-      case "mobilite":
-        return prothese.mobilite ? (
-          <Badge variant="secondary" className="text-xs">
-            {mobiliteLabels[prothese.mobilite] || prothese.mobilite}
-          </Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground">-</span>
-        );
-      case "typePilier":
-        return prothese.typePilier ? (
-          <Badge variant="secondary" className="text-xs">
-            {typePilierLabels[prothese.typePilier] || prothese.typePilier}
-          </Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground">-</span>
+      case "nbPoses":
+        return (
+          <span className="text-xs font-medium">
+            {prothese.poseCount || 0}
+          </span>
         );
       default:
         return null;
@@ -639,7 +615,10 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
   }
 
   // Sorted and paginated protheses for display
-  const sortedProtheses = catalogType === "protheses" ? sortProtheses(filteredImplants) : [];
+  const advancedFilteredProtheses = catalogType === "protheses" 
+    ? applyProtheseFilters(filteredImplants, protheseAdvancedFilters)
+    : [];
+  const sortedProtheses = catalogType === "protheses" ? sortProtheses(advancedFilteredProtheses) : [];
   const paginatedProtheses = sortedProtheses.slice(startIndex, startIndex + itemsPerPage);
 
   return (
@@ -684,10 +663,16 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
           data-testid="input-search-catalogue"
         />
         <span className="text-xs italic text-muted-foreground">
-          {totalImplants} {catalogType === "protheses" ? "prothèse" : "implant"}{totalImplants > 1 ? "s" : ""}
+          {catalogType === "protheses" ? sortedProtheses.length : totalImplants} {catalogType === "protheses" ? "prothèse" : "implant"}{(catalogType === "protheses" ? sortedProtheses.length : totalImplants) > 1 ? "s" : ""}
         </span>
         
-        {catalogType !== "protheses" && (
+        {catalogType === "protheses" ? (
+          <ProthesesAdvancedFilterDrawer
+            filters={protheseAdvancedFilters}
+            onFiltersChange={setProtheseAdvancedFilters}
+            activeFilterCount={protheseAdvancedFilters?.rules.length || 0}
+          />
+        ) : (
           <ImplantsAdvancedFilterDrawer
             filters={advancedFilters}
             onFiltersChange={setAdvancedFilters}
@@ -755,7 +740,14 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
         </Sheet>
       </div>
 
-      {catalogType !== "protheses" && (
+      {catalogType === "protheses" ? (
+        <div className="flex items-center justify-end mb-4">
+          <ProtheseFilterChips
+            filters={protheseAdvancedFilters}
+            onFiltersChange={setProtheseAdvancedFilters}
+          />
+        </div>
+      ) : (
         <div className="flex items-center justify-end mb-4">
           <ImplantFilterChips
             filters={advancedFilters}

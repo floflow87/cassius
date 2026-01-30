@@ -1769,3 +1769,63 @@ export type AuditLogWithUser = AuditLog & {
     username: string;
   } | null;
 };
+
+// Patch Notes System
+export const patchNoteTypeEnum = pgEnum("patch_note_type", [
+  "FEATURE",
+  "IMPROVEMENT",
+  "BUGFIX",
+  "SECURITY",
+]);
+
+export const patchNotes = pgTable("patch_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  version: text("version").notNull(),
+  date: date("date").notNull(),
+  baseline: text("baseline").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  versionIdx: index("patch_notes_version_idx").on(table.version),
+  dateIdx: index("patch_notes_date_idx").on(table.date),
+}));
+
+export const patchNoteLines = pgTable("patch_note_lines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patchNoteId: varchar("patch_note_id").notNull().references(() => patchNotes.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  type: patchNoteTypeEnum("type").notNull().default("FEATURE"),
+  order: integer("order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  patchNoteIdx: index("patch_note_lines_patch_note_idx").on(table.patchNoteId),
+}));
+
+export const patchNotesRelations = relations(patchNotes, ({ many }) => ({
+  lines: many(patchNoteLines),
+}));
+
+export const patchNoteLinesRelations = relations(patchNoteLines, ({ one }) => ({
+  patchNote: one(patchNotes, {
+    fields: [patchNoteLines.patchNoteId],
+    references: [patchNotes.id],
+  }),
+}));
+
+export const insertPatchNoteSchema = createInsertSchema(patchNotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPatchNoteLineSchema = createInsertSchema(patchNoteLines).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPatchNote = z.infer<typeof insertPatchNoteSchema>;
+export type PatchNote = typeof patchNotes.$inferSelect;
+export type InsertPatchNoteLine = z.infer<typeof insertPatchNoteLineSchema>;
+export type PatchNoteLine = typeof patchNoteLines.$inferSelect;
+
+export type PatchNoteWithLines = PatchNote & {
+  lines: PatchNoteLine[];
+};
