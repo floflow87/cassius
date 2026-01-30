@@ -95,7 +95,7 @@ export const typeDocumentTagEnum = pgEnum("type_document_tag", ["DEVIS", "CONSEN
 export const statutPatientEnum = pgEnum("statut_patient", ["ACTIF", "INACTIF", "ARCHIVE"]);
 export const typeImplantEnum = pgEnum("type_implant", ["IMPLANT", "MINI_IMPLANT", "PROTHESE"]);
 
-export const savedFilterPageTypeEnum = pgEnum("saved_filter_page_type", ["patients", "implants", "actes"]);
+export const savedFilterPageTypeEnum = pgEnum("saved_filter_page_type", ["patients", "implants", "actes", "protheses"]);
 
 // Onboarding enums
 export const onboardingStatusEnum = pgEnum("onboarding_status", ["IN_PROGRESS", "COMPLETED"]);

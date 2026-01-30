@@ -42,6 +42,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CassiusPagination, CassiusSearchInput } from "@/components/cassius-ui";
+import { ProthesesAdvancedFilterDrawer, ProtheseFilterChips, applyProtheseFilters, type ProtheseFilterGroup } from "@/components/protheses-advanced-filter-drawer";
 import {
   Sheet,
   SheetContent,
@@ -341,6 +342,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
 
   const [draggedProtheseColumn, setDraggedProtheseColumn] = useState<ProtheseColumnId | null>(null);
   const [dragOverProtheseColumn, setDragOverProtheseColumn] = useState<ProtheseColumnId | null>(null);
+  const [protheseAdvancedFilters, setProtheseAdvancedFilters] = useState<ProtheseFilterGroup | null>(null);
 
   useEffect(() => {
     localStorage.setItem(PROTHESE_STORAGE_KEY_COLUMNS, JSON.stringify(protheseColumns.map(c => c.id)));
@@ -938,9 +940,22 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         return patientName.includes(query) || marque.includes(query) || ref.includes(query) || typeProthese.includes(query);
       });
     }
+
+    // Apply advanced filters
+    if (protheseAdvancedFilters && protheseAdvancedFilters.rules.length > 0) {
+      const implantData = filtered.map(si => ({
+        ...si,
+        marque: si.implant?.marque || null,
+        referenceFabricant: si.implant?.referenceFabricant || null,
+        typeProthese: si.implant?.typeProthese || null,
+        poseCount: si.implant?.poseCount || 0,
+      }));
+      const filteredData = applyProtheseFilters(implantData, protheseAdvancedFilters);
+      filtered = filteredData.map(d => surgeryImplants.find(si => si.id === d.id)!).filter(Boolean);
+    }
     
     return filtered;
-  }, [surgeryImplants, searchQuery]);
+  }, [surgeryImplants, searchQuery, protheseAdvancedFilters]);
 
   const protheseTotalPages = Math.ceil(filteredProtheses.length / itemsPerPage);
   
@@ -1619,8 +1634,34 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-xs italic text-muted-foreground">{sortedProtheses.length} prothèse{sortedProtheses.length !== 1 ? "s" : ""}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs italic text-muted-foreground">{sortedProtheses.length} prothèse{sortedProtheses.length !== 1 ? "s" : ""}</span>
+                  <ProthesesAdvancedFilterDrawer
+                    filters={protheseAdvancedFilters}
+                    onFiltersChange={setProtheseAdvancedFilters}
+                    activeFilterCount={protheseAdvancedFilters?.rules.length ?? 0}
+                  />
+                </div>
               </div>
+              
+              {protheseAdvancedFilters && protheseAdvancedFilters.rules.length > 0 && (
+                <div className="mb-4">
+                  <ProtheseFilterChips
+                    filterGroup={protheseAdvancedFilters}
+                    onClearAll={() => setProtheseAdvancedFilters(null)}
+                    onRemoveRule={(index) => {
+                      if (protheseAdvancedFilters.rules.length === 1) {
+                        setProtheseAdvancedFilters(null);
+                      } else {
+                        setProtheseAdvancedFilters({
+                          ...protheseAdvancedFilters,
+                          rules: protheseAdvancedFilters.rules.filter((_, i) => i !== index),
+                        });
+                      }
+                    }}
+                  />
+                </div>
+              )}
 
               <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
                 <div className="overflow-x-auto">

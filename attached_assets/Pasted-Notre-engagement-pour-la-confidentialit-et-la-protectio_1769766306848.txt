@@ -1,0 +1,197 @@
+Notre engagement pour la confidentialité et la protection des données
+
+Chez Cassius, la confidentialité n’est pas une option.
+C’est un principe fondateur, une responsabilité éthique et une exigence absolue.
+
+Nous accompagnons des professionnels de santé dans le suivi clinique de leurs patients. À ce titre, nous manipulons des données sensibles, parfois critiques, qui exigent un niveau d’exigence maximal en matière de sécurité, de confidentialité et de conformité réglementaire.
+
+Ce manifeste décrit nos engagements concrets, les principes qui guident nos choix techniques, et les droits dont vous disposez.
+
+1. Une approche fondée sur la confiance et la responsabilité
+
+Les données que vous confiez à Cassius ne nous appartiennent pas.
+Elles restent la propriété exclusive des professionnels et des organisations qui les utilisent.
+
+Notre rôle est de :
+
+les héberger de manière sécurisée,
+
+les traiter uniquement dans le cadre des fonctionnalités prévues,
+
+garantir leur intégrité, leur confidentialité et leur disponibilité,
+
+et ne jamais en faire un usage détourné.
+
+Aucune exploitation commerciale des données médicales n’est réalisée, directement ou indirectement.
+
+2. Données collectées : sobriété et finalité claire
+
+Cassius applique un principe strict de minimisation des données.
+
+Nous ne collectons que les informations strictement nécessaires au bon fonctionnement de l’application, notamment :
+
+données d’identification des utilisateurs professionnels,
+
+données organisationnelles (cabinet, structure, rôles),
+
+données cliniques saisies volontairement par les praticiens (patients, implants, suivis, mesures ISQ, documents, rendez-vous),
+
+données techniques indispensables à la sécurité et à la traçabilité (logs, horodatages, historiques).
+
+Aucune donnée n’est collectée à l’insu de l’utilisateur.
+
+Chaque donnée a une finalité explicite :
+
+suivi clinique,
+
+traçabilité médicale,
+
+amélioration de l’expérience utilisateur,
+
+sécurité et conformité réglementaire.
+
+3. Données de santé : un niveau de protection renforcé
+
+Les données de santé sont considérées comme hautement sensibles.
+
+À ce titre, Cassius met en œuvre :
+
+une séparation stricte des données par organisation (multi-tenant sécurisé),
+
+des contrôles d’accès fins basés sur les rôles (RBAC),
+
+une traçabilité complète des actions (audit trail),
+
+une protection renforcée contre les accès non autorisés.
+
+Les données de santé ne sont jamais utilisées à des fins publicitaires, marketing ou statistiques externes sans anonymisation complète.
+
+4. Hébergement et sécurité technique
+
+Les données sont hébergées sur des infrastructures sécurisées, conformes aux standards de l’industrie.
+
+Cassius applique notamment :
+
+chiffrement des communications (HTTPS / TLS),
+
+chiffrement des données au repos lorsque possible,
+
+sauvegardes régulières,
+
+mécanismes de redondance,
+
+surveillance des accès et des anomalies,
+
+mises à jour de sécurité continues.
+
+L’accès aux bases de données est strictement contrôlé et limité aux services nécessaires au fonctionnement de l’application.
+
+5. Accès aux données et contrôle utilisateur
+
+Chaque utilisateur n’accède qu’aux données auxquelles son rôle l’autorise.
+
+Les administrateurs d’organisation peuvent :
+
+gérer les accès et les rôles,
+
+contrôler les utilisateurs actifs,
+
+révoquer des accès à tout moment.
+
+Chaque action sensible (modification, suppression, changement de statut clinique, ajout de document) est tracée avec :
+
+l’auteur,
+
+la date,
+
+le contexte.
+
+Cette traçabilité est essentielle à la fois pour la sécurité et pour la conformité médicale.
+
+6. Respect du RGPD et des réglementations en vigueur
+
+Cassius est conçu pour respecter les principes du Règlement Général sur la Protection des Données (RGPD), notamment :
+
+Licéité, loyauté et transparence
+
+Limitation des finalités
+
+Minimisation des données
+
+Exactitude
+
+Limitation de la conservation
+
+Intégrité et confidentialité
+
+Les utilisateurs disposent notamment des droits suivants :
+
+droit d’accès à leurs données,
+
+droit de rectification,
+
+droit à la limitation du traitement,
+
+droit à l’effacement lorsque la loi le permet,
+
+droit à la portabilité des données.
+
+Les demandes peuvent être formulées via les canaux de support officiels.
+
+7. Conservation et suppression des données
+
+Les données sont conservées :
+
+aussi longtemps que nécessaire à l’usage professionnel,
+
+conformément aux obligations légales et médicales applicables,
+
+ou selon les paramètres définis par l’organisation utilisatrice.
+
+À la fin d’un contrat ou sur demande légitime :
+
+les données peuvent être exportées,
+
+puis supprimées de manière sécurisée selon les procédures en vigueur.
+
+Aucune donnée n’est conservée indéfiniment sans justification.
+
+8. Partage et sous-traitants
+
+Cassius s’appuie sur des prestataires techniques reconnus (hébergement, authentification, communication), sélectionnés pour leur niveau de sécurité et leur conformité réglementaire.
+
+Ces prestataires :
+
+n’accèdent aux données que lorsque cela est strictement nécessaire,
+
+sont soumis à des obligations contractuelles strictes,
+
+ne peuvent pas exploiter les données pour leur propre compte.
+
+Aucun transfert de données n’est réalisé hors du cadre contractuel défini.
+
+9. Support et confidentialité
+
+Lorsque vous contactez le support Cassius :
+
+seules les informations nécessaires au diagnostic sont consultées,
+
+l’accès aux données est limité et temporaire,
+
+aucune action n’est réalisée sans votre accord ou votre demande explicite.
+
+La confidentialité s’applique aussi au support.
+
+10. Une démarche d’amélioration continue
+
+La sécurité et la confidentialité ne sont pas des états figés.
+
+Cassius s’engage à :
+
+améliorer continuellement ses mécanismes de protection,
+
+auditer régulièrement ses pratiques,
+
+adapter ses procédures aux évolutions réglementaires,
+
+intégrer la sécurité dès la conception des nouvelles fonctionnalités (privacy by design).

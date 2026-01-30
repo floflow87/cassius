@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Filter, Plus, Trash2, X, Save, Star } from "lucide-react";
+import { Filter, Plus, Trash2, Save, Star } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { SavedFilter } from "@shared/schema";
@@ -62,11 +62,8 @@ const PROTHESE_FILTER_CONFIGS: ProtheseFilterFieldConfig[] = [
     label: "Type de prothèse", 
     type: "select", 
     options: [
-      { value: "COURONNE_TRANSVISSEE", label: "Couronne transvissée" },
-      { value: "COURONNE_SCELLEE", label: "Couronne scellée" },
-      { value: "BRIDGE", label: "Bridge" },
-      { value: "PROTHESE_AMOVIBLE", label: "Prothèse amovible" },
-      { value: "AUTRE", label: "Autre" },
+      { value: "VISSEE", label: "Vissée" },
+      { value: "SCELLEE", label: "Scellée" },
     ],
     operators: ["equals", "not_equals"] 
   },
@@ -273,71 +270,117 @@ export function ProthesesAdvancedFilterDrawer({ filters, onFiltersChange, active
         <SheetTrigger asChild>
           <Button 
             variant="outline" 
-            size="sm" 
-            className="gap-2"
+            size="default" 
+            className="bg-white dark:bg-zinc-900"
             data-testid="btn-prothese-advanced-filters"
           >
-            <Filter className="h-4 w-4" />
-            Filtres
+            <Filter className="h-4 w-4 mr-2" />
+            Filtres avancés
             {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">
+              <Badge variant="secondary" className="ml-2">
                 {activeFilterCount}
               </Badge>
             )}
           </Button>
         </SheetTrigger>
-        <SheetContent className="w-[400px] sm:w-[540px]" side="right">
+        <SheetContent className="w-[500px] sm:max-w-[500px] overflow-y-auto" side="right">
           <SheetHeader>
-            <SheetTitle>Filtres avancés</SheetTitle>
+            <SheetTitle>Filtres avancés - Catalogue prothèses</SheetTitle>
             <SheetDescription>
-              Créez des filtres avancés pour affiner votre recherche de prothèses
+              Créez des filtres personnalisés pour affiner votre recherche de prothèses
             </SheetDescription>
           </SheetHeader>
 
-          <ScrollArea className="h-[calc(100vh-220px)] mt-6 pr-4">
-            <div className="space-y-4">
-              {savedFilters.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Favoris enregistrés</Label>
-                  <div className="flex flex-wrap gap-2">
+          <div className="py-6 space-y-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">Favoris</Label>
+              </div>
+              {isLoadingFilters ? (
+                <p className="text-sm text-muted-foreground">Chargement...</p>
+              ) : savedFilters.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucun favori enregistré</p>
+              ) : (
+                <ScrollArea className="max-h-40">
+                  <div className="space-y-1">
                     {savedFilters.map((sf) => (
-                      <Badge 
-                        key={sf.id} 
-                        variant="outline" 
-                        className="cursor-pointer gap-1 pr-1"
-                        onClick={() => handleLoadFilter(sf)}
+                      <div 
+                        key={sf.id}
+                        className="flex items-center justify-between gap-2 p-2 rounded-md hover-elevate"
                         data-testid={`saved-prothese-filter-${sf.id}`}
                       >
-                        <Star className="h-3 w-3" />
-                        {sf.name}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-4 w-4 ml-1 hover:bg-destructive/20"
-                          onClick={(e) => handleDeleteFilter(e, sf.id)}
-                          data-testid={`delete-prothese-filter-${sf.id}`}
+                        <span 
+                          className="text-sm truncate flex-1 cursor-pointer"
+                          onClick={() => handleLoadFilter(sf)}
                         >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
+                          {sf.name}
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => handleLoadFilter(sf, "AND")}
+                                data-testid={`button-combine-and-${sf.id}`}
+                              >
+                                +ET
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Combiner avec les filtres actuels (ET)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => handleLoadFilter(sf, "OR")}
+                                data-testid={`button-combine-or-${sf.id}`}
+                              >
+                                +OU
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Combiner avec les filtres actuels (OU)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={(e) => handleDeleteFilter(e, sf.id)}
+                            data-testid={`delete-prothese-filter-${sf.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
                     ))}
                   </div>
-                </div>
+                </ScrollArea>
               )}
+            </div>
 
-              <div className="flex items-center gap-2 mb-4">
-                <Label className="text-xs text-muted-foreground">Combiner les règles avec</Label>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={toggleOperator}
-                  className="font-mono text-xs"
-                  data-testid="toggle-prothese-operator"
-                >
-                  {localFilters.operator}
-                </Button>
-              </div>
+            <div className="border-t" />
 
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground">Combiner les filtres avec :</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleOperator}
+                data-testid="toggle-prothese-operator"
+              >
+                {localFilters.operator === "AND" ? "ET (tous)" : "OU (un parmi)"}
+              </Button>
+            </div>
+
+            <div className="space-y-4">
               {localFilters.rules.map((rule, index) => {
                 const fieldConfig = PROTHESE_FILTER_CONFIGS.find(c => c.field === rule.field);
                 
@@ -349,8 +392,9 @@ export function ProthesesAdvancedFilterDrawer({ filters, onFiltersChange, active
                       </div>
                     )}
                     
-                    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
-                      <div className="space-y-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground w-16">Champ</Label>
                         <Select
                           value={rule.field}
                           onValueChange={(value: ProtheseFilterField) => {
@@ -363,7 +407,7 @@ export function ProthesesAdvancedFilterDrawer({ filters, onFiltersChange, active
                             });
                           }}
                         >
-                          <SelectTrigger className="h-8 text-xs" data-testid={`prothese-filter-field-${rule.id}`}>
+                          <SelectTrigger className="flex-1" data-testid={`prothese-filter-field-${rule.id}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -374,12 +418,26 @@ export function ProthesesAdvancedFilterDrawer({ filters, onFiltersChange, active
                             ))}
                           </SelectContent>
                         </Select>
+                        {localFilters.rules.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeRule(rule.id)}
+                            data-testid={`remove-prothese-rule-${rule.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
 
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground w-16">Opérateur</Label>
                         <Select
                           value={rule.operator}
                           onValueChange={(value: ProtheseFilterOperator) => updateRule(rule.id, { operator: value })}
                         >
-                          <SelectTrigger className="h-8 text-xs" data-testid={`prothese-filter-operator-${rule.id}`}>
+                          <SelectTrigger className="flex-1" data-testid={`prothese-filter-operator-${rule.id}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -390,58 +448,49 @@ export function ProthesesAdvancedFilterDrawer({ filters, onFiltersChange, active
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
 
-                        <div className="flex gap-2">
-                          {fieldConfig?.type === "select" ? (
-                            <Select
-                              value={String(rule.value || "")}
-                              onValueChange={(value) => updateRule(rule.id, { value })}
-                            >
-                              <SelectTrigger className="h-8 text-xs" data-testid={`prothese-filter-value-${rule.id}`}>
-                                <SelectValue placeholder="Sélectionner..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {fieldConfig.options?.map((opt) => (
-                                  <SelectItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground w-16">Valeur</Label>
+                        {fieldConfig?.type === "select" ? (
+                          <Select
+                            value={String(rule.value || "")}
+                            onValueChange={(value) => updateRule(rule.id, { value })}
+                          >
+                            <SelectTrigger className="flex-1" data-testid={`prothese-filter-value-${rule.id}`}>
+                              <SelectValue placeholder="Sélectionner..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {fieldConfig.options?.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="flex-1 flex gap-2">
                             <Input
                               type={fieldConfig?.type === "number" ? "number" : "text"}
                               value={rule.value ?? ""}
                               onChange={(e) => updateRule(rule.id, { value: e.target.value })}
                               placeholder="Valeur..."
-                              className="h-8 text-xs"
+                              className="flex-1"
                               data-testid={`prothese-filter-value-${rule.id}`}
                             />
-                          )}
-                          {rule.operator === "between" && (
-                            <Input
-                              type="number"
-                              value={rule.value2 ?? ""}
-                              onChange={(e) => updateRule(rule.id, { value2: e.target.value })}
-                              placeholder="et..."
-                              className="h-8 text-xs"
-                              data-testid={`prothese-filter-value2-${rule.id}`}
-                            />
-                          )}
-                        </div>
+                            {rule.operator === "between" && (
+                              <Input
+                                type="number"
+                                value={rule.value2 ?? ""}
+                                onChange={(e) => updateRule(rule.id, { value2: e.target.value })}
+                                placeholder="et..."
+                                className="flex-1"
+                                data-testid={`prothese-filter-value2-${rule.id}`}
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
-
-                      {localFilters.rules.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => removeRule(rule.id)}
-                          data-testid={`remove-prothese-rule-${rule.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
                   </Card>
                 );
@@ -455,12 +504,12 @@ export function ProthesesAdvancedFilterDrawer({ filters, onFiltersChange, active
                 data-testid="add-prothese-rule"
               >
                 <Plus className="h-4 w-4" />
-                Ajouter une règle
+                Ajouter un filtre
               </Button>
             </div>
-          </ScrollArea>
+          </div>
 
-          <SheetFooter className="mt-4 gap-2">
+          <SheetFooter className="gap-2">
             <div className="flex items-center gap-2 w-full">
               {hasValidFilters && (
                 <Tooltip>
@@ -483,14 +532,14 @@ export function ProthesesAdvancedFilterDrawer({ filters, onFiltersChange, active
                 className="flex-1"
                 data-testid="clear-prothese-filters"
               >
-                Effacer
+                Effacer tout
               </Button>
               <Button 
                 onClick={handleApply} 
                 className="flex-1"
                 data-testid="apply-prothese-filters"
               >
-                Appliquer
+                Appliquer les filtres
               </Button>
             </div>
           </SheetFooter>
@@ -559,7 +608,7 @@ export function ProtheseFilterChips({
   };
 
   return (
-    <div className="flex flex-wrap gap-2 mt-2">
+    <div className="flex flex-wrap gap-2">
       {filters.rules.map((rule, index) => (
         <Badge 
           key={rule.id} 
@@ -581,7 +630,7 @@ export function ProtheseFilterChips({
             className="h-4 w-4 ml-1 hover:bg-destructive/20"
             onClick={() => removeRule(rule.id)}
           >
-            <X className="h-3 w-3" />
+            <Trash2 className="h-3 w-3" />
           </Button>
         </Badge>
       ))}
