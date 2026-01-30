@@ -420,7 +420,7 @@ export default function CatalogImplantDetailsPage() {
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-base flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              Actes chirurgicaux avec cet implant
+              Actes chirurgicaux avec {isProthese ? "cette prothèse" : "cet implant"}
             </CardTitle>
             {selectedActs.length > 0 && canDelete && (
               <Button
@@ -618,7 +618,7 @@ export default function CatalogImplantDetailsPage() {
       <AuditHistory
         entityType="CATALOG_IMPLANT"
         entityId={implantId || ""}
-        title="Historique de l'implant"
+        title={isProthese ? "Historique de la prothèse" : "Historique de l'implant"}
         maxItems={5}
       />
     </div>
