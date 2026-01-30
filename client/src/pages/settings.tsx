@@ -187,10 +187,10 @@ export default function SettingsPage() {
             {[
               { value: "security", label: "Informations & Sécurité", icon: Shield, show: true },
               { value: "notifications", label: "Notifications", icon: Bell, show: true },
-              { value: "privacy", label: "Confidentialité", icon: ShieldCheck, show: true },
               { value: "collaborators", label: "Collaborateurs", icon: Users, show: userIsAdmin },
               { value: "organization", label: "Organisation", icon: Building2, show: userIsAdmin },
               { value: "integrations", label: "Intégrations", icon: Link2, show: !userWasInvited && !userIsAssistant },
+              { value: "privacy", label: "Confidentialité", icon: ShieldCheck, show: true },
             ].filter(tab => tab.show).map((tab) => (
               <button
                 key={tab.value}

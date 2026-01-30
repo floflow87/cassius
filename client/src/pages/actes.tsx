@@ -948,7 +948,6 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         marque: si.implant?.marque || null,
         referenceFabricant: si.implant?.referenceFabricant || null,
         typeProthese: si.implant?.typeProthese || null,
-        poseCount: si.implant?.poseCount || 0,
       }));
       const filteredData = applyProtheseFilters(implantData, protheseAdvancedFilters);
       filtered = filteredData.map(d => surgeryImplants.find(si => si.id === d.id)!).filter(Boolean);
@@ -1263,6 +1262,17 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
               onFiltersChange={setSurgeryImplantFilters}
               activeFilterCount={surgeryImplantFilters?.rules.length || 0}
             />
+          )}
+
+          {activeTab === "protheses" && (
+            <>
+              <span className="text-xs italic text-muted-foreground">{sortedProtheses.length} prothèse{sortedProtheses.length !== 1 ? "s" : ""}</span>
+              <ProthesesAdvancedFilterDrawer
+                filters={protheseAdvancedFilters}
+                onFiltersChange={setProtheseAdvancedFilters}
+                activeFilterCount={protheseAdvancedFilters?.rules.length ?? 0}
+              />
+            </>
           )}
           
           {activeTab === "actes" && selectedIds.size > 0 && (
@@ -1633,32 +1643,11 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs italic text-muted-foreground">{sortedProtheses.length} prothèse{sortedProtheses.length !== 1 ? "s" : ""}</span>
-                  <ProthesesAdvancedFilterDrawer
-                    filters={protheseAdvancedFilters}
-                    onFiltersChange={setProtheseAdvancedFilters}
-                    activeFilterCount={protheseAdvancedFilters?.rules.length ?? 0}
-                  />
-                </div>
-              </div>
-              
               {protheseAdvancedFilters && protheseAdvancedFilters.rules.length > 0 && (
                 <div className="mb-4">
                   <ProtheseFilterChips
-                    filterGroup={protheseAdvancedFilters}
-                    onClearAll={() => setProtheseAdvancedFilters(null)}
-                    onRemoveRule={(index) => {
-                      if (protheseAdvancedFilters.rules.length === 1) {
-                        setProtheseAdvancedFilters(null);
-                      } else {
-                        setProtheseAdvancedFilters({
-                          ...protheseAdvancedFilters,
-                          rules: protheseAdvancedFilters.rules.filter((_, i) => i !== index),
-                        });
-                      }
-                    }}
+                    filters={protheseAdvancedFilters}
+                    onFiltersChange={setProtheseAdvancedFilters}
                   />
                 </div>
               )}

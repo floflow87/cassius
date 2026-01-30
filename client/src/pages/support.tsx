@@ -94,14 +94,20 @@ const helpSections: HelpSection[] = [
   {
     id: "catalog",
     icon: <Package className="h-5 w-5" />,
-    title: "Catalogue d'implants",
-    description: "Le catalogue d'implants centralise l'ensemble des références utilisées au cabinet afin d'assurer une traçabilité et une analyse clinique cohérentes.",
+    title: "Catalogue d'implants, mini-implants et prothèses",
+    description: "Le catalogue centralise l'ensemble des références d'implants, mini-implants et prothèses utilisées au cabinet afin d'assurer une traçabilité et une analyse clinique cohérentes.",
     points: [
       "Marque et fabricant",
       "Référence produit",
       "Dimensions et type de connexion",
       "Historique d'utilisation",
       "Statistiques de succès par modèle",
+    ],
+    subsections: [
+      {
+        title: "Types de dispositifs",
+        items: ["Implants standards", "Mini-implants", "Prothèses (vissées ou scellées)"],
+      },
     ],
   },
   {

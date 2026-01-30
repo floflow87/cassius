@@ -736,6 +736,8 @@ export default function PatientDetailsPage() {
   type RdvTag = "CONSULTATION" | "SUIVI" | "CHIRURGIE";
   const [rdvDialogOpen, setRdvDialogOpen] = useState(false);
   const [timelineRadioViewerId, setTimelineRadioViewerId] = useState<string | null>(null);
+  const [timelineRadioSignedUrl, setTimelineRadioSignedUrl] = useState<string | null>(null);
+  const [timelineRadioLoading, setTimelineRadioLoading] = useState(false);
   const [rdvForm, setRdvForm] = useState({
     titre: "",
     description: "",
@@ -746,6 +748,25 @@ export default function PatientDetailsPage() {
   });
   const [editingRdv, setEditingRdv] = useState<RendezVous | null>(null);
   const [deleteRdvId, setDeleteRdvId] = useState<string | null>(null);
+
+  // Fetch signed URL when timeline radio viewer opens
+  useEffect(() => {
+    if (timelineRadioViewerId) {
+      setTimelineRadioLoading(true);
+      setTimelineRadioSignedUrl(null);
+      fetch(`/api/radios/${timelineRadioViewerId}/signed-url`, { credentials: "include" })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.signedUrl) {
+            setTimelineRadioSignedUrl(data.signedUrl);
+          }
+        })
+        .catch(err => console.error("Failed to load radio URL:", err))
+        .finally(() => setTimelineRadioLoading(false));
+    } else {
+      setTimelineRadioSignedUrl(null);
+    }
+  }, [timelineRadioViewerId]);
 
   const { data: patientRdvs = [], isLoading: rdvsLoading } = useQuery<RendezVous[]>({
     queryKey: ["/api/patients", patientId, "rendez-vous"],
@@ -3068,15 +3089,21 @@ export default function PatientDetailsPage() {
                   </div>
                 </DialogHeader>
                 <div className="flex-1 overflow-auto bg-black/90 flex items-center justify-center min-h-[60vh]">
-                  {(radio as any).signedUrl || radio.url ? (
+                  {timelineRadioLoading ? (
+                    <div className="flex flex-col items-center justify-center gap-4">
+                      <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+                      <p className="text-muted-foreground text-sm">Chargement de l'image...</p>
+                    </div>
+                  ) : timelineRadioSignedUrl || (radio as any).signedUrl || radio.url ? (
                     <img
-                      src={(radio as any).signedUrl || radio.url}
+                      src={timelineRadioSignedUrl || (radio as any).signedUrl || radio.url}
                       alt={radio.title || getRadioLabel(radio.type)}
                       className="max-w-full max-h-[80vh] object-contain"
                     />
                   ) : (
-                    <div className="flex items-center justify-center">
+                    <div className="flex flex-col items-center justify-center gap-4">
                       <FileImage className="h-24 w-24 text-muted-foreground" />
+                      <p className="text-muted-foreground text-sm">Image non disponible</p>
                     </div>
                   )}
                 </div>
