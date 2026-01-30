@@ -312,7 +312,10 @@ function AuthenticatedApp() {
         <Route path="/accept-invitation" component={AcceptInvitationPage} />
         <Route path="/verify-email" component={VerifyEmailPage} />
         <Route>
-          {() => <LoginPage onLoginSuccess={() => refetch()} />}
+          {() => <LoginPage onLoginSuccess={() => {
+            refetch();
+            setLocation("/dashboard");
+          }} />}
         </Route>
       </Switch>
     );

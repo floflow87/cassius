@@ -34,6 +34,7 @@ const formSchema = z.object({
   date: z.string().min(1, "La date est requise"),
   operationId: z.string().optional(),
   implantId: z.string().optional(),
+  surgeryImplantId: z.string().optional(),
   filePath: z.string().min(1, "Veuillez téléverser une image"),
   fileName: z.string().optional(),
   mimeType: z.string().optional(),
@@ -84,6 +85,7 @@ export function RadioUploadForm({
         patientId,
         operationId: data.operationId || null,
         implantId: data.implantId || null,
+        surgeryImplantId: data.surgeryImplantId || null,
       });
       return res.json();
     },
@@ -320,51 +322,95 @@ export function RadioUploadForm({
           />
         )}
 
-        {surgeryImplants.length > 0 && (
-          <FormField
-            control={form.control}
-            name="implantId"
-            render={({ field }) => {
-              // Filter to only show surgery implants that have a valid implant reference
-              const validSurgeryImplants = surgeryImplants.filter(si => si.implantId && si.implant);
-              if (validSurgeryImplants.length === 0) return <></>;
+        {surgeryImplants.length > 0 && (() => {
+          // Séparer implants et prothèses
+          const implants = surgeryImplants.filter(si => si.implantId && si.implant && si.implant.typeImplant !== "PROTHESE");
+          const protheses = surgeryImplants.filter(si => si.implantId && si.implant && si.implant.typeImplant === "PROTHESE");
+          
+          return (
+            <>
+              {implants.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="implantId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lier à un implant (optionnel)</FormLabel>
+                      <div className="flex items-center gap-2">
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Sélectionner un implant" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {implants.map((surgeryImp) => (
+                              <SelectItem key={surgeryImp.id} value={surgeryImp.implantId}>
+                                Site {surgeryImp.siteFdi} - {surgeryImp.implant.marque} ({surgeryImp.implant.diametre}x{surgeryImp.implant.longueur}mm)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {field.value && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => field.onChange("")}
+                            data-testid="button-clear-implant"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               
-              return (
-                <FormItem>
-                  <FormLabel>Lier à un implant (optionnel)</FormLabel>
-                  <div className="flex items-center gap-2">
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                      <FormControl>
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Sélectionner un implant" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {validSurgeryImplants.map((surgeryImp) => (
-                          <SelectItem key={surgeryImp.id} value={surgeryImp.implantId}>
-                            Site {surgeryImp.siteFdi} - {surgeryImp.implant.marque} ({surgeryImp.implant.diametre}x{surgeryImp.implant.longueur}mm)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {field.value && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => field.onChange("")}
-                        data-testid="button-clear-implant"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              );
-            }}
-          />
-        )}
+              {protheses.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="surgeryImplantId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lier à une prothèse (optionnel)</FormLabel>
+                      <div className="flex items-center gap-2">
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Sélectionner une prothèse" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {protheses.map((surgeryImp) => (
+                              <SelectItem key={surgeryImp.id} value={surgeryImp.id}>
+                                Site {surgeryImp.siteFdi} - {surgeryImp.implant.marque} {surgeryImp.implant.referenceFabricant || ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {field.value && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => field.onChange("")}
+                            data-testid="button-clear-prothese"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </>
+          );
+        })()}
 
         <FormField
           control={form.control}

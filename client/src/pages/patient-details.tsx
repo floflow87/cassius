@@ -341,12 +341,12 @@ export default function PatientDetailsPage() {
   const [dragOverImplantColumn, setDragOverImplantColumn] = useState<ImplantColumnId | null>(null);
 
   // Implant type filter state
-  type ImplantTypeFilter = "all" | "IMPLANT" | "MINI_IMPLANT";
+  type ImplantTypeFilter = "all" | "IMPLANT" | "MINI_IMPLANT" | "PROTHESE";
   const IMPLANT_TYPE_FILTER_KEY = "cassius_implant_type_filter";
   const [implantTypeFilter, setImplantTypeFilter] = useState<ImplantTypeFilter>(() => {
     try {
       const saved = localStorage.getItem(IMPLANT_TYPE_FILTER_KEY);
-      if (saved === "all" || saved === "IMPLANT" || saved === "MINI_IMPLANT") return saved;
+      if (saved === "all" || saved === "IMPLANT" || saved === "MINI_IMPLANT" || saved === "PROTHESE") return saved;
     } catch {}
     return "all";
   });
@@ -2437,6 +2437,7 @@ export default function PatientDetailsPage() {
                       { value: "all" as const, label: "Tous" },
                       { value: "IMPLANT" as const, label: "Implants" },
                       { value: "MINI_IMPLANT" as const, label: "Mini-implants" },
+                      { value: "PROTHESE" as const, label: "Prothèses" },
                     ].map((filter) => (
                       <button
                         key={filter.value}

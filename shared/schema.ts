@@ -267,6 +267,7 @@ export const radios = pgTable("radios", {
   patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
   operationId: varchar("operation_id").references(() => operations.id, { onDelete: "set null" }),
   implantId: varchar("implant_id").references(() => implants.id, { onDelete: "set null" }),
+  surgeryImplantId: varchar("surgery_implant_id").references(() => surgeryImplants.id, { onDelete: "set null" }),
   type: typeRadioEnum("type").notNull(),
   title: text("title").notNull(),
   filePath: text("file_path"), // Supabase Storage path (nullable for legacy data)
@@ -295,6 +296,10 @@ export const radiosRelations = relations(radios, ({ one }) => ({
   implant: one(implants, {
     fields: [radios.implantId],
     references: [implants.id],
+  }),
+  surgeryImplant: one(surgeryImplants, {
+    fields: [radios.surgeryImplantId],
+    references: [surgeryImplants.id],
   }),
 }));
 
