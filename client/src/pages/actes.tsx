@@ -1249,19 +1249,25 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           />
           
           {activeTab === "actes" && (
-            <ActesAdvancedFilterDrawer
-              filters={advancedFilters}
-              onFiltersChange={setAdvancedFilters}
-              activeFilterCount={advancedFilters?.rules.length || 0}
-            />
+            <>
+              <span className="text-xs italic text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
+              <ActesAdvancedFilterDrawer
+                filters={advancedFilters}
+                onFiltersChange={setAdvancedFilters}
+                activeFilterCount={advancedFilters?.rules.length || 0}
+              />
+            </>
           )}
 
           {activeTab === "implants" && (
-            <SurgeryImplantsFilterDrawer
-              filters={surgeryImplantFilters}
-              onFiltersChange={setSurgeryImplantFilters}
-              activeFilterCount={surgeryImplantFilters?.rules.length || 0}
-            />
+            <>
+              <span className="text-xs italic text-muted-foreground">{sortedImplants.length} implant{sortedImplants.length !== 1 ? "s" : ""}</span>
+              <SurgeryImplantsFilterDrawer
+                filters={surgeryImplantFilters}
+                onFiltersChange={setSurgeryImplantFilters}
+                activeFilterCount={surgeryImplantFilters?.rules.length || 0}
+              />
+            </>
           )}
 
           {activeTab === "protheses" && (
@@ -1393,22 +1399,23 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs italic text-muted-foreground">{totalOperations} acte{totalOperations > 1 ? "s" : ""}</span>
-                <ActeFilterChips
-                  filters={advancedFilters}
-                  onRemoveFilter={(ruleId) => {
-                    if (!advancedFilters) return;
-                    const updatedRules = advancedFilters.rules.filter(r => r.id !== ruleId);
-                    if (updatedRules.length === 0) {
-                      setAdvancedFilters(null);
-                    } else {
-                      setAdvancedFilters({ ...advancedFilters, rules: updatedRules });
-                    }
-                  }}
-                  onClearAll={() => setAdvancedFilters(null)}
-                />
-              </div>
+              {advancedFilters && advancedFilters.rules.length > 0 && (
+                <div className="mb-4">
+                  <ActeFilterChips
+                    filters={advancedFilters}
+                    onRemoveFilter={(ruleId) => {
+                      if (!advancedFilters) return;
+                      const updatedRules = advancedFilters.rules.filter(r => r.id !== ruleId);
+                      if (updatedRules.length === 0) {
+                        setAdvancedFilters(null);
+                      } else {
+                        setAdvancedFilters({ ...advancedFilters, rules: updatedRules });
+                      }
+                    }}
+                    onClearAll={() => setAdvancedFilters(null)}
+                  />
+                </div>
+              )}
 
               <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
                 <div className="overflow-x-auto">
@@ -1540,22 +1547,23 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs italic text-muted-foreground">{sortedImplants.length} implant{sortedImplants.length !== 1 ? "s" : ""}</span>
-                <SurgeryImplantFilterChips
-                  filters={surgeryImplantFilters}
-                  onRemoveFilter={(ruleId) => {
-                    if (!surgeryImplantFilters) return;
-                    const updatedRules = surgeryImplantFilters.rules.filter(r => r.id !== ruleId);
-                    if (updatedRules.length === 0) {
-                      setSurgeryImplantFilters(null);
-                    } else {
-                      setSurgeryImplantFilters({ ...surgeryImplantFilters, rules: updatedRules });
-                    }
-                  }}
-                  onClearAll={() => setSurgeryImplantFilters(null)}
-                />
-              </div>
+              {surgeryImplantFilters && surgeryImplantFilters.rules.length > 0 && (
+                <div className="mb-4">
+                  <SurgeryImplantFilterChips
+                    filters={surgeryImplantFilters}
+                    onRemoveFilter={(ruleId) => {
+                      if (!surgeryImplantFilters) return;
+                      const updatedRules = surgeryImplantFilters.rules.filter(r => r.id !== ruleId);
+                      if (updatedRules.length === 0) {
+                        setSurgeryImplantFilters(null);
+                      } else {
+                        setSurgeryImplantFilters({ ...surgeryImplantFilters, rules: updatedRules });
+                      }
+                    }}
+                    onClearAll={() => setSurgeryImplantFilters(null)}
+                  />
+                </div>
+              )}
 
               <div className="bg-card rounded-lg border border-border-gray overflow-hidden">
                 <div className="overflow-x-auto">

@@ -85,13 +85,13 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
       setCustomBrand(false);
       onSuccess?.();
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Erreur",
-        description: "Impossible de créer la prothèse.",
+        description: error.message || "Impossible de créer la prothèse.",
         variant: "destructive",
       });
-      console.error("Create prothese error:", error);
+      console.error("Create prothese error:", error.message);
     },
   });
 
