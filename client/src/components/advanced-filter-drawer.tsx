@@ -39,6 +39,7 @@ const FILTER_FIELD_CONFIGS: FilterFieldConfig[] = [
     { value: "EXTRACTION_IMPLANT_IMMEDIATE", label: "Extraction + implant immédiat" },
     { value: "REPRISE_IMPLANT", label: "Reprise d'implant" },
     { value: "CHIRURGIE_GUIDEE", label: "Chirurgie guidée" },
+    { value: "POSE_PROTHESE", label: "Pose de prothèse" },
   ]},
   { field: "implant_marque", label: "Marque d'implant", category: "implant", type: "text", operators: ["contains", "equals", "not_contains"] },
   { field: "implant_reference", label: "Référence implant", category: "implant", type: "text", operators: ["contains", "equals"] },

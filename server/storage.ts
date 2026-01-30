@@ -162,7 +162,13 @@ export interface IStorage {
       typeChirurgieTemps?: string | null;
       isqPose?: number | null;
       notes?: string | null;
-    }>
+    }>,
+    protheseData?: {
+      marque?: string;
+      quantite?: "unitaire" | "plurale";
+      mobilite?: "amovible" | "fixe";
+      typePilier?: "multi_unit" | "droit" | "angule";
+    }
   ): Promise<{ operation: Operation; surgeryImplants: SurgeryImplant[] }>;
 
   // Implant catalog methods
@@ -1175,7 +1181,13 @@ export class DatabaseStorage implements IStorage {
       typeChirurgieTemps?: string | null;
       isqPose?: number | null;
       notes?: string | null;
-    }>
+    }>,
+    protheseData?: {
+      marque?: string;
+      quantite?: "unitaire" | "plurale";
+      mobilite?: "amovible" | "fixe";
+      typePilier?: "multi_unit" | "droit" | "angule";
+    }
   ): Promise<{ operation: Operation; surgeryImplants: SurgeryImplant[] }> {
     return await db.transaction(async (tx) => {
       const [operation] = await tx.insert(operations).values({
@@ -1222,6 +1234,34 @@ export class DatabaseStorage implements IStorage {
           notes: implantData.notes || null,
         }).returning();
         createdSurgeryImplants.push(surgeryImplant);
+      }
+
+      // Create prothese as surgery_implant with type PROTHESE
+      if (protheseData && protheseData.marque) {
+        // Create catalog implant entry for the prothese
+        const [protheseImplant] = await tx.insert(implants).values({
+          organisationId,
+          typeImplant: "PROTHESE",
+          marque: protheseData.marque,
+          referenceFabricant: null,
+          diametre: 0, // Not applicable for protheses
+          longueur: 0, // Not applicable for protheses
+          lot: null,
+          quantite: protheseData.quantite?.toUpperCase() as any || null,
+          mobilite: protheseData.mobilite?.toUpperCase() as any || null,
+          typePilier: protheseData.typePilier?.toUpperCase() as any || null,
+        }).returning();
+
+        // Create surgery_implant entry for the prothese
+        const [protheseSurgeryImplant] = await tx.insert(surgeryImplants).values({
+          organisationId,
+          surgeryId: operation.id,
+          implantId: protheseImplant.id,
+          siteFdi: "PROTHESE",
+          statut: "EN_SUIVI",
+          datePose: operationData.dateOperation,
+        }).returning();
+        createdSurgeryImplants.push(protheseSurgeryImplant);
       }
 
       return { operation, surgeryImplants: createdSurgeryImplants };

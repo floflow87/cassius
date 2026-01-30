@@ -59,6 +59,7 @@ const interventionLabels: Record<string, string> = {
   EXTRACTION_IMPLANT_IMMEDIATE: "Extraction + Implant immédiat",
   REPRISE_IMPLANT: "Reprise d'implant",
   CHIRURGIE_GUIDEE: "Chirurgie guidée",
+  POSE_PROTHESE: "Pose de prothèse",
 };
 
 const radioLabels: Record<string, string> = {

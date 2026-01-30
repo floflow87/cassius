@@ -60,8 +60,6 @@ const implantSchema = z.object({
 
 const protheseSchema = z.object({
   marque: z.string().optional(),
-  referenceFabricant: z.string().optional(),
-  typeProthese: z.enum(["vissee", "scellee"]),
   quantite: z.enum(["unitaire", "plurale"]),
   mobilite: z.enum(["amovible", "fixe"]),
   typePilier: z.enum(["multi_unit", "droit", "angule"]),
@@ -76,6 +74,7 @@ const formSchema = z.object({
     "EXTRACTION_IMPLANT_IMMEDIATE",
     "REPRISE_IMPLANT",
     "CHIRURGIE_GUIDEE",
+    "POSE_PROTHESE",
   ]),
   typeChirurgieTemps: z.enum(["UN_TEMPS", "DEUX_TEMPS"]).optional(),
   typeChirurgieApproche: z.enum(["LAMBEAU", "FLAPLESS"]).optional(),
@@ -282,6 +281,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                           <SelectItem value="EXTRACTION_IMPLANT_IMMEDIATE">Extraction + Implant immédiat</SelectItem>
                           <SelectItem value="REPRISE_IMPLANT">Reprise d'implant</SelectItem>
                           <SelectItem value="CHIRURGIE_GUIDEE">Chirurgie guidée</SelectItem>
+                          <SelectItem value="POSE_PROTHESE">Pose de prothèse</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -830,45 +830,6 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                         </FormItem>
                       );
                     }}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="prothese.referenceFabricant"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Référence fabricant</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Référence..." 
-                            {...field} 
-                            value={field.value || ""}
-                            data-testid="input-reference-prothese"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="prothese.typeProthese"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Type de prothèse</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-type-prothese">
-                              <SelectValue placeholder="Sélectionner..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="vissee">Vissée</SelectItem>
-                            <SelectItem value="scellee">Scellée</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
                   />
                   <FormField
                     control={form.control}

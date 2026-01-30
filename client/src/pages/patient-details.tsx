@@ -1076,6 +1076,7 @@ export default function PatientDetailsPage() {
       EXTRACTION_IMPLANT_IMMEDIATE: "Extraction + Implant immédiat",
       REPRISE_IMPLANT: "Reprise d'implant",
       CHIRURGIE_GUIDEE: "Chirurgie guidée",
+      POSE_PROTHESE: "Pose de prothèse",
     };
     return labels[type] || type;
   };

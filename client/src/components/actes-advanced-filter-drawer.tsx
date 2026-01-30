@@ -64,6 +64,7 @@ const TYPE_INTERVENTION_OPTIONS = [
   { value: "EXTRACTION_IMPLANT_IMMEDIATE", label: "Extraction + Implant immédiat" },
   { value: "REPRISE_IMPLANT", label: "Reprise d'implant" },
   { value: "CHIRURGIE_GUIDEE", label: "Chirurgie guidée" },
+  { value: "POSE_PROTHESE", label: "Pose de prothèse" },
 ];
 
 const TYPE_CHIRURGIE_TEMPS_OPTIONS = [

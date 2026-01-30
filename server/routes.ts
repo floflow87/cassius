@@ -1114,6 +1114,13 @@ export async function registerRoutes(
         isqPose: z.number().optional(),
       })
     ).default([]),
+    hasProthese: z.boolean().optional().default(false),
+    prothese: z.object({
+      marque: z.string().optional(),
+      quantite: z.enum(["unitaire", "plurale"]).optional(),
+      mobilite: z.enum(["amovible", "fixe"]).optional(),
+      typePilier: z.enum(["multi_unit", "droit", "angule"]).optional(),
+    }).optional(),
   });
 
   app.post("/api/operations", requireJwtOrSession, async (req, res) => {
@@ -1123,13 +1130,14 @@ export async function registerRoutes(
     try {
       // Validation du body avec Zod
       const data = operationWithImplantsSchema.parse(req.body);
-      const { implants: implantData, ...operationData } = data;
+      const { implants: implantData, hasProthese, prothese, ...operationData } = data;
 
       // Création transactionnelle : opération + surgery_implants (atomique)
       const { operation, surgeryImplants: createdSurgeryImplants } = await storage.createOperationWithImplants(
         organisationId,
         operationData,
-        implantData
+        implantData,
+        hasProthese && prothese ? prothese : undefined
       );
 
       // Auto-complete onboarding step 4 (first case) when operation is created
