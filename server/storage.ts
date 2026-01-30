@@ -1193,10 +1193,8 @@ export class DatabaseStorage implements IStorage {
       notes?: string | null;
     }>,
     protheseData?: {
-      marque?: string;
-      quantite?: "unitaire" | "plurale";
-      mobilite?: "amovible" | "fixe";
-      typePilier?: "multi_unit" | "droit" | "angule";
+      implantId: string;  // ID of existing catalog prothese
+      siteFdi: string;    // Site FDI for the prothese
     }
   ): Promise<{ operation: Operation; surgeryImplants: SurgeryImplant[] }> {
     return await db.transaction(async (tx) => {
@@ -1246,28 +1244,14 @@ export class DatabaseStorage implements IStorage {
         createdSurgeryImplants.push(surgeryImplant);
       }
 
-      // Create prothese as surgery_implant with type PROTHESE
-      if (protheseData && protheseData.marque) {
-        // Create catalog implant entry for the prothese
-        const [protheseImplant] = await tx.insert(implants).values({
-          organisationId,
-          typeImplant: "PROTHESE",
-          marque: protheseData.marque,
-          referenceFabricant: null,
-          diametre: 0, // Not applicable for protheses
-          longueur: 0, // Not applicable for protheses
-          lot: null,
-          quantite: protheseData.quantite?.toUpperCase() as any || null,
-          mobilite: protheseData.mobilite?.toUpperCase() as any || null,
-          typePilier: protheseData.typePilier?.toUpperCase() as any || null,
-        }).returning();
-
-        // Create surgery_implant entry for the prothese
+      // Create prothese as surgery_implant using existing catalog prothese
+      if (protheseData && protheseData.implantId) {
+        // Use the existing catalog prothese - do NOT create a new entry
         const [protheseSurgeryImplant] = await tx.insert(surgeryImplants).values({
           organisationId,
           surgeryId: operation.id,
-          implantId: protheseImplant.id,
-          siteFdi: "PROTHESE",
+          implantId: protheseData.implantId,
+          siteFdi: protheseData.siteFdi,
           statut: "EN_SUIVI",
           datePose: operationData.dateOperation,
         }).returning();

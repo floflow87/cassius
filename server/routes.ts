@@ -1116,10 +1116,8 @@ export async function registerRoutes(
     ).default([]),
     hasProthese: z.boolean().optional().default(false),
     prothese: z.object({
-      marque: z.string().optional(),
-      quantite: z.enum(["unitaire", "plurale"]).optional(),
-      mobilite: z.enum(["amovible", "fixe"]).optional(),
-      typePilier: z.enum(["multi_unit", "droit", "angule"]).optional(),
+      implantId: z.string(), // ID of existing catalog prothese
+      siteFdi: z.string(),   // Site FDI for the prothese
     }).optional(),
   });
 

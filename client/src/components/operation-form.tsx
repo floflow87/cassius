@@ -59,10 +59,8 @@ const implantSchema = z.object({
 });
 
 const protheseSchema = z.object({
-  marque: z.string().optional(),
-  quantite: z.enum(["unitaire", "plurale"]),
-  mobilite: z.enum(["amovible", "fixe"]),
-  typePilier: z.enum(["multi_unit", "droit", "angule"]),
+  implantId: z.string().min(1, "Veuillez sélectionner une prothèse du catalogue"),
+  siteFdi: z.string().min(1, "Veuillez sélectionner un site"),
 });
 
 const formSchema = z.object({
@@ -745,30 +743,24 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="prothese.marque"
+                    name="prothese.implantId"
                     render={({ field }) => {
                       const catalogProtheses = catalogImplants.filter(i => i.typeImplant === "PROTHESE");
-                      const brandsWithFavorites = new Set(catalogProtheses.filter(p => p.isFavorite).map(p => p.marque));
-                      const uniqueBrands = Array.from(new Set(catalogProtheses.map(p => p.marque))).sort((a, b) => {
-                        const aHasFavorite = brandsWithFavorites.has(a);
-                        const bHasFavorite = brandsWithFavorites.has(b);
-                        if (aHasFavorite && !bHasFavorite) return -1;
-                        if (!aHasFavorite && bHasFavorite) return 1;
-                        return a.localeCompare(b);
+                      const sortedProtheses = [...catalogProtheses].sort((a, b) => {
+                        if (a.isFavorite && !b.isFavorite) return -1;
+                        if (!a.isFavorite && b.isFavorite) return 1;
+                        return a.marque.localeCompare(b.marque);
                       });
                       
-                      if (uniqueBrands.length === 0) {
+                      const selectedProthese = catalogProtheses.find(p => p.id === field.value);
+                      
+                      if (catalogProtheses.length === 0) {
                         return (
-                          <FormItem>
-                            <FormLabel>Marque</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="Saisir la marque..." 
-                                {...field} 
-                                value={field.value || ""}
-                                data-testid="input-marque-prothese"
-                              />
-                            </FormControl>
+                          <FormItem className="col-span-2">
+                            <FormLabel>Prothèse du catalogue</FormLabel>
+                            <div className="text-sm text-muted-foreground p-3 border rounded-md bg-muted/50">
+                              Aucune prothèse dans le catalogue. Ajoutez d'abord une prothèse au catalogue.
+                            </div>
                             <FormMessage />
                           </FormItem>
                         );
@@ -776,7 +768,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                       
                       return (
                         <FormItem className="flex flex-col">
-                          <FormLabel>Marque</FormLabel>
+                          <FormLabel>Prothèse du catalogue</FormLabel>
                           <Popover open={protheseMarqueOpen} onOpenChange={setProtheseMarqueOpen}>
                             <PopoverTrigger asChild>
                               <FormControl>
@@ -787,37 +779,41 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                     "justify-between",
                                     !field.value && "text-muted-foreground"
                                   )}
-                                  data-testid="select-marque-prothese"
+                                  data-testid="select-prothese-catalogue"
                                 >
-                                  {field.value || "Sélectionner une marque..."}
+                                  {selectedProthese 
+                                    ? `${selectedProthese.marque} - ${selectedProthese.quantite || ""} ${selectedProthese.mobilite || ""}`.trim()
+                                    : "Sélectionner une prothèse..."}
                                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                               </FormControl>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[300px] p-0">
+                            <PopoverContent className="w-[350px] p-0">
                               <Command>
-                                <CommandInput placeholder="Rechercher une marque..." />
+                                <CommandInput placeholder="Rechercher une prothèse..." />
                                 <CommandList>
-                                  <CommandEmpty>Aucune marque trouvée</CommandEmpty>
-                                  <CommandGroup heading="Marques du catalogue">
-                                    {uniqueBrands.map((brand) => (
+                                  <CommandEmpty>Aucune prothèse trouvée</CommandEmpty>
+                                  <CommandGroup heading="Prothèses du catalogue">
+                                    {sortedProtheses.map((prothese) => (
                                       <CommandItem
-                                        key={brand}
-                                        value={brand}
+                                        key={prothese.id}
+                                        value={`${prothese.marque} ${prothese.quantite || ""} ${prothese.mobilite || ""}`}
                                         onSelect={() => {
-                                          field.onChange(brand);
+                                          field.onChange(prothese.id);
                                           setProtheseMarqueOpen(false);
                                         }}
                                       >
                                         <Check
                                           className={cn(
                                             "mr-2 h-4 w-4",
-                                            field.value === brand ? "opacity-100" : "opacity-0"
+                                            field.value === prothese.id ? "opacity-100" : "opacity-0"
                                           )}
                                         />
                                         <span className="flex items-center gap-1">
-                                          {brandsWithFavorites.has(brand) && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
-                                          {brand}
+                                          {prothese.isFavorite && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
+                                          <span>{prothese.marque}</span>
+                                          {prothese.quantite && <span className="text-muted-foreground text-xs">({prothese.quantite})</span>}
+                                          {prothese.mobilite && <span className="text-muted-foreground text-xs">{prothese.mobilite}</span>}
                                         </span>
                                       </CommandItem>
                                     ))}
@@ -833,64 +829,60 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                   />
                   <FormField
                     control={form.control}
-                    name="prothese.quantite"
+                    name="prothese.siteFdi"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Quantité</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-quantite-prothese">
-                              <SelectValue placeholder="Sélectionner..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="unitaire">Unitaire</SelectItem>
-                            <SelectItem value="plurale">Plurale</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="prothese.mobilite"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Mobilité</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-mobilite-prothese">
-                              <SelectValue placeholder="Sélectionner..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="amovible">Amovible</SelectItem>
-                            <SelectItem value="fixe">Fixe</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="prothese.typePilier"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Type de pilier</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-pilier-prothese">
-                              <SelectValue placeholder="Sélectionner..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="multi_unit">Multi-unit</SelectItem>
-                            <SelectItem value="droit">Droit</SelectItem>
-                            <SelectItem value="angule">Angulé</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Site</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className={cn(
+                                  "justify-between",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                                data-testid="select-site-prothese"
+                              >
+                                {field.value || "Sélectionner un site..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[200px] p-0">
+                            <Command>
+                              <CommandInput placeholder="Rechercher un site..." />
+                              <CommandList>
+                                <CommandEmpty>Aucun site trouvé</CommandEmpty>
+                                <CommandGroup heading="Maxillaire">
+                                  {["18", "17", "16", "15", "14", "13", "12", "11", "21", "22", "23", "24", "25", "26", "27", "28"].map((site) => (
+                                    <CommandItem
+                                      key={site}
+                                      value={site}
+                                      onSelect={() => field.onChange(site)}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", field.value === site ? "opacity-100" : "opacity-0")} />
+                                      {site}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                                <CommandGroup heading="Mandibule">
+                                  {["48", "47", "46", "45", "44", "43", "42", "41", "31", "32", "33", "34", "35", "36", "37", "38"].map((site) => (
+                                    <CommandItem
+                                      key={site}
+                                      value={site}
+                                      onSelect={() => field.onChange(site)}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", field.value === site ? "opacity-100" : "opacity-0")} />
+                                      {site}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
