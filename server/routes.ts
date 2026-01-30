@@ -3929,15 +3929,20 @@ export async function registerRoutes(
       };
       const measurementType = measurementTypeMap[appointment.type] || 'FOLLOW_UP';
 
-      // Upsert the measurement with 3-point ISQ values
+      // Upsert the measurement with 3-point ISQ values (round to integers)
+      const roundedIsqValue = Math.round(Number(isqValue));
+      const roundedVestibulaire = isqVestibulaire !== undefined ? Math.round(Number(isqVestibulaire)) : undefined;
+      const roundedMesial = isqMesial !== undefined ? Math.round(Number(isqMesial)) : undefined;
+      const roundedDistal = isqDistal !== undefined ? Math.round(Number(isqDistal)) : undefined;
+
       const measurement = await storage.upsertImplantMeasurement(organisationId, {
         surgeryImplantId,
         appointmentId,
         type: measurementType,
-        isqValue: Number(isqValue),
-        isqVestibulaire: isqVestibulaire !== undefined ? Number(isqVestibulaire) : undefined,
-        isqMesial: isqMesial !== undefined ? Number(isqMesial) : undefined,
-        isqDistal: isqDistal !== undefined ? Number(isqDistal) : undefined,
+        isqValue: roundedIsqValue,
+        isqVestibulaire: roundedVestibulaire,
+        isqMesial: roundedMesial,
+        isqDistal: roundedDistal,
         notes: notes || null,
         measuredByUserId: userId,
         measuredAt: appointment.dateStart,
@@ -3945,10 +3950,10 @@ export async function registerRoutes(
 
       // Also update the appointment's ISQ fields for backward compatibility
       await storage.updateAppointment(organisationId, appointmentId, { 
-        isq: Number(isqValue),
-        isqVestibulaire: isqVestibulaire !== undefined ? Number(isqVestibulaire) : undefined,
-        isqMesial: isqMesial !== undefined ? Number(isqMesial) : undefined,
-        isqDistal: isqDistal !== undefined ? Number(isqDistal) : undefined,
+        isq: roundedIsqValue,
+        isqVestibulaire: roundedVestibulaire,
+        isqMesial: roundedMesial,
+        isqDistal: roundedDistal,
       });
 
       // Recalculate flags and get suggestions
