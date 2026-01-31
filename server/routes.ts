@@ -956,7 +956,7 @@ export async function registerRoutes(
           ${message ? `<p style="margin: 16px 0;">${message.replace(/\n/g, '<br>')}</p>` : ''}
           <p>Pour consulter les informations, cliquez sur le lien ci-dessous :</p>
           <p style="text-align: center; margin: 24px 0;">
-            <a href="${shareLink}" style="background-color: #3b82f6; color: white; padding: 3px 24px; text-decoration: none; border-radius: 50px; display: inline-block;">
+            <a href="${shareLink}" style="background-color: #3b82f6; color: white; padding: 12px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 500;">
               Voir le compte rendu
             </a>
           </p>
