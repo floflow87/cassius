@@ -2674,6 +2674,28 @@ export async function registerRoutes(
         });
       }
 
+      // Rule 15: Status is EN_SUIVI, latest ISQ between 60-69 (any time) -> offer choice to continue monitoring or declare success
+      if (implant.statut === 'EN_SUIVI' && latestIsq !== null && latestIsq >= 60 && latestIsq < 70) {
+        // Suggest continuing follow-up is implicit (already EN_SUIVI)
+        // Suggest SUCCES with medium confidence if ISQ is decent
+        if (latestIsq >= 65) {
+          suggestions.push({
+            status: 'SUCCES',
+            confidence: 'MEDIUM',
+            rule: `ISQ ${latestIsq} ≥ 65 : ostéointégration satisfaisante, validation clinique recommandée`,
+            reasonCode: 'OSTEOINTEGRATION_OK',
+          });
+        } else {
+          // ISQ 60-64: suggest continuing to monitor or consider success with caution
+          suggestions.push({
+            status: 'SUCCES',
+            confidence: 'LOW',
+            rule: `ISQ ${latestIsq} entre 60-64 : ostéointégration en cours, confirmer avec examen clinique`,
+            reasonCode: 'OSTEOINTEGRATION_OK',
+          });
+        }
+      }
+
       // Filter out suggestions that match the current status (no point suggesting what's already applied)
       // Also filter out suggestions that have been applied and no new ISQ since
       const filteredSuggestions = suggestions.filter(s => 
