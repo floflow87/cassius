@@ -102,6 +102,30 @@ export function createDocumentsRouter(
     }
   });
 
+  // POST / - Create document record (alternative to confirm-upload)
+  router.post("/", requireAuth, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const data = createDocumentSchema.parse(req.body);
+      const userId = getUserId(req);
+      
+      const doc = await service.createDocument(organisationId, {
+        ...data,
+        createdBy: userId,
+      });
+      
+      res.status(201).json(doc);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      logger.error("Error creating document", { error: (error as Error).message });
+      res.status(500).json({ error: "Failed to create document" });
+    }
+  });
+
   router.get("/:id", requireAuth, async (req, res) => {
     const organisationId = getOrganisationId(req, res);
     if (!organisationId) return;
