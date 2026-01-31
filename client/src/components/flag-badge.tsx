@@ -315,14 +315,14 @@ export function FlagsTooltipBadge({ flags, variant = "default" }: FlagsTooltipBa
                 <div className="flex items-center gap-2">
                   <Badge
                     variant="secondary"
-                    className={`${config.className} text-xs gap-1`}
+                    className={`${config.className} text-[10px] gap-1`}
                   >
                     <IconComponent className="w-2.5 h-2.5" />
                     {typeLabels[flag.type] || flag.type}
                   </Badge>
                 </div>
                 {flag.description && (
-                  <p className="text-xs text-muted-foreground pl-1">{flag.description}</p>
+                  <p className="text-[10px] text-muted-foreground pl-1">{flag.description}</p>
                 )}
               </div>
             );
