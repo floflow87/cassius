@@ -2103,7 +2103,7 @@ export default function PatientDetailsPage() {
                     </p>
                   ) : (
                     <div className="space-y-4">
-                      {timelineEvents.slice(0, 4).map((event, index) => {
+                      {timelineEvents.slice(0, 5).map((event, index) => {
                         const getEventIcon = () => {
                           switch (event.type) {
                             case "operation":
@@ -2138,7 +2138,7 @@ export default function PatientDetailsPage() {
                               <div className={`p-2 rounded-full ${getEventBgColor()}`}>
                                 {getEventIcon()}
                               </div>
-                              {index < Math.min(timelineEvents.length - 1, 3) && (
+                              {index < Math.min(timelineEvents.length - 1, 4) && (
                                 <div className="flex-1 w-px bg-border mt-2" />
                               )}
                             </div>
