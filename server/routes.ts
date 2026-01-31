@@ -947,7 +947,9 @@ export async function registerRoutes(
 
       // Generate tracking ID for read receipt
       const emailTrackingId = crypto.randomUUID();
-      const trackingPixelUrl = `${req.protocol}://${req.get('host')}/api/public/email-track/${emailTrackingId}.png`;
+      // Extract base URL from the shareLink to ensure tracking works in production
+      const shareLinkUrl = new URL(shareLink);
+      const trackingPixelUrl = `${shareLinkUrl.origin}/api/public/email-track/${emailTrackingId}.png`;
 
       // Build email content with tracking pixel
       const emailHtml = `
