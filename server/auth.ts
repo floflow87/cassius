@@ -6,6 +6,7 @@ import { promisify } from "util";
 import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { generateToken } from "./jwtMiddleware";
+import { auditService } from "./auditService";
 
 const APP_ENV = process.env.APP_ENV || "development";
 
@@ -160,6 +161,19 @@ export function setupAuth(app: Express): void {
         }
 
         authLog("/api/auth/login", "SUCCESS", { userId: user.id, organisationId: user.organisationId, rememberMe });
+        
+        // Log login to audit system
+        if (user.organisationId) {
+          auditService.log({
+            organisationId: user.organisationId,
+            userId: user.id,
+            entityType: "USER" as any,
+            entityId: user.id,
+            action: "LOGIN" as any,
+            details: `${user.prenom || ''} ${user.nom || ''} (${user.username}) s'est connecté`,
+          }).catch(err => console.error("[AUDIT] Failed to log login:", err));
+        }
+        
         return res.json({
           token,
           user: {

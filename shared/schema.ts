@@ -1738,6 +1738,8 @@ export const auditActionEnum = pgEnum("audit_action", [
   "VIEW",
   "ARCHIVE",
   "RESTORE",
+  "LOGIN",
+  "LOGOUT",
 ]);
 
 export const auditEntityTypeEnum = pgEnum("audit_entity_type", [
@@ -1748,6 +1750,7 @@ export const auditEntityTypeEnum = pgEnum("audit_entity_type", [
   "APPOINTMENT",
   "DOCUMENT",
   "RADIO",
+  "USER",
 ]);
 
 export const auditLogs = pgTable("audit_logs", {

@@ -1214,6 +1214,8 @@ export default function DashboardPage() {
                       VIEW: Eye,
                       ARCHIVE: Archive,
                       RESTORE: RotateCcw,
+                      LOGIN: UserCircle,
+                      LOGOUT: UserCircle,
                     };
                     const actionLabels: Record<string, string> = {
                       CREATE: "Création",
@@ -1222,6 +1224,8 @@ export default function DashboardPage() {
                       VIEW: "Consultation",
                       ARCHIVE: "Archivage",
                       RESTORE: "Restauration",
+                      LOGIN: "Connexion",
+                      LOGOUT: "Déconnexion",
                     };
                     const actionColors: Record<string, string> = {
                       CREATE: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -1230,6 +1234,8 @@ export default function DashboardPage() {
                       VIEW: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
                       ARCHIVE: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
                       RESTORE: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+                      LOGIN: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+                      LOGOUT: "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400",
                     };
                     
                     const userName = activity.user?.prenom && activity.user?.nom
