@@ -406,7 +406,7 @@ export default function PatientDetailsPage() {
       setNewShareLink(link);
       setCurrentShareLinkId(data.id);
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "share-links"] });
-      toast({ title: "Lien créé", description: "Le lien de partage a été généré avec succès." });
+      toast({ title: "Lien créé", description: "Le lien de partage a été généré avec succès.", variant: "success" });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de créer le lien de partage.", variant: "destructive" });
@@ -420,7 +420,7 @@ export default function PatientDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "share-links"] });
-      toast({ title: "Lien révoqué", description: "Le lien de partage a été désactivé." });
+      toast({ title: "Lien révoqué", description: "Le lien de partage a été désactivé.", variant: "success" });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de révoquer le lien.", variant: "destructive" });
