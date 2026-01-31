@@ -1,9 +1,11 @@
 import { useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity, User, Calendar, Shield } from "lucide-react";
+import { getSiteBadgeColor } from "@/lib/utils";
 import type { PublicPatientShareData } from "@shared/schema";
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -43,6 +45,19 @@ function calculateAge(dateNaissance: string | null | undefined): string {
 export default function PublicSharePage() {
   const [, params] = useRoute("/share/:token");
   const token = params?.token;
+
+  // Hide Crisp chat widget on this page
+  useEffect(() => {
+    const crisp = (window as any).$crisp;
+    if (crisp) {
+      crisp.push(["do", "chat:hide"]);
+    }
+    return () => {
+      if (crisp) {
+        crisp.push(["do", "chat:show"]);
+      }
+    };
+  }, []);
 
   const { data, isLoading, error } = useQuery<PublicPatientShareData>({
     queryKey: ["/api/public/share", token],
@@ -127,8 +142,8 @@ export default function PublicSharePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Activity className="h-4 w-4" />
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Activity className="h-5 w-5" />
                 Implants ({implants.length})
               </CardTitle>
             </CardHeader>
@@ -139,14 +154,20 @@ export default function PublicSharePage() {
                 </p>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {implants.map((implant) => (
+                  {implants.map((implant) => {
+                    const siteColor = getSiteBadgeColor(implant.siteFdi);
+                    return (
                     <div
                       key={implant.id}
                       className="border rounded-md p-4 space-y-3"
                       data-testid={`card-implant-${implant.id}`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-[13px]">Site {implant.siteFdi}</span>
+                        <Badge 
+                          className={`${siteColor} text-[11px] font-medium`}
+                        >
+                          Site {implant.siteFdi}
+                        </Badge>
                         {getStatusBadge(implant.statut)}
                       </div>
                       <div className="grid grid-cols-2 gap-y-2 text-[12px]">
@@ -199,7 +220,8 @@ export default function PublicSharePage() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -211,9 +233,9 @@ export default function PublicSharePage() {
         </div>
       </div>
 
-      <div className="mt-4 text-center">
-        <img src="/assets/logos/logo-cassius-blue.png" alt="Cassius" className="h-5 mx-auto mb-1" />
-        <p className="text-[10px] text-muted-foreground italic">
+      <div className="mt-8 text-center">
+        <img src="/assets/logos/logo-cassius-blue.png" alt="Cassius" className="h-8 mx-auto mb-2" />
+        <p className="text-[11px] text-muted-foreground italic">
           Propulsé par <a href="https://cassiuspro.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Cassius</a>
         </p>
       </div>

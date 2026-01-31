@@ -928,12 +928,10 @@ export async function registerRoutes(
       const emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #0f172a;">Compte rendu opératoire partagé</h2>
-          <p>Bonjour,</p>
-          <p><strong>Dr. ${sender.prenom || ''} ${sender.nom || sender.email}</strong> vous partage un compte rendu opératoire via ${orgName}.</p>
           ${message ? `<div style="background-color: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;"><p style="margin: 0; white-space: pre-wrap;">${message}</p></div>` : ''}
           <p>Pour consulter les informations, cliquez sur le lien ci-dessous :</p>
           <p style="text-align: center; margin: 24px 0;">
-            <a href="${shareLink}" style="background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+            <a href="${shareLink}" style="background-color: #3b82f6; color: white; padding: 3px 24px; text-decoration: none; border-radius: 50px; display: inline-block;">
               Voir le compte rendu
             </a>
           </p>
