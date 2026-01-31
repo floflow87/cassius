@@ -41,6 +41,7 @@ import {
   ExternalLink,
   Link2,
   XCircle,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -355,11 +356,14 @@ export default function PatientDetailsPage() {
     return "all";
   });
 
-  // Share dialog state
+  // Share drawer state
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareExpiryDays, setShareExpiryDays] = useState<number | null>(null);
   const [newShareLink, setNewShareLink] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [shareEmailRecipient, setShareEmailRecipient] = useState("");
+  const [shareEmailSubject, setShareEmailSubject] = useState("");
+  const [shareEmailMessage, setShareEmailMessage] = useState("");
 
   // Share links query
   interface ShareLinkData {
@@ -405,6 +409,28 @@ export default function PatientDetailsPage() {
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de révoquer le lien.", variant: "destructive" });
+    },
+  });
+
+  // Send share link via email mutation
+  const sendShareEmailMutation = useMutation({
+    mutationFn: async () => {
+      if (!newShareLink) throw new Error("No share link");
+      await apiRequest("POST", `/api/patients/${patientId}/share-links/send-email`, {
+        recipientEmail: shareEmailRecipient,
+        subject: shareEmailSubject,
+        message: shareEmailMessage,
+        shareLink: newShareLink,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Email envoyé", description: "Le compte rendu a été envoyé avec succès." });
+      setShareEmailRecipient("");
+      setShareEmailSubject("");
+      setShareEmailMessage("");
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible d'envoyer l'email.", variant: "destructive" });
     },
   });
 
@@ -2221,11 +2247,14 @@ export default function PatientDetailsPage() {
                       >
                         Voir détails
                       </Button>
-                      <Dialog open={shareDialogOpen} onOpenChange={(open) => {
+                      <Sheet open={shareDialogOpen} onOpenChange={(open) => {
                         setShareDialogOpen(open);
                         if (!open) {
                           setNewShareLink(null);
                           setShareExpiryDays(null);
+                          setShareEmailRecipient("");
+                          setShareEmailSubject("");
+                          setShareEmailMessage("");
                         }
                       }}>
                         <Button 
@@ -2238,35 +2267,96 @@ export default function PatientDetailsPage() {
                           <Share2 className="h-4 w-4 mr-1" />
                           Partager
                         </Button>
-                        <DialogContent className="max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Partager les données implants</DialogTitle>
-                            <DialogDescription>
-                              Créez un lien sécurisé pour partager les informations d'implants de ce patient.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
+                        <SheetContent className="w-full sm:max-w-lg overflow-y-auto bg-white dark:bg-zinc-900">
+                          <SheetHeader>
+                            <SheetTitle>Partager le compte rendu opératoire</SheetTitle>
+                          </SheetHeader>
+                          <div className="mt-6 space-y-6">
+                            <p className="text-sm text-muted-foreground">
+                              Créez un lien sécurisé pour partager les informations d'implants de ce patient avec un confrère.
+                            </p>
+                            
                             {newShareLink ? (
-                              <div className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                  <Input 
-                                    value={newShareLink} 
-                                    readOnly 
-                                    className="font-mono text-sm bg-muted"
-                                    data-testid="input-share-link"
-                                  />
-                                  <Button 
-                                    size="icon" 
-                                    variant="outline" 
-                                    onClick={handleCopyLink}
-                                    data-testid="button-copy-link"
-                                  >
-                                    {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                  </Button>
+                              <div className="space-y-6">
+                                <div className="p-4 rounded-lg bg-muted/50 border space-y-3">
+                                  <Label className="text-xs text-muted-foreground">Lien de partage</Label>
+                                  <div className="flex items-center gap-2">
+                                    <Input 
+                                      value={newShareLink} 
+                                      readOnly 
+                                      className="font-mono text-xs bg-white dark:bg-zinc-800"
+                                      data-testid="input-share-link"
+                                    />
+                                    <Button 
+                                      size="icon" 
+                                      variant="outline" 
+                                      onClick={handleCopyLink}
+                                      data-testid="button-copy-link"
+                                    >
+                                      {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                    </Button>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Ce lien permet d'accéder aux données sans connexion.
+                                  </p>
                                 </div>
-                                <p className="text-sm text-muted-foreground">
-                                  Ce lien permet à quiconque d'accéder aux données d'implants du patient sans connexion.
-                                </p>
+
+                                <div className="border-t pt-6">
+                                  <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
+                                    <Mail className="h-4 w-4" />
+                                    Envoyer par email
+                                  </h4>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label htmlFor="share-email">Email du destinataire</Label>
+                                      <Input 
+                                        id="share-email"
+                                        type="email"
+                                        placeholder="confrere@cabinet.fr"
+                                        value={shareEmailRecipient}
+                                        onChange={(e) => setShareEmailRecipient(e.target.value)}
+                                        className="mt-1"
+                                        data-testid="input-share-email"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor="share-subject">Objet</Label>
+                                      <Input 
+                                        id="share-subject"
+                                        placeholder="Compte rendu opératoire - Patient"
+                                        value={shareEmailSubject}
+                                        onChange={(e) => setShareEmailSubject(e.target.value)}
+                                        className="mt-1"
+                                        data-testid="input-share-subject"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor="share-message">Message (optionnel)</Label>
+                                      <Textarea 
+                                        id="share-message"
+                                        placeholder="Cher confrère, veuillez trouver ci-joint le compte rendu opératoire..."
+                                        value={shareEmailMessage}
+                                        onChange={(e) => setShareEmailMessage(e.target.value)}
+                                        className="mt-1 min-h-[100px]"
+                                        data-testid="input-share-message"
+                                      />
+                                    </div>
+                                    <Button 
+                                      className="w-full"
+                                      onClick={() => sendShareEmailMutation.mutate()}
+                                      disabled={sendShareEmailMutation.isPending || !shareEmailRecipient || !shareEmailSubject}
+                                      data-testid="button-send-share-email"
+                                    >
+                                      {sendShareEmailMutation.isPending ? (
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                      ) : (
+                                        <Send className="h-4 w-4 mr-2" />
+                                      )}
+                                      Envoyer le compte rendu
+                                    </Button>
+                                  </div>
+                                </div>
+
                                 <Button 
                                   variant="outline" 
                                   className="w-full"
@@ -2276,7 +2366,7 @@ export default function PatientDetailsPage() {
                                 </Button>
                               </div>
                             ) : (
-                              <div className="space-y-3">
+                              <div className="space-y-4">
                                 <div>
                                   <Label>Expiration du lien</Label>
                                   <Select 
@@ -2344,8 +2434,8 @@ export default function PatientDetailsPage() {
                               </div>
                             )}
                           </div>
-                        </DialogContent>
-                      </Dialog>
+                        </SheetContent>
+                      </Sheet>
                       <Sheet open={operationDialogOpen} onOpenChange={setOperationDialogOpen}>
                         <SheetTrigger asChild>
                           <Button size="sm" data-testid="button-new-act">

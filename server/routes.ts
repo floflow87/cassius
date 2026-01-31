@@ -44,7 +44,7 @@ import {
   operations,
 } from "@shared/schema";
 import type { PublicPatientShareData, PatientShareLinkWithDetails, OnboardingData, OnboardingState } from "@shared/schema";
-import { onboardingState, appointments, documents, notificationPreferences, calendarIntegrations, visites, patchNotes, patchNoteLines } from "@shared/schema";
+import { onboardingState, appointments, documents, notificationPreferences, calendarIntegrations, visites, patchNotes, patchNoteLines, organisations, users } from "@shared/schema";
 import type {
   Patient,
   PatientDetail,
@@ -885,6 +885,92 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error revoking share link:", error);
       res.status(500).json({ error: "Failed to revoke share link" });
+    }
+  });
+
+  // Send share link via email
+  app.post("/api/patients/:patientId/share-links/send-email", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+    const userId = req.jwtUser?.userId;
+    if (!userId) return res.status(401).json({ error: "User not authenticated" });
+
+    const { patientId } = req.params;
+    const { recipientEmail, subject, message, shareLink } = req.body as { 
+      recipientEmail: string; 
+      subject: string; 
+      message: string;
+      shareLink: string;
+    };
+
+    if (!recipientEmail || !subject || !shareLink) {
+      return res.status(400).json({ error: "Email, subject and shareLink are required" });
+    }
+
+    try {
+      // Verify patient exists and belongs to this org
+      const patient = await storage.getPatient(organisationId, patientId);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Get sender info
+      const [sender] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!sender) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get organisation info
+      const [organisation] = await db.select().from(organisations).where(eq(organisations.id, organisationId)).limit(1);
+      const orgName = organisation?.nom || "Cassius";
+
+      // Build email content
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #0f172a;">Compte rendu opératoire partagé</h2>
+          <p>Bonjour,</p>
+          <p><strong>Dr. ${sender.prenom || ''} ${sender.nom || sender.email}</strong> vous partage un compte rendu opératoire via ${orgName}.</p>
+          ${message ? `<div style="background-color: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;"><p style="margin: 0; white-space: pre-wrap;">${message}</p></div>` : ''}
+          <p>Pour consulter les informations, cliquez sur le lien ci-dessous :</p>
+          <p style="text-align: center; margin: 24px 0;">
+            <a href="${shareLink}" style="background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Voir le compte rendu
+            </a>
+          </p>
+          <p style="color: #64748b; font-size: 12px;">Ce lien est sécurisé et peut être limité dans le temps selon les paramètres définis par l'expéditeur.</p>
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+          <p style="color: #64748b; font-size: 12px;">Cet email a été envoyé via Cassius - Plateforme de gestion en implantologie dentaire.</p>
+        </div>
+      `;
+
+      // Send email using Resend
+      const { sendRawEmail } = await import("./emails/send");
+      const emailResult = await sendRawEmail({
+        to: recipientEmail,
+        subject: subject,
+        html: emailHtml,
+      });
+
+      if (!emailResult.success) {
+        return res.status(500).json({ error: "Failed to send email" });
+      }
+
+      // Log audit
+      await storage.createAuditLog({
+        organisationId,
+        userId,
+        action: "UPDATE",
+        entityType: "PATIENT",
+        entityId: patientId,
+        details: `Compte rendu partagé par email à ${recipientEmail}`,
+        ipAddress: req.ip || null,
+        userAgent: req.headers["user-agent"] || null,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error sending share email:", error);
+      res.status(500).json({ error: "Failed to send email" });
     }
   });
 

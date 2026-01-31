@@ -276,3 +276,35 @@ export function getPreviewHtml(template: TemplateName, data?: any): string {
 }
 
 export { getBaseUrl };
+
+export async function sendRawEmail(params: { to: string; subject: string; html: string }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const credentials = await getCredentials();
+    
+    if (!credentials) {
+      console.log(`[Email] Skipping email to ${params.to} - Resend not configured`);
+      return { success: true, messageId: 'skipped-no-resend' };
+    }
+    
+    const { apiKey, fromEmail } = credentials;
+    const resend = new Resend(apiKey);
+    
+    const result = await resend.emails.send({
+      from: fromEmail,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    });
+    
+    if (result.error) {
+      console.error('[Email] Raw email send failed:', result.error);
+      return { success: false, error: result.error.message };
+    }
+    
+    console.log(`[Email] Raw email sent successfully to ${params.to}`);
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    console.error('[Email] Error sending raw email:', error);
+    return { success: false, error: String(error) };
+  }
+}
