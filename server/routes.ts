@@ -945,11 +945,15 @@ export async function registerRoutes(
       const [organisation] = await db.select().from(organisations).where(eq(organisations.id, organisationId)).limit(1);
       const orgName = organisation?.nom || "Cassius";
 
-      // Build email content
+      // Generate tracking ID for read receipt
+      const emailTrackingId = crypto.randomUUID();
+      const trackingPixelUrl = `${req.protocol}://${req.get('host')}/api/public/email-track/${emailTrackingId}.png`;
+
+      // Build email content with tracking pixel
       const emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #0f172a;">Compte rendu opératoire partagé</h2>
-          ${message ? `<div style="background-color: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;"><p style="margin: 0; white-space: pre-wrap;">${message}</p></div>` : ''}
+          ${message ? `<p style="margin: 16px 0;">${message.replace(/\n/g, '<br>')}</p>` : ''}
           <p>Pour consulter les informations, cliquez sur le lien ci-dessous :</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${shareLink}" style="background-color: #3b82f6; color: white; padding: 3px 24px; text-decoration: none; border-radius: 50px; display: inline-block;">
@@ -959,6 +963,7 @@ export async function registerRoutes(
           <p style="color: #64748b; font-size: 12px;">Ce lien est sécurisé et peut être limité dans le temps selon les paramètres définis par l'expéditeur.</p>
           <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
           <p style="color: #64748b; font-size: 12px;">Cet email a été envoyé via Cassius - Plateforme de gestion en implantologie dentaire.</p>
+          <img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />
         </div>
       `;
 
@@ -987,10 +992,11 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to send email" });
       }
 
-      // Try to record sent email if shareLinkId provided
+      // Try to record sent email if shareLinkId provided (with tracking ID)
       if (shareLinkId) {
         try {
           await db.insert(shareLinkEmails).values({
+            id: emailTrackingId,
             shareLinkId,
             recipientEmail,
             subject,
@@ -1019,6 +1025,31 @@ export async function registerRoutes(
       console.error("Error sending share email:", error);
       res.status(500).json({ error: "Failed to send email" });
     }
+  });
+
+  // Public endpoint for email tracking pixel (NO AUTH REQUIRED)
+  app.get("/api/public/email-track/:trackingId.png", async (req, res) => {
+    const { trackingId } = req.params;
+    
+    try {
+      // Update email status to READ
+      await db.update(shareLinkEmails)
+        .set({ status: "READ", readAt: new Date() })
+        .where(eq(shareLinkEmails.id, trackingId.replace('.png', '')));
+    } catch (e) {
+      console.log("Could not update email tracking:", e);
+    }
+    
+    // Return a 1x1 transparent PNG pixel
+    const pixel = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64'
+    );
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.send(pixel);
   });
 
   // Public endpoint to view shared patient data (NO AUTH REQUIRED)
