@@ -573,6 +573,26 @@ export async function registerRoutes(
         visitesByImplantId.get(v.implantId)!.push({ isqValue: v.isq, measuredAt: v.date });
       }
       
+      // Fetch implant_measurements for all surgery implants (ISQ 3 points)
+      const surgeryImplantIds = (patient.surgeryImplants || []).map(si => si.id);
+      const measurementsBySurgeryImplantId = new Map<string, Array<{ isqValue: number | null; measuredAt: Date | string }>>();
+      for (const siId of surgeryImplantIds) {
+        try {
+          const measurements = await storage.getImplantMeasurements(organisationId, siId);
+          if (measurements.length > 0) {
+            measurementsBySurgeryImplantId.set(siId, measurements.map(m => ({
+              isqValue: m.isqValue,
+              measuredAt: m.measuredAt,
+            })));
+          }
+        } catch (err: any) {
+          // Table may not exist in some environments
+          if (err?.code !== "42P01") {
+            console.error("[PATIENT] Error fetching measurements:", err?.message);
+          }
+        }
+      }
+      
       // OPTIMIZATION: Don't generate signed URLs upfront
       // Frontend fetches them on-demand via /api/radios/:id/url endpoint
       // This removes expensive batch URL generation from initial page load
@@ -582,15 +602,17 @@ export async function registerRoutes(
       })) || [];
       
       // Add latestIsq and flag info to each surgeryImplant (batch to avoid N+1)
-      const surgeryImplantIds = (patient.surgeryImplants || []).map(si => si.id);
       const implantFlagSummaries = await storage.getSurgeryImplantFlagSummaries(organisationId, surgeryImplantIds);
       
       const surgeryImplantsWithExtras = (patient.surgeryImplants || []).map((si) => {
         const siFlagSummary = implantFlagSummaries.get(si.id) || { activeFlagCount: 0 };
+        // Combine old visite measurements with new implant_measurements
         const visiteMeasurements = visitesByImplantId.get(si.implantId) || [];
+        const implantMeasurements = measurementsBySurgeryImplantId.get(si.id) || [];
+        const allMeasurements = [...visiteMeasurements, ...implantMeasurements];
         return {
           ...si,
-          latestIsq: computeLatestIsq(si, visiteMeasurements),
+          latestIsq: computeLatestIsq(si, allMeasurements),
           topFlag: siFlagSummary.topFlag,
           activeFlagCount: siFlagSummary.activeFlagCount,
         };
