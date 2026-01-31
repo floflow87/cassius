@@ -1520,7 +1520,7 @@ export default function PatientDetailsPage() {
                   <TooltipTrigger asChild>
                     <Badge 
                       variant="secondary" 
-                      className="bg-[#722F37] text-white dark:bg-[#722F37] dark:text-white cursor-help gap-1"
+                      className="bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 cursor-help gap-1"
                       data-testid="badge-patient-alerts"
                     >
                       <AlertTriangle className="w-3 h-3" />
