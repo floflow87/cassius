@@ -490,15 +490,18 @@ export async function registerRoutes(
     if (!organisationId) return;
 
     try {
-      const [summary, flagSummaries] = await Promise.all([
-        storage.getPatientsWithSummary(organisationId),
-        storage.getAllPatientFlagSummaries(organisationId),
-      ]);
+      const summary = await storage.getPatientsWithSummary(organisationId);
       
-      // Convert Map to object for JSON serialization
-      const flagsByPatient: Record<string, { topFlag?: any; activeFlagCount: number }> = {};
-      for (const [patientId, data] of flagSummaries) {
-        flagsByPatient[patientId] = data;
+      // Try to get flag summaries, but don't fail if table doesn't exist
+      let flagsByPatient: Record<string, { topFlag?: any; activeFlagCount: number }> = {};
+      try {
+        const flagSummaries = await storage.getAllPatientFlagSummaries(organisationId);
+        for (const [patientId, data] of flagSummaries) {
+          flagsByPatient[patientId] = data;
+        }
+      } catch (flagError) {
+        console.warn("Could not fetch flag summaries (table may not exist):", flagError);
+        // Continue without flags
       }
       
       res.json({ ...summary, flagsByPatient });
@@ -8139,6 +8142,10 @@ export async function registerRoutes(
       res.json(result);
     } catch (error: any) {
       console.error("[PATCH_NOTES] Error fetching patch notes:", error);
+      // Return empty array if table doesn't exist or has missing columns
+      if (error.message?.includes("does not exist") || error.message?.includes("column")) {
+        return res.json([]);
+      }
       res.status(500).json({ error: error.message });
     }
   });
