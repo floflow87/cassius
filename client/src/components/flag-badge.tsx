@@ -290,7 +290,7 @@ export function FlagsTooltipBadge({ flags, variant = "default" }: FlagsTooltipBa
   const TopIcon = topConfig.icon;
 
   const badgeClass = variant === "dark" 
-    ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 gap-1 cursor-default"
+    ? "bg-[#722F37] dark:bg-[#722F37] text-white dark:text-white gap-1 cursor-default"
     : `${topConfig.className} gap-1 cursor-default`;
 
   return (
