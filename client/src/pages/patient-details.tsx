@@ -364,8 +364,21 @@ export default function PatientDetailsPage() {
   const [shareEmailRecipient, setShareEmailRecipient] = useState("");
   const [shareEmailSubject, setShareEmailSubject] = useState("");
   const [shareEmailMessage, setShareEmailMessage] = useState("");
+  const [currentShareLinkId, setCurrentShareLinkId] = useState<string | null>(null);
+  
+  // Show more implants in overview card
+  const [showAllImplants, setShowAllImplants] = useState(false);
 
   // Share links query
+  interface ShareLinkEmailData {
+    id: string;
+    recipientEmail: string;
+    subject: string;
+    status: "SENT" | "DELIVERED" | "FAILED" | "READ";
+    sentAt: string;
+    deliveredAt: string | null;
+    readAt: string | null;
+  }
   interface ShareLinkData {
     id: string;
     expiresAt: string | null;
@@ -373,6 +386,7 @@ export default function PatientDetailsPage() {
     createdAt: string;
     accessCount: number;
     sharedByUserName?: string;
+    emails?: ShareLinkEmailData[];
   }
   const { data: shareLinks = [], isLoading: shareLinksLoading } = useQuery<ShareLinkData[]>({
     queryKey: ["/api/patients", patientId, "share-links"],
@@ -387,9 +401,10 @@ export default function PatientDetailsPage() {
       });
       return res.json();
     },
-    onSuccess: (data: { token: string }) => {
+    onSuccess: (data: { token: string; id: string }) => {
       const link = `${window.location.origin}/share/${data.token}`;
       setNewShareLink(link);
+      setCurrentShareLinkId(data.id);
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "share-links"] });
       toast({ title: "Lien créé", description: "Le lien de partage a été généré avec succès." });
     },
@@ -421,13 +436,15 @@ export default function PatientDetailsPage() {
         subject: shareEmailSubject,
         message: shareEmailMessage,
         shareLink: newShareLink,
+        shareLinkId: currentShareLinkId,
       });
     },
     onSuccess: () => {
-      toast({ title: "Email envoyé", description: "Le compte rendu a été envoyé avec succès." });
+      toast({ title: "Email envoyé", description: "Le compte rendu a été envoyé avec succès.", variant: "success" });
       setShareEmailRecipient("");
       setShareEmailSubject("");
       setShareEmailMessage("");
+      queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId, "share-links"] });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible d'envoyer l'email.", variant: "destructive" });
@@ -439,7 +456,7 @@ export default function PatientDetailsPage() {
       navigator.clipboard.writeText(newShareLink);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
-      toast({ title: "Copié", description: "Le lien a été copié dans le presse-papiers." });
+      toast({ title: "Copié", description: "Le lien a été copié dans le presse-papiers.", variant: "success" });
     }
   };
 
@@ -2238,7 +2255,7 @@ export default function PatientDetailsPage() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-xs font-medium">Implants posés</CardTitle>
+                    <CardTitle className="text-sm font-medium">Implants posés</CardTitle>
                     <div className="flex items-center gap-2">
                       <Button 
                         variant="ghost" 
@@ -2433,6 +2450,58 @@ export default function PatientDetailsPage() {
                                 </div>
                               </div>
                             )}
+
+                            {/* Email history */}
+                            {(() => {
+                              const allEmails = shareLinks.flatMap(l => l.emails || []);
+                              if (allEmails.length === 0) return null;
+                              return (
+                                <div className="border-t pt-4">
+                                  <h4 className="text-sm font-medium mb-3">Historique des emails</h4>
+                                  <div className="space-y-2">
+                                    {allEmails.map((email) => (
+                                      <div 
+                                        key={email.id} 
+                                        className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <div className="p-1 rounded bg-white dark:bg-zinc-800">
+                                                {email.status === "READ" && (
+                                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                                )}
+                                                {email.status === "DELIVERED" && (
+                                                  <CheckCircle className="h-4 w-4 text-blue-500" />
+                                                )}
+                                                {email.status === "SENT" && (
+                                                  <Send className="h-4 w-4 text-muted-foreground" />
+                                                )}
+                                                {email.status === "FAILED" && (
+                                                  <XCircle className="h-4 w-4 text-destructive" />
+                                                )}
+                                              </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top" className="bg-white dark:bg-zinc-800 text-xs">
+                                              {email.status === "READ" && "Lu"}
+                                              {email.status === "DELIVERED" && "Délivré"}
+                                              {email.status === "SENT" && "Envoyé"}
+                                              {email.status === "FAILED" && "Non délivré"}
+                                            </TooltipContent>
+                                          </Tooltip>
+                                          <div className="text-sm">
+                                            <p className="font-medium text-xs">{email.recipientEmail}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {new Date(email.sentAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </SheetContent>
                       </Sheet>
@@ -2464,48 +2533,68 @@ export default function PatientDetailsPage() {
                       Aucun implant posé
                     </p>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {patient.surgeryImplants?.slice(0, 4).map((surgeryImplant) => (
-                        <div key={surgeryImplant.id} className="border rounded-md p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="font-medium text-xs">Site {surgeryImplant.siteFdi}</span>
-                            {getStatusBadge(surgeryImplant.statut)}
-                          </div>
-                          <div className="grid grid-cols-2 gap-y-2 text-xs">
-                            <div>
-                              <span className="text-muted-foreground text-[10px]">Marque:</span>
-                              <p>{surgeryImplant.implant.marque}</p>
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {patient.surgeryImplants?.slice(0, showAllImplants ? undefined : 4).map((surgeryImplant) => {
+                          const siteColor = getSiteBadgeColor(surgeryImplant.siteFdi);
+                          return (
+                            <div key={surgeryImplant.id} className="border rounded-md p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <Badge className={`${siteColor} text-[10px] font-medium`}>
+                                  Site {surgeryImplant.siteFdi}
+                                </Badge>
+                                {getStatusBadge(surgeryImplant.statut)}
+                              </div>
+                              <div className="grid grid-cols-2 gap-y-2 text-xs">
+                                <div>
+                                  <span className="text-muted-foreground text-[10px]">Marque:</span>
+                                  <p>{surgeryImplant.implant.marque}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground text-[10px]">Dimensions:</span>
+                                  <p>{surgeryImplant.implant.diametre} x {surgeryImplant.implant.longueur}mm</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground text-[10px]">Date pose:</span>
+                                  <p>{formatDateShort(surgeryImplant.datePose)}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground text-[10px]">ISQ actuel:</span>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <p className="text-primary font-medium cursor-help underline decoration-dotted">
+                                        {surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose || "-"}
+                                      </p>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-[10px]">
+                                      <div className="space-y-1">
+                                        <p><span className="text-muted-foreground">Pose:</span> {surgeryImplant.isqPose ?? "-"}</p>
+                                        {surgeryImplant.isq2m != null && <p><span className="text-muted-foreground">2 mois:</span> {surgeryImplant.isq2m}</p>}
+                                        {surgeryImplant.isq3m != null && <p><span className="text-muted-foreground">3 mois:</span> {surgeryImplant.isq3m}</p>}
+                                        {surgeryImplant.isq6m != null && <p><span className="text-muted-foreground">6 mois:</span> {surgeryImplant.isq6m}</p>}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </div>
                             </div>
-                            <div>
-                              <span className="text-muted-foreground text-[10px]">Dimensions:</span>
-                              <p>{surgeryImplant.implant.diametre} x {surgeryImplant.implant.longueur}mm</p>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground text-[10px]">Date pose:</span>
-                              <p>{formatDateShort(surgeryImplant.datePose)}</p>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground text-[10px]">ISQ actuel:</span>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <p className="text-primary font-medium cursor-help underline decoration-dotted">
-                                    {surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose || "-"}
-                                  </p>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="text-[10px]">
-                                  <div className="space-y-1">
-                                    <p><span className="text-muted-foreground">Pose:</span> {surgeryImplant.isqPose ?? "-"}</p>
-                                    {surgeryImplant.isq2m != null && <p><span className="text-muted-foreground">2 mois:</span> {surgeryImplant.isq2m}</p>}
-                                    {surgeryImplant.isq3m != null && <p><span className="text-muted-foreground">3 mois:</span> {surgeryImplant.isq3m}</p>}
-                                    {surgeryImplant.isq6m != null && <p><span className="text-muted-foreground">6 mois:</span> {surgeryImplant.isq6m}</p>}
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </div>
+                          );
+                        })}
+                      </div>
+                      {(patient.surgeryImplants?.length || 0) > 4 && (
+                        <div className="mt-4 text-center">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-primary text-xs"
+                            onClick={() => setShowAllImplants(!showAllImplants)}
+                            data-testid="button-toggle-implants"
+                          >
+                            {showAllImplants ? "Voir moins" : `Voir plus (${(patient.surgeryImplants?.length || 0) - 4} autres)`}
+                          </Button>
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>

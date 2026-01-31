@@ -44,7 +44,7 @@ import {
   operations,
 } from "@shared/schema";
 import type { PublicPatientShareData, PatientShareLinkWithDetails, OnboardingData, OnboardingState } from "@shared/schema";
-import { onboardingState, appointments, documents, notificationPreferences, calendarIntegrations, visites, patchNotes, patchNoteLines, organisations, users } from "@shared/schema";
+import { onboardingState, appointments, documents, notificationPreferences, calendarIntegrations, visites, patchNotes, patchNoteLines, organisations, users, shareLinkEmails } from "@shared/schema";
 import type {
   Patient,
   PatientDetail,
@@ -844,7 +844,21 @@ export async function registerRoutes(
         )
       ).orderBy(desc(patientShareLinks.createdAt));
 
-      res.json(links);
+      // Get emails for each link
+      const linksWithEmails = await Promise.all(links.map(async (link) => {
+        const emails = await db.select({
+          id: shareLinkEmails.id,
+          recipientEmail: shareLinkEmails.recipientEmail,
+          subject: shareLinkEmails.subject,
+          status: shareLinkEmails.status,
+          sentAt: shareLinkEmails.sentAt,
+          deliveredAt: shareLinkEmails.deliveredAt,
+          readAt: shareLinkEmails.readAt,
+        }).from(shareLinkEmails).where(eq(shareLinkEmails.shareLinkId, link.id)).orderBy(desc(shareLinkEmails.sentAt));
+        return { ...link, emails };
+      }));
+
+      res.json(linksWithEmails);
     } catch (error) {
       console.error("Error fetching share links:", error);
       res.status(500).json({ error: "Failed to fetch share links" });
@@ -896,11 +910,12 @@ export async function registerRoutes(
     if (!userId) return res.status(401).json({ error: "User not authenticated" });
 
     const { patientId } = req.params;
-    const { recipientEmail, subject, message, shareLink } = req.body as { 
+    const { recipientEmail, subject, message, shareLink, shareLinkId } = req.body as { 
       recipientEmail: string; 
       subject: string; 
       message: string;
       shareLink: string;
+      shareLinkId?: string;
     };
 
     if (!recipientEmail || !subject || !shareLink) {
@@ -950,7 +965,27 @@ export async function registerRoutes(
       });
 
       if (!emailResult.success) {
+        // Record failed email if shareLinkId provided
+        if (shareLinkId) {
+          await db.insert(shareLinkEmails).values({
+            shareLinkId,
+            recipientEmail,
+            subject,
+            status: "FAILED",
+          });
+        }
         return res.status(500).json({ error: "Failed to send email" });
+      }
+
+      // Record sent email if shareLinkId provided
+      if (shareLinkId) {
+        await db.insert(shareLinkEmails).values({
+          shareLinkId,
+          recipientEmail,
+          subject,
+          status: "SENT",
+          resendMessageId: emailResult.messageId || null,
+        });
       }
 
       // Log audit

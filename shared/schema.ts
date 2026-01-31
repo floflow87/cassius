@@ -1285,6 +1285,29 @@ export const patientShareLinksRelations = relations(patientShareLinks, ({ one })
   }),
 }));
 
+// Share email status enum
+export const shareEmailStatusEnum = pgEnum("share_email_status", ["SENT", "DELIVERED", "FAILED", "READ"]);
+
+// Share link emails history
+export const shareLinkEmails = pgTable("share_link_emails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shareLinkId: varchar("share_link_id").notNull().references(() => patientShareLinks.id, { onDelete: "cascade" }),
+  recipientEmail: varchar("recipient_email").notNull(),
+  subject: varchar("subject").notNull(),
+  status: shareEmailStatusEnum("status").default("SENT").notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
+  resendMessageId: varchar("resend_message_id"),
+});
+
+export const shareLinkEmailsRelations = relations(shareLinkEmails, ({ one }) => ({
+  shareLink: one(patientShareLinks, {
+    fields: [shareLinkEmails.shareLinkId],
+    references: [patientShareLinks.id],
+  }),
+}));
+
 // Onboarding state for wizard
 export const onboardingState = pgTable("onboarding_state", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1488,6 +1511,11 @@ export const insertPatientShareLinkSchema = createInsertSchema(patientShareLinks
   accessCount: true,
 });
 
+export const insertShareLinkEmailSchema = createInsertSchema(shareLinkEmails).omit({
+  id: true,
+  sentAt: true,
+});
+
 export const insertOnboardingStateSchema = createInsertSchema(onboardingState).omit({
   id: true,
   createdAt: true,
@@ -1581,6 +1609,9 @@ export type DigestRun = typeof digestRuns.$inferSelect;
 
 export type InsertPatientShareLink = z.infer<typeof insertPatientShareLinkSchema>;
 export type PatientShareLink = typeof patientShareLinks.$inferSelect;
+
+export type InsertShareLinkEmail = z.infer<typeof insertShareLinkEmailSchema>;
+export type ShareLinkEmail = typeof shareLinkEmails.$inferSelect;
 
 export type InsertOnboardingState = z.infer<typeof insertOnboardingStateSchema>;
 export type OnboardingState = typeof onboardingState.$inferSelect;
