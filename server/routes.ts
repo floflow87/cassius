@@ -2928,11 +2928,18 @@ export async function registerRoutes(
 
   // Create document record (after successful upload)
   app.post("/api/documents", requireJwtOrSession, async (req, res) => {
+    console.log("[DOCUMENT POST] Received request body:", JSON.stringify(req.body, null, 2));
+    
     const organisationId = getOrganisationId(req, res);
-    if (!organisationId) return;
+    if (!organisationId) {
+      console.log("[DOCUMENT POST] No organisationId, returning");
+      return;
+    }
 
     try {
+      console.log("[DOCUMENT POST] Parsing with insertDocumentSchema...");
       const data = insertDocumentSchema.parse(req.body);
+      console.log("[DOCUMENT POST] Parsed data:", JSON.stringify(data, null, 2));
       const userId = req.jwtUser?.userId || null;
       const doc = await storage.createDocument(organisationId, { ...data, createdBy: userId });
       
