@@ -2834,7 +2834,7 @@ export default function PatientDetailsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                      className={`${selectedTag === tag ? config?.className : ""} ${selectedTag === tag ? "ring-2 ring-primary" : ""}`}
+                      className={`text-xs ${selectedTag === tag ? config?.className : ""} ${selectedTag === tag ? "ring-2 ring-primary" : ""}`}
                       data-testid={`button-tag-${tag.toLowerCase()}`}
                     >
                       {config?.label}
