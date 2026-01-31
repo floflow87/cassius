@@ -569,19 +569,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPatientImplantCounts(organisationId: string): Promise<Record<string, number>> {
-    const result = await db
-      .select({
-        patientId: operations.patientId,
-      })
-      .from(surgeryImplants)
-      .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
-      .where(eq(surgeryImplants.organisationId, organisationId));
-    
-    const counts: Record<string, number> = {};
-    for (const row of result) {
-      counts[row.patientId] = (counts[row.patientId] || 0) + 1;
+    try {
+      const result = await db
+        .select({
+          patientId: operations.patientId,
+        })
+        .from(surgeryImplants)
+        .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+        .where(eq(surgeryImplants.organisationId, organisationId));
+      
+      const counts: Record<string, number> = {};
+      for (const row of result) {
+        counts[row.patientId] = (counts[row.patientId] || 0) + 1;
+      }
+      return counts;
+    } catch (error) {
+      console.warn("Could not fetch implant counts (tables may not exist):", error);
+      return {};
     }
-    return counts;
   }
 
   async getPatientsWithSummary(organisationId: string): Promise<PatientSummary> {
@@ -1122,31 +1127,36 @@ export class DatabaseStorage implements IStorage {
       .where(eq(operations.organisationId, organisationId))
       .orderBy(desc(operations.dateOperation));
     
-    // Get implant counts and statuses per operation for success rate calculation
-    // Also get typeImplant to distinguish implants from protheses
-    const implantData = await db
-      .select({
-        surgeryId: surgeryImplants.surgeryId,
-        statut: surgeryImplants.statut,
-        typeImplant: implants.typeImplant,
-      })
-      .from(surgeryImplants)
-      .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
-      .where(eq(surgeryImplants.organisationId, organisationId));
-    
     // Build maps for count and success rate (excluding protheses)
     const implantCountMap: Record<string, number> = {};
     const protheseCountMap: Record<string, number> = {};
     const successCountMap: Record<string, number> = {};
-    for (const row of implantData) {
-      if (row.typeImplant === "PROTHESE") {
-        protheseCountMap[row.surgeryId] = (protheseCountMap[row.surgeryId] || 0) + 1;
-      } else {
-        implantCountMap[row.surgeryId] = (implantCountMap[row.surgeryId] || 0) + 1;
-        if (row.statut === "SUCCES" || row.statut === "EN_SUIVI") {
-          successCountMap[row.surgeryId] = (successCountMap[row.surgeryId] || 0) + 1;
+    
+    // Get implant counts and statuses per operation for success rate calculation
+    // Also get typeImplant to distinguish implants from protheses
+    try {
+      const implantData = await db
+        .select({
+          surgeryId: surgeryImplants.surgeryId,
+          statut: surgeryImplants.statut,
+          typeImplant: implants.typeImplant,
+        })
+        .from(surgeryImplants)
+        .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
+        .where(eq(surgeryImplants.organisationId, organisationId));
+      
+      for (const row of implantData) {
+        if (row.typeImplant === "PROTHESE") {
+          protheseCountMap[row.surgeryId] = (protheseCountMap[row.surgeryId] || 0) + 1;
+        } else {
+          implantCountMap[row.surgeryId] = (implantCountMap[row.surgeryId] || 0) + 1;
+          if (row.statut === "SUCCES" || row.statut === "EN_SUIVI") {
+            successCountMap[row.surgeryId] = (successCountMap[row.surgeryId] || 0) + 1;
+          }
         }
       }
+    } catch (error) {
+      console.warn("Could not fetch implant data for operations (tables may not exist):", error);
     }
     
     return operationsWithPatients.map(({ operation, patientNom, patientPrenom }) => {
@@ -1809,27 +1819,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPatientLastVisits(organisationId: string): Promise<Record<string, { date: string; titre: string | null }>> {
-    const now = new Date();
-    const allAppointments = await db
-      .select()
-      .from(appointments)
-      .where(and(
-        eq(appointments.organisationId, organisationId),
-        eq(appointments.status, 'COMPLETED'),
-        lte(appointments.dateStart, now)
-      ))
-      .orderBy(desc(appointments.dateStart));
+    try {
+      const now = new Date();
+      const allAppointments = await db
+        .select()
+        .from(appointments)
+        .where(and(
+          eq(appointments.organisationId, organisationId),
+          eq(appointments.status, 'COMPLETED'),
+          lte(appointments.dateStart, now)
+        ))
+        .orderBy(desc(appointments.dateStart));
 
-    const lastVisitByPatient: Record<string, { date: string; titre: string | null }> = {};
-    for (const apt of allAppointments) {
-      if (!lastVisitByPatient[apt.patientId]) {
-        lastVisitByPatient[apt.patientId] = {
-          date: apt.dateStart.toISOString().split('T')[0],
-          titre: apt.title,
-        };
+      const lastVisitByPatient: Record<string, { date: string; titre: string | null }> = {};
+      for (const apt of allAppointments) {
+        if (!lastVisitByPatient[apt.patientId]) {
+          lastVisitByPatient[apt.patientId] = {
+            date: apt.dateStart.toISOString().split('T')[0],
+            titre: apt.title,
+          };
+        }
       }
+      return lastVisitByPatient;
+    } catch (error) {
+      console.warn("Could not fetch last visits (tables may not exist):", error);
+      return {};
     }
-    return lastVisitByPatient;
   }
 
   async findSurgeryImplantForVisite(organisationId: string, catalogImplantId: string, patientId: string): Promise<string | null> {
