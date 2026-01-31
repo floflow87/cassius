@@ -305,7 +305,7 @@ export function FlagsTooltipBadge({ flags, variant = "default" }: FlagsTooltipBa
           <span className="text-xs">{flags.length}</span>
         </Badge>
       </TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-xs z-[99999] bg-white dark:bg-zinc-900 border shadow-lg">
+      <TooltipContent side="bottom" className="max-w-xs z-[99999] bg-white dark:bg-zinc-900 border shadow-lg text-[10px]">
         <div className="space-y-2">
           {sortedFlags.map((flag) => {
             const config = levelConfig[flag.level];

@@ -1527,7 +1527,7 @@ export default function PatientDetailsPage() {
                       <span>{allPatientAlerts.length} alerte{allPatientAlerts.length > 1 ? 's' : ''}</span>
                     </Badge>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-sm">
+                  <TooltipContent side="bottom" className="max-w-sm text-[10px]">
                     <div className="space-y-2">
                       {allPatientAlerts.map((flag) => {
                         const levelConfig: Record<string, { label: string; className: string }> = {
