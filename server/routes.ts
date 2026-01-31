@@ -952,9 +952,9 @@ export async function registerRoutes(
       // Build email content with tracking pixel
       const emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #0f172a;">Compte rendu opératoire partagé</h2>
-          ${message ? `<p style="margin: 16px 0;">${message.replace(/\n/g, '<br>')}</p>` : ''}
-          <p>Pour consulter les informations, cliquez sur le lien ci-dessous :</p>
+          <h2 style="color: #0f172a; font-size: 20px;">Compte rendu opératoire partagé</h2>
+          ${message ? `<p style="margin: 16px 0; font-size: 14px;">${message.replace(/\n/g, '<br>')}</p>` : ''}
+          <p style="font-size: 14px;">Pour consulter les informations, cliquez sur le lien ci-dessous :</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${shareLink}" style="background-color: #3b82f6; color: white; padding: 12px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 500;">
               Voir le compte rendu

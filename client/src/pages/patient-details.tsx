@@ -2426,11 +2426,11 @@ export default function PatientDetailsPage() {
                                         key={link.id} 
                                         className="flex items-center justify-between p-2 rounded-md bg-muted/50"
                                       >
-                                        <div className="text-sm">
-                                          <p className="text-muted-foreground">
+                                        <div>
+                                          <p className="text-xs text-muted-foreground">
                                             Créé le {new Date(link.createdAt).toLocaleDateString("fr-FR")}
                                           </p>
-                                          <p className="text-xs text-muted-foreground">
+                                          <p className="text-[10px] text-muted-foreground">
                                             {link.accessCount} accès
                                             {link.expiresAt && ` · Expire le ${new Date(link.expiresAt).toLocaleDateString("fr-FR")}`}
                                           </p>
