@@ -844,19 +844,25 @@ export async function registerRoutes(
         )
       ).orderBy(desc(patientShareLinks.createdAt));
 
-      // Get emails for each link
-      const linksWithEmails = await Promise.all(links.map(async (link) => {
-        const emails = await db.select({
-          id: shareLinkEmails.id,
-          recipientEmail: shareLinkEmails.recipientEmail,
-          subject: shareLinkEmails.subject,
-          status: shareLinkEmails.status,
-          sentAt: shareLinkEmails.sentAt,
-          deliveredAt: shareLinkEmails.deliveredAt,
-          readAt: shareLinkEmails.readAt,
-        }).from(shareLinkEmails).where(eq(shareLinkEmails.shareLinkId, link.id)).orderBy(desc(shareLinkEmails.sentAt));
-        return { ...link, emails };
-      }));
+      // Get emails for each link (gracefully handle if table doesn't exist)
+      let linksWithEmails;
+      try {
+        linksWithEmails = await Promise.all(links.map(async (link) => {
+          const emails = await db.select({
+            id: shareLinkEmails.id,
+            recipientEmail: shareLinkEmails.recipientEmail,
+            subject: shareLinkEmails.subject,
+            status: shareLinkEmails.status,
+            sentAt: shareLinkEmails.sentAt,
+            deliveredAt: shareLinkEmails.deliveredAt,
+            readAt: shareLinkEmails.readAt,
+          }).from(shareLinkEmails).where(eq(shareLinkEmails.shareLinkId, link.id)).orderBy(desc(shareLinkEmails.sentAt));
+          return { ...link, emails };
+        }));
+      } catch (e) {
+        console.log("Could not fetch email history, returning links without emails");
+        linksWithEmails = links.map(link => ({ ...link, emails: [] }));
+      }
 
       res.json(linksWithEmails);
     } catch (error) {
@@ -965,27 +971,35 @@ export async function registerRoutes(
       });
 
       if (!emailResult.success) {
-        // Record failed email if shareLinkId provided
+        // Try to record failed email if shareLinkId provided
         if (shareLinkId) {
-          await db.insert(shareLinkEmails).values({
-            shareLinkId,
-            recipientEmail,
-            subject,
-            status: "FAILED",
-          });
+          try {
+            await db.insert(shareLinkEmails).values({
+              shareLinkId,
+              recipientEmail,
+              subject,
+              status: "FAILED",
+            });
+          } catch (e) {
+            console.log("Could not record email history:", e);
+          }
         }
         return res.status(500).json({ error: "Failed to send email" });
       }
 
-      // Record sent email if shareLinkId provided
+      // Try to record sent email if shareLinkId provided
       if (shareLinkId) {
-        await db.insert(shareLinkEmails).values({
-          shareLinkId,
-          recipientEmail,
-          subject,
-          status: "SENT",
-          resendMessageId: emailResult.messageId || null,
-        });
+        try {
+          await db.insert(shareLinkEmails).values({
+            shareLinkId,
+            recipientEmail,
+            subject,
+            status: "SENT",
+            resendMessageId: emailResult.messageId || null,
+          });
+        } catch (e) {
+          console.log("Could not record email history:", e);
+        }
       }
 
       // Log audit
