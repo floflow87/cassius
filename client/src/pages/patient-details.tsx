@@ -1541,9 +1541,9 @@ export default function PatientDetailsPage() {
                           <div key={flag.id} className="flex items-start gap-2">
                             <AlertTriangle className={`w-3 h-3 mt-0.5 ${config.className}`} />
                             <div>
-                              <p className="font-medium text-sm">{flag.label}</p>
+                              <p className="font-medium text-xs">{flag.label}</p>
                               {flag.description && (
-                                <p className="text-xs text-muted-foreground">{flag.description}</p>
+                                <p className="text-[10px] text-muted-foreground">{flag.description}</p>
                               )}
                               {isFollowupFlag && flag.entityType === "OPERATION" && (
                                 <Link href={`/actes/${flag.entityId}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">

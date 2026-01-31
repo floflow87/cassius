@@ -519,7 +519,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                         control={form.control}
                         name={`implants.${index}.siteFdi`}
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="flex flex-col">
                             <FormLabel>Site FDI</FormLabel>
                             <FormControl>
                               <Input
@@ -748,7 +748,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                           control={form.control}
                           name={`protheses.${index}.siteFdi`}
                           render={({ field }) => (
-                            <FormItem>
+                            <FormItem className="flex flex-col">
                               <FormLabel>Site FDI</FormLabel>
                               <FormControl>
                                 <Input
