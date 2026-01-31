@@ -47,3 +47,27 @@ Cassius utilizes a modern full-stack architecture. The frontend is built with **
 *   **FullCalendar**: JavaScript calendar library for appointment display.
 *   **Resend**: Service for sending transactional emails.
 *   **Google Calendar API**: For bidirectional calendar synchronization.
+
+## Règles de Suggestion de Statut d'Implant (15 règles)
+
+Le système analyse automatiquement les mesures ISQ et le statut actuel pour suggérer des changements de statut. Voici les 15 règles implémentées :
+
+| # | Statut actuel | Condition ISQ | Suggestion | Confiance |
+|---|---------------|---------------|------------|-----------|
+| 1 | Tous | ISQ 6 mois ≥ 70 | SUCCES | Haute |
+| 2 | Tous | ISQ 3 mois ≥ 60 stable | SUCCES | Moyenne |
+| 3 | Tous | Chute ISQ > 15 pts | COMPLICATION | Haute |
+| 4 | Tous | ISQ ≤ 50 | ECHEC | Haute |
+| 5 | Tous | ISQ 51-59 | COMPLICATION | Moyenne |
+| 6 | ECHEC | ISQ ≥ 60 | EN_SUIVI | Moyenne |
+| 7 | ECHEC | ISQ ≥ 65 | SUCCES | Basse |
+| 8 | COMPLICATION | ISQ ≥ 70 | SUCCES | Moyenne |
+| 9 | COMPLICATION | ISQ 60-69 | EN_SUIVI | Moyenne |
+| 10 | SUCCES | ISQ < 60 | COMPLICATION | Haute |
+| 11 | SUCCES | ISQ 60-69 | EN_SUIVI | Moyenne |
+| 12 | EN_SUIVI | ISQ ≥ 70 | SUCCES | Haute |
+| 13 | EN_SUIVI | ISQ 65-69 + 3 mois | SUCCES | Moyenne |
+| 14 | EN_SUIVI | ISQ 60-64 + 6 mois | SUCCES | Basse |
+| 15 | EN_SUIVI | ISQ 60-69 | SUCCES | Basse/Moyenne |
+
+Les suggestions sont affichées sur le détail de l'implant et peuvent être appliquées en un clic.
