@@ -1,8 +1,9 @@
 import { db } from "../db";
-import { notifications, notificationPreferences, digestRuns, users } from "@shared/schema";
-import { eq, and, gte, isNull, inArray, lt, desc } from "drizzle-orm";
+import { notifications, notificationPreferences, digestRuns, users, surgeryImplants, implants, operations, patients } from "@shared/schema";
+import { eq, and, gte, isNull, inArray, lt, desc, sql, lte } from "drizzle-orm";
 import { sendEmail } from "../emails/send";
 import type { NotificationDigestData } from "../emails/templates/notificationDigest";
+import { notificationEvents } from "./notificationService";
 
 interface DigestResult {
   userId: string;
@@ -296,6 +297,12 @@ export function startDigestScheduler(): void {
       if (result.processed > 0) {
         console.log(`[DIGEST] Digest check complete: ${result.processed} digests sent`);
       }
+      
+      // Check for implants reaching 24 months (run once daily)
+      const currentHour = new Date().getHours();
+      if (currentHour === 8) {
+        await checkAutoSuccessRateNotifications();
+      }
     } catch (error) {
       // Errors are caught here - runDailyDigest exceptions don't escape
       console.error("[DIGEST] Digest check failed:", error);
@@ -316,4 +323,102 @@ export function stopDigestScheduler(): void {
     minuteIntervalId = null;
   }
   console.log("[DIGEST] Digest scheduler stopped");
+}
+
+function getSuccessRateFromISQ(isq: number): number {
+  if (isq === 100) return 100;
+  if (isq >= 81) return 80;
+  if (isq >= 61) return 60;
+  if (isq >= 41) return 40;
+  if (isq >= 21) return 20;
+  return 0;
+}
+
+export async function checkAutoSuccessRateNotifications(): Promise<number> {
+  console.log("[AUTO_SUCCESS_RATE] Checking for implants reaching 24 months...");
+  
+  try {
+    const twentyFourMonthsAgo = new Date();
+    twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
+    const formattedDate = twentyFourMonthsAgo.toISOString().split('T')[0];
+    
+    const implantsToNotify = await db
+      .select({
+        id: surgeryImplants.id,
+        organisationId: surgeryImplants.organisationId,
+        datePose: surgeryImplants.datePose,
+        siteFdi: surgeryImplants.siteFdi,
+        isqPose: surgeryImplants.isqPose,
+        isq2m: surgeryImplants.isq2m,
+        isq3m: surgeryImplants.isq3m,
+        isq6m: surgeryImplants.isq6m,
+        implantMarque: implants.marque,
+        implantRef: implants.referenceFabricant,
+        patientId: operations.patientId,
+      })
+      .from(surgeryImplants)
+      .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
+      .innerJoin(operations, eq(surgeryImplants.surgeryId, operations.id))
+      .where(
+        and(
+          lte(surgeryImplants.datePose, formattedDate)
+        )
+      );
+
+    let notificationCount = 0;
+
+    for (const implant of implantsToNotify) {
+      const latestISQ = implant.isq6m ?? implant.isq3m ?? implant.isq2m ?? implant.isqPose;
+      
+      if (latestISQ === null || latestISQ === undefined) continue;
+
+      const existingNotification = await db
+        .select({ id: notifications.id })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.dedupeKey, `auto_success_rate_${implant.id}`),
+            eq(notifications.organisationId, implant.organisationId)
+          )
+        )
+        .limit(1);
+
+      if (existingNotification.length > 0) continue;
+
+      const orgAdmins = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(
+            eq(users.organisationId, implant.organisationId),
+            inArray(users.role, ["ADMIN", "CHIRURGIEN"])
+          )
+        );
+
+      if (orgAdmins.length === 0) continue;
+
+      const successRate = getSuccessRateFromISQ(latestISQ);
+      const implantRef = implant.implantRef || `${implant.implantMarque} (${implant.siteFdi})`;
+
+      for (const admin of orgAdmins) {
+        await notificationEvents.onAutoSuccessRate({
+          organisationId: implant.organisationId,
+          recipientUserId: admin.id,
+          patientId: implant.patientId,
+          surgeryImplantId: implant.id,
+          implantRef,
+          datePose: implant.datePose,
+          latestISQ,
+          successRate,
+        });
+        notificationCount++;
+      }
+    }
+
+    console.log(`[AUTO_SUCCESS_RATE] Created ${notificationCount} notifications`);
+    return notificationCount;
+  } catch (error) {
+    console.error("[AUTO_SUCCESS_RATE] Error checking implants:", error);
+    return 0;
+  }
 }

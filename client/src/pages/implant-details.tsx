@@ -651,6 +651,29 @@ export default function ImplantDetailsPage() {
     return labels[score] ?? "—";
   };
 
+  const getSuccessRateFromISQ = (isq: number): number => {
+    if (isq === 100) return 100;
+    if (isq >= 81) return 80;
+    if (isq >= 61) return 60;
+    if (isq >= 41) return 40;
+    if (isq >= 21) return 20;
+    return 0;
+  };
+
+  const isOver24Months = (): boolean => {
+    if (!implantData?.datePose) return false;
+    const poseDate = new Date(implantData.datePose);
+    const now = new Date();
+    const monthsDiff = (now.getFullYear() - poseDate.getFullYear()) * 12 + (now.getMonth() - poseDate.getMonth());
+    return monthsDiff >= 24;
+  };
+
+  const getLatestISQ = (): number | null => {
+    const timeline = getISQTimeline();
+    if (timeline.length === 0) return null;
+    return timeline[0].value;
+  };
+
   if (isLoading) {
     return <ImplantDetailsSkeleton />;
   }
@@ -673,7 +696,10 @@ export default function ImplantDetailsPage() {
 
   const status = statusConfig[implantData.statut] || statusConfig.EN_SUIVI;
   const isqTimeline = getISQTimeline();
-  const successRate = getSuccessRateFromBoneLoss(boneLossScore);
+  const latestISQ = getLatestISQ();
+  const over24Months = isOver24Months();
+  const isAutoSuccessRate = over24Months && latestISQ !== null;
+  const successRate = isAutoSuccessRate ? getSuccessRateFromISQ(latestISQ!) : getSuccessRateFromBoneLoss(boneLossScore);
   const isProthese = implantData.implant.typeImplant === "PROTHESE";
   const implantType = isProthese 
     ? "Prothèse" 
@@ -774,6 +800,11 @@ export default function ImplantDetailsPage() {
             <CardTitle className={`text-sm flex items-center gap-2 ${successRate >= 80 ? "text-emerald-700 dark:text-emerald-400" : successRate >= 60 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400"}`}>
               Taux de réussite
               {successRate >= 80 && <CheckCircle2 className="h-3.5 w-3.5" />}
+              {isAutoSuccessRate && (
+                <Badge variant="outline" className="text-[9px] ml-auto bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                  Auto M+24
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -781,37 +812,61 @@ export default function ImplantDetailsPage() {
               <span className={`text-4xl font-bold ${getSuccessRateColor()}`} data-testid="text-success-rate">
                 {successRate}%
               </span>
-              <p className="text-[10px] text-muted-foreground mt-1">
-                {successRate === 100 ? "Aucune perte osseuse" : successRate >= 80 ? "Perte osseuse minimale" : successRate >= 60 ? "Perte osseuse modérée" : "Perte osseuse importante"}
-              </p>
-            </div>
-            <div className="pt-2 border-t">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs text-muted-foreground">Score de perte osseuse</Label>
-                </div>
-                <Select 
-                  value={boneLossScore.toString()} 
-                  onValueChange={handleBoneLossChange}
-                  disabled={updatePoseInfoMutation.isPending}
-                >
-                  <SelectTrigger data-testid="select-bone-loss" className="bg-white dark:bg-white dark:text-black text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-white">
-                    <SelectItem value="0" className="cursor-pointer dark:text-black text-xs">0 - Excellente (100%)</SelectItem>
-                    <SelectItem value="1" className="cursor-pointer dark:text-black text-xs">1 - Très bonne (80%)</SelectItem>
-                    <SelectItem value="2" className="cursor-pointer dark:text-black text-xs">2 - Bonne (60%)</SelectItem>
-                    <SelectItem value="3" className="cursor-pointer dark:text-black text-xs">3 - Modérée (40%)</SelectItem>
-                    <SelectItem value="4" className="cursor-pointer dark:text-black text-xs">4 - Faible (20%)</SelectItem>
-                    <SelectItem value="5" className="cursor-pointer dark:text-black text-xs">5 - Critique (0%)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground text-center">
-                  {getBoneLossLabel(boneLossScore)}
+              {isAutoSuccessRate ? (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Calculé automatiquement (ISQ {latestISQ})
                 </p>
-              </div>
+              ) : (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {successRate === 100 ? "Aucune perte osseuse" : successRate >= 80 ? "Perte osseuse minimale" : successRate >= 60 ? "Perte osseuse modérée" : "Perte osseuse importante"}
+                </p>
+              )}
             </div>
+            {isAutoSuccessRate ? (
+              <div className="pt-2 border-t">
+                <div className="text-center space-y-1">
+                  <p className="text-[10px] text-muted-foreground">
+                    Implant posé depuis plus de 24 mois
+                  </p>
+                  <p className="text-[10px] text-blue-600 dark:text-blue-400">
+                    Le taux est calculé automatiquement à partir du dernier ISQ enregistré
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="pt-2 border-t">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-muted-foreground">Score de perte osseuse</Label>
+                  </div>
+                  <Select 
+                    value={boneLossScore.toString()} 
+                    onValueChange={handleBoneLossChange}
+                    disabled={updatePoseInfoMutation.isPending}
+                  >
+                    <SelectTrigger data-testid="select-bone-loss" className="bg-white dark:bg-white dark:text-black text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white dark:bg-white">
+                      <SelectItem value="0" className="cursor-pointer dark:text-black text-xs">0 - Excellente (100%)</SelectItem>
+                      <SelectItem value="1" className="cursor-pointer dark:text-black text-xs">1 - Très bonne (80%)</SelectItem>
+                      <SelectItem value="2" className="cursor-pointer dark:text-black text-xs">2 - Bonne (60%)</SelectItem>
+                      <SelectItem value="3" className="cursor-pointer dark:text-black text-xs">3 - Modérée (40%)</SelectItem>
+                      <SelectItem value="4" className="cursor-pointer dark:text-black text-xs">4 - Faible (20%)</SelectItem>
+                      <SelectItem value="5" className="cursor-pointer dark:text-black text-xs">5 - Critique (0%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground text-center">
+                    {getBoneLossLabel(boneLossScore)}
+                  </p>
+                  {!over24Months && (
+                    <p className="text-[9px] text-muted-foreground text-center italic">
+                      Le calcul automatique s'activera à M+24
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

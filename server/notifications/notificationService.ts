@@ -723,6 +723,38 @@ export const notificationEvents = {
     });
   },
 
+  async onAutoSuccessRate(params: {
+    organisationId: string;
+    recipientUserId: string;
+    patientId: string;
+    surgeryImplantId: string;
+    implantRef: string;
+    datePose: string;
+    latestISQ: number;
+    successRate: number;
+  }) {
+    const formattedDate = new Date(params.datePose).toLocaleDateString('fr-FR');
+    return createNotification({
+      organisationId: params.organisationId,
+      recipientUserId: params.recipientUserId,
+      kind: "ALERT",
+      type: "AUTO_SUCCESS_RATE",
+      severity: "INFO",
+      title: "Taux de réussite calculé automatiquement",
+      body: `L'implant ${params.implantRef} posé le ${formattedDate} a un ISQ de ${params.latestISQ} et un taux de réussite automatique de ${params.successRate}%`,
+      entityType: "IMPLANT",
+      entityId: params.surgeryImplantId,
+      metadata: { 
+        implantRef: params.implantRef, 
+        datePose: params.datePose,
+        latestISQ: params.latestISQ, 
+        successRate: params.successRate,
+        patientId: params.patientId
+      },
+      dedupeKey: `auto_success_rate_${params.surgeryImplantId}`,
+    });
+  },
+
   async onFollowupToSchedule(params: {
     organisationId: string;
     recipientUserId: string;
