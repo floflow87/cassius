@@ -116,26 +116,15 @@ export function DocumentUploadForm({
 
   const documentMutation = useMutation({
     mutationFn: async (data: DocumentFormData) => {
-      // Use apiRequest which handles credentials properly
       const res = await apiRequest("POST", "/api/documents", {
         ...data,
         patientId,
       });
       
-      // Debug: Check if response came from our API
-      const apiResponse = res.headers.get('X-API-Response');
       const contentType = res.headers.get('content-type');
-      console.log("[DEBUG] Document POST response:", { 
-        status: res.status, 
-        apiResponse, 
-        contentType,
-        url: res.url 
-      });
-      
-      if (!apiResponse) {
-        const text = await res.text();
-        console.error("[DEBUG] Not from API, got:", text.substring(0, 300));
-        throw new Error("Réponse invalide - pas de notre API");
+      if (!contentType?.includes('application/json')) {
+        console.error("[Document Upload] Invalid content-type:", contentType);
+        throw new Error("Erreur serveur lors de l'enregistrement du document");
       }
       
       return res.json();
