@@ -164,7 +164,7 @@ export function AuditHistory({
   return (
     <Card data-testid="audit-history-card">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
           <History className="w-4 h-4" />
           {title}
         </CardTitle>
