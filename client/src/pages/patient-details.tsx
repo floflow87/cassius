@@ -1690,13 +1690,13 @@ export default function PatientDetailsPage() {
                   {patient.telephone && (
                     <div>
                       <span className="text-muted-foreground text-[10px]">Téléphone</span>
-                      <p>{patient.telephone}</p>
+                      <p>{patient.telephone.replace(/(\d{2})(?=\d)/g, '$1 ')}</p>
                     </div>
                   )}
                   {patient.email && (
                     <div>
                       <span className="text-muted-foreground text-[10px]">Email</span>
-                      <p>{patient.email}</p>
+                      <p><a href={`mailto:${patient.email}`} className="text-primary hover:underline">{patient.email}</a></p>
                     </div>
                   )}
                   {patient.ssn && (
@@ -2129,7 +2129,7 @@ export default function PatientDetailsPage() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-base font-medium">Timeline clinique</CardTitle>
+                    <CardTitle className="text-base font-medium">Fiche clinique</CardTitle>
                     <Button 
                       variant="ghost" 
                       className="text-primary text-xs p-0 h-auto"
@@ -2255,7 +2255,7 @@ export default function PatientDetailsPage() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-sm font-medium">Implants posés</CardTitle>
+                    <CardTitle className="text-base font-medium">Implants posés</CardTitle>
                     <div className="flex items-center gap-2">
                       <Button 
                         variant="ghost" 
@@ -3047,7 +3047,7 @@ export default function PatientDetailsPage() {
           </Card>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold">Historique</h3>
+            <h3 className="text-base font-medium">Historique</h3>
             {notesLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (

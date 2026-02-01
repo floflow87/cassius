@@ -750,7 +750,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
         return (
           <div>
             <div className="text-xs font-medium text-foreground">
-              {patient.prenom} {patient.nom}
+              {patient.nom} {patient.prenom}
             </div>
             <div className="text-[10px] text-muted-foreground">
               ID: {displayId}
@@ -1156,7 +1156,7 @@ export default function PatientsPage({ searchQuery, setSearchQuery }: PatientsPa
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <h3 className="text-sm font-medium text-foreground">
-                          {patient.prenom} {patient.nom}
+                          {patient.nom} {patient.prenom}
                         </h3>
                         <p className="text-[10px] text-muted-foreground">{displayId}</p>
                       </div>
