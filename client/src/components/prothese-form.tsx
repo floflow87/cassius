@@ -80,9 +80,14 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: ProtheseFormData) => {
-      // If it's a custom brand (not in commonBrands), save it
+      // If it's a custom brand (not in commonBrands), try to save it (ignore errors)
       if (!commonBrands.includes(data.marque)) {
-        await apiRequest("POST", "/api/custom-brands", { name: data.marque, type: "PROTHESE" });
+        try {
+          await apiRequest("POST", "/api/custom-brands", { name: data.marque, type: "PROTHESE" });
+        } catch (e) {
+          // Ignore custom brand save errors - table might not exist yet
+          console.warn("Could not save custom brand:", e);
+        }
       }
 
       const protheseData = {
