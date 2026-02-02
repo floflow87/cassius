@@ -1494,8 +1494,8 @@ export default function CalendarPage() {
   const [googleEventDrawerId, setGoogleEventDrawerId] = useState<string | null>(null);
   const [googleEventDrawerOpen, setGoogleEventDrawerOpen] = useState(false);
   
-  // Sidebar collapsed state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Sidebar collapsed state - default to collapsed
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [quickCreateDate, setQuickCreateDate] = useState<Date | null>(null);
@@ -2029,38 +2029,33 @@ export default function CalendarPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between gap-4 p-4 border-b bg-background shrink-0">
           <div className="flex items-center gap-2">
-            <div className="flex flex-col items-start">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                data-testid="button-toggle-sidebar"
-              >
-                <ChevronsLeft className={`h-4 w-4 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`} />
-              </Button>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => calendarRef.current?.getApi().prev()}
-                  data-testid="button-prev"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" className="bg-white dark:bg-zinc-900" onClick={goToToday} data-testid="button-today">
-                  Aujourd&apos;hui
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => calendarRef.current?.getApi().next()}
-                  data-testid="button-next"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              data-testid="button-toggle-sidebar"
+            >
+              <ChevronsLeft className={`h-4 w-4 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => calendarRef.current?.getApi().prev()}
+              data-testid="button-prev"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" className="bg-white dark:bg-zinc-900" onClick={goToToday} data-testid="button-today">
+              Aujourd&apos;hui
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => calendarRef.current?.getApi().next()}
+              data-testid="button-next"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
             <span className="text-sm font-medium" data-testid="text-calendar-title">
               {format(selectedDate, "MMMM yyyy", { locale: fr })}
             </span>
