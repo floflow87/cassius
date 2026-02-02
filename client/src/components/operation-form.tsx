@@ -466,44 +466,76 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                       ) : (
                                         <>
                                           <CommandEmpty>Aucun implant trouvé</CommandEmpty>
-                                          <CommandGroup>
-                                            {[...catalogImplants].sort((a, b) => {
+                                          {(() => {
+                                            // Group implants by brand+reference
+                                            const grouped = catalogImplants.reduce((acc, implant) => {
+                                              const key = `${implant.marque}|${implant.referenceFabricant || ''}`;
+                                              if (!acc[key]) {
+                                                acc[key] = {
+                                                  marque: implant.marque,
+                                                  referenceFabricant: implant.referenceFabricant,
+                                                  isFavorite: implant.isFavorite,
+                                                  dimensions: []
+                                                };
+                                              }
+                                              acc[key].dimensions.push(implant);
+                                              if (implant.isFavorite) acc[key].isFavorite = true;
+                                              return acc;
+                                            }, {} as Record<string, { marque: string; referenceFabricant: string | null; isFavorite: boolean; dimensions: typeof catalogImplants }>);
+
+                                            // Sort groups: favorites first, then alphabetically
+                                            const sortedGroups = Object.values(grouped).sort((a, b) => {
                                               if (a.isFavorite && !b.isFavorite) return -1;
                                               if (!a.isFavorite && b.isFavorite) return 1;
-                                              const labelA = `${a.marque} ${a.referenceFabricant || ""} ${a.diametre} ${a.longueur}`;
-                                              const labelB = `${b.marque} ${b.referenceFabricant || ""} ${b.diametre} ${b.longueur}`;
+                                              const labelA = `${a.marque} ${a.referenceFabricant || ""}`;
+                                              const labelB = `${b.marque} ${b.referenceFabricant || ""}`;
                                               return labelA.localeCompare(labelB);
-                                            }).map((implant) => (
-                                              <CommandItem
-                                                key={implant.id}
-                                                value={getImplantLabel(implant)}
-                                                onSelect={() => {
-                                                  field.onChange(implant.id);
-                                                  setOpenPopoverIndex(null);
-                                                }}
-                                                data-testid={`option-implant-${implant.id}`}
+                                            });
+
+                                            return sortedGroups.map((group) => (
+                                              <CommandGroup 
+                                                key={`${group.marque}-${group.referenceFabricant || ''}`}
+                                                heading={
+                                                  <span className="flex items-center gap-1 text-[11px]">
+                                                    {group.isFavorite && <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />}
+                                                    {group.marque} {group.referenceFabricant}
+                                                  </span>
+                                                }
                                               >
-                                                <Check
-                                                  className={cn(
-                                                    "mr-2 h-4 w-4",
-                                                    field.value === implant.id
-                                                      ? "opacity-100"
-                                                      : "opacity-0"
-                                                  )}
-                                                />
-                                                <div className="flex flex-col">
-                                                  <span className="font-medium flex items-center gap-1">
-                                                    {implant.isFavorite && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
-                                                    {implant.marque} {implant.referenceFabricant}
-                                                  </span>
-                                                  <span className="text-sm text-muted-foreground">
-                                                    Ø{implant.diametre}mm x {implant.longueur}mm
-                                                    {implant.lot && ` - Lot: ${implant.lot}`}
-                                                  </span>
-                                                </div>
-                                              </CommandItem>
-                                            ))}
-                                          </CommandGroup>
+                                                {group.dimensions
+                                                  .sort((a, b) => {
+                                                    const dimA = (a.diametre || 0) * 100 + (a.longueur || 0);
+                                                    const dimB = (b.diametre || 0) * 100 + (b.longueur || 0);
+                                                    return dimA - dimB;
+                                                  })
+                                                  .map((implant) => (
+                                                    <CommandItem
+                                                      key={implant.id}
+                                                      value={getImplantLabel(implant)}
+                                                      onSelect={() => {
+                                                        field.onChange(implant.id);
+                                                        setOpenPopoverIndex(null);
+                                                      }}
+                                                      data-testid={`option-implant-${implant.id}`}
+                                                      className="text-[12px]"
+                                                    >
+                                                      <Check
+                                                        className={cn(
+                                                          "mr-2 h-3 w-3",
+                                                          field.value === implant.id
+                                                            ? "opacity-100"
+                                                            : "opacity-0"
+                                                        )}
+                                                      />
+                                                      <span className="text-muted-foreground">
+                                                        Ø{implant.diametre}mm × {implant.longueur}mm
+                                                        {implant.lot && ` - Lot: ${implant.lot}`}
+                                                      </span>
+                                                    </CommandItem>
+                                                  ))}
+                                              </CommandGroup>
+                                            ));
+                                          })()}
                                         </>
                                       )}
                                     </CommandList>
