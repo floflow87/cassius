@@ -107,7 +107,11 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
   const { toast } = useToast();
   const [accordionValue, setAccordionValue] = useState<string[]>(["procedure"]);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
+  const [openDimensionPopoverIndex, setOpenDimensionPopoverIndex] = useState<number | null>(null);
   const [openProthesePopoverIndex, setOpenProthesePopoverIndex] = useState<number | null>(null);
+  const [openProtheseDimensionPopoverIndex, setOpenProtheseDimensionPopoverIndex] = useState<number | null>(null);
+  const [selectedBrandByIndex, setSelectedBrandByIndex] = useState<Record<number, string>>({});
+  const [selectedProtheseBrandByIndex, setSelectedProtheseBrandByIndex] = useState<Record<number, string>>({});
 
   const { data: catalogImplants = [], isLoading: isCatalogLoading, isError: isCatalogError } = useQuery<Implant[]>({
     queryKey: ["/api/implants"],
@@ -406,22 +410,53 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      {/* Brand/Reference Selector */}
                       <FormField
                         control={form.control}
                         name={`implants.${index}.catalogImplantId`}
                         render={({ field }) => {
-                          const selectedImplant = catalogImplants.find(
-                            (impl) => impl.id === field.value
-                          );
+                          // Group implants by brand+reference
+                          const grouped = catalogImplants.filter(i => i.typeImplant === "IMPLANT").reduce((acc, implant) => {
+                            const key = `${implant.marque}|${implant.referenceFabricant || ''}`;
+                            if (!acc[key]) {
+                              acc[key] = {
+                                key,
+                                marque: implant.marque,
+                                referenceFabricant: implant.referenceFabricant,
+                                isFavorite: implant.isFavorite,
+                                implants: []
+                              };
+                            }
+                            acc[key].implants.push(implant);
+                            if (implant.isFavorite) acc[key].isFavorite = true;
+                            return acc;
+                          }, {} as Record<string, { key: string; marque: string; referenceFabricant: string | null; isFavorite: boolean; implants: Implant[] }>);
+
+                          const brands = Object.values(grouped).sort((a, b) => {
+                            if (a.isFavorite && !b.isFavorite) return -1;
+                            if (!a.isFavorite && b.isFavorite) return 1;
+                            return `${a.marque} ${a.referenceFabricant || ""}`.localeCompare(`${b.marque} ${b.referenceFabricant || ""}`);
+                          });
+
+                          const currentBrandKey = selectedBrandByIndex[index];
+                          const currentBrand = currentBrandKey ? grouped[currentBrandKey] : null;
+                          const selectedImplant = catalogImplants.find(impl => impl.id === field.value);
+                          
+                          // Auto-select brand if implant is already selected
+                          if (selectedImplant && !currentBrandKey) {
+                            const implantBrandKey = `${selectedImplant.marque}|${selectedImplant.referenceFabricant || ''}`;
+                            if (grouped[implantBrandKey]) {
+                              setSelectedBrandByIndex(prev => ({ ...prev, [index]: implantBrandKey }));
+                            }
+                          }
+
                           return (
                             <FormItem className="flex flex-col">
-                              <FormLabel>Implant du catalogue</FormLabel>
+                              <FormLabel className="text-[11px]">Marque / Référence</FormLabel>
                               <Popover
                                 open={openPopoverIndex === index}
-                                onOpenChange={(open) =>
-                                  setOpenPopoverIndex(open ? index : null)
-                                }
+                                onOpenChange={(open) => setOpenPopoverIndex(open ? index : null)}
                               >
                                 <PopoverTrigger asChild>
                                   <FormControl>
@@ -430,20 +465,23 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                       role="combobox"
                                       disabled={isCatalogLoading}
                                       className={cn(
-                                        "justify-between w-full",
-                                        !field.value && "text-muted-foreground"
+                                        "justify-between w-full text-[12px]",
+                                        !currentBrand && "text-muted-foreground"
                                       )}
-                                      data-testid={`button-select-implant-${index}`}
+                                      data-testid={`button-select-brand-${index}`}
                                     >
                                       {isCatalogLoading ? (
                                         <>
                                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                          Chargement...
+                                          <span className="text-[11px]">Chargement...</span>
                                         </>
-                                      ) : selectedImplant ? (
-                                        <span className="truncate">{getImplantLabel(selectedImplant)}</span>
+                                      ) : currentBrand ? (
+                                        <span className="truncate flex items-center gap-1">
+                                          {currentBrand.isFavorite && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
+                                          {currentBrand.marque} {currentBrand.referenceFabricant}
+                                        </span>
                                       ) : (
-                                        "Sélectionner un implant"
+                                        <span className="text-[11px]">Sélectionner</span>
                                       )}
                                       {!isCatalogLoading && (
                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -451,92 +489,137 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                     </Button>
                                   </FormControl>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[400px] p-0" align="start" onWheelCapture={(e) => e.stopPropagation()}>
+                                <PopoverContent className="w-[280px] p-0" align="start" onWheelCapture={(e) => e.stopPropagation()}>
                                   <Command>
-                                    <CommandInput placeholder="Rechercher un implant..." />
+                                    <CommandInput placeholder="Rechercher..." className="text-[11px]" />
                                     <CommandList>
                                       {isCatalogError ? (
-                                        <div className="p-4 text-sm text-destructive text-center">
-                                          Erreur lors du chargement du catalogue
+                                        <div className="p-4 text-[11px] text-destructive text-center">
+                                          Erreur lors du chargement
                                         </div>
-                                      ) : catalogImplants.length === 0 ? (
-                                        <div className="p-4 text-sm text-muted-foreground text-center">
-                                          Aucun implant dans le catalogue. Ajoutez des implants dans la section Catalogue.
+                                      ) : brands.length === 0 ? (
+                                        <div className="p-4 text-[11px] text-muted-foreground text-center">
+                                          Aucun implant dans le catalogue
                                         </div>
                                       ) : (
                                         <>
-                                          <CommandEmpty>Aucun implant trouvé</CommandEmpty>
-                                          {(() => {
-                                            // Group implants by brand+reference
-                                            const grouped = catalogImplants.reduce((acc, implant) => {
-                                              const key = `${implant.marque}|${implant.referenceFabricant || ''}`;
-                                              if (!acc[key]) {
-                                                acc[key] = {
-                                                  marque: implant.marque,
-                                                  referenceFabricant: implant.referenceFabricant,
-                                                  isFavorite: implant.isFavorite,
-                                                  dimensions: []
-                                                };
-                                              }
-                                              acc[key].dimensions.push(implant);
-                                              if (implant.isFavorite) acc[key].isFavorite = true;
-                                              return acc;
-                                            }, {} as Record<string, { marque: string; referenceFabricant: string | null; isFavorite: boolean; dimensions: typeof catalogImplants }>);
-
-                                            // Sort groups: favorites first, then alphabetically
-                                            const sortedGroups = Object.values(grouped).sort((a, b) => {
-                                              if (a.isFavorite && !b.isFavorite) return -1;
-                                              if (!a.isFavorite && b.isFavorite) return 1;
-                                              const labelA = `${a.marque} ${a.referenceFabricant || ""}`;
-                                              const labelB = `${b.marque} ${b.referenceFabricant || ""}`;
-                                              return labelA.localeCompare(labelB);
-                                            });
-
-                                            return sortedGroups.map((group) => (
-                                              <CommandGroup 
-                                                key={`${group.marque}-${group.referenceFabricant || ''}`}
-                                                heading={
-                                                  <span className="flex items-center gap-1 text-[11px]">
-                                                    {group.isFavorite && <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />}
-                                                    {group.marque} {group.referenceFabricant}
-                                                  </span>
-                                                }
+                                          <CommandEmpty className="text-[11px]">Aucun résultat</CommandEmpty>
+                                          <CommandGroup>
+                                            {brands.map((brand) => (
+                                              <CommandItem
+                                                key={brand.key}
+                                                value={`${brand.marque} ${brand.referenceFabricant || ""}`}
+                                                onSelect={() => {
+                                                  setSelectedBrandByIndex(prev => ({ ...prev, [index]: brand.key }));
+                                                  field.onChange(""); // Reset dimension selection
+                                                  setOpenPopoverIndex(null);
+                                                }}
+                                                className="text-[11px]"
+                                                data-testid={`option-brand-${brand.key}`}
                                               >
-                                                {group.dimensions
-                                                  .sort((a, b) => {
-                                                    const dimA = (a.diametre || 0) * 100 + (a.longueur || 0);
-                                                    const dimB = (b.diametre || 0) * 100 + (b.longueur || 0);
-                                                    return dimA - dimB;
-                                                  })
-                                                  .map((implant) => (
-                                                    <CommandItem
-                                                      key={implant.id}
-                                                      value={getImplantLabel(implant)}
-                                                      onSelect={() => {
-                                                        field.onChange(implant.id);
-                                                        setOpenPopoverIndex(null);
-                                                      }}
-                                                      data-testid={`option-implant-${implant.id}`}
-                                                      className="text-[12px]"
-                                                    >
-                                                      <Check
-                                                        className={cn(
-                                                          "mr-2 h-3 w-3",
-                                                          field.value === implant.id
-                                                            ? "opacity-100"
-                                                            : "opacity-0"
-                                                        )}
-                                                      />
-                                                      <span className="text-muted-foreground">
-                                                        Ø{implant.diametre}mm × {implant.longueur}mm
-                                                        {implant.lot && ` - Lot: ${implant.lot}`}
-                                                      </span>
-                                                    </CommandItem>
-                                                  ))}
-                                              </CommandGroup>
-                                            ));
-                                          })()}
+                                                <Check
+                                                  className={cn(
+                                                    "mr-2 h-3 w-3",
+                                                    currentBrandKey === brand.key ? "opacity-100" : "opacity-0"
+                                                  )}
+                                                />
+                                                <span className="flex items-center gap-1">
+                                                  {brand.isFavorite && <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />}
+                                                  {brand.marque} {brand.referenceFabricant}
+                                                </span>
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
                                         </>
+                                      )}
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                      
+                      {/* Dimension Selector */}
+                      <FormField
+                        control={form.control}
+                        name={`implants.${index}.catalogImplantId`}
+                        render={({ field }) => {
+                          const currentBrandKey = selectedBrandByIndex[index];
+                          const availableDimensions = currentBrandKey 
+                            ? catalogImplants.filter(i => 
+                                i.typeImplant === "IMPLANT" && 
+                                `${i.marque}|${i.referenceFabricant || ''}` === currentBrandKey
+                              ).sort((a, b) => {
+                                const dimA = (a.diametre || 0) * 100 + (a.longueur || 0);
+                                const dimB = (b.diametre || 0) * 100 + (b.longueur || 0);
+                                return dimA - dimB;
+                              })
+                            : [];
+                          const selectedImplant = catalogImplants.find(impl => impl.id === field.value);
+
+                          return (
+                            <FormItem className="flex flex-col">
+                              <FormLabel className="text-[11px]">Dimension</FormLabel>
+                              <Popover
+                                open={openDimensionPopoverIndex === index}
+                                onOpenChange={(open) => setOpenDimensionPopoverIndex(open ? index : null)}
+                              >
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      disabled={!currentBrandKey}
+                                      className={cn(
+                                        "justify-between w-full text-[12px]",
+                                        !field.value && "text-muted-foreground"
+                                      )}
+                                      data-testid={`button-select-dimension-${index}`}
+                                    >
+                                      {selectedImplant ? (
+                                        <span className="truncate">
+                                          Ø{selectedImplant.diametre} × {selectedImplant.longueur}mm
+                                        </span>
+                                      ) : (
+                                        <span className="text-[11px]">{currentBrandKey ? "Sélectionner" : "Choisir marque"}</span>
+                                      )}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start" onWheelCapture={(e) => e.stopPropagation()}>
+                                  <Command>
+                                    <CommandList>
+                                      {availableDimensions.length === 0 ? (
+                                        <div className="p-4 text-[11px] text-muted-foreground text-center">
+                                          Aucune dimension
+                                        </div>
+                                      ) : (
+                                        <CommandGroup>
+                                          {availableDimensions.map((implant) => (
+                                            <CommandItem
+                                              key={implant.id}
+                                              value={`Ø${implant.diametre} × ${implant.longueur}mm`}
+                                              onSelect={() => {
+                                                field.onChange(implant.id);
+                                                setOpenDimensionPopoverIndex(null);
+                                              }}
+                                              className="text-[11px]"
+                                              data-testid={`option-dimension-${implant.id}`}
+                                            >
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-3 w-3",
+                                                  field.value === implant.id ? "opacity-100" : "opacity-0"
+                                                )}
+                                              />
+                                              Ø{implant.diametre} × {implant.longueur}mm
+                                              {implant.lot && <span className="ml-1 text-muted-foreground">Lot: {implant.lot}</span>}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
                                       )}
                                     </CommandList>
                                   </Command>
@@ -711,70 +794,195 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        {/* Prothese Brand Selector */}
                         <FormField
                           control={form.control}
                           name={`protheses.${index}.catalogProtheseId`}
-                          render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                              <FormLabel>Prothèse du catalogue</FormLabel>
-                              <Popover 
-                                open={openProthesePopoverIndex === index} 
-                                onOpenChange={(open) => setOpenProthesePopoverIndex(open ? index : null)}
-                              >
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button
-                                      variant="outline"
-                                      role="combobox"
-                                      className={cn(
-                                        "justify-between",
-                                        !field.value && "text-muted-foreground"
-                                      )}
-                                      data-testid={`select-prothese-catalogue-${index}`}
-                                    >
-                                      {selectedProthese 
-                                        ? getProtheseLabel(selectedProthese)
-                                        : "Sélectionner une prothèse..."}
-                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[350px] p-0">
-                                  <Command>
-                                    <CommandInput placeholder="Rechercher une prothèse..." />
-                                    <CommandList>
-                                      <CommandEmpty>Aucune prothèse trouvée</CommandEmpty>
-                                      <CommandGroup heading="Prothèses du catalogue">
-                                        {sortedProtheses.map((prothese) => (
-                                          <CommandItem
-                                            key={prothese.id}
-                                            value={`${prothese.marque} ${prothese.quantite || ""}`}
-                                            onSelect={() => {
-                                              field.onChange(prothese.id);
-                                              setOpenProthesePopoverIndex(null);
-                                            }}
-                                          >
-                                            <Check
-                                              className={cn(
-                                                "mr-2 h-4 w-4",
-                                                field.value === prothese.id ? "opacity-100" : "opacity-0"
-                                              )}
-                                            />
-                                            <span className="flex items-center gap-1">
-                                              {prothese.isFavorite && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
-                                              {getProtheseLabel(prothese)}
-                                            </span>
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                          render={({ field }) => {
+                            // Group protheses by brand
+                            const grouped = sortedProtheses.reduce((acc, prothese) => {
+                              const key = prothese.marque;
+                              if (!acc[key]) {
+                                acc[key] = {
+                                  key,
+                                  marque: prothese.marque,
+                                  isFavorite: prothese.isFavorite,
+                                  protheses: []
+                                };
+                              }
+                              acc[key].protheses.push(prothese);
+                              if (prothese.isFavorite) acc[key].isFavorite = true;
+                              return acc;
+                            }, {} as Record<string, { key: string; marque: string; isFavorite: boolean; protheses: typeof sortedProtheses }>);
+
+                            const brands = Object.values(grouped).sort((a, b) => {
+                              if (a.isFavorite && !b.isFavorite) return -1;
+                              if (!a.isFavorite && b.isFavorite) return 1;
+                              return a.marque.localeCompare(b.marque);
+                            });
+
+                            const currentBrandKey = selectedProtheseBrandByIndex[index];
+                            const currentBrand = currentBrandKey ? grouped[currentBrandKey] : null;
+                            const selectedProtheseItem = sortedProtheses.find(p => p.id === field.value);
+                            
+                            // Auto-select brand if prothese is already selected
+                            if (selectedProtheseItem && !currentBrandKey) {
+                              if (grouped[selectedProtheseItem.marque]) {
+                                setSelectedProtheseBrandByIndex(prev => ({ ...prev, [index]: selectedProtheseItem.marque }));
+                              }
+                            }
+
+                            return (
+                              <FormItem className="flex flex-col">
+                                <FormLabel className="text-[11px]">Marque</FormLabel>
+                                <Popover 
+                                  open={openProthesePopoverIndex === index} 
+                                  onOpenChange={(open) => setOpenProthesePopoverIndex(open ? index : null)}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        className={cn(
+                                          "justify-between text-[12px]",
+                                          !currentBrand && "text-muted-foreground"
+                                        )}
+                                        data-testid={`select-prothese-brand-${index}`}
+                                      >
+                                        {currentBrand ? (
+                                          <span className="truncate flex items-center gap-1">
+                                            {currentBrand.isFavorite && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
+                                            {currentBrand.marque}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[11px]">Sélectionner</span>
+                                        )}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[250px] p-0" onWheelCapture={(e) => e.stopPropagation()}>
+                                    <Command>
+                                      <CommandInput placeholder="Rechercher..." className="text-[11px]" />
+                                      <CommandList>
+                                        <CommandEmpty className="text-[11px]">Aucun résultat</CommandEmpty>
+                                        <CommandGroup>
+                                          {brands.map((brand) => (
+                                            <CommandItem
+                                              key={brand.key}
+                                              value={brand.marque}
+                                              onSelect={() => {
+                                                setSelectedProtheseBrandByIndex(prev => ({ ...prev, [index]: brand.key }));
+                                                field.onChange(""); // Reset variant selection
+                                                setOpenProthesePopoverIndex(null);
+                                              }}
+                                              className="text-[11px]"
+                                            >
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-3 w-3",
+                                                  currentBrandKey === brand.key ? "opacity-100" : "opacity-0"
+                                                )}
+                                              />
+                                              <span className="flex items-center gap-1">
+                                                {brand.isFavorite && <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />}
+                                                {brand.marque}
+                                              </span>
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                              </FormItem>
+                            );
+                          }}
+                        />
+                        
+                        {/* Prothese Variant Selector */}
+                        <FormField
+                          control={form.control}
+                          name={`protheses.${index}.catalogProtheseId`}
+                          render={({ field }) => {
+                            const currentBrandKey = selectedProtheseBrandByIndex[index];
+                            const availableVariants = currentBrandKey 
+                              ? sortedProtheses.filter(p => p.marque === currentBrandKey)
+                              : [];
+                            const selectedProtheseItem = sortedProtheses.find(p => p.id === field.value);
+
+                            return (
+                              <FormItem className="flex flex-col">
+                                <FormLabel className="text-[11px]">Variante</FormLabel>
+                                <Popover
+                                  open={openProtheseDimensionPopoverIndex === index}
+                                  onOpenChange={(open) => setOpenProtheseDimensionPopoverIndex(open ? index : null)}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        disabled={!currentBrandKey}
+                                        className={cn(
+                                          "justify-between text-[12px]",
+                                          !field.value && "text-muted-foreground"
+                                        )}
+                                        data-testid={`select-prothese-variant-${index}`}
+                                      >
+                                        {selectedProtheseItem ? (
+                                          <span className="truncate">
+                                            {selectedProtheseItem.typeProthese === "VISSEE" ? "Vissée" : selectedProtheseItem.typeProthese === "SCELLEE" ? "Scellée" : selectedProtheseItem.typeProthese || "Standard"}
+                                            {selectedProtheseItem.quantite && ` - ${selectedProtheseItem.quantite}`}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[11px]">{currentBrandKey ? "Sélectionner" : "Choisir marque"}</span>
+                                        )}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[200px] p-0" onWheelCapture={(e) => e.stopPropagation()}>
+                                    <Command>
+                                      <CommandList>
+                                        {availableVariants.length === 0 ? (
+                                          <div className="p-4 text-[11px] text-muted-foreground text-center">
+                                            Aucune variante
+                                          </div>
+                                        ) : (
+                                          <CommandGroup>
+                                            {availableVariants.map((prothese) => (
+                                              <CommandItem
+                                                key={prothese.id}
+                                                value={`${prothese.typeProthese || ""} ${prothese.quantite || ""}`}
+                                                onSelect={() => {
+                                                  field.onChange(prothese.id);
+                                                  setOpenProtheseDimensionPopoverIndex(null);
+                                                }}
+                                                className="text-[11px]"
+                                              >
+                                                <Check
+                                                  className={cn(
+                                                    "mr-2 h-3 w-3",
+                                                    field.value === prothese.id ? "opacity-100" : "opacity-0"
+                                                  )}
+                                                />
+                                                {prothese.typeProthese === "VISSEE" ? "Vissée" : prothese.typeProthese === "SCELLEE" ? "Scellée" : prothese.typeProthese || "Standard"}
+                                                {prothese.quantite && ` - ${prothese.quantite}`}
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                        )}
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                              </FormItem>
+                            );
+                          }}
                         />
                         <FormField
                           control={form.control}
