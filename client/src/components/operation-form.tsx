@@ -451,7 +451,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                     </Button>
                                   </FormControl>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[400px] p-0" align="start">
+                                <PopoverContent className="w-[400px] p-0" align="start" onWheelCapture={(e) => e.stopPropagation()}>
                                   <Command>
                                     <CommandInput placeholder="Rechercher un implant..." />
                                     <CommandList>
