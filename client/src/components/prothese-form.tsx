@@ -36,16 +36,17 @@ interface ProtheseFormProps {
 }
 
 const commonBrands = [
-  "Straumann",
-  "Nobel Biocare",
-  "Zimmer Biomet",
-  "Dentsply Sirona",
-  "BioHorizons",
-  "MIS Implants",
-  "Osstem",
-  "Neodent",
-  "Ivoclar",
   "3M ESPE",
+  "BioHorizons",
+  "Bredent",
+  "Dentsply Sirona",
+  "Ivoclar",
+  "MIS Implants",
+  "Neodent",
+  "Nobel Biocare",
+  "Osstem",
+  "Straumann",
+  "Zimmer Biomet",
 ];
 
 export function ProtheseForm({ onSuccess }: ProtheseFormProps) {

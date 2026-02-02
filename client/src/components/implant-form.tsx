@@ -38,14 +38,15 @@ interface ImplantFormProps {
 }
 
 const commonBrands = [
-  "Straumann",
-  "Nobel Biocare",
-  "Zimmer Biomet",
-  "Dentsply Sirona",
+  "Bredent",
   "BioHorizons",
+  "Dentsply Sirona",
   "MIS Implants",
-  "Osstem",
   "Neodent",
+  "Nobel Biocare",
+  "Osstem",
+  "Straumann",
+  "Zimmer Biomet",
 ];
 
 export function ImplantForm({ onSuccess }: ImplantFormProps) {
