@@ -410,7 +410,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       {/* Brand/Reference Selector */}
                       <FormField
                         control={form.control}
@@ -630,26 +630,29 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                           );
                         }}
                       />
-                      <FormField
-                        control={form.control}
-                        name={`implants.${index}.siteFdi`}
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>Site FDI</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Ex: 16"
-                                {...field}
-                                data-testid={`input-implant-fdi-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                     </div>
 
-                    <div className="grid grid-cols-4 gap-4">
+                    {/* Site FDI on its own row */}
+                    <FormField
+                      control={form.control}
+                      name={`implants.${index}.siteFdi`}
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel className="text-[11px]">Site FDI</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Ex: 16"
+                              className="w-32"
+                              {...field}
+                              data-testid={`input-implant-fdi-${index}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name={`implants.${index}.positionImplant`}
@@ -794,7 +797,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-2 gap-4">
                         {/* Prothese Brand Selector */}
                         <FormField
                           control={form.control}
@@ -984,31 +987,35 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                             );
                           }}
                         />
-                        <FormField
-                          control={form.control}
-                          name={`protheses.${index}.siteFdi`}
-                          render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                              <FormLabel>Site FDI</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Ex: 16"
-                                  {...field}
-                                  data-testid={`input-prothese-fdi-${index}`}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
                       </div>
+                      
+                      {/* Site FDI on its own row */}
+                      <FormField
+                        control={form.control}
+                        name={`protheses.${index}.siteFdi`}
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel className="text-[11px]">Site FDI</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Ex: 16"
+                                className="w-32"
+                                {...field}
+                                data-testid={`input-prothese-fdi-${index}`}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name={`protheses.${index}.mobilite`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Mobilité</FormLabel>
+                              <FormLabel className="text-[11px]">Type de prothèse</FormLabel>
                               <Select onValueChange={field.onChange} value={field.value || ""}>
                                 <FormControl>
                                   <SelectTrigger data-testid={`select-prothese-mobilite-${index}`}>
@@ -1029,7 +1036,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                           name={`protheses.${index}.typePilier`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Type de pilier</FormLabel>
+                              <FormLabel className="text-[11px]">Type de pilier</FormLabel>
                               <Select onValueChange={field.onChange} value={field.value || ""}>
                                 <FormControl>
                                   <SelectTrigger data-testid={`select-prothese-pilier-${index}`}>
