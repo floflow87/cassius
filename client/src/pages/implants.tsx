@@ -654,7 +654,7 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
   const paginatedProtheses = sortedProtheses.slice(startIndex, startIndex + itemsPerPage);
 
   return (
-    <div className="flex flex-col h-full overflow-auto px-6 pb-6">
+    <div className="flex flex-col px-6 pb-6">
       <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit mb-4" data-testid="tabs-catalogue-page">
         {[
           { value: "implants" as const, label: "Implants" },
