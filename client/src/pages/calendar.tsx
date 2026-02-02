@@ -2029,17 +2029,20 @@ export default function CalendarPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between gap-4 p-4 border-b bg-background shrink-0">
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              data-testid="button-toggle-sidebar"
-            >
-              {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </Button>
-            <Button variant="outline" size="sm" className="bg-white dark:bg-zinc-900" onClick={goToToday} data-testid="button-today">
-              Aujourd&apos;hui
-            </Button>
+            <div className="flex flex-col items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                data-testid="button-toggle-sidebar"
+              >
+                {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              </Button>
+              <Button variant="outline" size="sm" className="bg-white dark:bg-zinc-900" onClick={goToToday} data-testid="button-today">
+                Aujourd&apos;hui
+              </Button>
+            </div>
             <Button
               variant="ghost"
               size="icon"
@@ -2056,7 +2059,7 @@ export default function CalendarPage() {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <span className="text-base font-medium" data-testid="text-calendar-title">
+            <span className="text-sm font-medium" data-testid="text-calendar-title">
               {format(selectedDate, "MMMM yyyy", { locale: fr })}
             </span>
           </div>
