@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,22 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
   const { toast } = useToast();
   const [customBrand, setCustomBrand] = useState(false);
 
+  // Load custom brands from API
+  const { data: customBrandsData = [] } = useQuery<string[]>({
+    queryKey: ["/api/custom-brands", { type: "IMPLANT" }],
+    queryFn: async () => {
+      const res = await fetch("/api/custom-brands?type=IMPLANT");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  // Combine common brands with custom brands, sorted alphabetically
+  const allBrands = useMemo(() => {
+    const combined = [...commonBrands, ...customBrandsData];
+    return [...new Set(combined)].sort((a, b) => a.localeCompare(b, 'fr'));
+  }, [customBrandsData]);
+
   const form = useForm<ImplantFormData>({
     resolver: zodResolver(implantFormSchema),
     defaultValues: {
@@ -66,6 +82,11 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: ImplantFormData) => {
+      // If it's a custom brand (not in commonBrands), save it
+      if (!commonBrands.includes(data.marque)) {
+        await apiRequest("POST", "/api/custom-brands", { name: data.marque, type: "IMPLANT" });
+      }
+
       const implantData = {
         typeImplant: data.typeImplant,
         marque: data.marque,
@@ -83,6 +104,7 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
         description: "L'implant a ete ajoute au catalogue.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/implants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-brands"] });
       form.reset();
       setCustomBrand(false);
       onSuccess?.();
@@ -155,7 +177,7 @@ export function ImplantForm({ onSuccess }: ImplantFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {commonBrands.map((brand) => (
+                    {allBrands.map((brand) => (
                       <SelectItem key={brand} value={brand}>
                         {brand}
                       </SelectItem>

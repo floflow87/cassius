@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,22 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
   const { toast } = useToast();
   const [customBrand, setCustomBrand] = useState(false);
 
+  // Load custom brands from API
+  const { data: customBrandsData = [] } = useQuery<string[]>({
+    queryKey: ["/api/custom-brands", { type: "PROTHESE" }],
+    queryFn: async () => {
+      const res = await fetch("/api/custom-brands?type=PROTHESE");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  // Combine common brands with custom brands, sorted alphabetically
+  const allBrands = useMemo(() => {
+    const combined = [...commonBrands, ...customBrandsData];
+    return [...new Set(combined)].sort((a, b) => a.localeCompare(b, 'fr'));
+  }, [customBrandsData]);
+
   const form = useForm<ProtheseFormData>({
     resolver: zodResolver(protheseFormSchema),
     defaultValues: {
@@ -64,6 +80,11 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: ProtheseFormData) => {
+      // If it's a custom brand (not in commonBrands), save it
+      if (!commonBrands.includes(data.marque)) {
+        await apiRequest("POST", "/api/custom-brands", { name: data.marque, type: "PROTHESE" });
+      }
+
       const protheseData = {
         typeImplant: "PROTHESE" as const,
         marque: data.marque,
@@ -77,6 +98,7 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-brands"] });
       toast({
         title: "Prothèse créée",
         description: "La prothèse a été ajoutée au catalogue.",
@@ -132,7 +154,7 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {commonBrands.map((brand) => (
+                    {allBrands.map((brand) => (
                       <SelectItem key={brand} value={brand}>{brand}</SelectItem>
                     ))}
                     <SelectItem value="__custom__">Autre...</SelectItem>

@@ -44,7 +44,7 @@ import {
   operations,
 } from "@shared/schema";
 import type { PublicPatientShareData, PatientShareLinkWithDetails, OnboardingData, OnboardingState } from "@shared/schema";
-import { onboardingState, appointments, documents, notificationPreferences, calendarIntegrations, visites, patchNotes, patchNoteLines, organisations, users, shareLinkEmails } from "@shared/schema";
+import { onboardingState, appointments, documents, notificationPreferences, calendarIntegrations, visites, patchNotes, patchNoteLines, organisations, users, shareLinkEmails, customBrands } from "@shared/schema";
 import type {
   Patient,
   PatientDetail,
@@ -1504,6 +1504,63 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching brands:", error);
       res.status(500).json({ error: "Failed to fetch brands" });
+    }
+  });
+
+  // Get custom brands for organisation
+  app.get("/api/custom-brands", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const type = req.query.type as string || "IMPLANT";
+      const brands = await db.select().from(customBrands)
+        .where(and(
+          eq(customBrands.organisationId, organisationId),
+          eq(customBrands.type, type)
+        ))
+        .orderBy(customBrands.name);
+      res.json(brands.map(b => b.name));
+    } catch (error) {
+      console.error("Error fetching custom brands:", error);
+      res.status(500).json({ error: "Failed to fetch custom brands" });
+    }
+  });
+
+  // Add custom brand
+  app.post("/api/custom-brands", requireJwtOrSession, async (req, res) => {
+    const organisationId = getOrganisationId(req, res);
+    if (!organisationId) return;
+
+    try {
+      const { name, type = "IMPLANT" } = req.body;
+      if (!name || typeof name !== "string") {
+        return res.status(400).json({ error: "Brand name is required" });
+      }
+
+      // Check if already exists
+      const existing = await db.select().from(customBrands)
+        .where(and(
+          eq(customBrands.organisationId, organisationId),
+          eq(customBrands.name, name.trim()),
+          eq(customBrands.type, type)
+        ))
+        .limit(1);
+
+      if (existing.length > 0) {
+        return res.json({ success: true, existing: true });
+      }
+
+      await db.insert(customBrands).values({
+        organisationId,
+        name: name.trim(),
+        type,
+      });
+
+      res.status(201).json({ success: true });
+    } catch (error) {
+      console.error("Error creating custom brand:", error);
+      res.status(500).json({ error: "Failed to create custom brand" });
     }
   });
 

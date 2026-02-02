@@ -1308,6 +1308,20 @@ export const shareLinkEmailsRelations = relations(shareLinkEmails, ({ one }) => 
   }),
 }));
 
+// Custom brands added by users
+export const customBrandTypeEnum = pgEnum("custom_brand_type", ["IMPLANT", "PROTHESE"]);
+
+export const customBrands = pgTable("custom_brands", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organisationId: varchar("organisation_id").notNull(),
+  name: varchar("name").notNull(),
+  type: varchar("type").notNull().default("IMPLANT"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type CustomBrand = typeof customBrands.$inferSelect;
+export type InsertCustomBrand = typeof customBrands.$inferInsert;
+
 // Onboarding state for wizard
 export const onboardingState = pgTable("onboarding_state", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

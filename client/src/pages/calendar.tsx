@@ -12,7 +12,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay, parse, isPast } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Filter, User, Plus, Check, Pencil, X, Search, Copy, AlertTriangle, ExternalLink, RotateCcw, Settings } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronDown, Filter, User, Plus, Check, Pencil, X, Search, Copy, AlertTriangle, ExternalLink, RotateCcw, Settings } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -2029,7 +2029,7 @@ export default function CalendarPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between gap-4 p-4 border-b bg-background shrink-0">
           <div className="flex items-center gap-2">
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-start">
               <Button
                 variant="ghost"
                 size="icon"
@@ -2037,28 +2037,30 @@ export default function CalendarPage() {
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                 data-testid="button-toggle-sidebar"
               >
-                {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                <ChevronsLeft className={`h-4 w-4 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`} />
               </Button>
-              <Button variant="outline" size="sm" className="bg-white dark:bg-zinc-900" onClick={goToToday} data-testid="button-today">
-                Aujourd&apos;hui
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => calendarRef.current?.getApi().prev()}
+                  data-testid="button-prev"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" className="bg-white dark:bg-zinc-900" onClick={goToToday} data-testid="button-today">
+                  Aujourd&apos;hui
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => calendarRef.current?.getApi().next()}
+                  data-testid="button-next"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => calendarRef.current?.getApi().prev()}
-              data-testid="button-prev"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => calendarRef.current?.getApi().next()}
-              data-testid="button-next"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
             <span className="text-sm font-medium" data-testid="text-calendar-title">
               {format(selectedDate, "MMMM yyyy", { locale: fr })}
             </span>
