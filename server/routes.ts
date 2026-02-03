@@ -1303,6 +1303,9 @@ export async function registerRoutes(
         typeOs: z.enum(["D1", "D2", "D3", "D4"]).optional(),
         miseEnChargePrevue: z.enum(["IMMEDIATE", "PRECOCE", "DIFFEREE"]).optional(),
         isqPose: z.number().optional(),
+        greffeOsseuse: z.boolean().optional(),
+        typeGreffe: z.string().optional(),
+        greffeQuantite: z.string().optional(),
       })
     ).default([]),
     protheses: z.array(
