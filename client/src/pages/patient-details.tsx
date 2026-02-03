@@ -767,19 +767,22 @@ export default function PatientDetailsPage() {
         );
       case "greffe":
         return operation.greffeOsseuse ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800 cursor-help">
-                {operation.typeGreffe || "Oui"}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="text-xs">
-                <p><strong>Type :</strong> {operation.typeGreffe || "Non spécifié"}</p>
-                {operation.greffeQuantite && <p><strong>Quantité :</strong> {operation.greffeQuantite}</p>}
-              </div>
-            </TooltipContent>
-          </Tooltip>
+          operation.greffeQuantite ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800 cursor-help">
+                  {operation.typeGreffe || "Oui"}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs"><strong>Quantité :</strong> {operation.greffeQuantite}</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+              {operation.typeGreffe || "Oui"}
+            </Badge>
+          )
         ) : (
           <span className="text-muted-foreground">-</span>
         );
@@ -1324,17 +1327,18 @@ export default function PatientDetailsPage() {
         return <span className="text-xs font-mono">{surgeryImplant.typeOs || "-"}</span>;
       case "greffe":
         return surgeryImplant.greffeOsseuse ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-xs cursor-help text-amber-700 dark:text-amber-400">{surgeryImplant.typeGreffe || "Oui"}</span>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="text-xs">
-                <p><strong>Type :</strong> {surgeryImplant.typeGreffe || "Non spécifié"}</p>
-                {surgeryImplant.greffeQuantite && <p><strong>Quantité :</strong> {surgeryImplant.greffeQuantite}</p>}
-              </div>
-            </TooltipContent>
-          </Tooltip>
+          surgeryImplant.greffeQuantite ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-xs cursor-help text-amber-700 dark:text-amber-400">{surgeryImplant.typeGreffe || "Oui"}</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs"><strong>Quantité :</strong> {surgeryImplant.greffeQuantite}</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <span className="text-xs text-amber-700 dark:text-amber-400">{surgeryImplant.typeGreffe || "Oui"}</span>
+          )
         ) : (
           <span className="text-muted-foreground text-xs">-</span>
         );

@@ -410,17 +410,18 @@ export default function ActeDetailsPage() {
                     </TableCell>
                     <TableCell>
                       {si.greffeOsseuse ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="text-xs cursor-help text-amber-700 dark:text-amber-400">{si.typeGreffe || "Oui"}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-xs">
-                              <p><strong>Type :</strong> {si.typeGreffe || "Non spécifié"}</p>
-                              {si.greffeQuantite && <p><strong>Quantité :</strong> {si.greffeQuantite}</p>}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
+                        si.greffeQuantite ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-xs cursor-help text-amber-700 dark:text-amber-400">{si.typeGreffe || "Oui"}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs"><strong>Quantité :</strong> {si.greffeQuantite}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-xs text-amber-700 dark:text-amber-400">{si.typeGreffe || "Oui"}</span>
+                        )
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}

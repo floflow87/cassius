@@ -1126,17 +1126,18 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         );
       case "greffe":
         return si.greffeOsseuse ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-xs cursor-help">{si.typeGreffe || "Oui"}</span>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="text-xs">
-                <p><strong>Type :</strong> {si.typeGreffe || "Non spécifié"}</p>
-                {si.greffeQuantite && <p><strong>Quantité :</strong> {si.greffeQuantite}</p>}
-              </div>
-            </TooltipContent>
-          </Tooltip>
+          si.greffeQuantite ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-xs cursor-help text-amber-700 dark:text-amber-400">{si.typeGreffe || "Oui"}</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs"><strong>Quantité :</strong> {si.greffeQuantite}</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <span className="text-xs text-amber-700 dark:text-amber-400">{si.typeGreffe || "Oui"}</span>
+          )
         ) : (
           <span className="text-muted-foreground">-</span>
         );
@@ -1223,19 +1224,22 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         );
       case "greffe":
         return op.greffeOsseuse ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800 cursor-help">
-                {op.typeGreffe || "Oui"}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="text-xs">
-                <p><strong>Type :</strong> {op.typeGreffe || "Non spécifié"}</p>
-                {op.greffeQuantite && <p><strong>Quantité :</strong> {op.greffeQuantite}</p>}
-              </div>
-            </TooltipContent>
-          </Tooltip>
+          op.greffeQuantite ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800 cursor-help">
+                  {op.typeGreffe || "Oui"}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs"><strong>Quantité :</strong> {op.greffeQuantite}</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+              {op.typeGreffe || "Oui"}
+            </Badge>
+          )
         ) : (
           <span className="text-muted-foreground/50 text-xs">-</span>
         );

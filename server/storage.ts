@@ -1128,12 +1128,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(operations.organisationId, organisationId))
       .orderBy(desc(operations.dateOperation));
     
-    // Build maps for count and success rate (excluding protheses)
+    // Build maps for count, success rate, and graft info (excluding protheses)
     const implantCountMap: Record<string, number> = {};
     const protheseCountMap: Record<string, number> = {};
     const successCountMap: Record<string, number> = {};
+    const implantGreffeMap: Record<string, { typeGreffe: string | null; greffeQuantite: string | null }> = {};
     
-    // Get implant counts and statuses per operation for success rate calculation
+    // Get implant counts, statuses, and graft info per operation for success rate calculation
     // Also get typeImplant to distinguish implants from protheses
     try {
       const implantData = await db
@@ -1141,6 +1142,9 @@ export class DatabaseStorage implements IStorage {
           surgeryId: surgeryImplants.surgeryId,
           statut: surgeryImplants.statut,
           typeImplant: implants.typeImplant,
+          greffeOsseuse: surgeryImplants.greffeOsseuse,
+          typeGreffe: surgeryImplants.typeGreffe,
+          greffeQuantite: surgeryImplants.greffeQuantite,
         })
         .from(surgeryImplants)
         .innerJoin(implants, eq(surgeryImplants.implantId, implants.id))
@@ -1154,6 +1158,13 @@ export class DatabaseStorage implements IStorage {
           if (row.statut === "SUCCES" || row.statut === "EN_SUIVI") {
             successCountMap[row.surgeryId] = (successCountMap[row.surgeryId] || 0) + 1;
           }
+          // Track graft info from implants (first one with graft wins)
+          if (row.greffeOsseuse && !implantGreffeMap[row.surgeryId]) {
+            implantGreffeMap[row.surgeryId] = {
+              typeGreffe: row.typeGreffe,
+              greffeQuantite: row.greffeQuantite,
+            };
+          }
         }
       }
     } catch (error) {
@@ -1165,9 +1176,18 @@ export class DatabaseStorage implements IStorage {
       const protheseCount = protheseCountMap[operation.id] || 0;
       const successCount = successCountMap[operation.id] || 0;
       const successRate = implantCount > 0 ? Math.round((successCount / implantCount) * 100) : null;
+      const implantGreffe = implantGreffeMap[operation.id];
+      
+      // If operation has no graft but an implant has graft, use implant graft info
+      const hasGreffe = operation.greffeOsseuse || !!implantGreffe;
+      const finalTypeGreffe = operation.typeGreffe || implantGreffe?.typeGreffe || null;
+      const finalGreffeQuantite = operation.greffeQuantite || implantGreffe?.greffeQuantite || null;
       
       return {
         ...operation,
+        greffeOsseuse: hasGreffe,
+        typeGreffe: finalTypeGreffe,
+        greffeQuantite: finalGreffeQuantite,
         patientNom,
         patientPrenom,
         implantCount,
