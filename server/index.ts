@@ -141,10 +141,10 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
-    // Serve landing page at root in development
+    // Serve landing page at root and /landing in development
     const fs = await import("fs");
     const path = await import("path");
-    app.get("/", async (_req, res, next) => {
+    const serveLandingDev = async (_req: any, res: any, next: any) => {
       try {
         const landingPath = path.resolve(process.cwd(), "client", "public", "landing.html");
         if (fs.existsSync(landingPath)) {
@@ -156,7 +156,9 @@ app.use((req, res, next) => {
       } catch (e) {
         next(e);
       }
-    });
+    };
+    app.get("/", serveLandingDev);
+    app.get("/landing", serveLandingDev);
     
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
