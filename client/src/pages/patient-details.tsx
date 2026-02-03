@@ -2738,7 +2738,7 @@ export default function PatientDetailsPage() {
                               onDragOver={(e) => handleImplantDragOver(e, column.id)}
                               onDrop={(e) => handleImplantDrop(e, column.id)}
                               onDragEnd={handleImplantDragEnd}
-                              className={`px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-move select-none ${column.width || ""} ${dragOverImplantColumn === column.id ? "bg-primary/10" : ""}`}
+                              className={`px-4 py-2 text-left text-xs font-medium text-muted-foreground tracking-wider cursor-move select-none ${column.width || ""} ${dragOverImplantColumn === column.id ? "bg-primary/10" : ""}`}
                             >
                               <div className="flex items-center gap-1">
                                 <GripVertical className="h-3 w-3 opacity-40" />
