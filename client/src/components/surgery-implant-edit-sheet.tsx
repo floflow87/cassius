@@ -44,6 +44,7 @@ export function SurgeryImplantEditSheet({
     miseEnCharge: "",
     greffeOsseuse: false,
     typeGreffe: "",
+    greffeQuantite: "",
     isqPose: "",
     statut: "EN_SUIVI",
   });
@@ -57,6 +58,7 @@ export function SurgeryImplantEditSheet({
         miseEnCharge: surgeryImplant.miseEnCharge || "",
         greffeOsseuse: surgeryImplant.greffeOsseuse || false,
         typeGreffe: surgeryImplant.typeGreffe || "",
+        greffeQuantite: surgeryImplant.greffeQuantite || "",
         isqPose: surgeryImplant.isqPose?.toString() || "",
         statut: surgeryImplant.statut || "EN_SUIVI",
       });
@@ -72,6 +74,7 @@ export function SurgeryImplantEditSheet({
         miseEnCharge: data.miseEnCharge || null,
         greffeOsseuse: data.greffeOsseuse,
         typeGreffe: data.typeGreffe || null,
+        greffeQuantite: data.greffeQuantite || null,
         isqPose: data.isqPose ? parseInt(data.isqPose) : null,
         statut: data.statut,
       });
@@ -224,15 +227,27 @@ export function SurgeryImplantEditSheet({
           </div>
 
           {formData.greffeOsseuse && (
-            <div className="space-y-2 pl-4 border-l-2 border-primary/20">
-              <Label htmlFor="typeGreffe">Type de greffe</Label>
-              <Input
-                id="typeGreffe"
-                value={formData.typeGreffe}
-                onChange={(e) => setFormData((prev) => ({ ...prev, typeGreffe: e.target.value }))}
-                placeholder="Ex: Autogène, Xénogreffe..."
-                data-testid="input-type-greffe"
-              />
+            <div className="space-y-4 pl-4 border-l-2 border-primary/20">
+              <div className="space-y-2">
+                <Label htmlFor="typeGreffe">Type de greffe</Label>
+                <Input
+                  id="typeGreffe"
+                  value={formData.typeGreffe}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, typeGreffe: e.target.value }))}
+                  placeholder="Ex: Autogène, Xénogreffe..."
+                  data-testid="input-type-greffe"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="greffeQuantite">Quantité de greffe</Label>
+                <Input
+                  id="greffeQuantite"
+                  value={formData.greffeQuantite}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, greffeQuantite: e.target.value }))}
+                  placeholder="Ex: 0.5cc, 1g..."
+                  data-testid="input-greffe-quantite"
+                />
+              </div>
             </div>
           )}
 

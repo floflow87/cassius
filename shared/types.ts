@@ -101,6 +101,7 @@ export interface SurgeryImplant {
   miseEnCharge: TypeMiseEnCharge | null;
   greffeOsseuse: boolean | null;
   typeGreffe: string | null;
+  greffeQuantite: string | null;
   typeChirurgieTemps: TypeChirurgieTemps | null;
   isqPose: number | null;
   isq2m: number | null;

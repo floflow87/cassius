@@ -359,6 +359,7 @@ export default function ActeDetailsPage() {
                   <TableHead>Type Os</TableHead>
                   <TableHead>Mise en charge</TableHead>
                   <TableHead>ISQ Pose</TableHead>
+                  <TableHead>Greffe</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
@@ -398,6 +399,13 @@ export default function ActeDetailsPage() {
                     <TableCell>
                       {si.isqPose ? (
                         <span className="font-medium">{si.isqPose}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {si.greffeOsseuse ? (
+                        <span className="text-xs">{si.typeGreffe || "Oui"}</span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}

@@ -159,6 +159,7 @@ export interface IStorage {
       miseEnCharge?: string | null;
       greffeOsseuse?: boolean | null;
       typeGreffe?: string | null;
+      greffeQuantite?: string | null;
       typeChirurgieTemps?: string | null;
       isqPose?: number | null;
       notes?: string | null;
@@ -1201,6 +1202,7 @@ export class DatabaseStorage implements IStorage {
       miseEnCharge?: string | null;
       greffeOsseuse?: boolean | null;
       typeGreffe?: string | null;
+      greffeQuantite?: string | null;
       typeChirurgieTemps?: string | null;
       isqPose?: number | null;
       notes?: string | null;
@@ -1250,6 +1252,7 @@ export class DatabaseStorage implements IStorage {
           miseEnCharge: implantData.miseEnCharge as any || null,
           greffeOsseuse: implantData.greffeOsseuse || false,
           typeGreffe: implantData.typeGreffe || null,
+          greffeQuantite: implantData.greffeQuantite || null,
           typeChirurgieTemps: implantData.typeChirurgieTemps as any || null,
           isqPose: implantData.isqPose || null,
           statut: "EN_SUIVI",

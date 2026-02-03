@@ -236,6 +236,7 @@ export const surgeryImplants = pgTable("surgery_implants", {
   // Informations greffe spécifique à cet implant
   greffeOsseuse: boolean("greffe_osseuse").default(false),
   typeGreffe: text("type_greffe"),
+  greffeQuantite: text("greffe_quantite"),
   // Temps chirurgical
   typeChirurgieTemps: typeChirurgieTempsEnum("type_chirurgie_temps"),
   // Mesures ISQ

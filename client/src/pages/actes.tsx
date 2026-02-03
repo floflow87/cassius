@@ -90,7 +90,7 @@ type SurgeryImplantWithDetails = SurgeryImplant & {
 };
 
 // Implant table columns
-type ImplantColumnId = "patient" | "marque" | "dimensions" | "site" | "datePose" | "isq" | "statut";
+type ImplantColumnId = "patient" | "marque" | "dimensions" | "site" | "datePose" | "isq" | "greffe" | "statut";
 
 interface ImplantColumnConfig {
   id: ImplantColumnId;
@@ -100,12 +100,13 @@ interface ImplantColumnConfig {
 }
 
 const implantColumnWidths: Record<ImplantColumnId, string> = {
-  patient: "w-[18%]",
-  marque: "w-[18%]",
-  dimensions: "w-[12%]",
-  site: "w-[10%]",
-  datePose: "w-[14%]",
-  isq: "w-[14%]",
+  patient: "w-[16%]",
+  marque: "w-[16%]",
+  dimensions: "w-[10%]",
+  site: "w-[8%]",
+  datePose: "w-[12%]",
+  isq: "w-[12%]",
+  greffe: "w-[12%]",
   statut: "w-[14%]",
 };
 
@@ -116,6 +117,7 @@ const defaultImplantColumns: ImplantColumnConfig[] = [
   { id: "site", label: "Site", sortable: true },
   { id: "datePose", label: "Date de pose", sortable: true },
   { id: "isq", label: "ISQ", sortable: true },
+  { id: "greffe", label: "Greffe", sortable: true },
   { id: "statut", label: "Statut", sortable: true },
 ];
 
@@ -905,6 +907,10 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           aVal = a.latestIsq?.value || 0;
           bVal = b.latestIsq?.value || 0;
           break;
+        case "greffe":
+          aVal = a.greffeOsseuse ? 1 : 0;
+          bVal = b.greffeOsseuse ? 1 : 0;
+          break;
         case "statut":
           aVal = a.statut || "";
           bVal = b.statut || "";
@@ -1112,6 +1118,12 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             </Badge>
             <span className="text-xs text-muted-foreground">{si.latestIsq.label}</span>
           </div>
+        );
+      case "greffe":
+        return si.greffeOsseuse ? (
+          <span className="text-xs">{si.typeGreffe || "Oui"}</span>
+        ) : (
+          <span className="text-muted-foreground">-</span>
         );
       case "statut":
         const statutInfo = STATUT_LABELS[si.statut || "EN_SUIVI"] || STATUT_LABELS.EN_SUIVI;
