@@ -10,9 +10,7 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
-
-  // Serve landing page at root for visitors
+  // Serve landing page at root BEFORE static middleware
   app.get("/", (_req, res) => {
     const landingPath = path.resolve(distPath, "landing.html");
     if (fs.existsSync(landingPath)) {
@@ -22,7 +20,10 @@ export function serveStatic(app: Express) {
     }
   });
 
-  // fall through to index.html for SPA routes (except root which is landing)
+  // Static files (CSS, JS, images, etc.)
+  app.use(express.static(distPath));
+
+  // fall through to index.html for SPA routes
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
