@@ -69,6 +69,7 @@ export default function CatalogImplantDetailsPage() {
   const [editMarque, setEditMarque] = useState("");
   const [editTypeImplant, setEditTypeImplant] = useState<"IMPLANT" | "MINI_IMPLANT" | "PROTHESE">("IMPLANT");
   const [editReferenceFabricant, setEditReferenceFabricant] = useState("");
+  const [editTypeProthese, setEditTypeProthese] = useState<"VISSEE" | "SCELLEE" | "">("");
   const [editDiametre, setEditDiametre] = useState<number>(0);
   const [editLongueur, setEditLongueur] = useState<number>(0);
 
@@ -151,6 +152,7 @@ export default function CatalogImplantDetailsPage() {
       setEditMarque(implant.marque);
       setEditTypeImplant(implant.typeImplant || "IMPLANT");
       setEditReferenceFabricant(implant.referenceFabricant || "");
+      setEditTypeProthese(implant.typeProthese || "");
       setEditDiametre(implant.diametre);
       setEditLongueur(implant.longueur);
     }
@@ -173,9 +175,10 @@ export default function CatalogImplantDetailsPage() {
       marque: editMarque,
       typeImplant: editTypeImplant,
       referenceFabricant: editReferenceFabricant || null,
+      typeProthese: editTypeImplant === "PROTHESE" ? (editTypeProthese || null) : null,
       diametre: editDiametre,
       longueur: editLongueur,
-    });
+    } as any);
   };
 
   const isLoading = implantLoading || surgeriesLoading;
@@ -309,6 +312,20 @@ export default function CatalogImplantDetailsPage() {
                       data-testid="input-edit-reference" 
                     />
                   </div>
+                  {editTypeImplant === "PROTHESE" && (
+                    <div className="space-y-2">
+                      <Label>Type de prothèse</Label>
+                      <Select value={editTypeProthese} onValueChange={(v) => setEditTypeProthese(v as "VISSEE" | "SCELLEE" | "")}>
+                        <SelectTrigger data-testid="select-edit-type-prothese">
+                          <SelectValue placeholder="Sélectionner..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="VISSEE">Vissée</SelectItem>
+                          <SelectItem value="SCELLEE">Scellée</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Diamètre (mm)</Label>
