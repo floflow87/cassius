@@ -1373,14 +1373,14 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
             </SheetHeader>
             <div className="py-4 space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Patient</label>
+                <label className="text-xs font-medium">Patient</label>
                 <Popover open={patientPopoverOpen} onOpenChange={setPatientPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
                       aria-expanded={patientPopoverOpen}
-                      className="w-full justify-between"
+                      className="w-full justify-between text-xs h-8"
                       data-testid="select-patient-trigger"
                     >
                       {selectedPatientId
@@ -1388,14 +1388,14 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                           ? `${patients.find((p) => p.id === selectedPatientId)?.prenom} ${patients.find((p) => p.id === selectedPatientId)?.nom}`
                           : "Sélectionner un patient..."
                         : "Sélectionner un patient..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[350px] p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Rechercher un patient..." data-testid="input-search-patient" />
+                      <CommandInput placeholder="Rechercher un patient..." className="text-xs" data-testid="input-search-patient" />
                       <CommandList>
-                        <CommandEmpty>Aucun patient trouvé.</CommandEmpty>
+                        <CommandEmpty className="text-xs py-4">Aucun patient trouvé.</CommandEmpty>
                         <CommandGroup>
                           <ScrollArea className="h-[200px]">
                             {patients?.map((patient) => (
@@ -1406,11 +1406,12 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
                                   setSelectedPatientId(patient.id);
                                   setPatientPopoverOpen(false);
                                 }}
+                                className="text-xs"
                                 data-testid={`select-patient-${patient.id}`}
                               >
                                 <Check
                                   className={cn(
-                                    "mr-2 h-4 w-4",
+                                    "mr-2 h-3 w-3",
                                     selectedPatientId === patient.id ? "opacity-100" : "opacity-0"
                                   )}
                                 />

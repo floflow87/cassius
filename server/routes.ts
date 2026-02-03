@@ -1327,11 +1327,17 @@ export async function registerRoutes(
       const data = operationWithImplantsSchema.parse(req.body);
       const { implants: implantData, protheses: prothesesData, ...operationData } = data;
 
+      // Map miseEnChargePrevue to miseEnCharge for each implant
+      const mappedImplantData = implantData.map((implant) => ({
+        ...implant,
+        miseEnCharge: implant.miseEnChargePrevue,
+      }));
+
       // Création transactionnelle : opération + surgery_implants (atomique)
       const { operation, surgeryImplants: createdSurgeryImplants } = await storage.createOperationWithImplants(
         organisationId,
         operationData,
-        implantData,
+        mappedImplantData,
         prothesesData
       );
 
