@@ -766,21 +766,35 @@ export default function PatientDetailsPage() {
           </Badge>
         );
       case "greffe":
-        return operation.greffeOsseuse ? (
-          operation.greffeQuantite ? (
+        // Check operation-level graft first, then fallback to implant-level graft
+        let hasGreffe = operation.greffeOsseuse;
+        let typeGreffe = operation.typeGreffe;
+        let greffeQuantite = operation.greffeQuantite;
+        
+        if (!hasGreffe && operation.surgeryImplants) {
+          const implantWithGreffe = operation.surgeryImplants.find(si => si.greffeOsseuse);
+          if (implantWithGreffe) {
+            hasGreffe = true;
+            typeGreffe = implantWithGreffe.typeGreffe || null;
+            greffeQuantite = implantWithGreffe.greffeQuantite || null;
+          }
+        }
+        
+        return hasGreffe ? (
+          greffeQuantite ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800 cursor-help">
-                  {operation.typeGreffe || "Oui"}
+                  {typeGreffe || "Oui"}
                 </Badge>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="text-xs"><strong>Quantité :</strong> {operation.greffeQuantite}</p>
+                <p className="text-xs"><strong>Quantité :</strong> {greffeQuantite}</p>
               </TooltipContent>
             </Tooltip>
           ) : (
             <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
-              {operation.typeGreffe || "Oui"}
+              {typeGreffe || "Oui"}
             </Badge>
           )
         ) : (
