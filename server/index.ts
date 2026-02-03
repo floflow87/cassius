@@ -141,6 +141,23 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
+    // Serve landing page at root in development
+    const fs = await import("fs");
+    const path = await import("path");
+    app.get("/", async (_req, res, next) => {
+      try {
+        const landingPath = path.resolve(process.cwd(), "client", "public", "landing.html");
+        if (fs.existsSync(landingPath)) {
+          const content = await fs.promises.readFile(landingPath, "utf-8");
+          res.status(200).set({ "Content-Type": "text/html" }).end(content);
+        } else {
+          next();
+        }
+      } catch (e) {
+        next(e);
+      }
+    });
+    
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
