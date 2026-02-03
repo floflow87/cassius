@@ -363,6 +363,14 @@ export default function CatalogImplantDetailsPage() {
                   {implant.referenceFabricant || "—"}
                 </p>
               </div>
+              {isProthese && implant.typeProthese && (
+                <div>
+                  <span className="text-xs text-muted-foreground">Type de prothèse</span>
+                  <p className="text-sm font-medium" data-testid="text-prothese-type">
+                    {implant.typeProthese === "VISSEE" ? "Vissée" : implant.typeProthese === "SCELLEE" ? "Scellée" : implant.typeProthese}
+                  </p>
+                </div>
+              )}
               {!isProthese && (
                 <>
                   <div>

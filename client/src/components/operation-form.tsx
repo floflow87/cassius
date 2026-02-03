@@ -583,7 +583,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                           Ø{selectedImplant.diametre} × {selectedImplant.longueur}mm
                                         </span>
                                       ) : (
-                                        <span className="text-[11px]">{currentBrandKey ? "Sélectionner" : "Choisir marque"}</span>
+                                        <span className="text-[11px]">{currentBrandKey ? "Sélectionner" : "Choisir dimensions"}</span>
                                       )}
                                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
@@ -936,12 +936,14 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                         data-testid={`select-prothese-variant-${index}`}
                                       >
                                         {selectedProtheseItem ? (
-                                          <span className="truncate">
-                                            {selectedProtheseItem.typeProthese === "VISSEE" ? "Vissée" : selectedProtheseItem.typeProthese === "SCELLEE" ? "Scellée" : selectedProtheseItem.typeProthese || "Standard"}
-                                            {selectedProtheseItem.quantite && ` - ${selectedProtheseItem.quantite}`}
+                                          <span className="truncate flex flex-col items-start leading-tight">
+                                            <span>{selectedProtheseItem.referenceFabricant || "Standard"}</span>
+                                            <span className="text-[9px] italic text-muted-foreground">
+                                              {selectedProtheseItem.typeProthese === "VISSEE" ? "Vissée" : selectedProtheseItem.typeProthese === "SCELLEE" ? "Scellée" : ""}
+                                            </span>
                                           </span>
                                         ) : (
-                                          <span className="text-[11px]">{currentBrandKey ? "Sélectionner" : "Choisir marque"}</span>
+                                          <span className="text-[11px]">{currentBrandKey ? "Sélectionner" : "Choisir variante"}</span>
                                         )}
                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                       </Button>
@@ -972,8 +974,12 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                                     field.value === prothese.id ? "opacity-100" : "opacity-0"
                                                   )}
                                                 />
-                                                {prothese.typeProthese === "VISSEE" ? "Vissée" : prothese.typeProthese === "SCELLEE" ? "Scellée" : prothese.typeProthese || "Standard"}
-                                                {prothese.quantite && ` - ${prothese.quantite}`}
+                                                <span className="flex flex-col items-start leading-tight">
+                                                  <span>{prothese.referenceFabricant || "Standard"}</span>
+                                                  <span className="text-[9px] italic text-muted-foreground">
+                                                    {prothese.typeProthese === "VISSEE" ? "Vissée" : prothese.typeProthese === "SCELLEE" ? "Scellée" : ""}
+                                                  </span>
+                                                </span>
                                               </CommandItem>
                                             ))}
                                           </CommandGroup>
