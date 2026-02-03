@@ -405,7 +405,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                         onClick={() => remove(index)}
                         data-testid={`button-remove-implant-${index}`}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </CardHeader>
