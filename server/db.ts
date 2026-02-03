@@ -35,21 +35,19 @@ const maskedUrl = databaseUrl.replace(/:[^:@]+@/, ':***@');
 console.log(`[DB] Environment: ${APP_ENV}`);
 console.log(`[DB] Connecting to: ${maskedUrl.split('?')[0].split('@')[1] || 'configured host'}`);
 
-// Add search_path to URL if not present (required for Supabase pooler)
-const urlWithSearchPath = urlWithoutSslMode.includes('options=') 
-  ? urlWithoutSslMode 
-  : (urlWithoutSslMode.includes('?') 
-      ? `${urlWithoutSslMode}&options=-c%20search_path%3Dpublic`
-      : `${urlWithoutSslMode}?options=-c%20search_path%3Dpublic`);
-
 export const pool = new Pool({
-  connectionString: urlWithSearchPath,
+  connectionString: urlWithoutSslMode,
   connectionTimeoutMillis: DB_CONN_TIMEOUT_MS,
   idleTimeoutMillis: 300000,
   max: DB_POOL_MAX,
   keepAlive: true,
   keepAliveInitialDelayMillis: 0,
   ssl: DB_SSL ? { rejectUnauthorized: false } : false,
+});
+
+// Set search_path on each new connection (required for Supabase pooler)
+pool.on('connect', async (client) => {
+  await client.query('SET search_path TO public');
 });
 
 pool.on('error', (err) => {
