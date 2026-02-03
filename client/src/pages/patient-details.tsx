@@ -2032,7 +2032,7 @@ export default function PatientDetailsPage() {
                     </SheetTrigger>
                     <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
                       <SheetHeader>
-                        <SheetTitle>Nouvelle opération</SheetTitle>
+                        <SheetTitle>Nouvel acte chirurgical</SheetTitle>
                       </SheetHeader>
                       <div className="mt-6">
                         <OperationForm
@@ -2558,7 +2558,7 @@ export default function PatientDetailsPage() {
                         </SheetTrigger>
                         <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
                           <SheetHeader>
-                            <SheetTitle>Nouvelle opération</SheetTitle>
+                            <SheetTitle>Nouvel acte chirurgical</SheetTitle>
                           </SheetHeader>
                           <div className="mt-6">
                             <OperationForm
@@ -2800,7 +2800,7 @@ export default function PatientDetailsPage() {
               </SheetTrigger>
               <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
                 <SheetHeader>
-                  <SheetTitle>Nouvelle opération</SheetTitle>
+                  <SheetTitle>Nouvel acte chirurgical</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6">
                   <OperationForm
