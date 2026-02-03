@@ -56,6 +56,9 @@ const implantSchema = z.object({
   typeOs: z.enum(["D1", "D2", "D3", "D4"]).optional(),
   miseEnChargePrevue: z.enum(["IMMEDIATE", "PRECOCE", "DIFFEREE"]).optional(),
   isqPose: z.number().min(0).max(100).optional(),
+  greffeOsseuse: z.boolean().default(false),
+  typeGreffe: z.string().optional(),
+  greffeQuantite: z.string().optional(),
 });
 
 const protheseSchema = z.object({
@@ -157,12 +160,16 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
         typeOs: undefined,
         miseEnChargePrevue: undefined,
         isqPose: undefined,
+        greffeOsseuse: false,
+        typeGreffe: "",
+        greffeQuantite: "",
       });
       setAccordionValue(["procedure", "implants"]);
     }
   }, [defaultImplant, append, fields.length]);
 
   const watchGreffeOsseuse = form.watch("greffeOsseuse");
+  const watchTypeIntervention = form.watch("typeIntervention");
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -226,6 +233,9 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
       typeOs: undefined,
       miseEnChargePrevue: undefined,
       isqPose: undefined,
+      greffeOsseuse: false,
+      typeGreffe: "",
+      greffeQuantite: "",
     });
     setAccordionValue([...accordionValue, "implants"]);
   };
@@ -282,7 +292,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                   name="dateOperation"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Date de l'opération</FormLabel>
+                      <FormLabel>Date de l'opération <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Input type="date" {...field} data-testid="input-operation-date" />
                       </FormControl>
@@ -295,21 +305,21 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                   name="typeIntervention"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type d'intervention</FormLabel>
+                      <FormLabel>Type d'intervention <span className="text-destructive">*</span></FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-type-intervention">
+                          <SelectTrigger data-testid="select-type-intervention" className="text-[12px]">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="POSE_IMPLANT">Pose d'implant</SelectItem>
-                          <SelectItem value="GREFFE_OSSEUSE">Greffe osseuse</SelectItem>
-                          <SelectItem value="SINUS_LIFT">Sinus lift</SelectItem>
-                          <SelectItem value="EXTRACTION_IMPLANT_IMMEDIATE">Extraction + Implant immédiat</SelectItem>
-                          <SelectItem value="REPRISE_IMPLANT">Reprise d'implant</SelectItem>
-                          <SelectItem value="CHIRURGIE_GUIDEE">Chirurgie guidée</SelectItem>
-                          <SelectItem value="POSE_PROTHESE">Pose de prothèse</SelectItem>
+                          <SelectItem value="POSE_IMPLANT" className="text-[12px]">Pose d'implant</SelectItem>
+                          <SelectItem value="GREFFE_OSSEUSE" className="text-[12px]">Greffe osseuse</SelectItem>
+                          <SelectItem value="SINUS_LIFT" className="text-[12px]">Sinus lift</SelectItem>
+                          <SelectItem value="EXTRACTION_IMPLANT_IMMEDIATE" className="text-[12px]">Extraction + Implant immédiat</SelectItem>
+                          <SelectItem value="REPRISE_IMPLANT" className="text-[12px]">Reprise d'implant</SelectItem>
+                          <SelectItem value="CHIRURGIE_GUIDEE" className="text-[12px]">Chirurgie guidée</SelectItem>
+                          <SelectItem value="POSE_PROTHESE" className="text-[12px]">Pose de prothèse</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -453,7 +463,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
 
                           return (
                             <FormItem className="flex flex-col">
-                              <FormLabel className="text-[11px]">Marque / Référence</FormLabel>
+                              <FormLabel className="text-[11px]">Marque / Référence <span className="text-destructive">*</span></FormLabel>
                               <Popover
                                 open={openPopoverIndex === index}
                                 onOpenChange={(open) => setOpenPopoverIndex(open ? index : null)}
@@ -561,7 +571,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
 
                           return (
                             <FormItem className="flex flex-col">
-                              <FormLabel className="text-[11px]">Dimension</FormLabel>
+                              <FormLabel className="text-[11px]">Dimension <span className="text-destructive">*</span></FormLabel>
                               <Popover
                                 open={openDimensionPopoverIndex === index}
                                 onOpenChange={(open) => setOpenDimensionPopoverIndex(open ? index : null)}
@@ -638,7 +648,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                       name={`implants.${index}.siteFdi`}
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
-                          <FormLabel className="text-[11px]">Site FDI</FormLabel>
+                          <FormLabel className="text-[11px]">Site FDI <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input
                               placeholder="Ex: 16"
@@ -748,6 +758,72 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                         )}
                       />
                     </div>
+
+                    {/* Greffe osseuse toggle and fields */}
+                    <div className="border-t pt-4 mt-4">
+                      <FormField
+                        control={form.control}
+                        name={`implants.${index}.greffeOsseuse`}
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-[11px]">Greffe osseuse</FormLabel>
+                              <FormDescription className="text-[10px]">
+                                Greffe associée à cet implant
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid={`switch-greffe-${index}`}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {form.watch(`implants.${index}.greffeOsseuse`) && (
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                          <FormField
+                            control={form.control}
+                            name={`implants.${index}.typeGreffe`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[11px]">Type de greffe</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="Autogène, xénogreffe..."
+                                    className="text-[12px]"
+                                    {...field}
+                                    data-testid={`input-greffe-type-${index}`}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`implants.${index}.greffeQuantite`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[11px]">Quantité</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="Ex: 0.5cc"
+                                    className="text-[12px]"
+                                    {...field}
+                                    data-testid={`input-greffe-quantite-${index}`}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -838,7 +914,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
 
                             return (
                               <FormItem className="flex flex-col">
-                                <FormLabel className="text-[11px]">Marque</FormLabel>
+                                <FormLabel className="text-[11px]">Marque <span className="text-destructive">*</span></FormLabel>
                                 <Popover 
                                   open={openProthesePopoverIndex === index} 
                                   onOpenChange={(open) => setOpenProthesePopoverIndex(open ? index : null)}
@@ -918,7 +994,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
 
                             return (
                               <FormItem className="flex flex-col">
-                                <FormLabel className="text-[11px]">Variante</FormLabel>
+                                <FormLabel className="text-[11px]">Variante <span className="text-destructive">*</span></FormLabel>
                                 <Popover
                                   open={openProtheseDimensionPopoverIndex === index}
                                   onOpenChange={(open) => setOpenProtheseDimensionPopoverIndex(open ? index : null)}
@@ -1001,7 +1077,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                         name={`protheses.${index}.siteFdi`}
                         render={({ field }) => (
                           <FormItem className="flex flex-col">
-                            <FormLabel className="text-[11px]">Site FDI</FormLabel>
+                            <FormLabel className="text-[11px]">Site FDI <span className="text-destructive">*</span></FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Ex: 16"
@@ -1078,35 +1154,37 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="greffe" className="border border-primary/20 rounded-md px-4 mb-2">
-            <AccordionTrigger className="text-sm font-medium">
-              Greffe osseuse
-            </AccordionTrigger>
-            <AccordionContent className="space-y-4 pt-4">
-              <FormField
-                control={form.control}
-                name="greffeOsseuse"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                    <div className="space-y-0.5 flex items-center gap-2">
-                      <Plus className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <FormLabel>Greffe osseuse réalisée</FormLabel>
-                        <FormDescription>
-                          Indiquez si une greffe a été effectuée
-                        </FormDescription>
+          {/* Section greffe séparée uniquement si type intervention = GREFFE_OSSEUSE */}
+          {watchTypeIntervention === "GREFFE_OSSEUSE" && (
+            <AccordionItem value="greffe" className="border border-primary/20 rounded-md px-4 mb-2">
+              <AccordionTrigger className="text-sm font-medium">
+                Greffe osseuse (sans implant)
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-4">
+                <FormField
+                  control={form.control}
+                  name="greffeOsseuse"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <div className="space-y-0.5 flex items-center gap-2">
+                        <Plus className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <FormLabel>Greffe osseuse réalisée</FormLabel>
+                          <FormDescription>
+                            Indiquez si une greffe a été effectuée sans pose d'implant
+                          </FormDescription>
+                        </div>
                       </div>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        data-testid="switch-greffe"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-greffe"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
 
               {watchGreffeOsseuse && (
                 <div className="grid grid-cols-3 gap-4">
@@ -1164,7 +1242,8 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                 </div>
               )}
             </AccordionContent>
-          </AccordionItem>
+            </AccordionItem>
+          )}
 
           <AccordionItem value="notes" className="border border-primary/20 rounded-md px-4 mb-2">
             <AccordionTrigger className="text-sm font-medium">
