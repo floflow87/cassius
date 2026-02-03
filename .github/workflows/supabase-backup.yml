@@ -13,7 +13,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client openssl
+          sudo apt-get install -y postgresql-client openssl awscli
 
       - name: Create dump (compressed)
         env:
@@ -24,37 +24,38 @@ jobs:
           pg_dump "$SUPABASE_DB_URL" --no-owner --no-acl | gzip > "$fname"
           echo "FNAME=$fname" >> $GITHUB_ENV
           echo "TS=$ts" >> $GITHUB_ENV
+          ls -lah
 
       - name: Encrypt dump
         env:
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
-          enc="${{ env.FNAME }}.enc"
+          enc="${FNAME}.enc"
           openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 \
-            -in "${{ env.FNAME }}" -out "$enc" -pass env:BACKUP_PASSPHRASE
+            -in "$FNAME" -out "$enc" -pass env:BACKUP_PASSPHRASE
           echo "ENC=$enc" >> $GITHUB_ENV
           ls -lah
           ls -lah *.enc || true
 
-        - name: Debug dump files
-          run: |
-            echo "PWD=$(pwd)"
-            echo "FNAME=$FNAME"
-            echo "ENC=$ENC"
-            ls -lah
-            find . -maxdepth 3 -type f -name "*.enc" -o -name "*.sql.gz" || true
+      - name: Debug dump files
+        run: |
+          echo "PWD=$(pwd)"
+          echo "FNAME=$FNAME"
+          echo "ENC=$ENC"
+          ls -lah
+          find . -maxdepth 3 -type f \( -name "*.enc" -o -name "*.sql.gz" \) -print || true
 
-        - name: Upload to Backblaze B2 (S3)
-          env:
-            AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY }}
-            AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_KEY }}
-            AWS_DEFAULT_REGION: ${{ secrets.S3_REGION }}
-          run: |
-            test -f "$ENC" || (echo "File not found: $ENC" && exit 1)
-            aws --version
-            aws s3 cp "$ENC" "s3://${{ secrets.S3_BUCKET }}/supabase/floflow87/cassius/$(date +%F)/$ENC" \
-              --endpoint-url "${{ secrets.S3_ENDPOINT }}"
-    
+      - name: Upload to Backblaze B2 (S3)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.S3_REGION }}
+        run: |
+          test -f "$ENC" || (echo "File not found: $ENC" && exit 1)
+          aws --version
+          aws s3 cp "$ENC" "s3://${{ secrets.S3_BUCKET }}/supabase/floflow87/cassius/$(date +%F)/$ENC" \
+            --endpoint-url "${{ secrets.S3_ENDPOINT }}"
+
       - name: Cleanup
         run: |
-          rm -f "${{ env.FNAME }}" "${{ env.ENC }}"
+          rm -f "$FNAME" "$ENC"
