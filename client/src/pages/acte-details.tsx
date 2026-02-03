@@ -18,6 +18,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Table,
   TableBody,
   TableCell,
@@ -405,7 +410,17 @@ export default function ActeDetailsPage() {
                     </TableCell>
                     <TableCell>
                       {si.greffeOsseuse ? (
-                        <span className="text-xs">{si.typeGreffe || "Oui"}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-xs cursor-help text-amber-700 dark:text-amber-400">{si.typeGreffe || "Oui"}</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-xs">
+                              <p><strong>Type :</strong> {si.typeGreffe || "Non spécifié"}</p>
+                              {si.greffeQuantite && <p><strong>Quantité :</strong> {si.greffeQuantite}</p>}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}

@@ -766,7 +766,23 @@ export default function PatientDetailsPage() {
           </Badge>
         );
       case "greffe":
-        return operation.greffeOsseuse ? (operation.typeGreffe || "Oui") : "-";
+        return operation.greffeOsseuse ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800 cursor-help">
+                {operation.typeGreffe || "Oui"}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-xs">
+                <p><strong>Type :</strong> {operation.typeGreffe || "Non spécifié"}</p>
+                {operation.greffeQuantite && <p><strong>Quantité :</strong> {operation.greffeQuantite}</p>}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
       case "miseEnCharge":
         if (!operation.typeMiseEnCharge) return "-";
         return (
@@ -1308,7 +1324,17 @@ export default function PatientDetailsPage() {
         return <span className="text-xs font-mono">{surgeryImplant.typeOs || "-"}</span>;
       case "greffe":
         return surgeryImplant.greffeOsseuse ? (
-          <Check className="h-4 w-4 text-green-600" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-xs cursor-help text-amber-700 dark:text-amber-400">{surgeryImplant.typeGreffe || "Oui"}</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-xs">
+                <p><strong>Type :</strong> {surgeryImplant.typeGreffe || "Non spécifié"}</p>
+                {surgeryImplant.greffeQuantite && <p><strong>Quantité :</strong> {surgeryImplant.greffeQuantite}</p>}
+              </div>
+            </TooltipContent>
+          </Tooltip>
         ) : (
           <span className="text-muted-foreground text-xs">-</span>
         );
