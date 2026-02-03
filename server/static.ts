@@ -10,23 +10,9 @@ export function serveStatic(app: Express) {
     );
   }
 
-  // Serve landing page at root and /landing BEFORE static middleware
-  const serveLanding = (_req: any, res: any) => {
-    const landingPath = path.resolve(distPath, "landing.html");
-    if (fs.existsSync(landingPath)) {
-      res.sendFile(landingPath);
-    } else {
-      res.sendFile(path.resolve(distPath, "index.html"));
-    }
-  };
-  
-  app.get("/", serveLanding);
-  app.get("/landing", serveLanding);
-
-  // Static files (CSS, JS, images, etc.)
   app.use(express.static(distPath));
 
-  // fall through to index.html for SPA routes
+  // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });

@@ -141,25 +141,6 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
-    // Serve landing page at root and /landing in development
-    const fs = await import("fs");
-    const path = await import("path");
-    const serveLandingDev = async (_req: any, res: any, next: any) => {
-      try {
-        const landingPath = path.resolve(process.cwd(), "client", "public", "landing.html");
-        if (fs.existsSync(landingPath)) {
-          const content = await fs.promises.readFile(landingPath, "utf-8");
-          res.status(200).set({ "Content-Type": "text/html" }).end(content);
-        } else {
-          next();
-        }
-      } catch (e) {
-        next(e);
-      }
-    };
-    app.get("/", serveLandingDev);
-    app.get("/landing", serveLandingDev);
-    
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
