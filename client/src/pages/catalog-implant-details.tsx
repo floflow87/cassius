@@ -366,24 +366,24 @@ export default function CatalogImplantDetailsPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
                 <span className="text-xs text-muted-foreground">Marque</span>
-                <p className="text-sm font-medium" data-testid="text-implant-marque">{implant.marque}</p>
+                <p className="text-[13px] font-medium" data-testid="text-implant-marque">{implant.marque}</p>
               </div>
               <div>
                 <span className="text-xs text-muted-foreground">Type</span>
-                <p className="text-sm font-medium" data-testid="text-implant-type">
+                <p className="text-[13px] font-medium" data-testid="text-implant-type">
                   {isProthese ? "Prothèse" : implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"}
                 </p>
               </div>
               <div>
                 <span className="text-xs text-muted-foreground">Référence fabricant</span>
-                <p className="text-sm font-medium font-mono" data-testid="text-implant-reference">
+                <p className="text-[13px] font-medium" data-testid="text-implant-reference">
                   {implant.referenceFabricant || "—"}
                 </p>
               </div>
               {isProthese && implant.typeProthese && (
                 <div>
                   <span className="text-xs text-muted-foreground">Type de prothèse</span>
-                  <p className="text-sm font-medium" data-testid="text-prothese-type">
+                  <p className="text-[13px] font-medium" data-testid="text-prothese-type">
                     {implant.typeProthese === "VISSEE" ? "Vissée" : implant.typeProthese === "SCELLEE" ? "Scellée" : implant.typeProthese}
                   </p>
                 </div>
@@ -392,17 +392,17 @@ export default function CatalogImplantDetailsPage() {
                 <>
                   <div>
                     <span className="text-xs text-muted-foreground">Diamètre</span>
-                    <p className="text-sm font-medium font-mono" data-testid="text-implant-diametre">{implant.diametre} mm</p>
+                    <p className="text-[13px] font-medium" data-testid="text-implant-diametre">{implant.diametre} mm</p>
                   </div>
                   <div>
                     <span className="text-xs text-muted-foreground">Longueur</span>
-                    <p className="text-sm font-medium font-mono" data-testid="text-implant-longueur">{implant.longueur} mm</p>
+                    <p className="text-[13px] font-medium" data-testid="text-implant-longueur">{implant.longueur} mm</p>
                   </div>
                 </>
               )}
               <div>
                 <span className="text-xs text-muted-foreground">Numéro de lot</span>
-                <p className="text-sm font-medium font-mono">{implant.lot || "—"}</p>
+                <p className="text-[13px] font-medium">{implant.lot || "—"}</p>
               </div>
             </div>
           </CardContent>
