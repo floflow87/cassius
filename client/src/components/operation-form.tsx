@@ -3,7 +3,9 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Plus, Trash2, Check, ChevronsUpDown, Loader2, Star } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Loader2, Star, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
   Command,
@@ -74,7 +76,7 @@ const protheseSchema = z.object({
 
 const formSchema = z.object({
   dateOperation: z.string().min(1, "La date est requise"),
-  typeIntervention: z.enum([
+  typeIntervention: z.array(z.enum([
     "POSE_IMPLANT",
     "GREFFE_OSSEUSE",
     "SINUS_LIFT",
@@ -82,7 +84,7 @@ const formSchema = z.object({
     "REPRISE_IMPLANT",
     "CHIRURGIE_GUIDEE",
     "POSE_PROTHESE",
-  ]),
+  ])).min(1, "Sélectionnez au moins un type d'intervention"),
   typeChirurgieTemps: z.enum(["UN_TEMPS", "DEUX_TEMPS"]).optional(),
   typeChirurgieApproche: z.enum(["LAMBEAU", "FLAPLESS"]).optional(),
   greffeOsseuse: z.boolean().default(false),
@@ -98,6 +100,18 @@ const formSchema = z.object({
 });
 
 type FormData = z.infer<typeof formSchema>;
+
+const interventionTypeLabels: Record<string, string> = {
+  POSE_IMPLANT: "Pose d'implant",
+  GREFFE_OSSEUSE: "Greffe osseuse",
+  SINUS_LIFT: "Sinus lift",
+  EXTRACTION_IMPLANT_IMMEDIATE: "Extraction + Implant immédiat",
+  REPRISE_IMPLANT: "Implantoplastie",
+  CHIRURGIE_GUIDEE: "Chirurgie guidée",
+  POSE_PROTHESE: "Pose de prothèse",
+};
+
+const interventionTypeOptions = Object.entries(interventionTypeLabels).map(([value, label]) => ({ value, label }));
 
 interface DefaultImplant {
   catalogImplantId: string;
@@ -138,7 +152,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
     resolver: zodResolver(formSchema),
     defaultValues: {
       dateOperation: new Date().toISOString().split("T")[0],
-      typeIntervention: "POSE_IMPLANT",
+      typeIntervention: ["POSE_IMPLANT"],
       greffeOsseuse: false,
       implants: [],
       protheses: [],
@@ -327,23 +341,64 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                   name="typeIntervention"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type d'intervention <span className="text-destructive">*</span></FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-type-intervention" className="text-[12px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="POSE_IMPLANT" className="text-[12px]">Pose d'implant</SelectItem>
-                          <SelectItem value="GREFFE_OSSEUSE" className="text-[12px]">Greffe osseuse</SelectItem>
-                          <SelectItem value="SINUS_LIFT" className="text-[12px]">Sinus lift</SelectItem>
-                          <SelectItem value="EXTRACTION_IMPLANT_IMMEDIATE" className="text-[12px]">Extraction + Implant immédiat</SelectItem>
-                          <SelectItem value="REPRISE_IMPLANT" className="text-[12px]">Implantoplastie</SelectItem>
-                          <SelectItem value="CHIRURGIE_GUIDEE" className="text-[12px]">Chirurgie guidée</SelectItem>
-                          <SelectItem value="POSE_PROTHESE" className="text-[12px]">Pose de prothèse</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Type(s) d'intervention <span className="text-destructive">*</span></FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className="w-full justify-between font-normal text-[12px]"
+                              data-testid="select-type-intervention"
+                            >
+                              {field.value.length === 0
+                                ? "Sélectionner..."
+                                : `${field.value.length} type(s) sélectionné(s)`}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[320px] p-0" align="start">
+                          <div className="p-2 space-y-1">
+                            {interventionTypeOptions.map((option) => {
+                              const isSelected = field.value.includes(option.value as any);
+                              return (
+                                <div
+                                  key={option.value}
+                                  className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover-elevate"
+                                  onClick={() => {
+                                    const newValue = isSelected
+                                      ? field.value.filter((v: string) => v !== option.value)
+                                      : [...field.value, option.value as any];
+                                    field.onChange(newValue);
+                                  }}
+                                  data-testid={`option-intervention-${option.value}`}
+                                >
+                                  <Checkbox checked={isSelected} className="pointer-events-none" />
+                                  <span className="text-xs">{option.label}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                      {field.value.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {field.value.map((v: string) => (
+                            <Badge key={v} variant="secondary" className="text-[10px]" data-testid={`badge-intervention-${v}`}>
+                              {interventionTypeLabels[v] || v}
+                              <button
+                                type="button"
+                                className="ml-1"
+                                data-testid={`button-remove-intervention-${v}`}
+                                onClick={() => field.onChange(field.value.filter((x: string) => x !== v))}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -543,7 +598,12 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                                 value={`${brand.marque} ${brand.referenceFabricant || ""}`}
                                                 onSelect={() => {
                                                   setSelectedBrandByIndex(prev => ({ ...prev, [index]: brand.key }));
-                                                  field.onChange(""); // Reset dimension selection
+                                                  const favoriteInBrand = brand.implants.find(i => i.isFavorite);
+                                                  if (favoriteInBrand) {
+                                                    field.onChange(favoriteInBrand.id);
+                                                  } else {
+                                                    field.onChange("");
+                                                  }
                                                   setOpenPopoverIndex(null);
                                                 }}
                                                 className="text-[11px]"
@@ -1074,7 +1134,12 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                               value={brand.marque}
                                               onSelect={() => {
                                                 setSelectedProtheseBrandByIndex(prev => ({ ...prev, [index]: brand.key }));
-                                                field.onChange(""); // Reset variant selection
+                                                const favoriteInBrand = brand.protheses.find(p => p.isFavorite);
+                                                if (favoriteInBrand) {
+                                                  field.onChange(favoriteInBrand.id);
+                                                } else {
+                                                  field.onChange("");
+                                                }
                                                 setOpenProthesePopoverIndex(null);
                                               }}
                                               className="text-[11px]"

@@ -6,7 +6,8 @@ export type TypeIntervention =
   | "SINUS_LIFT"
   | "EXTRACTION_IMPLANT_IMMEDIATE"
   | "REPRISE_IMPLANT"
-  | "CHIRURGIE_GUIDEE";
+  | "CHIRURGIE_GUIDEE"
+  | "POSE_PROTHESE";
 
 export type TypeChirurgieTemps = "UN_TEMPS" | "DEUX_TEMPS";
 
@@ -57,7 +58,7 @@ export interface Operation {
   patientId: string;
   organisationId: string;
   dateOperation: string;
-  typeIntervention: TypeIntervention;
+  typeIntervention: TypeIntervention[];
   typeChirurgieTemps: TypeChirurgieTemps | null;
   typeChirurgieApproche: TypeChirurgieApproche | null;
   greffeOsseuse: boolean | null;
@@ -360,7 +361,7 @@ export interface CreatePatientInput {
 export interface CreateOperationInput {
   patientId: string;
   dateOperation: string;
-  typeIntervention: TypeIntervention;
+  typeIntervention: TypeIntervention[];
   typeChirurgieTemps?: TypeChirurgieTemps | null;
   typeChirurgieApproche?: TypeChirurgieApproche | null;
   greffeOsseuse?: boolean | null;
@@ -648,7 +649,7 @@ export interface GlobalSearchPatient {
 
 export interface GlobalSearchActe {
   id: string;
-  typeIntervention: TypeIntervention;
+  typeIntervention: TypeIntervention[];
   dateOperation: string;
   patientId: string;
   patientNom: string;

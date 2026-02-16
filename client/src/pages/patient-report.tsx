@@ -43,7 +43,7 @@ export default function PatientReportPage() {
     return age;
   };
 
-  const getInterventionLabel = (type: string) => {
+  const getInterventionLabel = (type: string | string[]) => {
     const labels: Record<string, string> = {
       POSE_IMPLANT: "Pose d'implant",
       GREFFE_OSSEUSE: "Greffe osseuse",
@@ -53,6 +53,9 @@ export default function PatientReportPage() {
       CHIRURGIE_GUIDEE: "Chirurgie guidée",
       POSE_PROTHESE: "Pose de prothèse",
     };
+    if (Array.isArray(type)) {
+      return type.map(t => labels[t] || t).join(" + ");
+    }
     return labels[type] || type;
   };
 

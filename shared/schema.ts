@@ -166,7 +166,7 @@ export const operations = pgTable("operations", {
   organisationId: varchar("organisation_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
   patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
   dateOperation: date("date_operation").notNull(),
-  typeIntervention: typeInterventionEnum("type_intervention").notNull(),
+  typeIntervention: text("type_intervention").array().notNull(),
   typeChirurgieTemps: typeChirurgieTempsEnum("type_chirurgie_temps"),
   typeChirurgieApproche: typeChirurgieApprocheEnum("type_chirurgie_approche"),
   greffeOsseuse: boolean("greffe_osseuse").default(false),

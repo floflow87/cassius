@@ -76,7 +76,9 @@ export function PatientTimeline({ patient, onViewRadio }: PatientTimelineProps) 
       id: `op-${op.id}`,
       date: op.dateOperation,
       type: "operation",
-      title: interventionLabels[op.typeIntervention] || op.typeIntervention,
+      title: Array.isArray(op.typeIntervention)
+        ? op.typeIntervention.map(t => interventionLabels[t] || t).join(" + ")
+        : interventionLabels[op.typeIntervention] || op.typeIntervention,
       description: op.notesPerop || undefined,
       metadata: {
         implants: op.surgeryImplants?.length || 0,

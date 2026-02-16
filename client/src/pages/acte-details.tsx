@@ -53,6 +53,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioUploadForm } from "@/components/radio-upload-form";
 import { RadioCard } from "@/components/radio-card";
 import { OperationEditForm } from "@/components/operation-edit-form";
@@ -105,8 +106,10 @@ export default function ActeDetailsPage() {
   const [radioDialogOpen, setRadioDialogOpen] = useState(false);
   const [editInterventionOpen, setEditInterventionOpen] = useState(false);
   const [addImplantOpen, setAddImplantOpen] = useState(false);
+  const [addProtheseOpen, setAddProtheseOpen] = useState(false);
   const [editingImplant, setEditingImplant] = useState<SurgeryImplantWithDetails | null>(null);
   const [deleteImplantId, setDeleteImplantId] = useState<string | null>(null);
+  const [implantTab, setImplantTab] = useState<string>("implants");
   const { toast } = useToast();
 
   const { data: operation, isLoading, isError, error } = useQuery<OperationDetail>({
@@ -188,7 +191,9 @@ export default function ActeDetailsPage() {
         </Button>
         <div>
           <h1 className="text-xl font-semibold" data-testid="text-acte-title">
-            {typeInterventionLabels[operation.typeIntervention] || operation.typeIntervention}
+            {Array.isArray(operation.typeIntervention)
+              ? operation.typeIntervention.map(t => typeInterventionLabels[t] || t).join(" + ")
+              : typeInterventionLabels[operation.typeIntervention] || operation.typeIntervention}
           </h1>
           <p className="text-xs text-muted-foreground" data-testid="text-acte-date">
             {formatDate(operation.dateOperation)}
@@ -248,11 +253,15 @@ export default function ActeDetailsPage() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Type</span>
-              <Badge className="text-[10px] rounded-full bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
-                {typeInterventionLabels[operation.typeIntervention] || operation.typeIntervention}
-              </Badge>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground shrink-0">Type</span>
+              <div className="flex flex-wrap gap-1 justify-end">
+                {(Array.isArray(operation.typeIntervention) ? operation.typeIntervention : [operation.typeIntervention]).map((t: string) => (
+                  <Badge key={t} className="text-[10px] rounded-full bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
+                    {typeInterventionLabels[t] || t}
+                  </Badge>
+                ))}
+              </div>
             </div>
             {operation.typeChirurgieApproche && (
               <div className="flex items-center justify-between">
@@ -371,138 +380,247 @@ export default function ActeDetailsPage() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-          <CardTitle className="text-base font-medium flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Implants posés ({operation.surgeryImplants.length})
-          </CardTitle>
-          <Button
-            size="sm"
-            onClick={() => setAddImplantOpen(true)}
-            data-testid="button-add-implant"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Ajouter un implant
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {operation.surgeryImplants.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-8">
-              Aucun implant posé lors de cette intervention
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Site</TableHead>
-                  <TableHead>Marque</TableHead>
-                  <TableHead>Dimensions</TableHead>
-                  <TableHead>Type Os</TableHead>
-                  <TableHead>Mise en charge</TableHead>
-                  <TableHead>ISQ Pose</TableHead>
-                  <TableHead>Greffe</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead className="w-10"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {operation.surgeryImplants.map((si) => (
-                  <TableRow
-                    key={si.id}
-                    className="cursor-pointer hover-elevate"
-                    onClick={() => setLocation(`/patients/${operation.patient.id}/implants/${si.id}`)}
-                    data-testid={`row-implant-${si.id}`}
-                  >
-                    <TableCell className="font-medium">{si.siteFdi}</TableCell>
-                    <TableCell>
-                      {si.implant.marque}
-                      {si.implant.referenceFabricant && (
-                        <span className="text-muted-foreground ml-1">({si.implant.referenceFabricant})</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {si.implant.diametre}mm x {si.implant.longueur}mm
-                    </TableCell>
-                    <TableCell>
-                      {si.typeOs ? (
-                        <span className="text-xs">{si.typeOs}</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {si.miseEnCharge ? (
-                        <span className="text-xs">{miseEnChargeLabels[si.miseEnCharge] || si.miseEnCharge}</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {si.isqPose ? (
-                        <span className="font-medium">{si.isqPose}</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {si.greffeOsseuse ? (
-                        si.greffeQuantite ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-xs cursor-help text-amber-700 dark:text-amber-400">{si.typeGreffe || "Oui"}</span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs"><strong>Quantité :</strong> {si.greffeQuantite}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-xs text-amber-700 dark:text-amber-400">{si.typeGreffe || "Oui"}</span>
-                        )
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {si.statut && statusConfig[si.statut] ? (
-                        <Badge variant={statusConfig[si.statut].variant} className="text-[10px]">
-                          {statusConfig[si.statut].label}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingImplant(si);
-                          }}
-                          data-testid={`button-edit-implant-${si.id}`}
+        <Tabs value={implantTab} onValueChange={setImplantTab}>
+          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+            <TabsList>
+              <TabsTrigger value="implants" data-testid="tab-implants">
+                Implants posés ({operation.surgeryImplants.filter(si => si.implant.typeImplant !== "PROTHESE").length})
+              </TabsTrigger>
+              <TabsTrigger value="protheses" data-testid="tab-protheses">
+                Prothèses posées ({operation.surgeryImplants.filter(si => si.implant.typeImplant === "PROTHESE").length})
+              </TabsTrigger>
+            </TabsList>
+            {implantTab === "implants" ? (
+              <Button
+                size="sm"
+                onClick={() => setAddImplantOpen(true)}
+                data-testid="button-add-implant"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Ajouter un implant
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => setAddProtheseOpen(true)}
+                data-testid="button-add-prothese"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Ajouter une prothèse
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            <TabsContent value="implants" className="mt-0">
+              {(() => {
+                const implantItems = operation.surgeryImplants.filter(si => si.implant.typeImplant !== "PROTHESE");
+                return implantItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">
+                    Aucun implant posé lors de cette intervention
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Site</TableHead>
+                        <TableHead>Marque</TableHead>
+                        <TableHead>Dimensions</TableHead>
+                        <TableHead>Type Os</TableHead>
+                        <TableHead>Mise en charge</TableHead>
+                        <TableHead>ISQ Pose</TableHead>
+                        <TableHead>Greffe</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {implantItems.map((si) => (
+                        <TableRow
+                          key={si.id}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => setLocation(`/patients/${operation.patient.id}/implants/${si.id}`)}
+                          data-testid={`row-implant-${si.id}`}
                         >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteImplantId(si.id);
-                          }}
-                          data-testid={`button-delete-implant-${si.id}`}
+                          <TableCell className="font-medium">{si.siteFdi}</TableCell>
+                          <TableCell>
+                            {si.implant.marque}
+                            {si.implant.referenceFabricant && (
+                              <span className="text-muted-foreground ml-1">({si.implant.referenceFabricant})</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {si.implant.diametre}mm x {si.implant.longueur}mm
+                          </TableCell>
+                          <TableCell>
+                            {si.typeOs ? (
+                              <span className="text-xs">{si.typeOs}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {si.miseEnCharge ? (
+                              <span className="text-xs">{miseEnChargeLabels[si.miseEnCharge] || si.miseEnCharge}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {si.isqPose ? (
+                              <span className="font-medium">{si.isqPose}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {si.greffeOsseuse ? (
+                              si.greffeQuantite ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-xs cursor-help text-amber-700 dark:text-amber-400">{si.typeGreffe || "Oui"}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs"><strong>Quantité :</strong> {si.greffeQuantite}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span className="text-xs text-amber-700 dark:text-amber-400">{si.typeGreffe || "Oui"}</span>
+                              )
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {si.statut && statusConfig[si.statut] ? (
+                              <Badge variant={statusConfig[si.statut].variant} className="text-[10px]">
+                                {statusConfig[si.statut].label}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingImplant(si);
+                                }}
+                                data-testid={`button-edit-implant-${si.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteImplantId(si.id);
+                                }}
+                                data-testid={`button-delete-implant-${si.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                );
+              })()}
+            </TabsContent>
+
+            <TabsContent value="protheses" className="mt-0">
+              {(() => {
+                const protheseItems = operation.surgeryImplants.filter(si => si.implant.typeImplant === "PROTHESE");
+                return protheseItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">
+                    Aucune prothèse posée lors de cette intervention
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Site</TableHead>
+                        <TableHead>Marque</TableHead>
+                        <TableHead>Référence</TableHead>
+                        <TableHead>Type prothèse</TableHead>
+                        <TableHead>Mobilité</TableHead>
+                        <TableHead>Type pilier</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {protheseItems.map((si) => (
+                        <TableRow
+                          key={si.id}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => setLocation(`/patients/${operation.patient.id}/implants/${si.id}`)}
+                          data-testid={`row-prothese-${si.id}`}
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
+                          <TableCell className="font-medium">{si.siteFdi}</TableCell>
+                          <TableCell>{si.implant.marque}</TableCell>
+                          <TableCell>
+                            {si.implant.referenceFabricant || <span className="text-muted-foreground">-</span>}
+                          </TableCell>
+                          <TableCell>
+                            {si.implant.typeProthese ? (
+                              <span className="text-xs">{si.implant.typeProthese === "VISSEE" ? "Vissée" : "Scellée"}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {si.implant.mobilite ? (
+                              <span className="text-xs">{si.implant.mobilite === "FIXE" ? "Fixe" : "Amovible"}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {si.implant.typePilier ? (
+                              <span className="text-xs">{si.implant.typePilier.replace(/_/g, " ")}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {si.statut && statusConfig[si.statut] ? (
+                              <Badge variant={statusConfig[si.statut].variant} className="text-[10px]">
+                                {statusConfig[si.statut].label}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteImplantId(si.id);
+                                }}
+                                data-testid={`button-delete-prothese-${si.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                );
+              })()}
+            </TabsContent>
+          </CardContent>
+        </Tabs>
       </Card>
 
       {operation.visites && operation.visites.length > 0 && (
@@ -642,6 +760,16 @@ export default function ActeDetailsPage() {
         open={addImplantOpen}
         onOpenChange={setAddImplantOpen}
         onSuccess={() => setAddImplantOpen(false)}
+        mode="IMPLANT"
+      />
+
+      <SurgeryImplantAddSheet
+        operationId={operation.id}
+        operationDate={operation.dateOperation}
+        open={addProtheseOpen}
+        onOpenChange={setAddProtheseOpen}
+        onSuccess={() => setAddProtheseOpen(false)}
+        mode="PROTHESE"
       />
 
       <AlertDialog open={!!deleteImplantId} onOpenChange={(open) => !open && setDeleteImplantId(null)}>

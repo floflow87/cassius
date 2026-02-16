@@ -184,7 +184,7 @@ export default function StatsPage() {
   const patientsData = patientsResponse?.patients || [];
 
   // Fetch operations for search suggestions  
-  const { data: operationsResponse } = useQuery<Array<{id: string; patientNom: string; patientPrenom: string; dateOperation: string; typeIntervention: string}>>({
+  const { data: operationsResponse } = useQuery<Array<{id: string; patientNom: string; patientPrenom: string; dateOperation: string; typeIntervention: string | string[]}>>({
     queryKey: ["/api/operations/summary"],
   });
   const operationsData = operationsResponse || [];
@@ -206,7 +206,9 @@ export default function StatsPage() {
     
     if (Array.isArray(operationsData)) {
       operationsData.forEach(op => {
-        const typeLabel = TYPE_LABELS[op.typeIntervention] || op.typeIntervention;
+        const typeLabel = Array.isArray(op.typeIntervention)
+          ? op.typeIntervention.map(t => TYPE_LABELS[t] || t).join(" + ")
+          : TYPE_LABELS[op.typeIntervention] || op.typeIntervention;
         suggestions.push({
           id: op.id,
           type: "operation",

@@ -299,7 +299,7 @@ export function RadioUploadForm({
                     <SelectContent>
                       {operations.map((op) => (
                         <SelectItem key={op.id} value={op.id}>
-                          {formatDate(op.dateOperation)} - {op.typeIntervention.replace(/_/g, " ")}
+                          {formatDate(op.dateOperation)} - {Array.isArray(op.typeIntervention) ? op.typeIntervention.map(t => t.replace(/_/g, " ")).join(", ") : op.typeIntervention.replace(/_/g, " ")}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -706,7 +706,8 @@ export default function PatientDetailsPage() {
           comparison = new Date(a.dateOperation || 0).getTime() - new Date(b.dateOperation || 0).getTime();
           break;
         case "typeIntervention":
-          comparison = (a.typeIntervention || "").localeCompare(b.typeIntervention || "");
+          comparison = (Array.isArray(a.typeIntervention) ? a.typeIntervention.join(",") : a.typeIntervention || "")
+            .localeCompare(Array.isArray(b.typeIntervention) ? b.typeIntervention.join(",") : b.typeIntervention || "");
           break;
         case "implants":
           comparison = (a.surgeryImplants?.length || 0) - (b.surgeryImplants?.length || 0);
@@ -742,8 +743,18 @@ export default function PatientDetailsPage() {
     switch (columnId) {
       case "date":
         return formatDateCompact(operation.dateOperation);
-      case "typeIntervention":
-        return getInterventionLabel(operation.typeIntervention);
+      case "typeIntervention": {
+        const types = Array.isArray(operation.typeIntervention) ? operation.typeIntervention : [operation.typeIntervention];
+        return (
+          <div className="flex flex-wrap gap-1">
+            {types.map((t: string) => (
+              <Badge key={t} variant="secondary" className="text-[10px] rounded-full">
+                {getInterventionLabel(t)}
+              </Badge>
+            ))}
+          </div>
+        );
+      }
       case "implants":
         const sites = operation.surgeryImplants?.map(si => si.siteFdi).join(", ") || "";
         return (
@@ -1156,7 +1167,7 @@ export default function PatientDetailsPage() {
     });
   };
 
-  const getInterventionLabel = (type: string) => {
+  const getInterventionLabel = (type: string | string[]) => {
     const labels: Record<string, string> = {
       POSE_IMPLANT: "Pose d'implant",
       GREFFE_OSSEUSE: "Greffe osseuse",
@@ -1166,6 +1177,9 @@ export default function PatientDetailsPage() {
       CHIRURGIE_GUIDEE: "Chirurgie guidée",
       POSE_PROTHESE: "Pose de prothèse",
     };
+    if (Array.isArray(type)) {
+      return type.map(t => labels[t] || t).join(" + ");
+    }
     return labels[type] || type;
   };
 

@@ -318,7 +318,9 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm truncate">
-                              {TYPE_INTERVENTION_LABELS[acte.typeIntervention] || acte.typeIntervention}
+                              {Array.isArray(acte.typeIntervention)
+                                ? acte.typeIntervention.map(t => TYPE_INTERVENTION_LABELS[t] || t).join(" + ")
+                                : TYPE_INTERVENTION_LABELS[acte.typeIntervention] || acte.typeIntervention}
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {formatDate(acte.dateOperation)} – {acte.patientPrenom} {acte.patientNom}

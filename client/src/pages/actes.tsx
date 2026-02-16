@@ -529,7 +529,9 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
     return (
       op.patientNom.toLowerCase().includes(query) ||
       op.patientPrenom.toLowerCase().includes(query) ||
-      TYPE_INTERVENTION_LABELS[op.typeIntervention]?.toLowerCase().includes(query)
+      (Array.isArray(op.typeIntervention) 
+        ? op.typeIntervention.some(t => TYPE_INTERVENTION_LABELS[t]?.toLowerCase().includes(query))
+        : TYPE_INTERVENTION_LABELS[op.typeIntervention]?.toLowerCase().includes(query))
     );
   }) || [];
 
@@ -547,7 +549,8 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
           comparison = `${a.patientNom} ${a.patientPrenom}`.localeCompare(`${b.patientNom} ${b.patientPrenom}`);
           break;
         case "typeIntervention":
-          comparison = a.typeIntervention.localeCompare(b.typeIntervention);
+          comparison = (Array.isArray(a.typeIntervention) ? a.typeIntervention.join(",") : a.typeIntervention || "")
+            .localeCompare(Array.isArray(b.typeIntervention) ? b.typeIntervention.join(",") : b.typeIntervention || "");
           break;
         case "chirurgie":
           comparison = (a.typeChirurgieTemps || "").localeCompare(b.typeChirurgieTemps || "");
@@ -1185,9 +1188,13 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         );
       case "typeIntervention":
         return (
-          <Badge className="text-[10px] rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border-0">
-            {TYPE_INTERVENTION_LABELS[op.typeIntervention] || op.typeIntervention}
-          </Badge>
+          <div className="flex flex-wrap gap-1">
+            {(Array.isArray(op.typeIntervention) ? op.typeIntervention : [op.typeIntervention]).map((t: string) => (
+              <Badge key={t} className="text-[10px] rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border-0">
+                {TYPE_INTERVENTION_LABELS[t] || t}
+              </Badge>
+            ))}
+          </div>
         );
       case "chirurgie": {
         const temps = op.typeChirurgieTemps ? CHIRURGIE_TEMPS_LABELS[op.typeChirurgieTemps] : null;

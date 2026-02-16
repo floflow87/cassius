@@ -192,7 +192,7 @@ type OperationWithDetails = {
   organisationId: string;
   patientId: string;
   dateOperation: string;
-  typeIntervention: string | null;
+  typeIntervention: string[] | null;
   typeChirurgieTemps: string | null;
   typeChirurgieApproche: string | null;
   greffeOsseuse: boolean | null;
@@ -224,7 +224,7 @@ function evaluateActeFilterRule(operation: OperationWithDetails, rule: {
       opValue = operation.dateOperation;
       break;
     case "typeIntervention":
-      opValue = operation.typeIntervention;
+      opValue = operation.typeIntervention ? operation.typeIntervention.join(",") : null;
       break;
     case "typeChirurgieTemps":
       opValue = operation.typeChirurgieTemps;
@@ -1434,14 +1434,15 @@ export async function registerRoutes(
     try {
       const updateSchema = z.object({
         dateOperation: z.string().optional(),
-        typeIntervention: z.enum([
+        typeIntervention: z.array(z.enum([
           "POSE_IMPLANT",
           "GREFFE_OSSEUSE",
           "SINUS_LIFT",
           "EXTRACTION_IMPLANT_IMMEDIATE",
           "REPRISE_IMPLANT",
           "CHIRURGIE_GUIDEE",
-        ]).optional(),
+          "POSE_PROTHESE",
+        ])).optional(),
         typeChirurgieTemps: z.enum(["UN_TEMPS", "DEUX_TEMPS"]).nullable().optional(),
         typeChirurgieApproche: z.enum(["LAMBEAU", "FLAPLESS"]).nullable().optional(),
         greffeOsseuse: z.boolean().nullable().optional(),
@@ -8253,11 +8254,11 @@ export async function registerRoutes(
         // Create demo operations with implants
         const today = new Date();
         const demoOperations = [
-          { patientIdx: 0, implantIdx: 0, daysAgo: 90, siteFdi: "36", typeIntervention: "POSE" as const, isqPose: 72 },
-          { patientIdx: 1, implantIdx: 1, daysAgo: 60, siteFdi: "46", typeIntervention: "POSE" as const, isqPose: 68 },
-          { patientIdx: 2, implantIdx: 2, daysAgo: 30, siteFdi: "24", typeIntervention: "POSE" as const, isqPose: 75 },
-          { patientIdx: 3, implantIdx: 0, daysAgo: 120, siteFdi: "11", typeIntervention: "POSE" as const, isqPose: 70 },
-          { patientIdx: 4, implantIdx: 1, daysAgo: 45, siteFdi: "21", typeIntervention: "POSE" as const, isqPose: 65 },
+          { patientIdx: 0, implantIdx: 0, daysAgo: 90, siteFdi: "36", typeIntervention: ["POSE_IMPLANT"], isqPose: 72 },
+          { patientIdx: 1, implantIdx: 1, daysAgo: 60, siteFdi: "46", typeIntervention: ["POSE_IMPLANT"], isqPose: 68 },
+          { patientIdx: 2, implantIdx: 2, daysAgo: 30, siteFdi: "24", typeIntervention: ["POSE_IMPLANT"], isqPose: 75 },
+          { patientIdx: 3, implantIdx: 0, daysAgo: 120, siteFdi: "11", typeIntervention: ["POSE_IMPLANT"], isqPose: 70 },
+          { patientIdx: 4, implantIdx: 1, daysAgo: 45, siteFdi: "21", typeIntervention: ["POSE_IMPLANT"], isqPose: 65 },
         ];
 
         for (const op of demoOperations) {

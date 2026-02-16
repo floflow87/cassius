@@ -497,7 +497,10 @@ export default function CatalogImplantDetailsPage() {
                 ) : (
                   surgeries.map((surgery) => {
                     const status = statusConfig[surgery.statut] || { label: surgery.statut, variant: "secondary" as const };
-                    const interventionType = surgery.surgery?.typeIntervention?.replace(/_/g, " ").toLowerCase() || "—";
+                    const typeInt = surgery.surgery?.typeIntervention;
+                    const interventionType = typeInt
+                      ? (Array.isArray(typeInt) ? typeInt.map(t => t.replace(/_/g, " ").toLowerCase()).join(", ") : typeInt.replace(/_/g, " ").toLowerCase())
+                      : "—";
 
                     return (
                       <TableRow 
