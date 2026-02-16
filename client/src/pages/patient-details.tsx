@@ -1162,7 +1162,7 @@ export default function PatientDetailsPage() {
       GREFFE_OSSEUSE: "Greffe osseuse",
       SINUS_LIFT: "Sinus lift",
       EXTRACTION_IMPLANT_IMMEDIATE: "Extraction + Implant immédiat",
-      REPRISE_IMPLANT: "Reprise d'implant",
+      REPRISE_IMPLANT: "Implantoplastie",
       CHIRURGIE_GUIDEE: "Chirurgie guidée",
       POSE_PROTHESE: "Pose de prothèse",
     };

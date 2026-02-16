@@ -50,7 +50,7 @@ export const roleEnum = pgEnum("role", ["CHIRURGIEN", "ASSISTANT", "ADMIN"]);
 
 // Enums pour les prothèses supra-implantaires
 export const typeProtheseEnum = pgEnum("type_prothese", ["VISSEE", "SCELLEE"]);
-export const typePilierEnum = pgEnum("type_pilier", ["DROIT", "ANGULE", "MULTI_UNIT"]);
+export const typePilierEnum = pgEnum("type_pilier", ["DROIT", "ANGULE", "MULTI_UNIT", "VISSE", "SCELLE"]);
 export const quantiteProtheseEnum = pgEnum("quantite_prothese", ["UNITAIRE", "PLURALE"]);
 export const mobiliteProtheseEnum = pgEnum("mobilite_prothese", ["AMOVIBLE", "FIXE"]);
 export const typeNoteTagEnum = pgEnum("type_note_tag", ["CONSULTATION", "CHIRURGIE", "SUIVI", "COMPLICATION", "ADMINISTRATIVE"]);

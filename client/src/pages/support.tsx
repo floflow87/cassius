@@ -83,7 +83,7 @@ const helpSections: HelpSection[] = [
         items: [
           "Pose d'implant simple ou multiple",
           "Extraction avec implant immédiat",
-          "Reprise d'implant",
+          "Implantoplastie",
           "Chirurgie guidée",
           "Greffe osseuse",
           "Régénération osseuse guidée (ROG)",

@@ -139,7 +139,7 @@ export function OperationEditForm({ operation, onSuccess }: OperationEditFormPro
                   <SelectItem value="GREFFE_OSSEUSE">Greffe osseuse</SelectItem>
                   <SelectItem value="SINUS_LIFT">Sinus lift</SelectItem>
                   <SelectItem value="EXTRACTION_IMPLANT_IMMEDIATE">Extraction + implant immédiat</SelectItem>
-                  <SelectItem value="REPRISE_IMPLANT">Reprise d'implant</SelectItem>
+                  <SelectItem value="REPRISE_IMPLANT">Implantoplastie</SelectItem>
                   <SelectItem value="CHIRURGIE_GUIDEE">Chirurgie guidée</SelectItem>
                   <SelectItem value="POSE_PROTHESE">Pose de prothèse</SelectItem>
                 </SelectContent>

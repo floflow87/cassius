@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute, useLocation } from "wouter";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import {
@@ -13,6 +13,7 @@ import {
   Pencil,
   Plus,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +50,8 @@ import { SurgeryImplantEditSheet } from "@/components/surgery-implant-edit-sheet
 import { SurgeryImplantAddSheet } from "@/components/surgery-implant-add-sheet";
 import { SurgeryTimeline } from "@/components/surgery-timeline";
 import { AuditHistory } from "@/components/audit-history";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { OperationDetail, SurgeryImplantWithDetails } from "@shared/types";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" | "success" }> = {
@@ -63,7 +66,7 @@ const typeInterventionLabels: Record<string, string> = {
   GREFFE_OSSEUSE: "Greffe osseuse",
   SINUS_LIFT: "Sinus lift",
   EXTRACTION_IMPLANT_IMMEDIATE: "Extraction + implant immédiat",
-  REPRISE_IMPLANT: "Reprise d'implant",
+  REPRISE_IMPLANT: "Implantoplastie",
   CHIRURGIE_GUIDEE: "Chirurgie guidée",
   POSE_PROTHESE: "Pose de prothèse",
 };
@@ -93,10 +96,32 @@ export default function ActeDetailsPage() {
   const [editInterventionOpen, setEditInterventionOpen] = useState(false);
   const [addImplantOpen, setAddImplantOpen] = useState(false);
   const [editingImplant, setEditingImplant] = useState<SurgeryImplantWithDetails | null>(null);
+  const { toast } = useToast();
 
   const { data: operation, isLoading, isError, error } = useQuery<OperationDetail>({
     queryKey: ["/api/operations", acteId],
     enabled: !!acteId,
+  });
+
+  const deleteImplantMutation = useMutation({
+    mutationFn: async (implantId: string) => {
+      return apiRequest("DELETE", "/api/surgery-implants", { ids: [implantId] });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations", acteId] });
+      toast({
+        title: "Implant supprimé",
+        description: "L'implant a été retiré de cet acte.",
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const formatDate = (dateString: string) => {
@@ -436,17 +461,32 @@ export default function ActeDetailsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingImplant(si);
-                        }}
-                        data-testid={`button-edit-implant-${si.id}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingImplant(si);
+                          }}
+                          data-testid={`button-edit-implant-${si.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm("Supprimer cet implant de l'acte ?")) {
+                              deleteImplantMutation.mutate(si.id);
+                            }
+                          }}
+                          data-testid={`button-delete-implant-${si.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -62,7 +62,7 @@ const TYPE_INTERVENTION_OPTIONS = [
   { value: "GREFFE_OSSEUSE", label: "Greffe osseuse" },
   { value: "SINUS_LIFT", label: "Sinus lift" },
   { value: "EXTRACTION_IMPLANT_IMMEDIATE", label: "Extraction + Implant immédiat" },
-  { value: "REPRISE_IMPLANT", label: "Reprise d'implant" },
+  { value: "REPRISE_IMPLANT", label: "Implantoplastie" },
   { value: "CHIRURGIE_GUIDEE", label: "Chirurgie guidée" },
   { value: "POSE_PROTHESE", label: "Pose de prothèse" },
 ];

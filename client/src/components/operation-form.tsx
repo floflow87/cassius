@@ -55,7 +55,11 @@ const implantSchema = z.object({
   positionImplant: z.enum(["CRESTAL", "SOUS_CRESTAL", "SUPRA_CRESTAL"]).optional(),
   typeOs: z.enum(["D1", "D2", "D3", "D4"]).optional(),
   miseEnChargePrevue: z.enum(["IMMEDIATE", "PRECOCE", "DIFFEREE"]).optional(),
-  isqPose: z.number().min(0).max(100).optional(),
+  isqVestibulaire: z.number().min(0).max(100).optional(),
+  isqMesial: z.number().min(0).max(100).optional(),
+  isqDistal: z.number().min(0).max(100).optional(),
+  isqDate: z.string().optional(),
+  isqAtPose: z.boolean().default(true),
   greffeOsseuse: z.boolean().default(false),
   typeGreffe: z.string().optional(),
   greffeQuantite: z.string().optional(),
@@ -65,7 +69,7 @@ const protheseSchema = z.object({
   catalogProtheseId: z.string().min(1, "Sélectionnez une prothèse du catalogue"),
   siteFdi: z.string().min(1, "Le site FDI est requis"),
   mobilite: z.enum(["AMOVIBLE", "FIXE"]).optional(),
-  typePilier: z.enum(["MULTI_UNIT", "DROIT", "ANGULE"]).optional(),
+  typePilier: z.enum(["MULTI_UNIT", "DROIT", "ANGULE", "VISSE", "SCELLE"]).optional(),
 });
 
 const formSchema = z.object({
@@ -159,7 +163,11 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
         positionImplant: undefined,
         typeOs: undefined,
         miseEnChargePrevue: undefined,
-        isqPose: undefined,
+        isqVestibulaire: undefined,
+        isqMesial: undefined,
+        isqDistal: undefined,
+        isqDate: "",
+        isqAtPose: true,
         greffeOsseuse: false,
         typeGreffe: "",
         greffeQuantite: "",
@@ -205,6 +213,15 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
         const catalogImplant = catalogImplants.find(
           (c) => c.id === implant.catalogImplantId
         );
+        const v = implant.isqVestibulaire;
+        const m = implant.isqMesial;
+        const d = implant.isqDistal;
+        const values = [v, m, d].filter((x): x is number => x !== undefined && x !== null);
+        const isqPose = values.length > 0
+          ? (v !== undefined && m !== undefined && d !== undefined
+              ? Math.round(((v * 2) + m + d) / 4)
+              : Math.round(values.reduce((a, b) => a + b, 0) / values.length))
+          : undefined;
         return {
           ...implant,
           implantId: implant.catalogImplantId,
@@ -213,6 +230,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
           diametre: catalogImplant?.diametre || 0,
           longueur: catalogImplant?.longueur || 0,
           lot: catalogImplant?.lot || null,
+          isqPose,
         };
       }),
       protheses: data.protheses.map((prothese) => ({
@@ -232,7 +250,11 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
       positionImplant: undefined,
       typeOs: undefined,
       miseEnChargePrevue: undefined,
-      isqPose: undefined,
+      isqVestibulaire: undefined,
+      isqMesial: undefined,
+      isqDistal: undefined,
+      isqDate: "",
+      isqAtPose: true,
       greffeOsseuse: false,
       typeGreffe: "",
       greffeQuantite: "",
@@ -317,7 +339,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                           <SelectItem value="GREFFE_OSSEUSE" className="text-[12px]">Greffe osseuse</SelectItem>
                           <SelectItem value="SINUS_LIFT" className="text-[12px]">Sinus lift</SelectItem>
                           <SelectItem value="EXTRACTION_IMPLANT_IMMEDIATE" className="text-[12px]">Extraction + Implant immédiat</SelectItem>
-                          <SelectItem value="REPRISE_IMPLANT" className="text-[12px]">Reprise d'implant</SelectItem>
+                          <SelectItem value="REPRISE_IMPLANT" className="text-[12px]">Implantoplastie</SelectItem>
                           <SelectItem value="CHIRURGIE_GUIDEE" className="text-[12px]">Chirurgie guidée</SelectItem>
                           <SelectItem value="POSE_PROTHESE" className="text-[12px]">Pose de prothèse</SelectItem>
                         </SelectContent>
@@ -710,53 +732,151 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name={`implants.${index}.miseEnChargePrevue`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Mise en charge prévue</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Sélectionner" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="IMMEDIATE">Immédiate</SelectItem>
-                                <SelectItem value="PRECOCE">Précoce</SelectItem>
-                                <SelectItem value="DIFFEREE">Différée</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`implants.${index}.isqPose`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>ISQ à la pose</FormLabel>
+                    <FormField
+                      control={form.control}
+                      name={`implants.${index}.miseEnChargePrevue`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Mise en charge prévue</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                placeholder="Ex: 72"
-                                {...field}
-                                value={field.value ?? ""}
-                                onChange={(e) =>
-                                  field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
-                                }
-                                data-testid={`input-implant-isq-${index}`}
-                              />
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner" />
+                              </SelectTrigger>
                             </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                            <SelectContent>
+                              <SelectItem value="IMMEDIATE">Immédiate</SelectItem>
+                              <SelectItem value="PRECOCE">Précoce</SelectItem>
+                              <SelectItem value="DIFFEREE">Différée</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="border-t pt-4 mt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium">ISQ</span>
+                        <div className="flex items-center gap-2">
+                          <FormField
+                            control={form.control}
+                            name={`implants.${index}.isqAtPose`}
+                            render={({ field }) => (
+                              <FormItem className="flex items-center gap-2 space-y-0">
+                                <FormControl>
+                                  <input
+                                    type="checkbox"
+                                    checked={field.value}
+                                    onChange={(e) => {
+                                      field.onChange(e.target.checked);
+                                      if (e.target.checked) {
+                                        form.setValue(`implants.${index}.isqDate`, "");
+                                      }
+                                    }}
+                                    className="h-4 w-4 rounded border-border"
+                                    data-testid={`checkbox-isq-at-pose-${index}`}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-[11px] font-normal cursor-pointer">
+                                  À la pose
+                                </FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      {!form.watch(`implants.${index}.isqAtPose`) && (
+                        <div className="mb-3">
+                          <FormField
+                            control={form.control}
+                            name={`implants.${index}.isqDate`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[11px]">Date de mesure ISQ</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} data-testid={`input-isq-date-${index}`} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                      <div className="grid grid-cols-3 gap-3">
+                        <FormField
+                          control={form.control}
+                          name={`implants.${index}.isqVestibulaire`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[11px]">V</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  placeholder="V"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  onChange={(e) =>
+                                    field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
+                                  }
+                                  data-testid={`input-isq-v-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`implants.${index}.isqMesial`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[11px]">M</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  placeholder="M"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  onChange={(e) =>
+                                    field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
+                                  }
+                                  data-testid={`input-isq-m-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`implants.${index}.isqDistal`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[11px]">D</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  placeholder="D"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  onChange={(e) =>
+                                    field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
+                                  }
+                                  data-testid={`input-isq-d-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                     </div>
 
                     {/* Greffe osseuse toggle and fields */}
@@ -994,7 +1114,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
 
                             return (
                               <FormItem className="flex flex-col">
-                                <FormLabel className="text-[11px]">Variante <span className="text-destructive">*</span></FormLabel>
+                                <FormLabel className="text-[11px]">Type de pilier <span className="text-destructive">*</span></FormLabel>
                                 <Popover
                                   open={openProtheseDimensionPopoverIndex === index}
                                   onOpenChange={(open) => setOpenProtheseDimensionPopoverIndex(open ? index : null)}
@@ -1118,17 +1238,16 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                           name={`protheses.${index}.typePilier`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-[11px]">Type de pilier</FormLabel>
+                              <FormLabel className="text-[11px]">Type de connexion</FormLabel>
                               <Select onValueChange={field.onChange} value={field.value || ""}>
                                 <FormControl>
-                                  <SelectTrigger data-testid={`select-prothese-pilier-${index}`}>
+                                  <SelectTrigger data-testid={`select-prothese-connexion-${index}`}>
                                     <SelectValue placeholder="Sélectionner..." />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="MULTI_UNIT">Multi-unit</SelectItem>
-                                  <SelectItem value="DROIT">Droit</SelectItem>
-                                  <SelectItem value="ANGULE">Angulé</SelectItem>
+                                  <SelectItem value="VISSE">Vissé</SelectItem>
+                                  <SelectItem value="SCELLE">Scellé</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />

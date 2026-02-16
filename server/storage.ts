@@ -168,7 +168,7 @@ export interface IStorage {
       implantId: string;  // ID of existing catalog prothese
       siteFdi: string;    // Site FDI for the prothese
       mobilite?: "AMOVIBLE" | "FIXE";
-      typePilier?: "MULTI_UNIT" | "DROIT" | "ANGULE";
+      typePilier?: "MULTI_UNIT" | "DROIT" | "ANGULE" | "VISSE" | "SCELLE";
     }>
   ): Promise<{ operation: Operation; surgeryImplants: SurgeryImplant[] }>;
 
@@ -1231,7 +1231,7 @@ export class DatabaseStorage implements IStorage {
       implantId: string;  // ID of existing catalog prothese
       siteFdi: string;    // Site FDI for the prothese
       mobilite?: "AMOVIBLE" | "FIXE";
-      typePilier?: "MULTI_UNIT" | "DROIT" | "ANGULE";
+      typePilier?: "MULTI_UNIT" | "DROIT" | "ANGULE" | "VISSE" | "SCELLE";
     }>
   ): Promise<{ operation: Operation; surgeryImplants: SurgeryImplant[] }> {
     return await db.transaction(async (tx) => {

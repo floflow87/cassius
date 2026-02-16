@@ -1313,7 +1313,7 @@ export async function registerRoutes(
         implantId: z.string(), // ID of existing catalog prothese
         siteFdi: z.string(),   // Site FDI for the prothese
         mobilite: z.enum(["AMOVIBLE", "FIXE"]).optional(),
-        typePilier: z.enum(["MULTI_UNIT", "DROIT", "ANGULE"]).optional(),
+        typePilier: z.enum(["MULTI_UNIT", "DROIT", "ANGULE", "VISSE", "SCELLE"]).optional(),
       })
     ).default([]),
   });
