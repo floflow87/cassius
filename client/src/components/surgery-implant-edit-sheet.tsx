@@ -29,6 +29,23 @@ interface SurgeryImplantEditSheetProps {
   onSuccess?: () => void;
 }
 
+const calculateWeightedISQ = (v: string, m: string, d: string): number | null => {
+  const vest = v ? parseFloat(v) : null;
+  const mes = m ? parseFloat(m) : null;
+  const dis = d ? parseFloat(d) : null;
+  
+  if (vest === null && mes === null && dis === null) return null;
+  
+  let sum = 0;
+  let count = 0;
+  if (vest !== null && !isNaN(vest)) { sum += vest * 2; count += 2; }
+  if (mes !== null && !isNaN(mes)) { sum += mes; count += 1; }
+  if (dis !== null && !isNaN(dis)) { sum += dis; count += 1; }
+  
+  if (count === 0) return null;
+  return Math.round((sum / count) * 10) / 10;
+};
+
 export function SurgeryImplantEditSheet({
   surgeryImplant,
   open,
@@ -45,9 +62,17 @@ export function SurgeryImplantEditSheet({
     greffeOsseuse: false,
     typeGreffe: "",
     greffeQuantite: "",
-    isqPose: "",
+    isqVestibulaire: "",
+    isqMesial: "",
+    isqDistal: "",
     statut: "EN_SUIVI",
   });
+
+  const calculatedISQ = calculateWeightedISQ(
+    formData.isqVestibulaire,
+    formData.isqMesial,
+    formData.isqDistal
+  );
 
   useEffect(() => {
     if (surgeryImplant) {
@@ -59,7 +84,9 @@ export function SurgeryImplantEditSheet({
         greffeOsseuse: surgeryImplant.greffeOsseuse || false,
         typeGreffe: surgeryImplant.typeGreffe || "",
         greffeQuantite: surgeryImplant.greffeQuantite || "",
-        isqPose: surgeryImplant.isqPose?.toString() || "",
+        isqVestibulaire: surgeryImplant.isqVestibulaire?.toString() || "",
+        isqMesial: surgeryImplant.isqMesial?.toString() || "",
+        isqDistal: surgeryImplant.isqDistal?.toString() || "",
         statut: surgeryImplant.statut || "EN_SUIVI",
       });
     }
@@ -67,6 +94,7 @@ export function SurgeryImplantEditSheet({
 
   const mutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      const isqPoseValue = calculateWeightedISQ(data.isqVestibulaire, data.isqMesial, data.isqDistal);
       return apiRequest("PATCH", `/api/surgery-implants/${surgeryImplant?.id}`, {
         siteFdi: data.siteFdi || null,
         positionImplant: data.positionImplant || null,
@@ -75,7 +103,10 @@ export function SurgeryImplantEditSheet({
         greffeOsseuse: data.greffeOsseuse,
         typeGreffe: data.typeGreffe || null,
         greffeQuantite: data.greffeQuantite || null,
-        isqPose: data.isqPose ? parseInt(data.isqPose) : null,
+        isqPose: isqPoseValue !== null ? Math.round(isqPoseValue) : null,
+        isqVestibulaire: data.isqVestibulaire ? parseInt(data.isqVestibulaire) : null,
+        isqMesial: data.isqMesial ? parseInt(data.isqMesial) : null,
+        isqDistal: data.isqDistal ? parseInt(data.isqDistal) : null,
         statut: data.statut,
       });
     },
@@ -203,17 +234,50 @@ export function SurgeryImplantEditSheet({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="isqPose">ISQ à la pose</Label>
-            <Input
-              id="isqPose"
-              type="number"
-              min="0"
-              max="100"
-              value={formData.isqPose}
-              onChange={(e) => setFormData((prev) => ({ ...prev, isqPose: e.target.value }))}
-              placeholder="0-100"
-              data-testid="input-isq-pose"
-            />
+            <Label className="text-xs font-medium">ISQ à la pose (V / M / D)</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Vestibulaire</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="V"
+                  value={formData.isqVestibulaire}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, isqVestibulaire: e.target.value }))}
+                  data-testid="input-isq-vest"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Mésial</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="M"
+                  value={formData.isqMesial}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, isqMesial: e.target.value }))}
+                  data-testid="input-isq-mesial"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Distal</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="D"
+                  value={formData.isqDistal}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, isqDistal: e.target.value }))}
+                  data-testid="input-isq-distal"
+                />
+              </div>
+            </div>
+            {calculatedISQ !== null && (
+              <p className="text-xs text-muted-foreground">
+                Moyenne pondérée : <span className="font-mono font-medium">{calculatedISQ}</span>
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between rounded-lg border p-3">

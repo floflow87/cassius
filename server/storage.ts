@@ -3551,14 +3551,14 @@ export class DatabaseStorage implements IStorage {
     // Track ISQ history per catalog implant for delta calculation
     const isqHistory = new Map<string, { date: string; value: number }[]>();
 
-    // Add ISQ events from pose (initial measurement)
     for (const { surgeryImplant, implant } of surgeryImplantsData) {
       if (surgeryImplant.isqPose !== null) {
         const stability = this.getIsqStability(surgeryImplant.isqPose);
+        const poseDate = new Date(operation.dateOperation).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
         events.push({
           type: "ISQ",
-          at: surgeryImplant.datePose,
-          title: `Mesure ISQ initiale`,
+          at: operation.dateOperation,
+          title: `ISQ à la pose (${poseDate})`,
           description: `Site ${surgeryImplant.siteFdi} - ${implant.marque}`,
           status: "done",
           surgeryImplantId: surgeryImplant.id,

@@ -43,6 +43,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { RadioUploadForm } from "@/components/radio-upload-form";
 import { RadioCard } from "@/components/radio-card";
 import { OperationEditForm } from "@/components/operation-edit-form";
@@ -96,6 +106,7 @@ export default function ActeDetailsPage() {
   const [editInterventionOpen, setEditInterventionOpen] = useState(false);
   const [addImplantOpen, setAddImplantOpen] = useState(false);
   const [editingImplant, setEditingImplant] = useState<SurgeryImplantWithDetails | null>(null);
+  const [deleteImplantId, setDeleteImplantId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: operation, isLoading, isError, error } = useQuery<OperationDetail>({
@@ -478,9 +489,7 @@ export default function ActeDetailsPage() {
                           size="icon"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm("Supprimer cet implant de l'acte ?")) {
-                              deleteImplantMutation.mutate(si.id);
-                            }
+                            setDeleteImplantId(si.id);
                           }}
                           data-testid={`button-delete-implant-${si.id}`}
                         >
@@ -634,6 +643,32 @@ export default function ActeDetailsPage() {
         onOpenChange={setAddImplantOpen}
         onSuccess={() => setAddImplantOpen(false)}
       />
+
+      <AlertDialog open={!!deleteImplantId} onOpenChange={(open) => !open && setDeleteImplantId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer l'implant</AlertDialogTitle>
+            <AlertDialogDescription>
+              Voulez-vous vraiment supprimer cet implant de l'acte ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-implant">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteImplantId) {
+                  deleteImplantMutation.mutate(deleteImplantId);
+                  setDeleteImplantId(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-delete-implant"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

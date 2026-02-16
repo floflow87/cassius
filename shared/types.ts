@@ -104,6 +104,9 @@ export interface SurgeryImplant {
   greffeQuantite: string | null;
   typeChirurgieTemps: TypeChirurgieTemps | null;
   isqPose: number | null;
+  isqVestibulaire: number | null;
+  isqMesial: number | null;
+  isqDistal: number | null;
   isq2m: number | null;
   isq3m: number | null;
   isq6m: number | null;
@@ -146,6 +149,9 @@ export interface Visite {
   patientId: string;
   date: string;
   isq: number | null;
+  isqVestibulaire: number | null;
+  isqMesial: number | null;
+  isqDistal: number | null;
   notes: string | null;
   radioId: string | null;
 }

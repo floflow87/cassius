@@ -96,6 +96,9 @@ interface ISQPoint {
   visiteId?: string;
   measurementId?: string;
   notes?: string;
+  isqVestibulaire?: number | null;
+  isqMesial?: number | null;
+  isqDistal?: number | null;
 }
 
 interface StatusHistoryEntry {
@@ -191,7 +194,16 @@ export default function ImplantDetailsPage() {
     value: string;
     date: string;
     notes: string;
+    isqVestibulaire: string;
+    isqMesial: string;
+    isqDistal: string;
   } | null>(null);
+
+  const editCalculatedISQ = editingIsqPoint ? calculateWeightedISQ(
+    editingIsqPoint.isqVestibulaire,
+    editingIsqPoint.isqMesial,
+    editingIsqPoint.isqDistal
+  ) : null;
   const [editIsqSheetOpen, setEditIsqSheetOpen] = useState(false);
   const [deleteIsqDialogOpen, setDeleteIsqDialogOpen] = useState(false);
   const [isqPointToDelete, setIsqPointToDelete] = useState<ISQPoint | null>(null);
@@ -344,18 +356,31 @@ export default function ImplantDetailsPage() {
       visiteId?: string;
       value: number;
       notes?: string;
+      isqVestibulaire?: number;
+      isqMesial?: number;
+      isqDistal?: number;
     }) => {
       if (data.source === "visite" && data.visiteId) {
-        return apiRequest("PATCH", `/api/visites/${data.visiteId}`, { isq: data.value, notes: data.notes });
+        return apiRequest("PATCH", `/api/visites/${data.visiteId}`, { 
+          isq: data.value, 
+          notes: data.notes,
+          isqVestibulaire: data.isqVestibulaire ?? null,
+          isqMesial: data.isqMesial ?? null,
+          isqDistal: data.isqDistal ?? null,
+        });
       } else {
-        const fieldMap = {
-          isqPose: "isqPose",
-          isq2m: "isq2m", 
-          isq3m: "isq3m",
-          isq6m: "isq6m",
-        };
-        const field = fieldMap[data.source as keyof typeof fieldMap];
-        return apiRequest("PATCH", `/api/surgery-implants/${implantId}`, { [field]: data.value });
+        const updateData: Record<string, number | null> = {};
+        if (data.source === "isqPose") {
+          updateData.isqPose = data.value;
+          updateData.isqVestibulaire = data.isqVestibulaire ?? null;
+          updateData.isqMesial = data.isqMesial ?? null;
+          updateData.isqDistal = data.isqDistal ?? null;
+        } else {
+          const fieldMap = { isq2m: "isq2m", isq3m: "isq3m", isq6m: "isq6m" };
+          const field = fieldMap[data.source as keyof typeof fieldMap];
+          updateData[field] = data.value;
+        }
+        return apiRequest("PATCH", `/api/surgery-implants/${implantId}`, updateData);
       }
     },
     onSuccess: () => {
@@ -482,7 +507,6 @@ export default function ImplantDetailsPage() {
   };
 
   const handleEditIsq = (point: ISQPoint) => {
-    // Guard: measurement source is read-only
     if (point.source === "measurement") return;
     
     setEditingIsqPoint({
@@ -491,15 +515,28 @@ export default function ImplantDetailsPage() {
       value: point.value.toString(),
       date: point.date,
       notes: point.sublabel !== "Visite de contrôle" ? point.sublabel : "",
+      isqVestibulaire: point.isqVestibulaire?.toString() || "",
+      isqMesial: point.isqMesial?.toString() || "",
+      isqDistal: point.isqDistal?.toString() || "",
     });
     setEditIsqSheetOpen(true);
   };
 
   const handleSaveEditIsq = () => {
-    if (!editingIsqPoint || !editingIsqPoint.value) {
+    if (!editingIsqPoint) return;
+    
+    const calculatedValue = calculateWeightedISQ(
+      editingIsqPoint.isqVestibulaire,
+      editingIsqPoint.isqMesial,
+      editingIsqPoint.isqDistal
+    );
+    
+    const finalValue = calculatedValue !== null ? Math.round(calculatedValue) : (editingIsqPoint.value ? parseInt(editingIsqPoint.value) : null);
+    
+    if (finalValue === null) {
       toast({
         title: "Valeur requise",
-        description: "Veuillez saisir une valeur ISQ",
+        description: "Veuillez saisir au moins une valeur ISQ (V, M ou D)",
         variant: "destructive",
       });
       return;
@@ -507,8 +544,11 @@ export default function ImplantDetailsPage() {
     updateIsqMutation.mutate({
       source: editingIsqPoint.source,
       visiteId: editingIsqPoint.visiteId,
-      value: parseInt(editingIsqPoint.value),
+      value: finalValue,
       notes: editingIsqPoint.notes,
+      isqVestibulaire: editingIsqPoint.isqVestibulaire ? parseInt(editingIsqPoint.isqVestibulaire) : undefined,
+      isqMesial: editingIsqPoint.isqMesial ? parseInt(editingIsqPoint.isqMesial) : undefined,
+      isqDistal: editingIsqPoint.isqDistal ? parseInt(editingIsqPoint.isqDistal) : undefined,
     });
   };
 
@@ -546,14 +586,16 @@ export default function ImplantDetailsPage() {
   const getISQTimeline = (): ISQPoint[] => {
     const points: ISQPoint[] = [];
 
-    // Add ISQ at placement (isqPose)
     if (implantData?.isqPose && implantData?.datePose) {
       points.push({ 
         label: "Pose", 
         sublabel: "ISQ à la pose",
         value: implantData.isqPose, 
         date: implantData.datePose,
-        source: "isqPose"
+        source: "isqPose",
+        isqVestibulaire: implantData.isqVestibulaire,
+        isqMesial: implantData.isqMesial,
+        isqDistal: implantData.isqDistal,
       });
     }
 
@@ -592,7 +634,6 @@ export default function ImplantDetailsPage() {
       });
     }
 
-    // Add visites with ISQ
     implantData?.visites
       ?.filter(v => v.isq)
       .forEach((visite) => {
@@ -604,6 +645,9 @@ export default function ImplantDetailsPage() {
           source: "visite",
           visiteId: visite.id,
           notes: visite.notes || undefined,
+          isqVestibulaire: visite.isqVestibulaire,
+          isqMesial: visite.isqMesial,
+          isqDistal: visite.isqDistal,
         });
       });
 
@@ -1358,7 +1402,6 @@ export default function ImplantDetailsPage() {
         </CardContent>
       </Card>
 
-      {/* Edit ISQ Sheet */}
       <Sheet open={editIsqSheetOpen} onOpenChange={setEditIsqSheetOpen}>
         <SheetContent>
           <SheetHeader>
@@ -1377,16 +1420,50 @@ export default function ImplantDetailsPage() {
               <p className="text-xs text-muted-foreground">La date ne peut pas être modifiée</p>
             </div>
             <div className="space-y-2">
-              <Label>Valeur ISQ</Label>
-              <Input 
-                type="number" 
-                min="0" 
-                max="100" 
-                placeholder="Ex: 75" 
-                value={editingIsqPoint?.value || ""}
-                onChange={(e) => setEditingIsqPoint(prev => prev ? { ...prev, value: e.target.value } : null)}
-                data-testid="input-edit-isq-value" 
-              />
+              <Label className="text-xs font-medium">Mesures ISQ (V / M / D)</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Vestibulaire</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="V"
+                    value={editingIsqPoint?.isqVestibulaire || ""}
+                    onChange={(e) => setEditingIsqPoint(prev => prev ? { ...prev, isqVestibulaire: e.target.value } : null)}
+                    data-testid="input-edit-isq-vest"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Mésial</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="M"
+                    value={editingIsqPoint?.isqMesial || ""}
+                    onChange={(e) => setEditingIsqPoint(prev => prev ? { ...prev, isqMesial: e.target.value } : null)}
+                    data-testid="input-edit-isq-mesial"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Distal</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="D"
+                    value={editingIsqPoint?.isqDistal || ""}
+                    onChange={(e) => setEditingIsqPoint(prev => prev ? { ...prev, isqDistal: e.target.value } : null)}
+                    data-testid="input-edit-isq-distal"
+                  />
+                </div>
+              </div>
+              {editCalculatedISQ !== null && (
+                <p className="text-xs text-muted-foreground">
+                  Moyenne pondérée : <span className="font-mono font-medium">{editCalculatedISQ}</span>
+                </p>
+              )}
             </div>
             {editingIsqPoint?.source === "visite" && (
               <div className="space-y-2">
