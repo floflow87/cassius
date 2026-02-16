@@ -3726,7 +3726,7 @@ export class DatabaseStorage implements IStorage {
     return "high";
   }
 
-  private getInterventionLabel(type: string): string {
+  private getInterventionLabel(type: string | string[]): string {
     const labels: Record<string, string> = {
       POSE_IMPLANT: "Pose d'implant",
       GREFFE_OSSEUSE: "Greffe osseuse",
@@ -3734,7 +3734,11 @@ export class DatabaseStorage implements IStorage {
       EXTRACTION_IMPLANT_IMMEDIATE: "Extraction + Implant immédiat",
       REPRISE_IMPLANT: "Reprise d'implant",
       CHIRURGIE_GUIDEE: "Chirurgie guidée",
+      POSE_PROTHESE: "Pose de prothèse",
     };
+    if (Array.isArray(type)) {
+      return type.map(t => labels[t] || t).join(" + ");
+    }
     return labels[type] || type;
   }
 
