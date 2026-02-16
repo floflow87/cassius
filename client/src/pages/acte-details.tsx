@@ -109,6 +109,7 @@ export default function ActeDetailsPage() {
   const [addProtheseOpen, setAddProtheseOpen] = useState(false);
   const [editingImplant, setEditingImplant] = useState<SurgeryImplantWithDetails | null>(null);
   const [deleteImplantId, setDeleteImplantId] = useState<string | null>(null);
+  const [deleteOperationOpen, setDeleteOperationOpen] = useState(false);
   const [implantTab, setImplantTab] = useState<string>("implants");
   const { toast } = useToast();
 
@@ -133,6 +134,28 @@ export default function ActeDetailsPage() {
       toast({
         title: "Erreur",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteOperationMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/operations/${acteId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+      toast({
+        title: "Acte supprimé",
+        description: "L'acte chirurgical et ses implants associés ont été supprimés.",
+        variant: "success",
+      });
+      setLocation("/actes");
+    },
+    onError: (error) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de supprimer l'acte.",
         variant: "destructive",
       });
     },
@@ -180,25 +203,35 @@ export default function ActeDetailsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setLocation("/actes")}
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-xl font-semibold" data-testid="text-acte-title">
-            {Array.isArray(operation.typeIntervention)
-              ? operation.typeIntervention.map(t => typeInterventionLabels[t] || t).join(" + ")
-              : typeInterventionLabels[operation.typeIntervention] || operation.typeIntervention}
-          </h1>
-          <p className="text-xs text-muted-foreground" data-testid="text-acte-date">
-            {formatDate(operation.dateOperation)}
-          </p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setLocation("/actes")}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold" data-testid="text-acte-title">
+              {Array.isArray(operation.typeIntervention)
+                ? operation.typeIntervention.map(t => typeInterventionLabels[t] || t).join(" + ")
+                : typeInterventionLabels[operation.typeIntervention] || operation.typeIntervention}
+            </h1>
+            <p className="text-xs text-muted-foreground" data-testid="text-acte-date">
+              {formatDate(operation.dateOperation)}
+            </p>
+          </div>
         </div>
+        <Button
+          variant="destructive"
+          size="icon"
+          onClick={() => setDeleteOperationOpen(true)}
+          data-testid="button-delete-operation"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -791,6 +824,30 @@ export default function ActeDetailsPage() {
               }}
               className="bg-destructive text-destructive-foreground"
               data-testid="button-confirm-delete-implant"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteOperationOpen} onOpenChange={setDeleteOperationOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer l'acte chirurgical</AlertDialogTitle>
+            <AlertDialogDescription>
+              Voulez-vous vraiment supprimer cet acte chirurgical ? Tous les implants posés lors de cet acte seront également supprimés. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-operation">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                deleteOperationMutation.mutate();
+                setDeleteOperationOpen(false);
+              }}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-delete-operation"
             >
               Supprimer
             </AlertDialogAction>

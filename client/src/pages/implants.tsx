@@ -75,7 +75,7 @@ const STORAGE_KEY_SORT = "cassius_implants_sort";
 const STORAGE_KEY_PROTHESES_COLUMNS = "cassius_protheses_columns_order";
 const STORAGE_KEY_PROTHESES_SORT = "cassius_protheses_sort";
 
-type ProtheseColumnId = "marque" | "typeProthese" | "nbPoses";
+type ProtheseColumnId = "marque" | "mobilite" | "typeProthese" | "nbPoses";
 
 interface ProtheseColumnConfig {
   id: ProtheseColumnId;
@@ -85,20 +85,27 @@ interface ProtheseColumnConfig {
 }
 
 const protheseColumnWidths: Record<ProtheseColumnId, string> = {
-  marque: "w-[40%]",
-  typeProthese: "w-[35%]",
+  marque: "w-[30%]",
+  mobilite: "w-[20%]",
+  typeProthese: "w-[25%]",
   nbPoses: "w-[25%]",
 };
 
 const defaultProtheseColumns: ProtheseColumnConfig[] = [
   { id: "marque", label: "Marque", sortable: true },
-  { id: "typeProthese", label: "Type de prothèse", sortable: true },
+  { id: "mobilite", label: "Type de prothèse", sortable: true },
+  { id: "typeProthese", label: "Type de connexion", sortable: true },
   { id: "nbPoses", label: "Nombre de poses", sortable: true },
 ];
 
 const typeProtheseLabels: Record<string, string> = {
   VISSEE: "Vissée",
   SCELLEE: "Scellée",
+};
+
+const mobiliteLabels: Record<string, string> = {
+  AMOVIBLE: "Amovible",
+  FIXE: "Fixe",
 };
 
 interface CataloguePageProps {
@@ -361,6 +368,9 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
         case "marque":
           comparison = a.marque.localeCompare(b.marque);
           break;
+        case "mobilite":
+          comparison = (a.mobilite || "").localeCompare(b.mobilite || "");
+          break;
         case "typeProthese":
           comparison = (a.typeProthese || "").localeCompare(b.typeProthese || "");
           break;
@@ -445,6 +455,14 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
               </span>
             </div>
           </div>
+        );
+      case "mobilite":
+        return prothese.mobilite ? (
+          <Badge variant="outline" className="text-xs">
+            {mobiliteLabels[prothese.mobilite] || prothese.mobilite}
+          </Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
         );
       case "typeProthese":
         return prothese.typeProthese ? (

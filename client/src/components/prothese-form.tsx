@@ -26,7 +26,16 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 const protheseFormSchema = z.object({
   marque: z.string().min(1, "Marque requise"),
   referenceFabricant: z.string().optional(),
-  typeProthese: z.enum(["VISSEE", "SCELLEE"]),
+  mobilite: z.enum(["AMOVIBLE", "FIXE"]),
+  typeProthese: z.enum(["VISSEE", "SCELLEE"]).optional(),
+}).refine((data) => {
+  if (data.mobilite === "FIXE" && !data.typeProthese) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Le type de connexion est requis pour une prothèse fixe",
+  path: ["typeProthese"],
 });
 
 type ProtheseFormData = z.infer<typeof protheseFormSchema>;
@@ -53,7 +62,6 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
   const { toast } = useToast();
   const [customBrand, setCustomBrand] = useState(false);
 
-  // Load custom brands from API
   const { data: customBrandsData = [] } = useQuery<string[]>({
     queryKey: ["/api/custom-brands", { type: "PROTHESE" }],
     queryFn: async () => {
@@ -63,7 +71,6 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
     },
   });
 
-  // Combine common brands with custom brands, sorted alphabetically
   const allBrands = useMemo(() => {
     const combined = [...commonBrands, ...customBrandsData];
     return [...new Set(combined)].sort((a, b) => a.localeCompare(b, 'fr'));
@@ -74,18 +81,19 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
     defaultValues: {
       marque: "",
       referenceFabricant: "",
+      mobilite: "FIXE",
       typeProthese: "VISSEE",
     },
   });
 
+  const mobiliteValue = form.watch("mobilite");
+
   const createMutation = useMutation({
     mutationFn: async (data: ProtheseFormData) => {
-      // If it's a custom brand (not in commonBrands), try to save it (ignore errors)
       if (!commonBrands.includes(data.marque)) {
         try {
           await apiRequest("POST", "/api/custom-brands", { name: data.marque, type: "PROTHESE" });
         } catch (e) {
-          // Ignore custom brand save errors - table might not exist yet
           console.warn("Could not save custom brand:", e);
         }
       }
@@ -96,7 +104,8 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
         referenceFabricant: data.referenceFabricant || null,
         diametre: 0,
         longueur: 0,
-        typeProthese: data.typeProthese,
+        mobilite: data.mobilite,
+        typeProthese: data.mobilite === "FIXE" ? data.typeProthese : null,
       };
 
       const res = await apiRequest("POST", "/api/implants", protheseData);
@@ -191,25 +200,56 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
 
         <FormField
           control={form.control}
-          name="typeProthese"
+          name="mobilite"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Type de prothèse</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <Select onValueChange={(v) => {
+                field.onChange(v);
+                if (v === "AMOVIBLE") {
+                  form.setValue("typeProthese", undefined);
+                } else {
+                  form.setValue("typeProthese", "VISSEE");
+                }
+              }} value={field.value}>
                 <FormControl>
-                  <SelectTrigger data-testid="select-type-prothese">
+                  <SelectTrigger data-testid="select-mobilite-prothese">
                     <SelectValue placeholder="Sélectionnez le type" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="VISSEE">Vissée</SelectItem>
-                  <SelectItem value="SCELLEE">Scellée</SelectItem>
+                  <SelectItem value="AMOVIBLE">Amovible</SelectItem>
+                  <SelectItem value="FIXE">Fixe</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
             </FormItem>
           )}
         />
+
+        {mobiliteValue === "FIXE" && (
+          <FormField
+            control={form.control}
+            name="typeProthese"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Type de connexion</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-type-connexion">
+                      <SelectValue placeholder="Sélectionnez le type de connexion" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="VISSEE">Vissée</SelectItem>
+                    <SelectItem value="SCELLEE">Scellée</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <Button 
           type="submit" 

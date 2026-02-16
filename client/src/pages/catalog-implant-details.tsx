@@ -70,6 +70,7 @@ export default function CatalogImplantDetailsPage() {
   const [editTypeImplant, setEditTypeImplant] = useState<"IMPLANT" | "MINI_IMPLANT" | "PROTHESE">("IMPLANT");
   const [editReferenceFabricant, setEditReferenceFabricant] = useState("");
   const [editTypeProthese, setEditTypeProthese] = useState<"VISSEE" | "SCELLEE" | "">("");
+  const [editMobilite, setEditMobilite] = useState<"AMOVIBLE" | "FIXE" | "">("");
   const [editDiametre, setEditDiametre] = useState<number>(0);
   const [editLongueur, setEditLongueur] = useState<number>(0);
 
@@ -153,6 +154,7 @@ export default function CatalogImplantDetailsPage() {
       setEditTypeImplant(implant.typeImplant || "IMPLANT");
       setEditReferenceFabricant(implant.referenceFabricant || "");
       setEditTypeProthese(implant.typeProthese || "");
+      setEditMobilite(implant.mobilite || "");
       setEditDiametre(implant.diametre);
       setEditLongueur(implant.longueur);
     }
@@ -175,7 +177,8 @@ export default function CatalogImplantDetailsPage() {
       marque: editMarque,
       typeImplant: editTypeImplant,
       referenceFabricant: editReferenceFabricant || null,
-      typeProthese: editTypeImplant === "PROTHESE" ? (editTypeProthese || null) : null,
+      mobilite: editTypeImplant === "PROTHESE" ? (editMobilite || null) : null,
+      typeProthese: editTypeImplant === "PROTHESE" && editMobilite === "FIXE" ? (editTypeProthese || null) : null,
       diametre: editDiametre,
       longueur: editLongueur,
     } as any);
@@ -315,6 +318,25 @@ export default function CatalogImplantDetailsPage() {
                   {editTypeImplant === "PROTHESE" && (
                     <div className="space-y-2">
                       <Label>Type de prothèse</Label>
+                      <Select value={editMobilite} onValueChange={(v) => {
+                        setEditMobilite(v as "AMOVIBLE" | "FIXE" | "");
+                        if (v === "AMOVIBLE") {
+                          setEditTypeProthese("");
+                        }
+                      }}>
+                        <SelectTrigger data-testid="select-edit-mobilite">
+                          <SelectValue placeholder="Sélectionner..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AMOVIBLE">Amovible</SelectItem>
+                          <SelectItem value="FIXE">Fixe</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {editTypeImplant === "PROTHESE" && editMobilite === "FIXE" && (
+                    <div className="space-y-2">
+                      <Label>Type de connexion</Label>
                       <Select value={editTypeProthese} onValueChange={(v) => setEditTypeProthese(v as "VISSEE" | "SCELLEE" | "")}>
                         <SelectTrigger data-testid="select-edit-type-prothese">
                           <SelectValue placeholder="Sélectionner..." />
@@ -380,9 +402,17 @@ export default function CatalogImplantDetailsPage() {
                   {implant.referenceFabricant || "—"}
                 </p>
               </div>
-              {isProthese && implant.typeProthese && (
+              {isProthese && (
                 <div>
                   <span className="text-xs text-muted-foreground">Type de prothèse</span>
+                  <p className="text-[13px] font-medium" data-testid="text-prothese-mobilite">
+                    {implant.mobilite === "AMOVIBLE" ? "Amovible" : implant.mobilite === "FIXE" ? "Fixe" : "—"}
+                  </p>
+                </div>
+              )}
+              {isProthese && implant.mobilite === "FIXE" && implant.typeProthese && (
+                <div>
+                  <span className="text-xs text-muted-foreground">Type de connexion</span>
                   <p className="text-[13px] font-medium" data-testid="text-prothese-type">
                     {implant.typeProthese === "VISSEE" ? "Vissée" : implant.typeProthese === "SCELLEE" ? "Scellée" : implant.typeProthese}
                   </p>
