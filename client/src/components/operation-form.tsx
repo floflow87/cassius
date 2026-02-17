@@ -84,6 +84,8 @@ const formSchema = z.object({
     "REPRISE_IMPLANT",
     "CHIRURGIE_GUIDEE",
     "POSE_PROTHESE",
+    "DEPOSE_IMPLANT",
+    "DEPOSE_PROTHESE",
   ])).min(1, "Sélectionnez au moins un type d'intervention"),
   typeChirurgieTemps: z.enum(["UN_TEMPS", "DEUX_TEMPS"]).optional(),
   typeChirurgieApproche: z.enum(["LAMBEAU", "FLAPLESS"]).optional(),
@@ -109,6 +111,8 @@ const interventionTypeLabels: Record<string, string> = {
   REPRISE_IMPLANT: "Implantoplastie",
   CHIRURGIE_GUIDEE: "Chirurgie guidée",
   POSE_PROTHESE: "Pose de prothèse",
+  DEPOSE_IMPLANT: "Dépose d'implant",
+  DEPOSE_PROTHESE: "Dépose de prothèse",
 };
 
 const interventionTypeOptions = Object.entries(interventionTypeLabels).map(([value, label]) => ({ value, label }));

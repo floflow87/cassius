@@ -69,7 +69,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn, getSiteBadgeColor } from "@/lib/utils";
+import { cn, getSiteBadgeColor, isDeposeIntervention } from "@/lib/utils";
 import { OperationForm } from "@/components/operation-form";
 import { queryClient } from "@/lib/queryClient";
 import { ActesAdvancedFilterDrawer, ActeFilterChips, type ActeFilterGroup } from "@/components/actes-advanced-filter-drawer";
@@ -89,6 +89,7 @@ type SurgeryImplantWithDetails = SurgeryImplant & {
   implant?: Implant | null;
   patient?: { id: string; nom: string; prenom: string } | null;
   datePose?: string | null;
+  operationTypeIntervention?: string | string[] | null;
   latestIsq?: { value: number; label: string } | null;
   topFlag?: { type: string; severity: string } | null;
   activeFlagCount?: number;
@@ -223,6 +224,8 @@ const TYPE_INTERVENTION_LABELS: Record<string, string> = {
   REPRISE_IMPLANT: "Implantoplastie",
   CHIRURGIE_GUIDEE: "Chirurgie guidée",
   POSE_PROTHESE: "Pose de prothèse",
+  DEPOSE_IMPLANT: "Dépose d'implant",
+  DEPOSE_PROTHESE: "Dépose de prothèse",
 };
 
 const CHIRURGIE_TEMPS_LABELS: Record<string, string> = {
@@ -1053,7 +1056,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         return si.siteFdi ? (
           <Badge 
             variant="outline" 
-            className={`text-[10px] border-0 ${getSiteBadgeColor(si.siteFdi)}`}
+            className={`text-[10px] border-0 ${getSiteBadgeColor(si.siteFdi, isDeposeIntervention(si.operationTypeIntervention ?? undefined))}`}
           >
             {si.siteFdi}
           </Badge>
@@ -1101,7 +1104,7 @@ export default function ActesPage({ searchQuery: externalSearchQuery, setSearchQ
         return si.siteFdi ? (
           <Badge 
             variant="outline" 
-            className={`text-[10px] border-0 ${getSiteBadgeColor(si.siteFdi)}`}
+            className={`text-[10px] border-0 ${getSiteBadgeColor(si.siteFdi, isDeposeIntervention(si.operationTypeIntervention ?? undefined))}`}
           >
             {si.siteFdi}
           </Badge>

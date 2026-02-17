@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getSiteBadgeColor } from "@/lib/utils";
+import { getSiteBadgeColor, isDeposeIntervention } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute, useLocation } from "wouter";
 import { format } from "date-fns";
@@ -1176,6 +1176,8 @@ export default function PatientDetailsPage() {
       REPRISE_IMPLANT: "Implantoplastie",
       CHIRURGIE_GUIDEE: "Chirurgie guidée",
       POSE_PROTHESE: "Pose de prothèse",
+      DEPOSE_IMPLANT: "Dépose d'implant",
+      DEPOSE_PROTHESE: "Dépose de prothèse",
     };
     if (Array.isArray(type)) {
       return type.map(t => labels[t] || t).join(" + ");
@@ -1431,6 +1433,7 @@ export default function PatientDetailsPage() {
     description?: string;
     badges?: string[];
     siteBadges?: string[];
+    isDepose?: boolean;
     badgeClassName?: string;
     radioId?: string;
     documentId?: string;
@@ -1458,6 +1461,7 @@ export default function PatientDetailsPage() {
       title: getInterventionLabel(op.typeIntervention),
       description: op.notesPerop || defaultDescription,
       siteBadges: op.surgeryImplants?.map(imp => imp.siteFdi),
+      isDepose: isDeposeIntervention(op.typeIntervention),
     });
   });
 
@@ -2276,7 +2280,7 @@ export default function PatientDetailsPage() {
                                         <Badge 
                                           key={i} 
                                           variant="outline" 
-                                          className={`text-[10px] border-0 ${getSiteBadgeColor(site)}`}
+                                          className={`text-[10px] border-0 ${getSiteBadgeColor(site, event.isDepose)}`}
                                         >
                                           {site}
                                         </Badge>
@@ -2594,7 +2598,9 @@ export default function PatientDetailsPage() {
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {patient.surgeryImplants?.slice(0, showAllImplants ? undefined : 4).map((surgeryImplant) => {
-                          const siteColor = getSiteBadgeColor(surgeryImplant.siteFdi);
+                          const op = patient.operations?.find(o => o.id === surgeryImplant.surgeryId);
+                          const depose = isDeposeIntervention(op?.typeIntervention);
+                          const siteColor = getSiteBadgeColor(surgeryImplant.siteFdi, depose);
                           return (
                             <div key={surgeryImplant.id} className="border rounded-md p-4">
                               <div className="flex items-center justify-between mb-3">

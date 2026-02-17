@@ -48,6 +48,9 @@ export const TYPES_INTERVENTION = {
   EXTRACTION_IMPLANT_IMMEDIATE: { value: "EXTRACTION_IMPLANT_IMMEDIATE", label: "Extraction + implant immédiat", description: "Extraction dentaire suivie d'une pose immédiate" },
   REPRISE_IMPLANT: { value: "REPRISE_IMPLANT", label: "Reprise d'implant", description: "Révision ou remplacement d'un implant existant" },
   CHIRURGIE_GUIDEE: { value: "CHIRURGIE_GUIDEE", label: "Chirurgie guidée", description: "Chirurgie assistée par guide numérique" },
+  POSE_PROTHESE: { value: "POSE_PROTHESE", label: "Pose de prothèse", description: "Pose d'une prothèse sur implant" },
+  DEPOSE_IMPLANT: { value: "DEPOSE_IMPLANT", label: "Dépose d'implant", description: "Retrait chirurgical d'un implant" },
+  DEPOSE_PROTHESE: { value: "DEPOSE_PROTHESE", label: "Dépose de prothèse", description: "Retrait d'une prothèse sur implant" },
 } as const;
 
 export type TypeInterventionKey = keyof typeof TYPES_INTERVENTION;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { getSiteBadgeColor } from "@/lib/utils";
+import { getSiteBadgeColor, isDeposeIntervention } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -1137,7 +1137,7 @@ export default function DashboardPage() {
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <Badge 
-                            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xs font-medium border-0 ${getSiteBadgeColor(si.siteFdi)}`}
+                            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xs font-medium border-0 ${getSiteBadgeColor(si.siteFdi, isDeposeIntervention((si as any).operationTypeIntervention))}`}
                           >
                             {si.siteFdi}
                           </Badge>

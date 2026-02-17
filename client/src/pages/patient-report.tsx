@@ -52,6 +52,8 @@ export default function PatientReportPage() {
       REPRISE_IMPLANT: "Implantoplastie",
       CHIRURGIE_GUIDEE: "Chirurgie guidée",
       POSE_PROTHESE: "Pose de prothèse",
+      DEPOSE_IMPLANT: "Dépose d'implant",
+      DEPOSE_PROTHESE: "Dépose de prothèse",
     };
     if (Array.isArray(type)) {
       return type.map(t => labels[t] || t).join(" + ");
