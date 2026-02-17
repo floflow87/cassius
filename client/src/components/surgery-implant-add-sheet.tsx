@@ -283,9 +283,6 @@ export function SurgeryImplantAddSheet({
                   <SelectContent>
                     <SelectItem value="VISSE">Vissé</SelectItem>
                     <SelectItem value="SCELLE">Scellé</SelectItem>
-                    <SelectItem value="MULTI_UNIT">Multi-unit</SelectItem>
-                    <SelectItem value="DROIT">Droit</SelectItem>
-                    <SelectItem value="ANGULE">Angulé</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

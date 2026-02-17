@@ -71,7 +71,7 @@ const protheseSchema = z.object({
   catalogProtheseId: z.string().min(1, "Sélectionnez une prothèse du catalogue"),
   siteFdi: z.string().min(1, "Le site FDI est requis"),
   mobilite: z.enum(["AMOVIBLE", "FIXE"]).optional(),
-  typePilier: z.enum(["MULTI_UNIT", "DROIT", "ANGULE", "VISSE", "SCELLE"]).optional(),
+  typePilier: z.enum(["VISSE", "SCELLE"]).optional(),
 });
 
 const formSchema = z.object({
@@ -203,6 +203,9 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients", patientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/search"] });
       toast({
         title: "Opération créée",
         description: "L'opération a été enregistrée avec succès.",

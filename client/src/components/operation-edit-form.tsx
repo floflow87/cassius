@@ -86,7 +86,10 @@ export function OperationEditForm({ operation, onSuccess }: OperationEditFormPro
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations", operation.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients", operation.patientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/search"] });
       toast({
         title: "Modifications enregistrées",
         description: "L'intervention a été mise à jour.",

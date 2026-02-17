@@ -145,6 +145,12 @@ export default function ActeDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/search"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/implant-counts"] });
+      if (operation?.patientId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/patients", operation.patientId] });
+      }
       toast({
         title: "Acte supprimé",
         description: "L'acte chirurgical et ses implants associés ont été supprimés.",
