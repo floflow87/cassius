@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { VisiteForm } from "@/components/visite-form";
+import { getSiteBadgeColor } from "@/lib/utils";
 import type { Implant, Visite, SurgeryImplantWithDetails } from "@shared/schema";
 
 interface SurgeryImplantWithVisites extends SurgeryImplantWithDetails {
@@ -20,6 +21,7 @@ interface SurgeryImplantWithVisites extends SurgeryImplantWithDetails {
 interface ImplantCardProps {
   surgeryImplant: SurgeryImplantWithVisites;
   patientId: string;
+  isDepose?: boolean;
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "echec" | "complication" | "ensuivi" | "success" }> = {
@@ -29,7 +31,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   ECHEC: { label: "Échec", variant: "echec" },
 };
 
-export function ImplantCard({ surgeryImplant, patientId }: ImplantCardProps) {
+export function ImplantCard({ surgeryImplant, patientId, isDepose = false }: ImplantCardProps) {
   const [visiteDialogOpen, setVisiteDialogOpen] = useState(false);
 
   const formatDate = (dateString: string) => {
@@ -57,7 +59,7 @@ export function ImplantCard({ surgeryImplant, patientId }: ImplantCardProps) {
         <CardHeader className="pb-1.5 pt-3 px-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted font-mono text-sm font-medium">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-md font-mono text-sm font-medium ${isDepose ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white" : "bg-muted"}`}>
                 {surgeryImplant.siteFdi}
               </div>
               <div>

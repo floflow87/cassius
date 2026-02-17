@@ -1300,8 +1300,11 @@ export default function PatientDetailsPage() {
     switch (columnId) {
       case "site":
         if (!surgeryImplant.siteFdi) return <span className="text-muted-foreground text-xs">-</span>;
+        const siteOp = patient?.operations?.find(o => o.id === surgeryImplant.surgeryId);
+        const siteDepose = isDeposeIntervention(siteOp?.typeIntervention);
+        const siteBadgeColor = getSiteBadgeColor(surgeryImplant.siteFdi, siteDepose);
         return (
-          <Badge className="bg-gradient-to-r from-teal-500 to-emerald-500 text-white border-0 font-mono text-[10px] font-medium">
+          <Badge className={`${siteBadgeColor} text-white border-0 font-mono text-[10px] font-medium`}>
             {surgeryImplant.siteFdi}
           </Badge>
         );
@@ -1387,7 +1390,7 @@ export default function PatientDetailsPage() {
       default:
         return null;
     }
-  }, [implantFlagsById]);
+  }, [implantFlagsById, patient]);
 
   if (isLoading) {
     return <PatientDetailsSkeleton />;
@@ -2800,9 +2803,13 @@ export default function PatientDetailsPage() {
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredSurgeryImplants.map((surgeryImplant) => (
-                    <ImplantCard key={surgeryImplant.id} surgeryImplant={surgeryImplant} patientId={patient.id} />
-                  ))}
+                  {filteredSurgeryImplants.map((surgeryImplant) => {
+                    const cardOp = patient?.operations?.find(o => o.id === surgeryImplant.surgeryId);
+                    const cardDepose = isDeposeIntervention(cardOp?.typeIntervention);
+                    return (
+                      <ImplantCard key={surgeryImplant.id} surgeryImplant={surgeryImplant} patientId={patient.id} isDepose={cardDepose} />
+                    );
+                  })}
                 </div>
               )}
             </>
