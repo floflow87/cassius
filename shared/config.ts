@@ -51,6 +51,7 @@ export const TYPES_INTERVENTION = {
   POSE_PROTHESE: { value: "POSE_PROTHESE", label: "Pose de prothèse", description: "Pose d'une prothèse sur implant" },
   DEPOSE_IMPLANT: { value: "DEPOSE_IMPLANT", label: "Dépose d'implant", description: "Retrait chirurgical d'un implant" },
   DEPOSE_PROTHESE: { value: "DEPOSE_PROTHESE", label: "Dépose de prothèse", description: "Retrait d'une prothèse sur implant" },
+  DECOUVERTE_IMPLANT: { value: "DECOUVERTE_IMPLANT", label: "Découverte implant", description: "Procédure de découverte d'un implant enfoui" },
 } as const;
 
 export type TypeInterventionKey = keyof typeof TYPES_INTERVENTION;

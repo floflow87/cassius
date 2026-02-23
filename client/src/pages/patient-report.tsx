@@ -54,6 +54,7 @@ export default function PatientReportPage() {
       POSE_PROTHESE: "Pose de prothèse",
       DEPOSE_IMPLANT: "Dépose d'implant",
       DEPOSE_PROTHESE: "Dépose de prothèse",
+      DECOUVERTE_IMPLANT: "Découverte implant",
     };
     if (Array.isArray(type)) {
       return type.map(t => labels[t] || t).join(" + ");

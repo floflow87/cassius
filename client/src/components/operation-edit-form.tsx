@@ -41,6 +41,7 @@ const formSchema = z.object({
     "POSE_PROTHESE",
     "DEPOSE_IMPLANT",
     "DEPOSE_PROTHESE",
+    "DECOUVERTE_IMPLANT",
   ])).min(1, "Sélectionnez au moins un type d'intervention"),
   typeChirurgieTemps: z.enum(["UN_TEMPS", "DEUX_TEMPS"]).optional().nullable(),
   typeChirurgieApproche: z.enum(["LAMBEAU", "FLAPLESS"]).optional().nullable(),
@@ -145,6 +146,7 @@ export function OperationEditForm({ operation, onSuccess }: OperationEditFormPro
               POSE_PROTHESE: "Pose de prothèse",
               DEPOSE_IMPLANT: "Dépose d'implant",
               DEPOSE_PROTHESE: "Dépose de prothèse",
+              DECOUVERTE_IMPLANT: "Découverte implant",
             };
             const options = Object.entries(interventionLabels).map(([value, label]) => ({ value, label }));
             return (

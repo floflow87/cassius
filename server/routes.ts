@@ -1444,6 +1444,7 @@ export async function registerRoutes(
           "POSE_PROTHESE",
           "DEPOSE_IMPLANT",
           "DEPOSE_PROTHESE",
+          "DECOUVERTE_IMPLANT",
         ])).optional(),
         typeChirurgieTemps: z.enum(["UN_TEMPS", "DEUX_TEMPS"]).nullable().optional(),
         typeChirurgieApproche: z.enum(["LAMBEAU", "FLAPLESS"]).nullable().optional(),

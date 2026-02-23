@@ -67,6 +67,7 @@ const TYPE_INTERVENTION_OPTIONS = [
   { value: "POSE_PROTHESE", label: "Pose de prothèse" },
   { value: "DEPOSE_IMPLANT", label: "Dépose d'implant" },
   { value: "DEPOSE_PROTHESE", label: "Dépose de prothèse" },
+  { value: "DECOUVERTE_IMPLANT", label: "Découverte implant" },
 ];
 
 const TYPE_CHIRURGIE_TEMPS_OPTIONS = [

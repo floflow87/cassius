@@ -9,7 +9,8 @@ export type TypeIntervention =
   | "CHIRURGIE_GUIDEE"
   | "POSE_PROTHESE"
   | "DEPOSE_IMPLANT"
-  | "DEPOSE_PROTHESE";
+  | "DEPOSE_PROTHESE"
+  | "DECOUVERTE_IMPLANT";
 
 export type TypeChirurgieTemps = "UN_TEMPS" | "DEUX_TEMPS";
 

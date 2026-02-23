@@ -38,7 +38,8 @@ export const typeInterventionEnum = pgEnum("type_intervention", [
   "CHIRURGIE_GUIDEE",
   "POSE_PROTHESE",
   "DEPOSE_IMPLANT",
-  "DEPOSE_PROTHESE"
+  "DEPOSE_PROTHESE",
+  "DECOUVERTE_IMPLANT"
 ]);
 
 export const typeChirurgieTempsEnum = pgEnum("type_chirurgie_temps", ["UN_TEMPS", "DEUX_TEMPS"]);
