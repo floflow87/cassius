@@ -268,9 +268,9 @@ export default function CatalogImplantDetailsPage() {
                 Mini
               </Badge>
             )}
-            {isProthese && implant.mobilite && (
+            {isProthese && (
               <Badge variant="outline" className="text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800" data-testid="badge-prothese-type">
-                {implant.mobilite === "AMOVIBLE" ? "Amovible" : implant.typeProthese === "VISSEE" ? "Vissée" : implant.typeProthese === "SCELLEE" ? "Scellée" : "Fixe"}
+                Prothèse
               </Badge>
             )}
           </div>
@@ -439,6 +439,22 @@ export default function CatalogImplantDetailsPage() {
                   {implant.referenceFabricant || "—"}
                 </p>
               </div>
+              {isProthese && (
+                <div>
+                  <span className="text-xs text-muted-foreground">Type de prothèse</span>
+                  <p className="text-[13px] font-medium" data-testid="text-prothese-mobilite">
+                    {implant.mobilite === "AMOVIBLE" ? "Amovible" : implant.mobilite === "FIXE" ? "Fixe" : "—"}
+                  </p>
+                </div>
+              )}
+              {isProthese && implant.mobilite === "FIXE" && implant.typeProthese && (
+                <div>
+                  <span className="text-xs text-muted-foreground">Type de connexion</span>
+                  <p className="text-[13px] font-medium" data-testid="text-prothese-type">
+                    {implant.typeProthese === "VISSEE" ? "Vissée" : implant.typeProthese === "SCELLEE" ? "Scellée" : implant.typeProthese}
+                  </p>
+                </div>
+              )}
               {isProthese && implant.nomPilier && (
                 <div>
                   <span className="text-xs text-muted-foreground">Nom du pilier</span>

@@ -71,7 +71,8 @@ const protheseSchema = z.object({
   catalogProtheseId: z.string().min(1, "Sélectionnez une prothèse du catalogue"),
   siteFdi: z.string().min(1, "Le site FDI est requis"),
   mobilite: z.enum(["AMOVIBLE", "FIXE"]).optional(),
-  typePilier: z.enum(["VISSE", "SCELLE"]).optional(),
+  typeProthese: z.enum(["VISSEE", "SCELLEE"]).optional(),
+  typePilier: z.enum(["DROIT", "ANGULE", "MULTI_UNIT"]).optional(),
 });
 
 const formSchema = z.object({
@@ -262,6 +263,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
         implantId: prothese.catalogProtheseId,
         siteFdi: prothese.siteFdi,
         mobilite: prothese.mobilite,
+        typeProthese: prothese.typeProthese,
         typePilier: prothese.typePilier,
       })),
     };
@@ -292,6 +294,7 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
       catalogProtheseId: "",
       siteFdi: "",
       mobilite: undefined,
+      typeProthese: undefined,
       typePilier: undefined,
     });
     setAccordionValue([...accordionValue, "protheses"]);
@@ -1110,6 +1113,10 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                                             value={`${prothese.marque} ${prothese.nomPilier || ""} ${prothese.referenceFabricant || ""}`}
                                             onSelect={() => {
                                               field.onChange(prothese.id);
+                                              // Auto-remplir depuis le catalogue (modifiable)
+                                              if (prothese.mobilite) form.setValue(`protheses.${index}.mobilite`, prothese.mobilite);
+                                              if (prothese.typeProthese) form.setValue(`protheses.${index}.typeProthese`, prothese.typeProthese);
+                                              if (prothese.typePilier) form.setValue(`protheses.${index}.typePilier`, prothese.typePilier as "DROIT" | "ANGULE" | "MULTI_UNIT");
                                               setOpenProthesePopoverIndex(null);
                                             }}
                                             className="text-[11px]"
@@ -1133,19 +1140,29 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                           )}
                         />
 
-                        {/* Type de pilier (lecture seule depuis le catalogue) */}
-                        <div className="flex flex-col gap-2">
-                          <span className="text-[11px] font-medium leading-none">Type de pilier</span>
-                          <div className="h-9 flex items-center">
-                            {selectedProthese?.typePilier ? (
-                              <Badge variant="outline" className="text-[11px]">
-                                {selectedProthese.typePilier === "DROIT" ? "Droit" : selectedProthese.typePilier === "ANGULE" ? "Angulé" : "Multi-unit"}
-                              </Badge>
-                            ) : (
-                              <span className="text-[11px] text-muted-foreground">—</span>
-                            )}
-                          </div>
-                        </div>
+                        {/* Type de pilier — éditable, auto-rempli depuis le catalogue */}
+                        <FormField
+                          control={form.control}
+                          name={`protheses.${index}.typePilier`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel className="text-[11px]">Type de pilier</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                                <FormControl>
+                                  <SelectTrigger className="h-9 text-[12px]" data-testid={`select-prothese-type-pilier-${index}`}>
+                                    <SelectValue placeholder="—" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="DROIT">Droit</SelectItem>
+                                  <SelectItem value="ANGULE">Angulé</SelectItem>
+                                  <SelectItem value="MULTI_UNIT">Multi-unit</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
 
                       {/* Ligne 2 : Site FDI */}
@@ -1167,27 +1184,51 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                         )}
                       />
 
-                      {/* Ligne 3 : Type de prothèse + Type de connexion (lecture seule depuis le catalogue) */}
-                      {selectedProthese && (selectedProthese.mobilite || selectedProthese.typeProthese) && (
-                        <div className="grid grid-cols-2 gap-3">
-                          {selectedProthese.mobilite && (
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[11px] font-medium text-muted-foreground">Type de prothèse</span>
-                              <span className="text-[12px] font-medium">
-                                {selectedProthese.mobilite === "AMOVIBLE" ? "Amovible" : "Fixe"}
-                              </span>
-                            </div>
+                      {/* Ligne 3 : Type de prothèse + Type de connexion — éditables, auto-remplis */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={form.control}
+                          name={`protheses.${index}.mobilite`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[11px]">Type de prothèse</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                                <FormControl>
+                                  <SelectTrigger className="text-[12px]" data-testid={`select-prothese-mobilite-${index}`}>
+                                    <SelectValue placeholder="—" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="AMOVIBLE">Amovible</SelectItem>
+                                  <SelectItem value="FIXE">Fixe</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
                           )}
-                          {selectedProthese.mobilite === "FIXE" && selectedProthese.typeProthese && (
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[11px] font-medium text-muted-foreground">Type de connexion</span>
-                              <span className="text-[12px] font-medium">
-                                {selectedProthese.typeProthese === "VISSEE" ? "Vissée" : "Scellée"}
-                              </span>
-                            </div>
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`protheses.${index}.typeProthese`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[11px]">Type de connexion</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                                <FormControl>
+                                  <SelectTrigger className="text-[12px]" data-testid={`select-prothese-connexion-${index}`}>
+                                    <SelectValue placeholder="—" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="VISSEE">Vissée</SelectItem>
+                                  <SelectItem value="SCELLEE">Scellée</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
                           )}
-                        </div>
-                      )}
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 );
