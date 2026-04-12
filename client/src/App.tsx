@@ -34,6 +34,7 @@ import NotificationsPage from "@/pages/notifications";
 import PublicSharePage from "@/pages/public-share";
 import OnboardingPage from "@/pages/onboarding";
 import SupportPage from "@/pages/support";
+import PrivacyPage from "@/pages/privacy";
 import { apiRequest } from "@/lib/queryClient";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -227,6 +228,7 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
         <Redirect to="/settings?tab=integrations" />
       </Route>
       <Route path="/support" component={SupportPage} />
+      <Route path="/privacy" component={PrivacyPage} />
       <Route path="/settings/google-calendar" component={GoogleCalendarPage} />
       <Route path="/settings/:section" component={SettingsPage} />
       <Route path="/settings" component={SettingsPage} />
@@ -304,6 +306,7 @@ function AuthenticatedApp() {
     return (
       <Switch>
         <Route path="/share/:token" component={PublicSharePage} />
+        <Route path="/privacy" component={PrivacyPage} />
         <Route path="/register">
           {() => <RegisterPage onRegisterSuccess={() => refetch()} />}
         </Route>

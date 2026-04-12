@@ -253,9 +253,14 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-8">
+        <div className="text-center mt-8 space-y-1">
           <p className="text-xs text-muted-foreground" data-testid="text-rgpd">
             Données médicales chiffrées et conformes RGPD
+          </p>
+          <p className="text-[11px] text-muted-foreground/60">
+            <a href="/privacy" className="hover:underline hover:text-muted-foreground transition-colors" data-testid="link-privacy">
+              Politique de confidentialité
+            </a>
           </p>
         </div>
       </div>
