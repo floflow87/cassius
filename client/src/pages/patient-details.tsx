@@ -368,6 +368,8 @@ export default function PatientDetailsPage() {
   
   // Show more implants in overview card
   const [showAllImplants, setShowAllImplants] = useState(false);
+  const [showAllProtheses, setShowAllProtheses] = useState(false);
+  const [overviewImplantTab, setOverviewImplantTab] = useState<"implants" | "protheses">("implants");
 
   // Share links query
   interface ShareLinkEmailData {
@@ -1699,7 +1701,7 @@ export default function PatientDetailsPage() {
         {canDelete && (
           <Button
             size="icon"
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-red-600 hover:bg-red-700 text-white border-0"
             onClick={() => setDeletePatientDialogOpen(true)}
             data-testid="button-delete-patient-header"
           >
@@ -2331,8 +2333,23 @@ export default function PatientDetailsPage() {
 
               <Card>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-base font-medium">Implants posés</CardTitle>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1 p-0.5 bg-muted rounded-md">
+                      {(["implants", "protheses"] as const).map((tab) => {
+                        const count = tab === "implants"
+                          ? (patient.surgeryImplants?.filter(si => si.implant?.typeImplant !== "PROTHESE").length || 0)
+                          : (patient.surgeryImplants?.filter(si => si.implant?.typeImplant === "PROTHESE").length || 0);
+                        return (
+                          <button
+                            key={tab}
+                            onClick={() => setOverviewImplantTab(tab)}
+                            className={`text-[12px] px-3 py-1 rounded transition-all ${overviewImplantTab === tab ? "bg-white dark:bg-zinc-900 font-medium shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                          >
+                            {tab === "implants" ? "Implants posés" : "Prothèses posées"} <span className="opacity-60">({count})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                     <div className="flex items-center gap-2">
                       <Button 
                         variant="ghost" 
@@ -2605,76 +2622,95 @@ export default function PatientDetailsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {implantCount === 0 ? (
-                    <p className="text-xs text-muted-foreground py-4 text-center">
-                      Aucun implant posé
-                    </p>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {patient.surgeryImplants?.slice(0, showAllImplants ? undefined : 4).map((surgeryImplant) => {
-                          const op = patient.operations?.find(o => o.id === surgeryImplant.surgeryId);
-                          const depose = isDeposeIntervention(op?.typeIntervention);
-                          const siteColor = getSiteBadgeColor(surgeryImplant.siteFdi, depose);
-                          return (
-                            <div key={surgeryImplant.id} className="border rounded-md p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <Badge className={`${siteColor} text-[10px] font-medium`}>
-                                  Site {surgeryImplant.siteFdi}
-                                </Badge>
-                                {getStatusBadge(surgeryImplant.statut)}
+                  {(() => {
+                    const isImplantsTab = overviewImplantTab === "implants";
+                    const overviewItems = (patient.surgeryImplants || []).filter(si =>
+                      isImplantsTab ? si.implant?.typeImplant !== "PROTHESE" : si.implant?.typeImplant === "PROTHESE"
+                    );
+                    const showAll = isImplantsTab ? showAllImplants : showAllProtheses;
+                    const toggleShowAll = isImplantsTab
+                      ? () => setShowAllImplants(v => !v)
+                      : () => setShowAllProtheses(v => !v);
+                    const displayItems = overviewItems.slice(0, showAll ? undefined : 4);
+
+                    if (overviewItems.length === 0) {
+                      return (
+                        <p className="text-xs text-muted-foreground py-4 text-center">
+                          {isImplantsTab ? "Aucun implant posé" : "Aucune prothèse posée"}
+                        </p>
+                      );
+                    }
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {displayItems.map((surgeryImplant) => {
+                            const op = patient.operations?.find(o => o.id === surgeryImplant.surgeryId);
+                            const depose = isDeposeIntervention(op?.typeIntervention);
+                            const siteColor = getSiteBadgeColor(surgeryImplant.siteFdi, depose);
+                            return (
+                              <div key={surgeryImplant.id} className="border rounded-md p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <Badge className={`${siteColor} text-[10px] font-medium`}>
+                                    Site {surgeryImplant.siteFdi}
+                                  </Badge>
+                                  {getStatusBadge(surgeryImplant.statut)}
+                                </div>
+                                <div className="grid grid-cols-2 gap-y-2 text-xs">
+                                  <div>
+                                    <span className="text-muted-foreground text-[10px]">Marque:</span>
+                                    <p>{surgeryImplant.implant.marque}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground text-[10px]">{isImplantsTab ? "Dimensions:" : "Réf. fabricant:"}</span>
+                                    <p>{isImplantsTab ? `${surgeryImplant.implant.diametre} x ${surgeryImplant.implant.longueur}mm` : (surgeryImplant.implant.referenceFabricant || "—")}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground text-[10px]">Date pose:</span>
+                                    <p>{formatDateShort(surgeryImplant.datePose)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground text-[10px]">{isImplantsTab ? "ISQ actuel:" : "Type:"}</span>
+                                    {isImplantsTab ? (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <p className="text-primary font-medium cursor-help underline decoration-dotted">
+                                            {surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose || "-"}
+                                          </p>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="text-[10px]">
+                                          <div className="space-y-1">
+                                            <p><span className="text-muted-foreground">Pose:</span> {surgeryImplant.isqPose ?? "-"}</p>
+                                            {surgeryImplant.isq2m != null && <p><span className="text-muted-foreground">2 mois:</span> {surgeryImplant.isq2m}</p>}
+                                            {surgeryImplant.isq3m != null && <p><span className="text-muted-foreground">3 mois:</span> {surgeryImplant.isq3m}</p>}
+                                            {surgeryImplant.isq6m != null && <p><span className="text-muted-foreground">6 mois:</span> {surgeryImplant.isq6m}</p>}
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    ) : (
+                                      <p>{surgeryImplant.implant.typeImplant === "PROTHESE" ? "Prothèse" : "—"}</p>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="grid grid-cols-2 gap-y-2 text-xs">
-                                <div>
-                                  <span className="text-muted-foreground text-[10px]">Marque:</span>
-                                  <p>{surgeryImplant.implant.marque}</p>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground text-[10px]">Dimensions:</span>
-                                  <p>{surgeryImplant.implant.diametre} x {surgeryImplant.implant.longueur}mm</p>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground text-[10px]">Date pose:</span>
-                                  <p>{formatDateShort(surgeryImplant.datePose)}</p>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground text-[10px]">ISQ actuel:</span>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <p className="text-primary font-medium cursor-help underline decoration-dotted">
-                                        {surgeryImplant.isq6m || surgeryImplant.isq3m || surgeryImplant.isq2m || surgeryImplant.isqPose || "-"}
-                                      </p>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="text-[10px]">
-                                      <div className="space-y-1">
-                                        <p><span className="text-muted-foreground">Pose:</span> {surgeryImplant.isqPose ?? "-"}</p>
-                                        {surgeryImplant.isq2m != null && <p><span className="text-muted-foreground">2 mois:</span> {surgeryImplant.isq2m}</p>}
-                                        {surgeryImplant.isq3m != null && <p><span className="text-muted-foreground">3 mois:</span> {surgeryImplant.isq3m}</p>}
-                                        {surgeryImplant.isq6m != null && <p><span className="text-muted-foreground">6 mois:</span> {surgeryImplant.isq6m}</p>}
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {(patient.surgeryImplants?.length || 0) > 4 && (
-                        <div className="mt-4 text-center">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-primary text-xs"
-                            onClick={() => setShowAllImplants(!showAllImplants)}
-                            data-testid="button-toggle-implants"
-                          >
-                            {showAllImplants ? "Voir moins" : `Voir plus (${(patient.surgeryImplants?.length || 0) - 4} autres)`}
-                          </Button>
+                            );
+                          })}
                         </div>
-                      )}
-                    </>
-                  )}
+                        {overviewItems.length > 4 && (
+                          <div className="mt-4 text-center">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-primary text-xs"
+                              onClick={toggleShowAll}
+                              data-testid={isImplantsTab ? "button-toggle-implants" : "button-toggle-protheses"}
+                            >
+                              {showAll ? "Voir moins" : `Voir plus (${overviewItems.length - 4} autres)`}
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
