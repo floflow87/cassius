@@ -1,0 +1,104 @@
+Politique de confidentialité – Cassius
+
+Dernière mise à jour : [à compléter]
+
+1. Introduction
+
+La présente politique de confidentialité a pour objectif d’informer les utilisateurs de l’application Cassius sur la manière dont leurs données personnelles sont collectées, utilisées et protégées.
+
+Cassius est une application SaaS destinée aux professionnels de santé, permettant la gestion de données cliniques, notamment en implantologie.
+
+2. Responsable du traitement
+
+Le responsable du traitement des données est :
+
+Cassius / Volta Studio
+Email : [ton email]
+Site : https://cassiuspro.com
+
+3. Données collectées
+
+Nous collectons uniquement les données nécessaires au fonctionnement de l’application.
+
+a) Données de compte
+Nom
+Prénom
+Email
+Mot de passe (chiffré)
+b) Données professionnelles
+Organisation / cabinet
+Rôle utilisateur
+c) Données patients (sous responsabilité du praticien)
+Nom / prénom
+Informations médicales liées aux implants
+Données de suivi (ISQ, visites, etc.)
+Documents et radiographies
+
+⚠️ Ces données sont sous la responsabilité du professionnel de santé utilisateur.
+
+4. Utilisation des données
+
+Les données sont utilisées pour :
+
+Fournir et faire fonctionner l’application
+Gérer les comptes utilisateurs
+Assurer le suivi clinique des patients
+Améliorer l’expérience utilisateur
+Garantir la sécurité et la traçabilité
+5. Intégrations Google
+
+Cassius peut utiliser des services Google (Google Calendar, Gmail).
+
+a) Google Calendar
+Synchronisation des rendez-vous
+Aucune utilisation à des fins publicitaires
+b) Gmail (si activé)
+Accès limité aux métadonnées des emails (expéditeur, date)
+Aucun accès au contenu des emails sans consentement explicite
+
+👉 Cassius n’utilise pas les données Google à des fins commerciales ou publicitaires.
+
+6. Partage des données
+
+Les données ne sont jamais vendues.
+
+Elles peuvent être partagées uniquement avec :
+
+des prestataires techniques (hébergement, stockage)
+dans le respect strict de la confidentialité
+7. Hébergement et sécurité
+
+Les données sont hébergées via des services sécurisés (ex : Supabase).
+
+Mesures mises en place :
+
+chiffrement des données
+accès sécurisé (authentification)
+contrôle des accès par rôle
+8. Durée de conservation
+
+Les données sont conservées :
+
+pendant toute la durée d’utilisation du service
+puis supprimées ou anonymisées sur demande
+9. Droits des utilisateurs
+
+Conformément au RGPD, vous disposez des droits suivants :
+
+accès à vos données
+rectification
+suppression
+limitation du traitement
+portabilité
+
+Pour exercer ces droits :
+👉 [ton email]
+
+10. Cookies
+
+Cassius utilise des cookies techniques nécessaires au fonctionnement de l’application.
+
+11. Modifications
+
+Cette politique peut être modifiée à tout moment.
+Les utilisateurs seront informés en cas de changement majeur.

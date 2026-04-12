@@ -147,6 +147,7 @@ export default function StatsPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<SearchSuggestion[]>([]);
   const [isqDistributionFilter, setIsqDistributionFilter] = useState<string>("all");
+  const [isqDimensionFilter, setIsqDimensionFilter] = useState<string>("all");
   const [isqEvolutionFilter, setIsqEvolutionFilter] = useState<string>("all");
   const [cohorteStartDate, setCohorteStartDate] = useState<string>("");
   const [cohorteEndDate, setCohorteEndDate] = useState<string>("");
@@ -354,6 +355,7 @@ export default function StatsPage() {
     implant: {
       marque: string;
       diametre: number;
+      longueur: number;
       referenceFabricant?: string | null;
       typeImplant?: "IMPLANT" | "MINI_IMPLANT" | "PROTHESE";
     };
@@ -366,6 +368,41 @@ export default function StatsPage() {
       return res.json();
     },
   });
+
+  // Available implant dimensions from all surgery implants
+  const availableIsqDimensions = useMemo(() => {
+    const dims = new Set<string>();
+    surgeryImplantsData.forEach((si) => {
+      if (si.implant?.diametre && si.implant?.longueur) {
+        dims.add(`${si.implant.diametre}x${si.implant.longueur}`);
+      }
+    });
+    return Array.from(dims).sort((a, b) => {
+      const [da, la] = a.split("x").map(Number);
+      const [db, lb] = b.split("x").map(Number);
+      return da !== db ? da - db : la - lb;
+    });
+  }, [surgeryImplantsData]);
+
+  // ISQ distribution filtered by dimension (client-side)
+  const isqDistributionByDimension = useMemo(() => {
+    if (isqDimensionFilter === "all") return null;
+    const [dia, lon] = isqDimensionFilter.split("x").map(Number);
+    const filtered = surgeryImplantsData.filter(
+      (si) => si.implant?.diametre === dia && si.implant?.longueur === lon && si.isqPose !== null && si.isqPose > 0
+    );
+    const ranges = [
+      { category: "< 40 (critique)", min: 0, max: 40 },
+      { category: "40–49 (faible)", min: 40, max: 50 },
+      { category: "50–59 (modéré)", min: 50, max: 60 },
+      { category: "60–69 (bon)", min: 60, max: 70 },
+      { category: "≥ 70 (excellent)", min: 70, max: Infinity },
+    ];
+    return ranges.map(({ category, min, max }) => ({
+      category,
+      count: filtered.filter((si) => si.isqPose! >= min && si.isqPose! < max).length,
+    })).filter((r) => r.count > 0);
+  }, [isqDimensionFilter, surgeryImplantsData]);
 
   // Filter surgery implants by selected period
   const filteredSurgeryImplants = useMemo(() => {
@@ -405,7 +442,10 @@ export default function StatsPage() {
             groupValue = implant.implant?.marque || "Non spécifié";
             break;
           case "diametre":
-            groupValue = implant.implant?.diametre ? `${implant.implant.diametre}mm` : "Non spécifié";
+            groupValue = implant.implant?.diametre ? `Ø${implant.implant.diametre}mm` : "Non spécifié";
+            break;
+          case "longueur":
+            groupValue = implant.implant?.longueur ? `${implant.implant.longueur}mm` : "Non spécifié";
             break;
           case "localisation":
             groupValue = implant.siteFdi || "Non spécifié";
@@ -545,7 +585,7 @@ export default function StatsPage() {
     { name: "Autre", value: otherValue, color: STATS_COLORS.grayMuted },
   ];
 
-  const isqData = isqDistributionData;
+  const isqData = isqDistributionByDimension ?? isqDistributionData;
   const isqEvolutionChartData = isqEvolutionData.map((d) => ({
     ...d,
     month: format(new Date(d.period + "-01"), "MMM", { locale: fr }),
@@ -1022,19 +1062,37 @@ export default function StatsPage() {
                   <CardTitle>Distribution ISQ</CardTitle>
                   <CardDescription className="text-xs">Stabilité des implants à la pose</CardDescription>
                 </div>
-                <Select value={isqDistributionFilter} onValueChange={setIsqDistributionFilter}>
-                  <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-model">
-                    <SelectValue placeholder="Tous les implants" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les implants</SelectItem>
-                    {stats?.availableImplantModels.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2 flex-wrap justify-end">
+                  <Select value={isqDimensionFilter} onValueChange={(v) => { setIsqDimensionFilter(v); setIsqDistributionFilter("all"); }}>
+                    <SelectTrigger className="w-44 bg-white dark:bg-zinc-900" data-testid="select-isq-dimension">
+                      <SelectValue placeholder="Toutes dimensions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes dimensions</SelectItem>
+                      {availableIsqDimensions.map((dim) => {
+                        const [dia, lon] = dim.split("x");
+                        return (
+                          <SelectItem key={dim} value={dim}>
+                            Ø{dia}mm × {lon}mm
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <Select value={isqDistributionFilter} onValueChange={(v) => { setIsqDistributionFilter(v); setIsqDimensionFilter("all"); }}>
+                    <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-model">
+                      <SelectValue placeholder="Tous les implants" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les implants</SelectItem>
+                      {stats?.availableImplantModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -1223,6 +1281,7 @@ export default function StatsPage() {
                   <SelectContent>
                     <SelectItem value="marque">Marque d'implant</SelectItem>
                     <SelectItem value="diametre">Diamètre</SelectItem>
+                    <SelectItem value="longueur">Longueur</SelectItem>
                     <SelectItem value="localisation">Localisation (site FDI)</SelectItem>
                     <SelectItem value="greffe">Greffe ou non</SelectItem>
                     <SelectItem value="miseEnCharge">Mise en charge</SelectItem>

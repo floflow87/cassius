@@ -297,9 +297,14 @@ export default function CatalogImplantDetailsPage() {
             <h1 className="text-2xl font-semibold" data-testid="text-implant-title">
               {implantType} {implant.marque} {typeLabel}
             </h1>
+            {implant.typeImplant === "IMPLANT" && (
+              <Badge variant="outline" className="text-[11px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800" data-testid="badge-implant-type">
+                Implant
+              </Badge>
+            )}
             {implant.typeImplant === "MINI_IMPLANT" && (
               <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                Mini
+                Mini-implant
               </Badge>
             )}
             {isProthese && (
@@ -471,18 +476,11 @@ export default function CatalogImplantDetailsPage() {
                 <span className="text-xs text-muted-foreground">Marque</span>
                 <p className="text-[13px] font-medium" data-testid="text-implant-marque">{implant.marque}</p>
               </div>
-              {isProthese ? (
+              {isProthese && (
                 <div>
                   <span className="text-xs text-muted-foreground">Nom du pilier</span>
                   <p className="text-[13px] font-medium" data-testid="text-implant-type">
                     {implant.nomPilier || "—"}
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <span className="text-xs text-muted-foreground">Type</span>
-                  <p className="text-[13px] font-medium" data-testid="text-implant-type">
-                    {implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"}
                   </p>
                 </div>
               )}
