@@ -266,6 +266,13 @@ function AuthenticatedApp() {
   // Check onboarding status for new users (only when authenticated)
   const { state: onboardingState, isLoading: onboardingLoading } = useOnboarding({ enabled: !!user });
   
+  // Redirect /auth (and /login) to / if already authenticated
+  useEffect(() => {
+    if (user && (location === "/auth" || location === "/login")) {
+      setLocation("/");
+    }
+  }, [user, location, setLocation]);
+
   // Redirect to onboarding if needed (new user with incomplete onboarding)
   useEffect(() => {
     if (user && onboardingState && !onboardingLoading) {
