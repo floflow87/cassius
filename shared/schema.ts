@@ -37,6 +37,7 @@ export const typeInterventionEnum = pgEnum("type_intervention", [
   "REPRISE_IMPLANT",
   "CHIRURGIE_GUIDEE",
   "POSE_PROTHESE",
+  "PROTHESE_PROVISOIRE",
   "DEPOSE_IMPLANT",
   "DEPOSE_PROTHESE",
   "DECOUVERTE_IMPLANT"
@@ -212,6 +213,7 @@ export const implants = pgTable("implants", {
   quantite: quantiteProtheseEnum("quantite"), // unitaire, plurale
   mobilite: mobiliteProtheseEnum("mobilite"), // amovible, fixe
   typePilier: typePilierEnum("type_pilier"), // multi-unit, droit, angulé
+  nomPilier: text("nom_pilier"), // Nom commercial/personnalisé du pilier
 });
 
 export const implantsRelations = relations(implants, ({ one, many }) => ({

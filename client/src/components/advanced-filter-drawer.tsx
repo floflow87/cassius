@@ -40,6 +40,7 @@ const FILTER_FIELD_CONFIGS: FilterFieldConfig[] = [
     { value: "REPRISE_IMPLANT", label: "Implantoplastie" },
     { value: "CHIRURGIE_GUIDEE", label: "Chirurgie guidée" },
     { value: "POSE_PROTHESE", label: "Pose de prothèse" },
+    { value: "PROTHESE_PROVISOIRE", label: "Prothèse provisoire" },
     { value: "DEPOSE_IMPLANT", label: "Dépose d'implant" },
     { value: "DEPOSE_PROTHESE", label: "Dépose de prothèse" },
     { value: "DECOUVERTE_IMPLANT", label: "Découverte implant" },

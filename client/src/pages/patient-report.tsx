@@ -52,6 +52,7 @@ export default function PatientReportPage() {
       REPRISE_IMPLANT: "Implantoplastie",
       CHIRURGIE_GUIDEE: "Chirurgie guidée",
       POSE_PROTHESE: "Pose de prothèse",
+      PROTHESE_PROVISOIRE: "Prothèse provisoire",
       DEPOSE_IMPLANT: "Dépose d'implant",
       DEPOSE_PROTHESE: "Dépose de prothèse",
       DECOUVERTE_IMPLANT: "Découverte implant",
@@ -220,8 +221,17 @@ export default function PatientReportPage() {
                 {patient.surgeryImplants.map((surgeryImplant) => (
                   <tr key={surgeryImplant.id} className="border-b">
                     <td className="py-2 px-2 font-mono">{surgeryImplant.siteFdi}</td>
-                    <td className="py-2 px-2">{surgeryImplant.implant.marque}</td>
-                    <td className="py-2 px-2 font-mono">{surgeryImplant.implant.diametre}x{surgeryImplant.implant.longueur}mm</td>
+                    <td className="py-2 px-2">
+                      {surgeryImplant.implant.marque}
+                      {surgeryImplant.implant.typeImplant === "PROTHESE" && surgeryImplant.implant.nomPilier && (
+                        <span className="block text-xs text-muted-foreground">{surgeryImplant.implant.nomPilier}</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 font-mono">
+                      {surgeryImplant.implant.typeImplant === "PROTHESE" 
+                        ? (surgeryImplant.implant.mobilite === "AMOVIBLE" ? "Amovible" : surgeryImplant.implant.typeProthese === "VISSEE" ? "Vissée" : surgeryImplant.implant.typeProthese === "SCELLEE" ? "Scellée" : "—")
+                        : `${surgeryImplant.implant.diametre}x${surgeryImplant.implant.longueur}mm`}
+                    </td>
                     <td className="py-2 px-2 font-mono">{surgeryImplant.typeOs || "-"}</td>
                     <td className="py-2 px-2 font-mono">{surgeryImplant.isqPose || "-"}</td>
                     <td className="py-2 px-2 font-mono">{surgeryImplant.isq3m || "-"}</td>

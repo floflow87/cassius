@@ -26,6 +26,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 const protheseFormSchema = z.object({
   marque: z.string().min(1, "Marque requise"),
   referenceFabricant: z.string().optional(),
+  nomPilier: z.string().optional(),
+  typePilier: z.enum(["DROIT", "ANGULE", "MULTI_UNIT"]).optional(),
   mobilite: z.enum(["AMOVIBLE", "FIXE"]),
   typeProthese: z.enum(["VISSEE", "SCELLEE"]).optional(),
 }).refine((data) => {
@@ -81,6 +83,8 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
     defaultValues: {
       marque: "",
       referenceFabricant: "",
+      nomPilier: "",
+      typePilier: undefined,
       mobilite: "FIXE",
       typeProthese: "VISSEE",
     },
@@ -102,6 +106,8 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
         typeImplant: "PROTHESE" as const,
         marque: data.marque,
         referenceFabricant: data.referenceFabricant || null,
+        nomPilier: data.nomPilier || null,
+        typePilier: data.typePilier || null,
         diametre: 0,
         longueur: 0,
         mobilite: data.mobilite,
@@ -193,6 +199,47 @@ export function ProtheseForm({ onSuccess }: ProtheseFormProps) {
                   data-testid="input-reference-prothese"
                 />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="nomPilier"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nom du pilier (optionnel)</FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="Ex: Straumann Bone Level NC, Nobel Active RP..." 
+                  {...field} 
+                  data-testid="input-nom-pilier"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="typePilier"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Type de pilier (optionnel)</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || ""}>
+                <FormControl>
+                  <SelectTrigger data-testid="select-type-pilier">
+                    <SelectValue placeholder="Sélectionner un type de pilier" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="DROIT">Droit</SelectItem>
+                  <SelectItem value="ANGULE">Angulé</SelectItem>
+                  <SelectItem value="MULTI_UNIT">Multi-unit</SelectItem>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}

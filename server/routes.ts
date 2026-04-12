@@ -1442,6 +1442,7 @@ export async function registerRoutes(
           "REPRISE_IMPLANT",
           "CHIRURGIE_GUIDEE",
           "POSE_PROTHESE",
+          "PROTHESE_PROVISOIRE",
           "DEPOSE_IMPLANT",
           "DEPOSE_PROTHESE",
           "DECOUVERTE_IMPLANT",

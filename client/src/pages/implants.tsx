@@ -75,7 +75,7 @@ const STORAGE_KEY_SORT = "cassius_implants_sort";
 const STORAGE_KEY_PROTHESES_COLUMNS = "cassius_protheses_columns_order";
 const STORAGE_KEY_PROTHESES_SORT = "cassius_protheses_sort";
 
-type ProtheseColumnId = "marque" | "mobilite" | "typeProthese" | "nbPoses";
+type ProtheseColumnId = "marque" | "mobilite" | "nomPilier" | "nbPoses";
 
 interface ProtheseColumnConfig {
   id: ProtheseColumnId;
@@ -87,14 +87,14 @@ interface ProtheseColumnConfig {
 const protheseColumnWidths: Record<ProtheseColumnId, string> = {
   marque: "w-[30%]",
   mobilite: "w-[20%]",
-  typeProthese: "w-[25%]",
+  nomPilier: "w-[25%]",
   nbPoses: "w-[25%]",
 };
 
 const defaultProtheseColumns: ProtheseColumnConfig[] = [
   { id: "marque", label: "Marque", sortable: true },
   { id: "mobilite", label: "Type de prothèse", sortable: true },
-  { id: "typeProthese", label: "Type de connexion", sortable: true },
+  { id: "nomPilier", label: "Nom du pilier", sortable: true },
   { id: "nbPoses", label: "Nombre de poses", sortable: true },
 ];
 
@@ -371,8 +371,8 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
         case "mobilite":
           comparison = (a.mobilite || "").localeCompare(b.mobilite || "");
           break;
-        case "typeProthese":
-          comparison = (a.typeProthese || "").localeCompare(b.typeProthese || "");
+        case "nomPilier":
+          comparison = (a.nomPilier || "").localeCompare(b.nomPilier || "");
           break;
         case "nbPoses":
           comparison = (a.poseCount || 0) - (b.poseCount || 0);
@@ -446,10 +446,17 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
             <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center shrink-0">
               <Activity className="h-4 w-4 text-primary" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-medium text-foreground">
-                {prothese.marque}
-              </span>
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-foreground">
+                  {prothese.marque}
+                </span>
+                {prothese.typeProthese && (
+                  <Badge className="text-[9px] px-1 py-0 bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800">
+                    {typeProtheseLabels[prothese.typeProthese] || prothese.typeProthese}
+                  </Badge>
+                )}
+              </div>
               <span className="text-[10px] text-muted-foreground">
                 Réf: {prothese.referenceFabricant || "-"}
               </span>
@@ -464,11 +471,11 @@ export default function CataloguePage({ searchQuery: externalSearchQuery, setSea
         ) : (
           <span className="text-xs text-muted-foreground">-</span>
         );
-      case "typeProthese":
-        return prothese.typeProthese ? (
-          <Badge variant="outline" className="text-xs">
-            {typeProtheseLabels[prothese.typeProthese] || prothese.typeProthese}
-          </Badge>
+      case "nomPilier":
+        return prothese.nomPilier ? (
+          <span className="text-xs text-foreground">
+            {prothese.nomPilier}
+          </span>
         ) : (
           <span className="text-xs text-muted-foreground">-</span>
         );

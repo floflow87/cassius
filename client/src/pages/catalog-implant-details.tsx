@@ -418,6 +418,22 @@ export default function CatalogImplantDetailsPage() {
                   </p>
                 </div>
               )}
+              {isProthese && implant.nomPilier && (
+                <div>
+                  <span className="text-xs text-muted-foreground">Nom du pilier</span>
+                  <p className="text-[13px] font-medium" data-testid="text-nom-pilier">
+                    {implant.nomPilier}
+                  </p>
+                </div>
+              )}
+              {isProthese && implant.typePilier && (
+                <div>
+                  <span className="text-xs text-muted-foreground">Type de pilier</span>
+                  <p className="text-[13px] font-medium" data-testid="text-type-pilier">
+                    {implant.typePilier === "DROIT" ? "Droit" : implant.typePilier === "ANGULE" ? "Angulé" : implant.typePilier === "MULTI_UNIT" ? "Multi-unit" : implant.typePilier}
+                  </p>
+                </div>
+              )}
               {!isProthese && (
                 <>
                   <div>

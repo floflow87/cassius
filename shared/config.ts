@@ -49,6 +49,7 @@ export const TYPES_INTERVENTION = {
   REPRISE_IMPLANT: { value: "REPRISE_IMPLANT", label: "Reprise d'implant", description: "Révision ou remplacement d'un implant existant" },
   CHIRURGIE_GUIDEE: { value: "CHIRURGIE_GUIDEE", label: "Chirurgie guidée", description: "Chirurgie assistée par guide numérique" },
   POSE_PROTHESE: { value: "POSE_PROTHESE", label: "Pose de prothèse", description: "Pose d'une prothèse sur implant" },
+  PROTHESE_PROVISOIRE: { value: "PROTHESE_PROVISOIRE", label: "Prothèse provisoire", description: "Pose d'une prothèse provisoire sur implant" },
   DEPOSE_IMPLANT: { value: "DEPOSE_IMPLANT", label: "Dépose d'implant", description: "Retrait chirurgical d'un implant" },
   DEPOSE_PROTHESE: { value: "DEPOSE_PROTHESE", label: "Dépose de prothèse", description: "Retrait d'une prothèse sur implant" },
   DECOUVERTE_IMPLANT: { value: "DECOUVERTE_IMPLANT", label: "Découverte implant", description: "Procédure de découverte d'un implant enfoui" },

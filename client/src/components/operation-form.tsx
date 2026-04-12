@@ -84,6 +84,7 @@ const formSchema = z.object({
     "REPRISE_IMPLANT",
     "CHIRURGIE_GUIDEE",
     "POSE_PROTHESE",
+    "PROTHESE_PROVISOIRE",
     "DEPOSE_IMPLANT",
     "DEPOSE_PROTHESE",
     "DECOUVERTE_IMPLANT",
@@ -112,6 +113,7 @@ const interventionTypeLabels: Record<string, string> = {
   REPRISE_IMPLANT: "Implantoplastie",
   CHIRURGIE_GUIDEE: "Chirurgie guidée",
   POSE_PROTHESE: "Pose de prothèse",
+  PROTHESE_PROVISOIRE: "Prothèse provisoire",
   DEPOSE_IMPLANT: "Dépose d'implant",
   DEPOSE_PROTHESE: "Dépose de prothèse",
   DECOUVERTE_IMPLANT: "Découverte implant",
@@ -1265,48 +1267,18 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                         />
                       </div>
                       
-                      {/* Site FDI on its own row */}
-                      <FormField
-                        control={form.control}
-                        name={`protheses.${index}.siteFdi`}
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel className="text-[11px]">Site FDI <span className="text-destructive">*</span></FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Ex: 16"
-                                className="w-32"
-                                {...field}
-                                data-testid={`input-prothese-fdi-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
+                      {/* Nom du pilier (from catalog, read-only display) */}
+                      {selectedProthese?.nomPilier && (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[11px] font-medium text-muted-foreground">Pilier</span>
+                          <span className="text-sm font-medium text-foreground">
+                            {selectedProthese.nomPilier}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Type de connexion + Site FDI on same row */}
                       <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name={`protheses.${index}.mobilite`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-[11px]">Type de prothèse</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value || ""}>
-                                <FormControl>
-                                  <SelectTrigger data-testid={`select-prothese-mobilite-${index}`}>
-                                    <SelectValue placeholder="Sélectionner..." />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="AMOVIBLE">Amovible</SelectItem>
-                                  <SelectItem value="FIXE">Fixe</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
                         <FormField
                           control={form.control}
                           name={`protheses.${index}.typePilier`}
@@ -1328,7 +1300,47 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                             </FormItem>
                           )}
                         />
+                        <FormField
+                          control={form.control}
+                          name={`protheses.${index}.siteFdi`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel className="text-[11px]">Site FDI <span className="text-destructive">*</span></FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Ex: 16"
+                                  {...field}
+                                  data-testid={`input-prothese-fdi-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
+
+                      {/* Type de prothèse (mobilite) */}
+                      <FormField
+                        control={form.control}
+                        name={`protheses.${index}.mobilite`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[11px]">Type de prothèse</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid={`select-prothese-mobilite-${index}`}>
+                                  <SelectValue placeholder="Sélectionner..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="AMOVIBLE">Amovible</SelectItem>
+                                <SelectItem value="FIXE">Fixe</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </CardContent>
                   </Card>
                 );

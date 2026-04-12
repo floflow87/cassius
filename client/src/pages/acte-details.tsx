@@ -80,6 +80,10 @@ const typeInterventionLabels: Record<string, string> = {
   REPRISE_IMPLANT: "Implantoplastie",
   CHIRURGIE_GUIDEE: "Chirurgie guidée",
   POSE_PROTHESE: "Pose de prothèse",
+  PROTHESE_PROVISOIRE: "Prothèse provisoire",
+  DEPOSE_IMPLANT: "Dépose d'implant",
+  DEPOSE_PROTHESE: "Dépose de prothèse",
+  DECOUVERTE_IMPLANT: "Découverte implant",
 };
 
 const approchLabels: Record<string, string> = {

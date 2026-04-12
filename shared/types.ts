@@ -8,6 +8,7 @@ export type TypeIntervention =
   | "REPRISE_IMPLANT"
   | "CHIRURGIE_GUIDEE"
   | "POSE_PROTHESE"
+  | "PROTHESE_PROVISOIRE"
   | "DEPOSE_IMPLANT"
   | "DEPOSE_PROTHESE"
   | "DECOUVERTE_IMPLANT";
@@ -91,6 +92,9 @@ export interface Implant {
   quantite: "UNITAIRE" | "PLURALE" | null;
   mobilite: "AMOVIBLE" | "FIXE" | null;
   typePilier: "DROIT" | "ANGULE" | "MULTI_UNIT" | null;
+  nomPilier: string | null;
+  isFavorite: boolean;
+  poseCount?: number;
 }
 
 // SurgeryImplant = implant posé lors d'une chirurgie (avec contexte de pose)
