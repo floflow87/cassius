@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cassius | Le cockpit implantologie</title>
+    <meta name="description" content="Plateforme de suivi clinique et de gestion pour chirurgiens-dentistes.">
+    <meta property="og:title" content="Cassius - Le cockpit implantologie">
+    <meta property="og:description" content="Simplifiez votre suivi clinique.">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Iconify -->
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3C83F6',
+                        'primary-light': '#EBF3FF',
+                        surface: '#F9FAFB',
+                        border: '#E5E7EB',
+                        text: {
+                            main: '#111827',
+                            muted: '#6B7280',
+                        },
+                        status: {
+                            success: '#059669', // Desaturated Green
+                            successBg: '#ECFDF5',
+                            warning: '#D97706', // Desaturated Orange
+                            warningBg: '#FFFBEB',
+                            error: '#DC2626',   // Desaturated Red
+                            errorBg: '#FEF2F2',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
+                        'glow': '0 0 40px -10px rgba(60, 131, 246, 0.15)',
+                    },
+                    borderRadius: {
+                        'xl': '16px',
+                        '2xl': '20px',
+                    },
+                    letterSpacing: {
+                        tight: '-0.025em',
+                        tighter: '-0.04em',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Custom scrollbar for subtle feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #E5E7EB;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #D1D5DB;
+        }
+        
+        /* Animation utilities */
+        .reveal {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUp 0.8s ease-out forwards;
+        }
+        
+        @keyframes fadeUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+    </style>
+</head>
+<body class="bg-white text-text-muted font-sans antialiased selection:bg-primary-light selection:text-primary overflow-x-hidden">
+
+
+
+
+
+
+
+    <!-- Header -->
+    <header class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-border/50">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="#" class="text-text-main text-xl font-semibold tracking-tight">Cassius</a>
+            
+            <nav class="hidden md:flex gap-8">
+                <a href="#fonctionnalites" class="text-sm font-medium text-text-muted hover:text-primary transition-colors">Fonctionnalités</a>
+                <a href="#integrations" class="text-sm font-medium text-text-muted hover:text-primary transition-colors">Intégrations</a>
+                <a href="#tarifs" class="text-sm font-medium text-text-muted hover:text-primary transition-colors">Tarifs</a>
+                
+            </nav>
+            
+            <div class="flex items-center gap-4">
+                <a href="https://app.cassiuspro.com/auth" class="text-sm font-medium text-text-main hover:text-primary transition-colors hidden sm:block">Se connecter</a>
+                <a href="https://calendly.com/admin-cassiusapp/30min" class="w-full sm:w-auto bg-primary text-white font-medium px-8 py-3.5 rounded-full shadow-glow hover:bg-blue-600 transition-all hover:scale-105 text-sm pt-2.5 pr-5 pb-2.5 pl-5">
+  Demander une démo
+</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="pt-32">
+        <!-- Hero Section -->
+        <section class="md:pb-32 overflow-hidden pr-6 pb-20 pl-6 relative">
+            <!-- Background Blob -->
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-3xl -z-10 pointer-events-none"></div>
+
+            <div class="max-w-4xl mx-auto text-center reveal">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-light/50 border border-primary/10 text-primary text-xs font-medium mb-8">
+                    <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                    Nouveau : Module ISQ 2.0 disponible
+                </div>
+                
+                <h1 class="md:text-7xl text-text-main leading-[1.1] text-5xl font-semibold tracking-tight mb-6">Cassius, le compagnon <br> <span class="text-primary">des chirurgiens-dentistes.</span></h1>
+                
+                <p class="md:text-xl text-text-muted leading-relaxed text-lg font-light max-w-2xl mr-auto mb-10 ml-auto">
+                    La plateforme tout-en-un pour les chirurgiens-dentistes exigeants. Centralisez vos suivis cliniques, tracez vos implants et sécurisez vos données patients.
+                </p>
+                
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <a href="https://calendly.com/admin-cassiusapp/30min" class="w-full sm:w-auto bg-primary text-white font-medium px-8 py-3.5 rounded-full shadow-glow hover:shadow-lg transition-all flex items-center justify-center gap-2 group">
+  Demander une démo
+  <iconify-icon icon="solar:arrow-right-linear" width="20" class="group-hover:translate-x-1 transition-transform"></iconify-icon>
+</a>
+                    <a href="#fonctionnalites" class="w-full sm:w-auto bg-white border border-border text-text-main font-medium px-8 py-3.5 rounded-full hover:bg-surface transition-colors flex items-center justify-center gap-2">
+                        <iconify-icon icon="solar:layers-minimalistic-linear" width="20" class="" height="20" style="color: rgb(17, 24, 39)"></iconify-icon>
+                        Voir les fonctionnalités
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- KPI Strip -->
+        <section class="max-w-7xl mx-auto px-6 mb-24 reveal delay-100">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- KPI 1 -->
+                <div class="bg-white border border-border/60 p-6 rounded-2xl shadow-soft flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-primary-light text-primary flex items-center justify-center">
+                        <iconify-icon icon="solar:chart-2-linear" width="24" class=""></iconify-icon>
+                    </div>
+                    <div class="">
+                        <div class="text-text-muted text-sm font-medium">Suivi ISQ moyen</div>
+                        <div class="text-2xl font-semibold text-text-main tracking-tight">78.4</div>
+                    </div>
+                </div>
+                <!-- KPI 2 -->
+                <div class="bg-white border border-border/60 p-6 rounded-2xl shadow-soft flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-primary-light text-primary flex items-center justify-center">
+                        <iconify-icon icon="solar:folder-check-linear" width="24"></iconify-icon>
+                    </div>
+                    <div class="">
+                        <div class="text-sm text-text-muted font-medium">Documents traités</div>
+                        <div class="text-2xl font-semibold text-text-main tracking-tight">1,240</div>
+                    </div>
+                </div>
+                <!-- KPI 3 -->
+                <div class="bg-white border border-border/60 p-6 rounded-2xl shadow-soft flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-primary-light text-primary flex items-center justify-center">
+                        <iconify-icon icon="solar:calendar-date-linear" width="24"></iconify-icon>
+                    </div>
+                    <div class="">
+                        <div class="text-sm text-text-muted font-medium">Chirurgies à venir</div>
+                        <div class="text-2xl font-semibold text-text-main tracking-tight">12</div>
+                    </div>
+                </div>
+                <!-- KPI 4 -->
+                <div class="bg-white border border-border/60 p-6 rounded-2xl shadow-soft flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-primary-light text-primary flex items-center justify-center">
+                        <iconify-icon icon="solar:shield-check-linear" width="24"></iconify-icon>
+                    </div>
+                    <div class="">
+                        <div class="text-sm text-text-muted font-medium">Traçabilité</div>
+                        <div class="text-2xl font-semibold text-text-main tracking-tight">100%</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Feature Grid Modules -->
+        <section class="pt-24 pb-24" id="fonctionnalites">
+            <div class="max-w-7xl mr-auto ml-auto pr-6 pl-6">
+                <div class="text-center max-w-2xl mx-auto mb-16">
+                    <h2 class="text-3xl md:text-4xl font-semibold text-text-main tracking-tight mb-4">Un écosystème complet</h2>
+                    <p class="text-text-muted">Gérez l'intégralité de votre flux de travail clinique depuis une interface unique et intuitive.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 gap-x-6 gap-y-6">
+                    <!-- Card 1 -->
+                    <div class="group bg-white p-8 rounded-2xl border border-border hover:border-primary/30 transition-all hover:shadow-soft">
+                        <div class="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center mb-6 text-text-main group-hover:text-primary transition-colors">
+                            <iconify-icon icon="solar:users-group-rounded-linear" width="22"></iconify-icon>
+                        </div>
+                        <h3 class="text-lg font-semibold text-text-main mb-2">CRM Patients</h3>
+                        <p class="text-sm text-text-muted mb-6 leading-relaxed">Centralisez les dossiers, antécédents et plans de traitement dans une vue unifiée.</p>
+                        <a href="#" class="text-sm font-medium text-primary hover:text-blue-600 flex items-center gap-1">
+                            En savoir plus <iconify-icon icon="solar:arrow-right-linear" width="14" class=""></iconify-icon>
+                        </a>
+                    </div>
+
+                    <!-- Card 2 -->
+                    <div class="group bg-white p-8 rounded-2xl border border-border hover:border-primary/30 transition-all hover:shadow-soft">
+                        <div class="border-border flex text-text-main group-hover:text-primary transition-colors w-10 h-10 border rounded-full mb-6 items-center justify-center">
+                            <iconify-icon icon="solar:stethoscope-linear" width="22" class="" height="22" style="color: rgb(60, 131, 246);"></iconify-icon>
+                        </div>
+                        <h3 class="text-lg font-semibold text-text-main mb-2">Gestion des Actes</h3>
+                        <p class="text-sm text-text-muted mb-6 leading-relaxed">Suivez chaque intervention avec précision, de la consultation post-op à la pose.</p>
+                        <a href="#" class="text-sm font-medium text-primary hover:text-blue-600 flex items-center gap-1">
+                            En savoir plus <iconify-icon icon="solar:arrow-right-linear" width="14" class=""></iconify-icon>
+                        </a>
+                    </div>
+
+                    <!-- Card 3 -->
+                    <div class="group bg-white p-8 rounded-2xl border border-border hover:border-primary/30 transition-all hover:shadow-soft">
+                        <div class="border-border flex text-text-main group-hover:text-primary transition-colors w-10 h-10 border rounded-full mb-6 items-center justify-center">
+                            <iconify-icon icon="solar:screw-large-linear" width="22"></iconify-icon>
+                        </div>
+                        <h3 class="text-lg font-semibold text-text-main mb-2">Traçabilité Implants</h3>
+                        <p class="text-sm text-text-muted mb-6 leading-relaxed">Répertoire complet des références implants, vis de cicatrisation et accastillage.</p>
+                        <a href="#" class="text-sm font-medium text-primary hover:text-blue-600 flex items-center gap-1">
+                            En savoir plus <iconify-icon icon="solar:arrow-right-linear" width="14"></iconify-icon>
+                        </a>
+                    </div>
+
+                    <!-- Card 4 -->
+                    <div class="group bg-white p-8 rounded-2xl border border-border hover:border-primary/30 transition-all hover:shadow-soft">
+                        <div class="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center mb-6 text-text-main group-hover:text-primary transition-colors">
+                            <iconify-icon icon="solar:folder-with-files-linear" width="22"></iconify-icon>
+                        </div>
+                        <h3 class="text-lg font-semibold text-text-main mb-2">Documents Explorer</h3>
+                        <p class="text-sm text-text-muted mb-6 leading-relaxed">Stockage sécurisé, signature électronique et partage de fichiers conformes HDS.</p>
+                        <a href="#" class="text-sm font-medium text-primary hover:text-blue-600 flex items-center gap-1">
+                            En savoir plus <iconify-icon icon="solar:arrow-right-linear" width="14" class=""></iconify-icon>
+                        </a>
+                    </div>
+
+                    <!-- Card 5 -->
+                    <div class="group bg-white p-8 rounded-2xl border border-border hover:border-primary/30 transition-all hover:shadow-soft">
+                        <div class="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center mb-6 text-text-main group-hover:text-primary transition-colors">
+                            <iconify-icon icon="solar:bell-bing-linear" width="22" class=""></iconify-icon>
+                        </div>
+                        <h3 class="text-lg font-semibold text-text-main mb-2">Notifications Smart</h3>
+                        <p class="text-sm text-text-muted mb-6 leading-relaxed">Rappels automatiques pour les suivis de cicatrisation et les tâches administratives.</p>
+                        <a href="#" class="text-sm font-medium text-primary hover:text-blue-600 flex items-center gap-1">
+                            En savoir plus <iconify-icon icon="solar:arrow-right-linear" width="14"></iconify-icon>
+                        </a>
+                    </div>
+
+                    <!-- Card 6 -->
+                    <div class="group bg-white p-8 rounded-2xl border border-border hover:border-primary/30 transition-all hover:shadow-soft">
+                        <div class="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center mb-6 text-text-main group-hover:text-primary transition-colors">
+                            <iconify-icon icon="solar:graph-up-linear" width="22"></iconify-icon>
+                        </div>
+                        <h3 class="text-lg font-semibold text-text-main mb-2">Statistiques</h3>
+                        <p class="text-sm text-text-muted mb-6 leading-relaxed">Analysez votre activité, taux de succès et performance du cabinet en temps réel.</p>
+                        <a href="#" class="text-sm font-medium text-primary hover:text-blue-600 flex items-center gap-1">
+                            En savoir plus <iconify-icon icon="solar:arrow-right-linear" width="14"></iconify-icon>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Focus: ISQ & Flags -->
+        <section class="border-y border-border/50 pt-24 pb-24 gap-x-16 gap-y-16">
+            
+        <div class="grid lg:grid-cols-2 gap-16 max-w-7xl mr-auto ml-auto pr-6 pl-6 gap-x-16 gap-y-16 items-center">
+  <!-- Visual Mockup (Left) -->
+  <div class="order-2">
+    <div class="inline-block text-primary text-sm font-semibold tracking-wide uppercase mb-4">CRM &amp; Suivi Clinique
+    </div>
+    <h2 class="md:text-4xl text-text-main text-3xl font-semibold tracking-tight mb-6">Le dossier patient,<br>enfin centralisé.
+    </h2>
+    <p class="text-text-muted leading-relaxed text-lg mb-8">
+      Pilotez l'intégralité du parcours de soin depuis une interface unique. Historique, radios, devis signés et notes
+      cliniques sont accessibles en un clic.
+    </p>
+    <div class="space-y-5 mb-8">
+      <div class="flex items-start gap-4">
+        <div class="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-primary shrink-0 mt-1">
+          <iconify-icon icon="solar:calendar-add-linear" width="20" class=""></iconify-icon>
+        </div>
+        <div class="">
+          <h4 class="text-base font-semibold text-text-main mb-1">Agenda Synchronisé</h4>
+          <p class="text-sm text-text-muted leading-relaxed">Vos rendez-vous Google Calendar remontent directement dans
+            la fiche patient. Finis les doublons.</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-4">
+        <div class="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-primary shrink-0 mt-1">
+          <iconify-icon icon="solar:clipboard-check-linear" width="20" class=""></iconify-icon>
+        </div>
+        <div class="">
+          <h4 class="text-base font-semibold text-text-main mb-1">Suivi Administratif</h4>
+          <p class="text-sm text-text-muted leading-relaxed">Générez et stockez devis et consentements. Suivez les
+            signatures électroniques en temps réel.</p>
+        </div>
+      </div>
+    </div>
+    <a href="#" class="text-primary font-medium flex items-center gap-2 hover:gap-3 transition-all">
+      Explorer le CRM Patient
+      <iconify-icon icon="solar:arrow-right-linear" width="20"></iconify-icon>
+    </a>
+  </div><div class="order-1 border-border overflow-hidden bg-white border rounded-2xl pt-1 pr-1 pb-1 pl-1 shadow-soft">
+    <div class="flex overflow-hidden bg-[#F8FAFC] h-[380px] z-10 rounded-xl relative">
+      <!-- Dark Sidebar -->
+      <div class="w-14 bg-[#0F172A] flex flex-col items-center py-6 gap-6 shrink-0 z-10">
+  <div class="flex text-white bg-white/10 w-8 h-8 rounded-lg items-center justify-center">
+    <iconify-icon icon="solar:user-bold" width="18" class=""></iconify-icon>
+  </div>
+  <div class="hover:text-white transition-colors cursor-pointer text-gray-500 text-center w-8 h-8">
+    <iconify-icon icon="solar:calendar-linear" width="20" class="" height="20" style="color: rgb(255, 255, 255);"></iconify-icon>
+  </div>
+  <div class="hover:text-white transition-colors cursor-pointer text-gray-500 text-center w-8 h-8">
+    <iconify-icon icon="solar:folder-linear" width="20" class=""></iconify-icon>
+  </div>
+</div>
+
+      <!-- Dashboard Content -->
+      <div class="flex-1 p-4 flex flex-col overflow-hidden">
+        <!-- Top Bar -->
+        <div class="flex mb-4 items-center justify-between">
+          <div class="">
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-semibold text-text-main">Arnaud Dubois</h3>
+              <span class="px-2 py-0.5 rounded text-[10px] bg-status-successBg text-status-success border border-status-success/20 font-medium">Actif</span>
+            </div>
+            <div class="text-[10px] text-text-muted">66 ans • Depuis 2026</div>
+          </div>
+          <div class="flex gap-2">
+            <div class="border-border flex text-text-muted bg-white w-8 h-8 border rounded-full items-center justify-center">
+              <iconify-icon icon="solar:bell-linear" width="16" class="" height="16" style="color: rgb(107, 114, 128);"></iconify-icon>
+            </div>
+            <div class="border-border flex text-text-muted bg-white w-8 h-8 border rounded-full items-center justify-center">
+              <iconify-icon icon="solar:calendar-minimalistic-outline" width="16" class="" height="16" style="color: rgb(107, 114, 128);"></iconify-icon>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+              JB</div>
+          </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          <div class="bg-white p-3 rounded-lg border border-border/60 shadow-sm">
+            <div class="text-[10px] text-text-muted uppercase tracking-wide font-medium mb-1 flex items-center gap-1">
+              <iconify-icon icon="solar:screw-linear" class="text-primary"></iconify-icon> Implants
+            </div>
+            <div class="text-lg font-bold text-text-main">0</div>
+          </div>
+          <div class="bg-white p-3 rounded-lg border border-border/60 shadow-sm">
+            <div class="text-[10px] text-text-muted uppercase tracking-wide font-medium mb-1 flex items-center gap-1">
+              <iconify-icon icon="solar:stethoscope-linear" class="text-primary"></iconify-icon> Actes
+            </div>
+            <div class="text-lg font-bold text-text-main">1</div>
+          </div>
+          <div class="bg-white p-3 rounded-lg border border-border/60 shadow-sm">
+            <div class="text-[10px] text-text-muted uppercase tracking-wide font-medium mb-1 flex items-center gap-1">
+              <iconify-icon icon="solar:calendar-linear" class="text-primary"></iconify-icon> Visites
+            </div>
+            <div class="text-lg font-bold text-text-main">2</div>
+          </div>
+        </div>
+
+        <!-- Content Grid -->
+        <div class="flex gap-4 h-full overflow-hidden">
+          <!-- Timeline Feed -->
+          <div class="flex-1 bg-white rounded-lg border border-border/60 shadow-sm p-4 overflow-hidden relative">
+            <div class="flex justify-between items-center mb-4">
+              <h4 class="text-xs font-bold text-text-main">Fiche clinique</h4>
+              <span class="text-[10px] text-primary cursor-pointer">Voir tout</span>
+            </div>
+
+            <div class="space-y-4 relative">
+              <!-- Line -->
+              <div class="absolute left-3.5 top-2 bottom-0 w-px bg-border/60 z-0"></div>
+
+              <!-- Item 1 -->
+              <div class="flex gap-3 relative z-10">
+                <div class="w-7 h-7 rounded-full bg-primary-light text-primary border border-primary/10 flex items-center justify-center shrink-0">
+                  <iconify-icon icon="solar:calendar-check-bold" width="14"></iconify-icon>
+                </div>
+                <div class="">
+                  <div class="text-xs font-semibold text-text-main">Visite de contrôle</div>
+                  <div class="text-[10px] text-text-muted mb-1">29 janv. 2026 • 14:30</div>
+                  <span class="inline-block px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[9px] border border-gray-200">Terminé</span>
+                </div>
+              </div>
+
+              <!-- Item 2 -->
+              <div class="flex gap-3 relative z-10">
+                <div class="w-7 h-7 rounded-full bg-blue-50 text-blue-500 border border-blue-100 flex items-center justify-center shrink-0">
+                  <iconify-icon icon="solar:gallery-bold" width="14" class=""></iconify-icon>
+                </div>
+                <div class="flex-1">
+                  <div class="text-xs font-semibold text-text-main">Radio panoramique</div>
+                  <div class="text-[10px] text-text-muted mb-1">28 janv. 2026</div>
+                  <div class="bg-surface rounded border border-border p-1.5 flex items-center gap-2 w-full max-w-[160px]">
+                    <div class="w-6 h-6 bg-gray-300 rounded overflow-hidden relative">
+                      <div class="absolute inset-0 bg-black/20"></div>
+                    </div>
+                    <span class="text-[10px] text-primary underline">Voir l'image</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Item 3 -->
+              <div class="flex gap-3 relative z-10">
+                <div class="w-7 h-7 rounded-full bg-orange-50 text-orange-500 border border-orange-100 flex items-center justify-center shrink-0">
+                  <iconify-icon icon="solar:file-text-bold" width="14"></iconify-icon>
+                </div>
+                <div>
+                  <div class="text-xs font-semibold text-text-main">Consentement éclairé</div>
+                  <div class="text-[10px] text-text-muted mb-1">28 janv. 2026</div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-[10px] text-text-main">Devis_Implant.pdf</span>
+                    <iconify-icon icon="solar:check-circle-bold" class="text-status-success" width="12"></iconify-icon>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Gradient Overlay for fade -->
+            <div class="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Text Content (Right) -->
+  
+</div></section>
+
+        <!-- Focus: Documents Explorer -->
+        <section class="pt-24 pb-24">
+            <!-- Existing Block: Documents -->
+            <div class="grid lg:grid-cols-2 gap-16 lg:flex-row-reverse max-w-7xl mr-auto mb-0 ml-auto pr-6 pl-6 gap-x-16 gap-y-16 items-center">
+                <!-- Text Content -->
+                <div class="order-2 lg:order-1">
+  <div class="inline-block text-primary text-sm font-semibold tracking-wide uppercase mb-4">Gestion Documentaire</div>
+  <h2 class="text-3xl md:text-4xl font-semibold text-text-main tracking-tight mb-6">Vos documents cliniques, <br>parfaitement organisés.
+  </h2>
+  <p class="text-text-muted text-lg mb-8 leading-relaxed">
+    Fini les dossiers papiers éparpillés. L'explorateur de documents Cassius classe automatiquement vos radios,
+    consentements et correspondances.
+  </p>
+  <div class="flex flex-wrap gap-3 mb-8">
+    <span class="px-3 py-1 rounded-full bg-white border border-border text-xs text-text-muted font-medium">DICOM</span>
+    <span class="px-3 py-1 rounded-full bg-white border border-border text-xs text-text-muted font-medium">PDF</span>
+    <span class="px-3 py-1 rounded-full bg-white border border-border text-xs text-text-muted font-medium">JPG/PNG</span>
+    <span class="px-3 py-1 rounded-full bg-white border border-border text-xs text-text-muted font-medium">STL</span>
+  </div>
+  <a href="#" class="text-primary font-medium flex items-center gap-2 hover:gap-3 transition-all">
+    Découvrir la gestion documentaire
+    <iconify-icon icon="solar:arrow-right-linear" width="20" class=""></iconify-icon>
+  </a>
+</div>
+
+                <!-- Visual Mockup -->
+                <div class="order-1 lg:order-2 border-border overflow-hidden bg-white border rounded-2xl pt-1 pr-1 pb-1 pl-1 shadow-soft">
+                    <div class="flex h-[340px] bg-surface rounded-xl">
+                        <!-- Sidebar -->
+                        <div class="border-border hidden sm:block w-1/3 border-r pt-4 pr-4 pb-4 pl-4">
+                            <div class="flex items-center gap-2 mb-6 opacity-70">
+                                <div class="w-3 h-3 rounded-full bg-border"></div>
+                                <div class="w-20 h-2 bg-border rounded-full"></div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-3 p-2 bg-primary text-white rounded-lg shadow-sm w-full transition-all cursor-default">
+                                    <iconify-icon icon="solar:users-group-rounded-bold" width="18" height="18"></iconify-icon>
+                                    <span class="text-xs font-semibold tracking-wide">Patients</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-text-muted pl-2">
+                                    <iconify-icon icon="solar:folder-linear" class=""></iconify-icon>
+                                    <span class="text-xs">Radiographies</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-text-muted pl-2">
+                                    <iconify-icon icon="solar:folder-linear" class=""></iconify-icon>
+                                    <span class="text-xs">Devis</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Main List -->
+                        <div class="flex-1 p-4 bg-white rounded-r-xl">
+                            <div class="flex justify-between items-center mb-6">
+                                <span class="text-sm font-semibold text-text-main">Dossier Martin D.</span>
+                                <iconify-icon icon="solar:menu-dots-bold" class="text-text-muted"></iconify-icon>
+                            </div>
+                            <div class="space-y-2">
+                                <!-- File Item -->
+                                <div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface transition-colors cursor-pointer border border-transparent hover:border-border">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded bg-blue-50 text-blue-500 flex items-center justify-center">
+                                            <iconify-icon icon="solar:file-text-linear" class=""></iconify-icon>
+                                        </div>
+                                        <div class="">
+                                            <div class="text-xs font-medium text-text-main">Consentement.pdf</div>
+                                            <div class="text-[10px] text-text-muted">1.2 MB • Hier</div>
+                                        </div>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded text-[10px] bg-status-successBg text-status-success border border-status-success/20">Signé</span>
+                                </div>
+                                <!-- File Item -->
+                                <div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface transition-colors cursor-pointer border border-transparent hover:border-border">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded bg-orange-50 text-orange-500 flex items-center justify-center">
+                                            <iconify-icon icon="solar:gallery-linear" class=""></iconify-icon>
+                                        </div>
+                                        <div class="">
+                                            <div class="text-xs font-medium text-text-main">Radio_Pano.jpg</div>
+                                            <div class="text-[10px] text-text-muted">4.8 MB • 24 Oct</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- File Item -->
+                                <div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface transition-colors cursor-pointer border border-transparent hover:border-border">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded bg-purple-50 text-purple-500 flex items-center justify-center">
+                                            <iconify-icon icon="solar:box-linear" class=""></iconify-icon>
+                                        </div>
+                                        <div class="">
+                                            <div class="text-xs font-medium text-text-main">Scan_3D.stl</div>
+                                            <div class="text-[10px] text-text-muted">128 MB • 20 Oct</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- New Block: CRM & Clinical Record -->
+            
+        </section><section class="border-y border-border/50 pt-24 pb-24 gap-x-16 gap-y-16">
+            <div class="grid lg:grid-cols-2 gap-16 max-w-7xl mr-auto ml-auto pr-6 pl-6 gap-x-16 gap-y-16 items-center">
+                <!-- Visual Mockup -->
+                <div class="bg-surface rounded-2xl p-8 border border-border shadow-inner relative overflow-hidden">
+                    <!-- Abstract Timeline UI -->
+                    <div class="bg-white rounded-xl shadow-soft p-6 border border-border w-full">
+                        <div class="flex items-center justify-between mb-6">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-primary-light text-primary flex items-center justify-center">
+                                    <iconify-icon icon="solar:bone-linear" width="20"></iconify-icon>
+                                </div>
+                                <div class="">
+                                    <div class="text-sm font-semibold text-text-main">Implant #14</div>
+                                    <div class="text-xs text-text-muted">Nobel Biocare • Active</div>
+                                </div>
+                            </div>
+                            <div class="px-2 py-1 bg-status-successBg text-status-success text-xs rounded-md font-medium border border-status-success/10">Stable</div>
+                        </div>
+                        
+                        <!-- Graph bars -->
+                        <div class="flex items-end justify-between h-32 gap-4 pb-4 border-b border-dashed border-border">
+                            <div class="w-full bg-surface rounded-t-md relative group h-[40%]">
+                                <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-medium text-text-muted">62</div>
+                            </div>
+                            <div class="w-full bg-surface rounded-t-md relative group h-[60%]">
+                                <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-medium text-text-muted">68</div>
+                            </div>
+                            <div class="w-full bg-primary/60 rounded-t-md relative group h-[75%]">
+                                <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-medium text-primary">74</div>
+                            </div>
+                            <div class="w-full bg-primary rounded-t-md relative group h-[85%]">
+                                <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-medium text-primary font-bold">79</div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-text-muted mt-2">
+                            <span>S0</span>
+                            <span>S2</span>
+                            <span class="">S6</span>
+                            <span class="">S12</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Floating Badge -->
+                    <div class="absolute top-1/2 right-4 bg-white p-3 rounded-xl shadow-lg border border-border flex items-center gap-3 animate-pulse">
+                        <div class="w-2 h-2 rounded-full bg-status-warning"></div>
+                        <span class="text-xs font-medium text-text-main">Alerte: Contrôle requis</span>
+                    </div>
+                </div>
+
+                <!-- Text Content -->
+                <div class="">
+                    <div class="inline-block text-primary text-sm font-semibold tracking-wide uppercase mb-4">Précision Clinique</div>
+                    <h2 class="text-3xl md:text-4xl font-semibold text-text-main tracking-tight mb-6">Visualisez la stabilité. <br>Anticipez les risques.</h2>
+                    <p class="text-text-muted text-lg mb-8 leading-relaxed">
+                        Le module de suivi ISQ permet de tracer l'évolution de l'ostéo-intégration dans le temps. Détectez les anomalies grâce aux flags automatiques avant qu'elles ne deviennent critiques.
+                    </p>
+                    
+                    <ul class="space-y-4">
+                        <li class="flex items-start gap-3">
+                            <iconify-icon icon="solar:check-circle-bold" class="text-primary mt-1" width="20"></iconify-icon>
+                            <span class="text-text-main">Saisie rapide des valeurs ISQ par quadrant.</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <iconify-icon icon="solar:check-circle-bold" class="text-primary mt-1" width="20"></iconify-icon>
+                            <span class="text-text-main">Comparaison automatique avec les courbes de référence.</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <iconify-icon icon="solar:check-circle-bold" class="text-primary mt-1" width="20"></iconify-icon>
+                            <span class="text-text-main">Système de flags pour les patients à risque.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Integrations -->
+        <section class="pt-24 pb-24" id="integrations">
+            <div class="max-w-7xl mr-auto ml-auto pr-6 pl-6">
+                <div class="flex flex-col md:flex-row md:items-end mb-12 gap-x-6 gap-y-6 items-start justify-between">
+                    <div class="max-w-xl">
+                        <h2 class="text-3xl font-semibold text-text-main tracking-tight mb-4">Connecté à vos outils</h2>
+                        <p class="text-text-muted">Cassius s'intègre parfaitement à votre flux de travail existant. Synchronisez vos rendez-vous et vos communications.</p>
+                    </div>
+                    
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 gap-x-6 gap-y-6">
+                    <!-- Google Calendar -->
+                    <div class="border-border flex flex-col hover:shadow-soft transition-all text-center bg-white border rounded-2xl pt-6 pr-6 pb-6 pl-6 items-center">
+                        <iconify-icon icon="logos:google-calendar" width="40" class="mb-4" height="40"></iconify-icon>
+                        <h4 class="font-semibold text-text-main">Google Calendar</h4>
+                        <p class="text-xs text-text-muted mt-2">Sync bidirectionnelle</p>
+                    </div>
+
+                    <!-- Stripe -->
+                    <div class="border-border flex flex-col hover:shadow-soft transition-all text-center bg-white border rounded-2xl pt-6 pr-6 pb-6 pl-6 items-center">
+                        <iconify-icon icon="logos:google-gmail" width="82" class="opacity-80 mb-4 grayscale" height="34"></iconify-icon>
+                        <h4 class="text-text-main font-semibold mt-auto">Gmail</h4>
+                        <p class="text-text-muted text-xs mt-2">L'ensemble de vos emails au même endroit</p>
+                    <div class="text-[10px] text-text-muted uppercase font-medium tracking-wide rounded pt-0.5 pr-2 pb-0.5 pl-2 absolute top-3 right-3">Bientôt</div><div class="text-[10px] text-text-muted uppercase font-medium tracking-wide rounded pt-0.5 pr-2 pb-0.5 pl-2 absolute top-3 right-3">Bientôt</div></div>
+
+                    <!-- Resend -->
+                    <div class="border-border flex flex-col hover:shadow-soft transition-all text-center bg-white border rounded-2xl pt-6 pr-6 pb-6 pl-6 items-center">
+                        
+                        <iconify-icon icon="logos:google-meet" width="82" class="opacity-80 mb-4 grayscale" height="34"></iconify-icon><h4 class="text-text-main font-semibold">Google Meet</h4>
+                        <p class="text-text-muted text-xs mt-2">Faites des consultations en visio</p>
+                    <div class="text-[10px] text-text-muted uppercase font-medium tracking-wide rounded pt-0.5 pr-2 pb-0.5 pl-2 absolute top-3 right-3">Bientôt</div><div class="text-[10px] text-text-muted uppercase font-medium tracking-wide rounded pt-0.5 pr-2 pb-0.5 pl-2 absolute top-3 right-3">Bientôt</div></div>
+
+                    <!-- Doctolib (Disabled) -->
+                    <div class="border-border flex flex-col cursor-not-allowed overflow-hidden text-center opacity-60 border rounded-2xl pt-6 pr-6 pb-6 pl-6 relative items-center">
+                        <div class="text-[10px] text-text-muted uppercase font-medium tracking-wide rounded pt-0.5 pr-2 pb-0.5 pl-2 absolute top-3 right-3">Bientôt</div>
+                        
+                        <svg xmlns="http://www.w3.org/2000/svg" width="82" height="34" viewBox="0 0 512 214" class="opacity-80 mb-4 grayscale w-[82px] h-[34px]" data-logos="stripe" data-icon-set="logos" data-icon-replaced="true" stroke-width="2" style="color: rgb(107, 114, 128); width: 82px; height: 34px;"><path fill="#635BFF" d="M512 110.08c0-36.409-17.636-65.138-51.342-65.138c-33.85 0-54.33 28.73-54.33 64.854c0 42.808 24.179 64.426 58.88 64.426c16.925 0 29.725-3.84 39.396-9.244v-28.445c-9.67 4.836-20.764 7.823-34.844 7.823c-13.796 0-26.027-4.836-27.591-21.618h69.547c0-1.85.284-9.245.284-12.658m-70.258-13.511c0-16.071 9.814-22.756 18.774-22.756c8.675 0 17.92 6.685 17.92 22.756zm-90.31-51.627c-13.939 0-22.899 6.542-27.876 11.094l-1.85-8.818h-31.288v165.83l35.555-7.537l.143-40.249c5.12 3.698 12.657 8.96 25.173 8.96c25.458 0 48.64-20.48 48.64-65.564c-.142-41.245-23.609-63.716-48.498-63.716m-8.534 97.991c-8.391 0-13.37-2.986-16.782-6.684l-.143-52.765c3.698-4.124 8.818-6.968 16.925-6.968c12.942 0 21.902 14.506 21.902 33.137c0 19.058-8.818 33.28-21.902 33.28M241.493 36.551l35.698-7.68V0l-35.698 7.538zm0 10.809h35.698v124.444h-35.698zm-38.257 10.524L200.96 47.36h-30.72v124.444h35.556V87.467c8.39-10.951 22.613-8.96 27.022-7.396V47.36c-4.551-1.707-21.191-4.836-29.582 10.524m-71.112-41.386l-34.702 7.395l-.142 113.92c0 21.05 15.787 36.551 36.836 36.551c11.662 0 20.195-2.133 24.888-4.693V140.8c-4.55 1.849-27.022 8.391-27.022-12.658V77.653h27.022V47.36h-27.022zM35.982 83.484c0-5.546 4.551-7.68 12.09-7.68c10.808 0 24.461 3.272 35.27 9.103V51.484c-11.804-4.693-23.466-6.542-35.27-6.542C19.2 44.942 0 60.018 0 85.192c0 39.252 54.044 32.995 54.044 49.92c0 6.541-5.688 8.675-13.653 8.675c-11.804 0-26.88-4.836-38.827-11.378v33.849c13.227 5.689 26.596 8.106 38.827 8.106c29.582 0 49.92-14.648 49.92-40.106c-.142-42.382-54.329-34.845-54.329-50.774"></path></svg><h4 class="text-text-main font-semibold">Stripe</h4>
+                        <p class="text-text-muted text-xs mt-2">Gérer vos paiements en ligne</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pricing -->
+        <section id="tarifs" class="py-24 bg-surface/30 border-t border-border/50">
+            <div class="max-w-7xl mr-auto ml-auto pr-6 pl-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl font-semibold text-text-main tracking-tight mb-4">Tarification transparente</h2>
+                    <p class="text-text-muted">Choisissez le plan adapté à la taille de votre cabinet.</p>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                    <!-- Plan Essentiel -->
+                    <div class="bg-white p-8 rounded-[24px] border border-border flex flex-col relative">
+                        <h3 class="text-lg font-medium text-text-main mb-2">Essentiel</h3>
+                        <div class="flex items-baseline gap-1 mb-6">
+                            <span class="text-4xl font-semibold text-text-main tracking-tight">49€</span>
+                            <span class="text-text-muted">/mois</span>
+                        </div>
+                        <p class="text-sm text-text-muted mb-8 pb-8 border-b border-border">Pour les cabinets individuels qui débutent leur digitalisation.</p>
+                        
+                        <ul class="flex-1 mb-8 space-y-4">
+    <li class="flex items-center gap-3 text-sm text-text-main">
+        <iconify-icon icon="solar:check-circle-linear" class="text-primary"></iconify-icon>
+        Inclut 1 utilisateur
+    </li>
+    <li class="flex items-center gap-3 text-sm text-text-main">
+        <iconify-icon icon="solar:check-circle-linear" class="text-primary"></iconify-icon>
+        CRM Patients illimité
+    </li>
+    <li class="flex items-center gap-3 text-sm text-text-main">
+        <iconify-icon icon="solar:check-circle-linear" class="text-primary"></iconify-icon>
+        Suivi ISQ basique
+    </li>
+</ul>
+                        
+                        <button class="border-border text-text-main hover:bg-surface transition-colors font-medium w-full border rounded-full pt-3 pb-3 cursor-pointer" onclick="window.location.href='https://calendly.com/admin-cassiusapp/30min'" role="button">Commencer</button>
+                    </div>
+
+                    <!-- Plan Pro -->
+                    <div class="bg-white p-8 rounded-[24px] border border-primary/20 shadow-lg shadow-primary/5 flex flex-col relative ring-1 ring-primary/20">
+                        <div class="absolute top-0 right-0 bg-primary-light text-primary text-xs font-bold px-3 py-1 rounded-bl-xl rounded-tr-[23px]">POPULAIRE</div>
+                        <h3 class="text-lg font-medium text-text-main mb-2">Pro</h3>
+                        <div class="flex items-baseline gap-1 mb-6">
+                            <span class="text-4xl font-semibold text-text-main tracking-tight">99€</span>
+                            <span class="text-text-muted">/mois</span>
+                        </div>
+                        <p class="text-sm text-text-muted mb-8 pb-8 border-b border-border">Pour les cliniques d'implantologie avec équipe complète.</p>
+                        
+                        <ul class="flex-1 mb-8 space-y-4">
+    <li class="flex items-center gap-3 text-sm text-text-main">
+        <iconify-icon icon="solar:check-circle-bold" class="text-primary" width="14" height="14" style="color: rgb(60, 131, 246)"></iconify-icon>
+        Utilisateurs illimités
+    </li>
+    <li class="flex gap-3 text-text-main text-sm gap-x-3 gap-y-3 items-center">
+        <iconify-icon icon="solar:check-circle-bold" class="text-primary"></iconify-icon>
+        Module Analytics avancé
+    </li>
+    <li class="flex gap-3 text-text-main text-sm gap-x-3 gap-y-3 items-center">
+        <iconify-icon icon="solar:check-circle-bold" class="text-primary"></iconify-icon>
+        Intégrations API complètes
+    </li>
+
+</ul>
+                        
+                        <button class="w-full sm:w-auto bg-primary text-white font-medium px-8 py-3.5 rounded-full shadow-glow hover:bg-blue-600 transition-colors cursor-pointer pt-3 pb-3" onclick="window.location.href='https://calendly.com/admin-cassiusapp/30min'" role="button">Choisir Pro</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Security -->
+        <section id="securite" class="py-24">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl font-semibold text-text-main tracking-tight mb-4">Sécurité HDS native</h2>
+                    <p class="text-text-muted max-w-2xl mx-auto">Vos données de santé méritent le plus haut niveau de protection.</p>
+                </div>
+                
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="p-6 rounded-2xl bg-surface border border-border/50">
+                        <iconify-icon icon="solar:server-square-linear" class="text-primary mb-4" width="32"></iconify-icon>
+                        <h4 class="font-semibold text-text-main mb-2">Multi-tenant</h4>
+                        <p class="text-xs text-text-muted leading-relaxed">Isolation logique stricte des données de chaque cabinet.</p>
+                    </div>
+                    <div class="p-6 rounded-2xl bg-surface border border-border/50">
+                        <iconify-icon icon="solar:lock-keyhole-linear" class="text-primary mb-4" width="32"></iconify-icon>
+                        <h4 class="font-semibold text-text-main mb-2">URLs Signées</h4>
+                        <p class="text-xs text-text-muted leading-relaxed">Accès temporaire et crypté aux documents sensibles.</p>
+                    </div>
+                    <div class="p-6 rounded-2xl bg-surface border border-border/50">
+                        <iconify-icon icon="solar:user-id-linear" class="text-primary mb-4" width="32"></iconify-icon>
+                        <h4 class="font-semibold text-text-main mb-2">Rôles &amp; Permissions</h4>
+                        <p class="text-xs text-text-muted leading-relaxed">Granularité fine des accès (Chirurgien, Assistant, Secrétariat).</p>
+                    </div>
+                    <div class="p-6 rounded-2xl bg-surface border border-border/50">
+                        <iconify-icon icon="solar:shield-check-linear" class="text-primary mb-4" width="32"></iconify-icon>
+                        <h4 class="font-semibold text-text-main mb-2">Audit &amp; Backups</h4>
+                        <p class="text-xs text-text-muted leading-relaxed">Traçabilité complète des actions et sauvegardes horaires chiffrées.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Testimonials -->
+        <section class="py-24 bg-surface/30">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="bg-white p-8 rounded-2xl border border-border shadow-sm">
+                        <div class="flex gap-1 text-yellow-400 mb-4">
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                        </div>
+                        <p class="text-text-main text-sm italic mb-6 leading-relaxed">"Cassius a transformé notre gestion post-opératoire. La visualisation des courbes ISQ est un game-changer pour sécuriser nos mises en charge immédiates."</p>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-200"></div>
+                            <div class="">
+                                <div class="text-xs font-semibold text-text-main">Dr. Thomas V.</div>
+                                <div class="text-[10px] text-text-muted">Chirurgien Dentiste, Paris</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white p-8 rounded-2xl border border-border shadow-sm">
+                        <div class="flex gap-1 text-yellow-400 mb-4">
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16" class=""></iconify-icon>
+                        </div>
+                        <p class="text-text-main text-sm italic mb-6 leading-relaxed">"L'interface est d'une clarté absolue. Mon assistante a pris l'outil en main en une après-midi. Le gain de temps administratif est réel."</p>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-200"></div>
+                            <div class="">
+                                <div class="text-xs font-semibold text-text-main">Dr. Sarah L.</div>
+                                <div class="text-[10px] text-text-muted">Implantologue, Lyon</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-2xl border border-border shadow-sm">
+                        <div class="flex gap-1 text-yellow-400 mb-4">
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                            <iconify-icon icon="solar:star-bold" width="16"></iconify-icon>
+                        </div>
+                        <p class="text-text-main text-sm italic mb-6 leading-relaxed">"Enfin un logiciel moderne qui ne ressemble pas à Windows 98. La gestion documentaire est fluide et ultra-rapide."</p>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-200"></div>
+                            <div class="">
+                                <div class="text-xs font-semibold text-text-main">Dr. Marc A.</div>
+                                <div class="text-[10px] text-text-muted">Parodontiste, Bordeaux</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final CTA -->
+        <section class="pt-24 pr-6 pb-24 pl-6">
+            <div class="max-w-4xl mx-auto bg-text-main rounded-[32px] p-12 text-center relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                
+                <h2 class="text-3xl md:text-4xl font-semibold text-white tracking-tight mb-6 relative z-10">Prêt à simplifier votre suivi ?</h2>
+                <p class="text-gray-400 mb-10 text-lg relative z-10">Rejoignez les cabinets modernes qui font confiance à Cassius.</p>
+                
+                <a href="https://calendly.com/admin-cassiusapp/30min" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center bg-primary hover:bg-blue-600 text-white font-medium px-8 py-4 rounded-full transition-all shadow-glow hover:scale-105 relative z-10">
+                    Demander une démo
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-border bg-white pt-16 pb-8">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex flex-col md:flex-row justify-between items-start gap-12 mb-16">
+                <div class="">
+                    <a href="/#" class="text-text-main block text-xl font-semibold tracking-tight mb-4">Cassius</a>
+                    <p class="text-text-muted text-sm max-w-xs">
+                        Cassius — le compagnon digital des chirurgiens-dentistes.
+                    </p>
+                </div>
+                
+                <div class="flex gap-16 flex-wrap">
+                    <div class="">
+                        <h4 class="font-semibold text-text-main text-sm mb-4">Produit</h4>
+                        <ul class="space-y-3 text-sm text-text-muted">
+                            <li class=""><a href="#" class="hover:text-primary transition-colors">Fonctionnalités</a></li>
+                            <li><a href="#" class="hover:text-primary transition-colors">Intégrations</a></li>
+                            <li><a href="#" class="hover:text-primary transition-colors">Tarifs</a></li>
+                            
+                        </ul>
+                    </div>
+                    <div class="">
+                        <h4 class="font-semibold text-text-main text-sm mb-4">Société</h4>
+                        <ul class="space-y-3 text-sm text-text-muted">
+                            <li><a href="#" class="hover:text-primary transition-colors">À propos</a></li>
+                            <li><a href="#" class="hover:text-primary transition-colors">Contact</a></li>
+                            <li class=""><a href="#" class="hover:text-primary transition-colors">Blog</a></li>
+                        </ul>
+                    </div>
+                    <div class="">
+                        <h4 class="font-semibold text-text-main text-sm mb-4">Légal</h4>
+                        <ul class="space-y-3 text-sm text-text-muted">
+                            <li class=""><a href="#" class="hover:text-primary transition-colors">Mentions légales</a></li>
+                            <li class=""><div class="inline">
+  <a href="#privacy-policy" class="hover:text-primary transition-colors">Politique de confidentialité</a>
+  
+  <div id="privacy-policy" class="hidden target:block fixed inset-0 z-[100] bg-white overflow-y-auto text-left cursor-auto font-sans antialiased w-full h-full" style="margin: 0; padding: 0;">
+    <div class="max-w-3xl mx-auto px-6 py-24">
+      <a href="#" class="inline-flex items-center gap-2 text-primary hover:text-blue-600 font-medium mb-12 transition-colors text-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+        Retour
+      </a>
+      
+      <h1 class="text-4xl font-semibold text-text-main tracking-tight mb-12">Politique de confidentialité</h1>
+      
+      <div class="space-y-10 text-text-muted leading-relaxed text-base">
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">1. Introduction</h2>
+          <p>La présente politique de confidentialité a pour objectif d'informer les utilisateurs de l'application Cassius sur la manière dont leurs données personnelles sont collectées, utilisées et protégées.</p>
+          <p class="mt-4">Cassius est une application SaaS destinée aux professionnels de santé, permettant la gestion de données cliniques, notamment en implantologie.</p>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">2. Responsable du traitement</h2>
+          <p>Le responsable du traitement des données est :</p>
+          <ul class="mt-4 space-y-2">
+            <li></li>
+            <li>Email : <a href="mailto:contact@cassiuspro.com" class="text-primary hover:underline">contact@cassiuspro.com</a></li>
+            <li>Site : <a href="https://cassiuspro.com" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">https://cassiuspro.com</a></li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">3. Données collectées</h2>
+          <p class="mb-6">Nous collectons uniquement les données nécessaires au fonctionnement de l'application.</p>
+          
+          <h3 class="text-lg font-medium text-text-main mb-3">a) Données de compte</h3>
+          <ul class="list-disc pl-5 mb-6 space-y-2">
+            <li>Nom</li>
+            <li>Prénom</li>
+            <li>Email</li>
+            
+          </ul>
+
+          <h3 class="text-lg font-medium text-text-main mb-3">b) Données professionnelles</h3>
+          <ul class="list-disc pl-5 mb-6 space-y-2">
+            <li>Organisation / cabinet</li>
+            <li>Rôle utilisateur</li>
+          </ul>
+
+          <h3 class="text-lg font-medium text-text-main mb-3">c) Données patients (sous responsabilité du praticien)</h3>
+          <ul class="list-disc pl-5 mb-6 space-y-2">
+            <li>Nom / prénom</li>
+            <li>Informations médicales liées aux implants</li>
+            <li>Données de suivi (ISQ, visites, etc.)</li>
+            
+          </ul>
+
+          <div class="bg-status-warningBg border border-status-warning/20 text-status-warning p-4 rounded-xl flex gap-3 items-start">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-triangle-alert shrink-0 mt-0.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+            <p class="text-sm font-medium">Ces données sont sous la responsabilité du professionnel de santé utilisateur.</p>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">4. Utilisation des données</h2>
+          <p class="mb-4">Les données sont utilisées pour :</p>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>Fournir et faire fonctionner l'application</li>
+            <li>Gérer les comptes utilisateurs</li>
+            <li>Assurer le suivi clinique des patients</li>
+            
+            
+          </ul>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">5. Intégrations Google</h2>
+          <p class="mb-6">Cassius peut utiliser des services Google (Google Calendar, Gmail).</p>
+          
+          <h3 class="text-lg font-medium text-text-main mb-3">a) Google Calendar</h3>
+          <ul class="list-disc pl-5 mb-6 space-y-2">
+            <li>Synchronisation des rendez-vous</li>
+            <li>Aucune utilisation à des fins publicitaires</li>
+          </ul>
+
+          <h3 class="text-lg font-medium text-text-main mb-3">b) Gmail (si activé)</h3>
+          <ul class="list-disc pl-5 mb-6 space-y-2">
+            <li>Accès limité aux métadonnées des emails (expéditeur, date)</li>
+            <li>Aucun accès au contenu des emails sans consentement explicite</li>
+          </ul>
+
+          <div class="bg-primary-light border border-primary/20 text-primary p-4 rounded-xl flex gap-3 items-start">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+            <p class="text-sm font-medium">Cassius n'utilise pas les données Google à des fins commerciales ou publicitaires.</p>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">6. Partage des données</h2>
+          <p class="mb-4">Les données ne sont jamais vendues. Elles peuvent être partagées uniquement avec :</p>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>des prestataires techniques (hébergement, stockage)</li>
+            <li>dans le respect strict de la confidentialité</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">7. Hébergement et sécurité</h2>
+          <p class="mb-4">Les données sont hébergées via des services sécurisés (ex : Supabase).</p>
+          <p class="mb-4">Mesures mises en place :</p>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>chiffrement des données</li>
+            <li>accès sécurisé (authentification)</li>
+            <li>contrôle des accès par rôle</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">8. Durée de conservation</h2>
+          <p class="mb-4">Les données sont conservées :</p>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>pendant toute la durée d'utilisation du service</li>
+            <li>puis supprimées ou anonymisées sur demande</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">9. Droits des utilisateurs</h2>
+          <p class="mb-4">Conformément au RGPD, vous disposez des droits2"&gt;
+            </p><li>accès à vos données</li>
+            <li>rectification</li>
+            <li>suppression</li>
+            <li>limitation du traitement</li>
+            <li>portabilité</li>
+          
+          <p>Pour exercer ces droits : <br><a href="mailto:contact@cassiuspro.com" class="text-primary hover:underline">contact@cassiuspro.com</a></p>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">10. Cookies</h2>
+          <p>Cassius utilise des cookies techniques nécessaires au fonctionnement de l'application.</p>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">11. Modifications</h2>
+          <p>Cette politique peut être modifiée à tout moment. Les utilisateurs seront informés en cas de changement majeur.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+</div></li>
+                            <li class=""><div class="inline">
+  <a href="#terms-of-service" class="hover:text-primary transition-colors">CGU</a>
+  
+  <div id="terms-of-service" class="hidden target:block fixed inset-0 z-[100] bg-white overflow-y-auto text-left cursor-auto font-sans antialiased w-full h-full" style="margin: 0; padding: 0;">
+    <div class="max-w-3xl mx-auto px-6 py-24">
+      <a href="#" class="inline-flex items-center gap-2 text-primary hover:text-blue-600 font-medium mb-12 transition-colors text-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+        Retour
+      </a>
+      
+      <h1 class="text-4xl font-semibold text-text-main tracking-tight mb-12">Conditions d'utilisation</h1>
+      
+      <div class="space-y-10 text-text-muted leading-relaxed text-base">
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">1. Objet</h2>
+          <p>Les présentes conditions régissent l’accès et l’utilisation de l’application Cassius, plateforme SaaS de gestion de données cliniques.</p>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">2. Accès au service</h2>
+          <p class="mb-4">L’accès à Cassius est réservé aux utilisateurs disposant d’un compte.</p>
+          <p class="mb-4">L’utilisateur est responsable :</p>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>de la confidentialité de ses identifiants</li>
+            <li>de l’usage de son compte</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">3. Utilisation du service</h2>
+          <p class="mb-4">L’utilisateur s’engage à :</p>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>utiliser l’application conformément à la loi</li>
+            <li>ne pas porter atteinte à la sécurité du service</li>
+            <li>ne pas détourner l’usage de la plateforme</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">4. Données patients</h2>
+          <p class="mb-4">Les données patients saisies dans Cassius sont sous la responsabilité exclusive du professionnel de santé utilisateur.</p>
+          
+          <div class="bg-primary-light border border-primary/20 text-primary p-4 rounded-xl flex gap-3 items-start">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+            <p class="text-sm font-medium">Cassius agit comme un outil technique, non comme responsable médical.</p>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">5. Disponibilité</h2>
+          <p class="mb-4">Cassius s’efforce d’assurer un service disponible en continu, mais ne garantit pas une disponibilité sans interruption.</p>
+          <p>Des maintenances peuvent être effectuées.</p>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">6. Sécurité</h2>
+          <p class="mb-4">L’utilisateur s’engage à :</p>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>ne pas tenter d’accéder aux comptes d’autres utilisateurs</li>
+            <li>signaler toute faille de sécurité</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">7. Responsabilité</h2>
+          <p class="mb-4">Cassius ne pourra être tenu responsable :</p>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>d’une mauvaise utilisation du service</li>
+            <li>d’erreurs de saisie des utilisateurs</li>
+            <li>de décisions médicales prises via l’outil</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">8. Intégrations tierces</h2>
+          <p>L’utilisation de services tiers (Google, etc.) est soumise à leurs propres conditions.</p>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">9. Résiliation</h2>
+          <p class="mb-4">L’utilisateur peut supprimer son compte à tout moment.</p>
+          <p>Cassius se réserve le droit de suspendre un compte en cas de non-respect des conditions.</p>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">10. Évolution du service</h2>
+          <p>Cassius peut modifier ses fonctionnalités à tout moment pour améliorer le service.</p>
+        </section>
+
+        <section>
+          <h2 class="text-xl font-semibold text-text-main tracking-tight mb-4">11. Droit applicable</h2>
+          <p>Les présentes conditions sont régies par le droit français.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+</div></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-border flex flex-col sm:flex-row gap-4 text-center border-t pt-8 gap-x-4 gap-y-4 items-center justify-between text-align: center;">
+    <div class="text-text-muted text-sm text-center" style="font-style: italic; font-size: 12px; ">© 2026 Cassius. Tous
+        droits réservés.</div>
+    <div class="flex gap-4">
+        <a href="#" class="text-text-muted hover:text-primary transition-colors">
+            <iconify-icon icon="solar:brands-linkedin-linear" width="20"></iconify-icon>
+        </a>
+        <a href="#" class="text-text-muted hover:text-primary transition-colors">
+            <iconify-icon icon="solar:brands-twitter-linear" width="20"></iconify-icon>
+        </a>
+    </div>
+</div>
+        </div>
+    </footer>
+
+
+</body></html>
