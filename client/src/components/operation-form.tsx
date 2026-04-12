@@ -1064,283 +1064,130 @@ export function OperationForm({ patientId, onSuccess, defaultImplant }: Operatio
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        {/* Prothese Brand Selector */}
+                      {/* Ligne 1 : Marque + Nom du pilier (sélecteur combiné) | Type de pilier */}
+                      <div className="grid grid-cols-3 gap-3">
                         <FormField
                           control={form.control}
                           name={`protheses.${index}.catalogProtheseId`}
-                          render={({ field }) => {
-                            // Group protheses by brand
-                            const grouped = sortedProtheses.reduce((acc, prothese) => {
-                              const key = prothese.marque;
-                              if (!acc[key]) {
-                                acc[key] = {
-                                  key,
-                                  marque: prothese.marque,
-                                  isFavorite: prothese.isFavorite,
-                                  protheses: []
-                                };
-                              }
-                              acc[key].protheses.push(prothese);
-                              if (prothese.isFavorite) acc[key].isFavorite = true;
-                              return acc;
-                            }, {} as Record<string, { key: string; marque: string; isFavorite: boolean; protheses: typeof sortedProtheses }>);
-
-                            const brands = Object.values(grouped).sort((a, b) => {
-                              if (a.isFavorite && !b.isFavorite) return -1;
-                              if (!a.isFavorite && b.isFavorite) return 1;
-                              return a.marque.localeCompare(b.marque);
-                            });
-
-                            const currentBrandKey = selectedProtheseBrandByIndex[index];
-                            const currentBrand = currentBrandKey ? grouped[currentBrandKey] : null;
-                            const selectedProtheseItem = sortedProtheses.find(p => p.id === field.value);
-                            
-                            // Auto-select brand if prothese is already selected
-                            if (selectedProtheseItem && !currentBrandKey) {
-                              if (grouped[selectedProtheseItem.marque]) {
-                                setSelectedProtheseBrandByIndex(prev => ({ ...prev, [index]: selectedProtheseItem.marque }));
-                              }
-                            }
-
-                            return (
-                              <FormItem className="flex flex-col">
-                                <FormLabel className="text-[11px]">Marque <span className="text-destructive">*</span></FormLabel>
-                                <Popover 
-                                  open={openProthesePopoverIndex === index} 
-                                  onOpenChange={(open) => setOpenProthesePopoverIndex(open ? index : null)}
-                                >
-                                  <PopoverTrigger asChild>
-                                    <FormControl>
-                                      <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        className={cn(
-                                          "justify-between text-[12px]",
-                                          !currentBrand && "text-muted-foreground"
-                                        )}
-                                        data-testid={`select-prothese-brand-${index}`}
-                                      >
-                                        {currentBrand ? (
+                          render={({ field }) => (
+                            <FormItem className="col-span-2 flex flex-col">
+                              <FormLabel className="text-[11px]">Marque / Nom du pilier <span className="text-destructive">*</span></FormLabel>
+                              <Popover
+                                open={openProthesePopoverIndex === index}
+                                onOpenChange={(open) => setOpenProthesePopoverIndex(open ? index : null)}
+                              >
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      className={cn("justify-between text-[12px] h-9", !field.value && "text-muted-foreground")}
+                                      data-testid={`select-prothese-${index}`}
+                                    >
+                                      {field.value ? (() => {
+                                        const p = sortedProtheses.find(p => p.id === field.value);
+                                        return p ? (
                                           <span className="truncate flex items-center gap-1">
-                                            {currentBrand.isFavorite && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
-                                            {currentBrand.marque}
+                                            {p.isFavorite && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 shrink-0" />}
+                                            <span className="font-medium">{p.marque}</span>
+                                            {p.nomPilier && <span className="text-muted-foreground">— {p.nomPilier}</span>}
                                           </span>
-                                        ) : (
-                                          <span className="text-[11px]">Sélectionner</span>
-                                        )}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                    </FormControl>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-[250px] p-0" onWheelCapture={(e) => e.stopPropagation()}>
-                                    <Command>
-                                      <CommandInput placeholder="Rechercher..." className="text-[11px]" />
-                                      <CommandList>
-                                        <CommandEmpty className="text-[11px]">Aucun résultat</CommandEmpty>
-                                        <CommandGroup>
-                                          {brands.map((brand) => (
-                                            <CommandItem
-                                              key={brand.key}
-                                              value={brand.marque}
-                                              onSelect={() => {
-                                                setSelectedProtheseBrandByIndex(prev => ({ ...prev, [index]: brand.key }));
-                                                const favoriteInBrand = brand.protheses.find(p => p.isFavorite);
-                                                if (favoriteInBrand) {
-                                                  field.onChange(favoriteInBrand.id);
-                                                } else {
-                                                  field.onChange("");
-                                                }
-                                                setOpenProthesePopoverIndex(null);
-                                              }}
-                                              className="text-[11px]"
-                                            >
-                                              <Check
-                                                className={cn(
-                                                  "mr-2 h-3 w-3",
-                                                  currentBrandKey === brand.key ? "opacity-100" : "opacity-0"
-                                                )}
-                                              />
-                                              <span className="flex items-center gap-1">
-                                                {brand.isFavorite && <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />}
-                                                {brand.marque}
-                                              </span>
-                                            </CommandItem>
-                                          ))}
-                                        </CommandGroup>
-                                      </CommandList>
-                                    </Command>
-                                  </PopoverContent>
-                                </Popover>
-                              </FormItem>
-                            );
-                          }}
-                        />
-                        
-                        {/* Prothese Variant Selector */}
-                        <FormField
-                          control={form.control}
-                          name={`protheses.${index}.catalogProtheseId`}
-                          render={({ field }) => {
-                            const currentBrandKey = selectedProtheseBrandByIndex[index];
-                            const availableVariants = currentBrandKey 
-                              ? sortedProtheses.filter(p => p.marque === currentBrandKey)
-                              : [];
-                            const selectedProtheseItem = sortedProtheses.find(p => p.id === field.value);
-
-                            return (
-                              <FormItem className="flex flex-col">
-                                <FormLabel className="text-[11px]">Type de pilier <span className="text-destructive">*</span></FormLabel>
-                                <Popover
-                                  open={openProtheseDimensionPopoverIndex === index}
-                                  onOpenChange={(open) => setOpenProtheseDimensionPopoverIndex(open ? index : null)}
-                                >
-                                  <PopoverTrigger asChild>
-                                    <FormControl>
-                                      <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        disabled={!currentBrandKey}
-                                        className={cn(
-                                          "justify-between text-[12px]",
-                                          !field.value && "text-muted-foreground"
-                                        )}
-                                        data-testid={`select-prothese-variant-${index}`}
-                                      >
-                                        {selectedProtheseItem ? (
-                                          <span className="truncate flex flex-col items-start leading-tight">
-                                            <span>{selectedProtheseItem.referenceFabricant || "Standard"}</span>
-                                            <span className="text-[9px] italic text-muted-foreground">
-                                              {selectedProtheseItem.typeProthese === "VISSEE" ? "Vissée" : selectedProtheseItem.typeProthese === "SCELLEE" ? "Scellée" : ""}
+                                        ) : <span className="text-[11px]">Sélectionner</span>;
+                                      })() : <span className="text-[11px]">Sélectionner une prothèse</span>}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[360px] p-0" onWheelCapture={(e) => e.stopPropagation()}>
+                                  <Command>
+                                    <CommandInput placeholder="Rechercher marque ou pilier..." className="text-[11px]" />
+                                    <CommandList>
+                                      <CommandEmpty className="text-[11px] p-4 text-center text-muted-foreground">Aucun résultat</CommandEmpty>
+                                      <CommandGroup>
+                                        {sortedProtheses.map((prothese) => (
+                                          <CommandItem
+                                            key={prothese.id}
+                                            value={`${prothese.marque} ${prothese.nomPilier || ""} ${prothese.referenceFabricant || ""}`}
+                                            onSelect={() => {
+                                              field.onChange(prothese.id);
+                                              setOpenProthesePopoverIndex(null);
+                                            }}
+                                            className="text-[11px]"
+                                          >
+                                            <Check className={cn("mr-2 h-3 w-3 shrink-0", field.value === prothese.id ? "opacity-100" : "opacity-0")} />
+                                            <span className="flex items-center gap-1.5">
+                                              {prothese.isFavorite && <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />}
+                                              <span className="font-medium">{prothese.marque}</span>
+                                              {prothese.nomPilier && <span className="text-muted-foreground">— {prothese.nomPilier}</span>}
+                                              {prothese.referenceFabricant && <span className="text-muted-foreground text-[10px]">({prothese.referenceFabricant})</span>}
                                             </span>
-                                          </span>
-                                        ) : (
-                                          <span className="text-[11px]">{currentBrandKey ? "Sélectionner" : "Choisir variante"}</span>
-                                        )}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                    </FormControl>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-[200px] p-0" onWheelCapture={(e) => e.stopPropagation()}>
-                                    <Command>
-                                      <CommandList>
-                                        {availableVariants.length === 0 ? (
-                                          <div className="p-4 text-[11px] text-muted-foreground text-center">
-                                            Aucune variante
-                                          </div>
-                                        ) : (
-                                          <CommandGroup>
-                                            {availableVariants.map((prothese) => (
-                                              <CommandItem
-                                                key={prothese.id}
-                                                value={`${prothese.typeProthese || ""} ${prothese.quantite || ""}`}
-                                                onSelect={() => {
-                                                  field.onChange(prothese.id);
-                                                  setOpenProtheseDimensionPopoverIndex(null);
-                                                }}
-                                                className="text-[11px]"
-                                              >
-                                                <Check
-                                                  className={cn(
-                                                    "mr-2 h-3 w-3",
-                                                    field.value === prothese.id ? "opacity-100" : "opacity-0"
-                                                  )}
-                                                />
-                                                <span className="flex flex-col items-start leading-tight">
-                                                  <span>{prothese.referenceFabricant || "Standard"}</span>
-                                                  <span className="text-[9px] italic text-muted-foreground">
-                                                    {prothese.typeProthese === "VISSEE" ? "Vissée" : prothese.typeProthese === "SCELLEE" ? "Scellée" : ""}
-                                                  </span>
-                                                </span>
-                                              </CommandItem>
-                                            ))}
-                                          </CommandGroup>
-                                        )}
-                                      </CommandList>
-                                    </Command>
-                                  </PopoverContent>
-                                </Popover>
-                                <FormMessage />
-                              </FormItem>
-                            );
-                          }}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </div>
-                      
-                      {/* Nom du pilier (from catalog, read-only display) */}
-                      {selectedProthese?.nomPilier && (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[11px] font-medium text-muted-foreground">Pilier</span>
-                          <span className="text-sm font-medium text-foreground">
-                            {selectedProthese.nomPilier}
-                          </span>
+
+                        {/* Type de pilier (lecture seule depuis le catalogue) */}
+                        <div className="flex flex-col gap-2">
+                          <span className="text-[11px] font-medium leading-none">Type de pilier</span>
+                          <div className="h-9 flex items-center">
+                            {selectedProthese?.typePilier ? (
+                              <Badge variant="outline" className="text-[11px]">
+                                {selectedProthese.typePilier === "DROIT" ? "Droit" : selectedProthese.typePilier === "ANGULE" ? "Angulé" : "Multi-unit"}
+                              </Badge>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground">—</span>
+                            )}
+                          </div>
                         </div>
-                      )}
-
-                      {/* Type de connexion + Site FDI on same row */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name={`protheses.${index}.typePilier`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-[11px]">Type de connexion</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value || ""}>
-                                <FormControl>
-                                  <SelectTrigger data-testid={`select-prothese-connexion-${index}`}>
-                                    <SelectValue placeholder="Sélectionner..." />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="VISSE">Vissé</SelectItem>
-                                  <SelectItem value="SCELLE">Scellé</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name={`protheses.${index}.siteFdi`}
-                          render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                              <FormLabel className="text-[11px]">Site FDI <span className="text-destructive">*</span></FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Ex: 16"
-                                  {...field}
-                                  data-testid={`input-prothese-fdi-${index}`}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
                       </div>
 
-                      {/* Type de prothèse (mobilite) */}
+                      {/* Ligne 2 : Site FDI */}
                       <FormField
                         control={form.control}
-                        name={`protheses.${index}.mobilite`}
+                        name={`protheses.${index}.siteFdi`}
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[11px]">Type de prothèse</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                              <FormControl>
-                                <SelectTrigger data-testid={`select-prothese-mobilite-${index}`}>
-                                  <SelectValue placeholder="Sélectionner..." />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="AMOVIBLE">Amovible</SelectItem>
-                                <SelectItem value="FIXE">Fixe</SelectItem>
-                              </SelectContent>
-                            </Select>
+                          <FormItem className="flex flex-col">
+                            <FormLabel className="text-[11px]">Site FDI <span className="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Ex: 16"
+                                {...field}
+                                data-testid={`input-prothese-fdi-${index}`}
+                              />
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+
+                      {/* Ligne 3 : Type de prothèse + Type de connexion (lecture seule depuis le catalogue) */}
+                      {selectedProthese && (selectedProthese.mobilite || selectedProthese.typeProthese) && (
+                        <div className="grid grid-cols-2 gap-3">
+                          {selectedProthese.mobilite && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[11px] font-medium text-muted-foreground">Type de prothèse</span>
+                              <span className="text-[12px] font-medium">
+                                {selectedProthese.mobilite === "AMOVIBLE" ? "Amovible" : "Fixe"}
+                              </span>
+                            </div>
+                          )}
+                          {selectedProthese.mobilite === "FIXE" && selectedProthese.typeProthese && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[11px] font-medium text-muted-foreground">Type de connexion</span>
+                              <span className="text-[12px] font-medium">
+                                {selectedProthese.typeProthese === "VISSEE" ? "Vissée" : "Scellée"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );

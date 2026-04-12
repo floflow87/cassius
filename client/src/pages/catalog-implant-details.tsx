@@ -71,6 +71,8 @@ export default function CatalogImplantDetailsPage() {
   const [editReferenceFabricant, setEditReferenceFabricant] = useState("");
   const [editTypeProthese, setEditTypeProthese] = useState<"VISSEE" | "SCELLEE" | "">("");
   const [editMobilite, setEditMobilite] = useState<"AMOVIBLE" | "FIXE" | "">("");
+  const [editNomPilier, setEditNomPilier] = useState("");
+  const [editTypePilier, setEditTypePilier] = useState<"DROIT" | "ANGULE" | "MULTI_UNIT" | "">("");
   const [editDiametre, setEditDiametre] = useState<number>(0);
   const [editLongueur, setEditLongueur] = useState<number>(0);
 
@@ -155,6 +157,8 @@ export default function CatalogImplantDetailsPage() {
       setEditReferenceFabricant(implant.referenceFabricant || "");
       setEditTypeProthese(implant.typeProthese || "");
       setEditMobilite(implant.mobilite || "");
+      setEditNomPilier(implant.nomPilier || "");
+      setEditTypePilier((implant.typePilier as "DROIT" | "ANGULE" | "MULTI_UNIT" | "") || "");
       setEditDiametre(implant.diametre);
       setEditLongueur(implant.longueur);
     }
@@ -179,6 +183,8 @@ export default function CatalogImplantDetailsPage() {
       referenceFabricant: editReferenceFabricant || null,
       mobilite: editTypeImplant === "PROTHESE" ? (editMobilite || null) : null,
       typeProthese: editTypeImplant === "PROTHESE" && editMobilite === "FIXE" ? (editTypeProthese || null) : null,
+      nomPilier: editTypeImplant === "PROTHESE" ? (editNomPilier || null) : null,
+      typePilier: editTypeImplant === "PROTHESE" ? (editTypePilier || null) : null,
       diametre: editDiametre,
       longueur: editLongueur,
     } as any);
@@ -253,13 +259,18 @@ export default function CatalogImplantDetailsPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-semibold" data-testid="text-implant-title">
               {implantType} {implant.marque} {typeLabel}
             </h1>
             {implant.typeImplant === "MINI_IMPLANT" && (
               <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                 Mini
+              </Badge>
+            )}
+            {isProthese && implant.mobilite && (
+              <Badge variant="outline" className="text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800" data-testid="badge-prothese-type">
+                {implant.mobilite === "AMOVIBLE" ? "Amovible" : implant.typeProthese === "VISSEE" ? "Vissée" : implant.typeProthese === "SCELLEE" ? "Scellée" : "Fixe"}
               </Badge>
             )}
           </div>
@@ -348,6 +359,32 @@ export default function CatalogImplantDetailsPage() {
                       </Select>
                     </div>
                   )}
+                  {editTypeImplant === "PROTHESE" && (
+                    <div className="space-y-2">
+                      <Label>Nom du pilier (optionnel)</Label>
+                      <Input
+                        value={editNomPilier}
+                        onChange={(e) => setEditNomPilier(e.target.value)}
+                        placeholder="Ex: Bone Level NC, Active RP..."
+                        data-testid="input-edit-nom-pilier"
+                      />
+                    </div>
+                  )}
+                  {editTypeImplant === "PROTHESE" && (
+                    <div className="space-y-2">
+                      <Label>Type de pilier (optionnel)</Label>
+                      <Select value={editTypePilier} onValueChange={(v) => setEditTypePilier(v as "DROIT" | "ANGULE" | "MULTI_UNIT" | "")}>
+                        <SelectTrigger data-testid="select-edit-type-pilier">
+                          <SelectValue placeholder="Sélectionner..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DROIT">Droit</SelectItem>
+                          <SelectItem value="ANGULE">Angulé</SelectItem>
+                          <SelectItem value="MULTI_UNIT">Multi-unit</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Diamètre (mm)</Label>
@@ -402,22 +439,6 @@ export default function CatalogImplantDetailsPage() {
                   {implant.referenceFabricant || "—"}
                 </p>
               </div>
-              {isProthese && (
-                <div>
-                  <span className="text-xs text-muted-foreground">Type de prothèse</span>
-                  <p className="text-[13px] font-medium" data-testid="text-prothese-mobilite">
-                    {implant.mobilite === "AMOVIBLE" ? "Amovible" : implant.mobilite === "FIXE" ? "Fixe" : "—"}
-                  </p>
-                </div>
-              )}
-              {isProthese && implant.mobilite === "FIXE" && implant.typeProthese && (
-                <div>
-                  <span className="text-xs text-muted-foreground">Type de connexion</span>
-                  <p className="text-[13px] font-medium" data-testid="text-prothese-type">
-                    {implant.typeProthese === "VISSEE" ? "Vissée" : implant.typeProthese === "SCELLEE" ? "Scellée" : implant.typeProthese}
-                  </p>
-                </div>
-              )}
               {isProthese && implant.nomPilier && (
                 <div>
                   <span className="text-xs text-muted-foreground">Nom du pilier</span>
