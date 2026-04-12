@@ -35,6 +35,7 @@ import PublicSharePage from "@/pages/public-share";
 import OnboardingPage from "@/pages/onboarding";
 import SupportPage from "@/pages/support";
 import PrivacyPage from "@/pages/privacy";
+import TermsPage from "@/pages/terms";
 import { apiRequest } from "@/lib/queryClient";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -229,6 +230,7 @@ function Router({ searchQuery, setSearchQuery }: { searchQuery: string; setSearc
       </Route>
       <Route path="/support" component={SupportPage} />
       <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/terms" component={TermsPage} />
       <Route path="/settings/google-calendar" component={GoogleCalendarPage} />
       <Route path="/settings/:section" component={SettingsPage} />
       <Route path="/settings" component={SettingsPage} />
@@ -307,6 +309,7 @@ function AuthenticatedApp() {
       <Switch>
         <Route path="/share/:token" component={PublicSharePage} />
         <Route path="/privacy" component={PrivacyPage} />
+        <Route path="/terms" component={TermsPage} />
         <Route path="/register">
           {() => <RegisterPage onRegisterSuccess={() => refetch()} />}
         </Route>

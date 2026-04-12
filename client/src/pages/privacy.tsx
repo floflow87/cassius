@@ -40,7 +40,7 @@ export default function PrivacyPage() {
             <h2 className="text-base font-semibold mb-2">2. Responsable du traitement</h2>
             <p className="text-muted-foreground">Le responsable du traitement des données est :</p>
             <div className="mt-2 pl-4 border-l-2 border-muted text-muted-foreground space-y-1">
-              <p><span className="font-medium text-foreground">Cassius / Volta Studio</span></p>
+              <p><span className="font-medium text-foreground">Cassius</span></p>
               <p>Email : <a href="mailto:contact@cassiuspro.com" className="text-primary underline">contact@cassiuspro.com</a></p>
               <p>Site : <a href="https://cassiuspro.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">https://cassiuspro.com</a></p>
             </div>
@@ -182,9 +182,15 @@ export default function PrivacyPage() {
 
         </div>
 
-        <footer className="mt-12 pt-6 border-t text-center">
+        <footer className="mt-12 pt-6 border-t text-center space-y-2">
           <p className="text-xs text-muted-foreground">
-            Cassius / Volta Studio — <a href="https://cassiuspro.com" className="underline">cassiuspro.com</a>
+            Cassius —{" "}
+            <a href="https://cassiuspro.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">
+              Voir le site
+            </a>
+          </p>
+          <p className="text-[11px] text-muted-foreground/60">
+            <a href="/terms" className="hover:underline hover:text-muted-foreground transition-colors">Conditions d'utilisation</a>
           </p>
         </footer>
       </div>

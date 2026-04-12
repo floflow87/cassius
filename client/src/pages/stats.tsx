@@ -57,6 +57,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { IsqTimingBadge } from "@/components/isq-timing-badge";
 
 const PERIOD_OPTIONS = [
@@ -146,8 +147,8 @@ export default function StatsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<SearchSuggestion[]>([]);
-  const [isqDistributionFilter, setIsqDistributionFilter] = useState<string>("all");
-  const [isqDimensionFilter, setIsqDimensionFilter] = useState<string>("all");
+  const [isqModelFilters, setIsqModelFilters] = useState<string[]>([]);
+  const [isqDimensionFilters, setIsqDimensionFilters] = useState<string[]>([]);
   const [isqEvolutionFilter, setIsqEvolutionFilter] = useState<string>("all");
   const [cohorteStartDate, setCohorteStartDate] = useState<string>("");
   const [cohorteEndDate, setCohorteEndDate] = useState<string>("");
@@ -256,31 +257,6 @@ export default function StatsPage() {
     enabled: period !== "custom" || (!!customFrom && !!customTo),
   });
 
-  // Separate query for ISQ Distribution (filtered by model + patient/operation filters)
-  const { data: isqDistributionStats } = useQuery<ClinicalStats>({
-    queryKey: ["/api/stats/clinical", dateRange.from, dateRange.to, "isq-distribution", isqDistributionFilter, selectedPatientIds, selectedOperationIds],
-    queryFn: async () => {
-      const params = new URLSearchParams({
-        from: dateRange.from,
-        to: dateRange.to,
-      });
-      if (isqDistributionFilter && isqDistributionFilter !== "all") {
-        params.append("implantModelId", isqDistributionFilter);
-      }
-      if (selectedPatientIds.length > 0) {
-        params.append("patientIds", selectedPatientIds.join(","));
-      }
-      if (selectedOperationIds.length > 0) {
-        params.append("operationIds", selectedOperationIds.join(","));
-      }
-      const res = await fetch(`/api/stats/clinical?${params.toString()}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch ISQ distribution stats");
-      return res.json();
-    },
-    enabled: (period !== "custom" || (!!customFrom && !!customTo)) && isqDistributionFilter !== "all",
-  });
 
   // Separate query for ISQ Evolution (filtered by model + patient/operation filters)
   const { data: isqEvolutionStats } = useQuery<ClinicalStats>({
@@ -309,10 +285,7 @@ export default function StatsPage() {
     enabled: period !== "custom" || (!!customFrom && !!customTo),
   });
 
-  // Use filtered data when filter is applied, otherwise use main stats
-  const isqDistributionData = isqDistributionFilter !== "all" 
-    ? (isqDistributionStats?.isqDistribution || [])
-    : (stats?.isqDistribution || []);
+  const isqDistributionData = stats?.isqDistribution || [];
   
   // Always use isqEvolutionStats for ISQ evolution (respects implant type switch)
   const isqEvolutionData = isqEvolutionStats?.isqEvolution || [];
@@ -340,6 +313,7 @@ export default function StatsPage() {
   // Fetch surgery implants for success rate by dimension
   interface SurgeryImplantForStats {
     id: string;
+    implantId: string;
     siteFdi: string;
     typeOs: string | null;
     miseEnCharge: string | null;
@@ -384,13 +358,19 @@ export default function StatsPage() {
     });
   }, [surgeryImplantsData]);
 
-  // ISQ distribution filtered by dimension (client-side)
-  const isqDistributionByDimension = useMemo(() => {
-    if (isqDimensionFilter === "all") return null;
-    const [dia, lon] = isqDimensionFilter.split("x").map(Number);
-    const filtered = surgeryImplantsData.filter(
-      (si) => si.implant?.diametre === dia && si.implant?.longueur === lon && si.isqPose !== null && si.isqPose > 0
-    );
+  // ISQ distribution filtered by multi-select model + dimension (client-side)
+  const isqDistributionMultiFilter = useMemo(() => {
+    if (isqModelFilters.length === 0 && isqDimensionFilters.length === 0) return null;
+    let filtered = surgeryImplantsData.filter((si) => si.isqPose !== null && si.isqPose > 0);
+    if (isqModelFilters.length > 0) {
+      filtered = filtered.filter((si) => isqModelFilters.includes(si.implantId));
+    }
+    if (isqDimensionFilters.length > 0) {
+      filtered = filtered.filter((si) => {
+        const dim = `${si.implant?.diametre}x${si.implant?.longueur}`;
+        return isqDimensionFilters.includes(dim);
+      });
+    }
     const ranges = [
       { category: "< 40 (critique)", min: 0, max: 40 },
       { category: "40–49 (faible)", min: 40, max: 50 },
@@ -402,7 +382,7 @@ export default function StatsPage() {
       category,
       count: filtered.filter((si) => si.isqPose! >= min && si.isqPose! < max).length,
     })).filter((r) => r.count > 0);
-  }, [isqDimensionFilter, surgeryImplantsData]);
+  }, [isqModelFilters, isqDimensionFilters, surgeryImplantsData]);
 
   // Filter surgery implants by selected period
   const filteredSurgeryImplants = useMemo(() => {
@@ -585,7 +565,7 @@ export default function StatsPage() {
     { name: "Autre", value: otherValue, color: STATS_COLORS.grayMuted },
   ];
 
-  const isqData = isqDistributionByDimension ?? isqDistributionData;
+  const isqData = isqDistributionMultiFilter ?? isqDistributionData;
   const isqEvolutionChartData = isqEvolutionData.map((d) => ({
     ...d,
     month: format(new Date(d.period + "-01"), "MMM", { locale: fr }),
@@ -1063,35 +1043,74 @@ export default function StatsPage() {
                   <CardDescription className="text-xs">Stabilité des implants à la pose</CardDescription>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end">
-                  <Select value={isqDimensionFilter} onValueChange={(v) => { setIsqDimensionFilter(v); setIsqDistributionFilter("all"); }}>
-                    <SelectTrigger className="w-44 bg-white dark:bg-zinc-900" data-testid="select-isq-dimension">
-                      <SelectValue placeholder="Toutes dimensions" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Toutes dimensions</SelectItem>
-                      {availableIsqDimensions.map((dim) => {
-                        const [dia, lon] = dim.split("x");
-                        return (
-                          <SelectItem key={dim} value={dim}>
-                            Ø{dia}mm × {lon}mm
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <Select value={isqDistributionFilter} onValueChange={(v) => { setIsqDistributionFilter(v); setIsqDimensionFilter("all"); }}>
-                    <SelectTrigger className="w-48 bg-white dark:bg-zinc-900" data-testid="select-isq-model">
-                      <SelectValue placeholder="Tous les implants" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tous les implants</SelectItem>
-                      {stats?.availableImplantModels.map((model) => (
-                        <SelectItem key={model.id} value={model.id}>
-                          {model.marque} {model.referenceFabricant ? `- ${model.referenceFabricant}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Dimension multi-select */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 text-xs bg-white dark:bg-zinc-900 font-normal justify-between min-w-40" data-testid="select-isq-dimension">
+                        {isqDimensionFilters.length === 0
+                          ? "Toutes dimensions"
+                          : `${isqDimensionFilters.length} dimension${isqDimensionFilters.length > 1 ? "s" : ""}`}
+                        <span className="ml-2 text-muted-foreground">▾</span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-52 p-2" align="end">
+                      <div className="space-y-1 max-h-60 overflow-y-auto">
+                        <button
+                          className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted text-muted-foreground"
+                          onClick={() => setIsqDimensionFilters([])}
+                        >
+                          Tout effacer
+                        </button>
+                        {availableIsqDimensions.map((dim) => {
+                          const [dia, lon] = dim.split("x");
+                          const checked = isqDimensionFilters.includes(dim);
+                          return (
+                            <label key={dim} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-xs">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(c) => setIsqDimensionFilters(prev => c ? [...prev, dim] : prev.filter(d => d !== dim))}
+                              />
+                              Ø{dia}mm × {lon}mm
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  {/* Modèle multi-select */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 text-xs bg-white dark:bg-zinc-900 font-normal justify-between min-w-44" data-testid="select-isq-model">
+                        {isqModelFilters.length === 0
+                          ? "Tous les modèles"
+                          : `${isqModelFilters.length} modèle${isqModelFilters.length > 1 ? "s" : ""}`}
+                        <span className="ml-2 text-muted-foreground">▾</span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-2" align="end">
+                      <div className="space-y-1 max-h-60 overflow-y-auto">
+                        <button
+                          className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted text-muted-foreground"
+                          onClick={() => setIsqModelFilters([])}
+                        >
+                          Tout effacer
+                        </button>
+                        {stats?.availableImplantModels.map((model) => {
+                          const checked = isqModelFilters.includes(model.id);
+                          const label = `${model.marque}${model.referenceFabricant ? ` - ${model.referenceFabricant}` : ""}`;
+                          return (
+                            <label key={model.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-xs">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(c) => setIsqModelFilters(prev => c ? [...prev, model.id] : prev.filter(id => id !== model.id))}
+                              />
+                              {label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </CardHeader>
               <CardContent>

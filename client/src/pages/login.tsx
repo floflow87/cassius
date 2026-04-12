@@ -238,10 +238,12 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <p className="text-xs text-muted-foreground" data-testid="text-rgpd">
             Données médicales chiffrées et conformes RGPD
           </p>
-          <p className="text-[11px] text-muted-foreground/60">
-            <a href="/privacy" className="hover:underline hover:text-muted-foreground transition-colors" data-testid="link-privacy">
-              Politique de confidentialité
+          <p className="text-[11px] text-muted-foreground/60 space-x-3">
+            <a href="https://cassiuspro.com" target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-muted-foreground transition-colors" data-testid="link-site">
+              Voir le site
             </a>
+            <span>·</span>
+            <a href="/terms" className="hover:underline hover:text-muted-foreground transition-colors" data-testid="link-terms">CGU</a>
           </p>
         </div>
       </div>
