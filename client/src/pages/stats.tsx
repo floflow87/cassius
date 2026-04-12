@@ -1106,7 +1106,7 @@ export default function StatsPage() {
                               {item.daysSinceVisit === null ? "Jamais" : `${item.daysSinceVisit}j`}
                             </Badge>
                             <Button variant="ghost" size="icon" asChild>
-                              <Link href={`/surgery-implants/${item.implantId}`}>
+                              <Link href={`/patients/${item.patientId}/implants/${item.implantId}`}>
                                 <ExternalLink className="h-3 w-3" />
                               </Link>
                             </Button>

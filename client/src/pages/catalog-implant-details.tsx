@@ -137,6 +137,7 @@ export default function CatalogImplantDetailsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/catalog-implants"] });
+      queryClient.removeQueries({ queryKey: ["/api/catalog-implants", implantId] });
       toast({
         title: "Suppression effectuée",
         description: "La fiche catalogue a été supprimée",
@@ -315,9 +316,8 @@ export default function CatalogImplantDetailsPage() {
         </div>
         {canDelete && (
           <Button
-            variant="ghost"
             size="icon"
-            className="text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-950/30"
+            className="bg-red-600 hover:bg-red-700 text-white"
             onClick={() => setDeleteImplantDialogOpen(true)}
             data-testid="button-delete-catalog-implant"
           >
@@ -505,14 +505,6 @@ export default function CatalogImplantDetailsPage() {
                   <span className="text-xs text-muted-foreground">Type de connexion</span>
                   <p className="text-[13px] font-medium" data-testid="text-prothese-type">
                     {implant.typeProthese === "VISSEE" ? "Vissée" : implant.typeProthese === "SCELLEE" ? "Scellée" : implant.typeProthese}
-                  </p>
-                </div>
-              )}
-              {isProthese && implant.nomPilier && (
-                <div>
-                  <span className="text-xs text-muted-foreground">Nom du pilier</span>
-                  <p className="text-[13px] font-medium" data-testid="text-nom-pilier">
-                    {implant.nomPilier}
                   </p>
                 </div>
               )}

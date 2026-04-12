@@ -71,6 +71,7 @@ import {
   implantStatusReasons,
   implantStatusHistory,
   implantMeasurements,
+  patientShareLinks,
   appointmentRadios,
   type RadioNote,
   type RadioNoteWithAuthor,
@@ -542,6 +543,42 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePatient(organisationId: string, id: string): Promise<boolean> {
+    // Manual cascade to handle missing FK constraints in DB
+    // 1. Get patient's operation IDs
+    const patientOperations = await db.select({ id: operations.id })
+      .from(operations)
+      .where(and(eq(operations.patientId, id), eq(operations.organisationId, organisationId)));
+    const operationIds = patientOperations.map(op => op.id);
+
+    if (operationIds.length > 0) {
+      // 2. Get surgery implant IDs for those operations
+      const patientSurgeryImplants = await db.select({ id: surgeryImplants.id })
+        .from(surgeryImplants)
+        .where(inArray(surgeryImplants.surgeryId, operationIds));
+      const surgeryImplantIds = patientSurgeryImplants.map(si => si.id);
+
+      if (surgeryImplantIds.length > 0) {
+        // 3. Delete implant measurements
+        await db.delete(implantMeasurements).where(inArray(implantMeasurements.surgeryImplantId, surgeryImplantIds));
+        // 4. Delete implant status history
+        await db.delete(implantStatusHistory).where(inArray(implantStatusHistory.implantId, surgeryImplantIds));
+        // 5. Delete surgery implants
+        await db.delete(surgeryImplants).where(inArray(surgeryImplants.id, surgeryImplantIds));
+      }
+      // 6. Delete operations
+      await db.delete(operations).where(inArray(operations.id, operationIds));
+    }
+
+    // 7. Delete other patient-linked records
+    await db.delete(appointments).where(and(eq(appointments.patientId, id), eq(appointments.organisationId, organisationId)));
+    await db.delete(rendezVous).where(and(eq(rendezVous.patientId, id), eq(rendezVous.organisationId, organisationId)));
+    await db.delete(visites).where(and(eq(visites.patientId, id), eq(visites.organisationId, organisationId)));
+    await db.delete(notes).where(and(eq(notes.patientId, id), eq(notes.organisationId, organisationId)));
+    await db.delete(radios).where(and(eq(radios.patientId, id), eq(radios.organisationId, organisationId)));
+    await db.delete(documents).where(and(eq(documents.patientId, id), eq(documents.organisationId, organisationId)));
+    await db.delete(patientShareLinks).where(and(eq(patientShareLinks.patientId, id), eq(patientShareLinks.organisationId, organisationId)));
+
+    // 8. Finally delete patient
     const result = await db.delete(patients)
       .where(and(
         eq(patients.id, id),

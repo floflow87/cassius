@@ -1698,9 +1698,8 @@ export default function PatientDetailsPage() {
         </div>
         {canDelete && (
           <Button
-            variant="ghost"
             size="icon"
-            className="text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-950/30"
+            className="bg-red-600 hover:bg-red-700 text-white"
             onClick={() => setDeletePatientDialogOpen(true)}
             data-testid="button-delete-patient-header"
           >
