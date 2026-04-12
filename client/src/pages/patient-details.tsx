@@ -2334,7 +2334,7 @@ export default function PatientDetailsPage() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-1 p-0.5 bg-muted rounded-md">
+                    <div className="flex items-center gap-1 p-1 bg-white dark:bg-zinc-900 rounded-full w-fit">
                       {(["implants", "protheses"] as const).map((tab) => {
                         const count = tab === "implants"
                           ? (patient.surgeryImplants?.filter(si => si.implant?.typeImplant !== "PROTHESE").length || 0)
@@ -2343,9 +2343,18 @@ export default function PatientDetailsPage() {
                           <button
                             key={tab}
                             onClick={() => setOverviewImplantTab(tab)}
-                            className={`text-[12px] px-3 py-1 rounded transition-all ${overviewImplantTab === tab ? "bg-white dark:bg-zinc-900 font-medium shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                            className={`relative px-4 py-1.5 text-xs font-medium rounded-full transition-colors duration-200 ${overviewImplantTab === tab ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
                           >
-                            {tab === "implants" ? "Implants posés" : "Prothèses posées"} <span className="opacity-60">({count})</span>
+                            {overviewImplantTab === tab && (
+                              <motion.div
+                                layoutId="overview-implant-tab-indicator"
+                                className="absolute inset-0 bg-primary rounded-full"
+                                transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                              />
+                            )}
+                            <span className="relative z-10">
+                              {tab === "implants" ? "Implants posés" : "Prothèses posées"} ({count})
+                            </span>
                           </button>
                         );
                       })}
