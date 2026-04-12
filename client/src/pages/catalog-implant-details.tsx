@@ -29,6 +29,16 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -61,6 +71,7 @@ export default function CatalogImplantDetailsPage() {
   const { canDelete } = useCurrentUser();
 
   const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [deleteImplantDialogOpen, setDeleteImplantDialogOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesContent, setNotesContent] = useState("");
   const [selectedActs, setSelectedActs] = useState<string[]>([]);
@@ -115,6 +126,28 @@ export default function CatalogImplantDetailsPage() {
       toast({
         title: "Erreur",
         description: "Une erreur est survenue lors de la suppression",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteCatalogImplantMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/catalog-implants/${implantId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/catalog-implants"] });
+      toast({
+        title: "Suppression effectuée",
+        description: "La fiche catalogue a été supprimée",
+        variant: "success",
+      });
+      setLocation("/implants");
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer cette fiche catalogue",
         variant: "destructive",
       });
     },
@@ -280,6 +313,17 @@ export default function CatalogImplantDetailsPage() {
             </p>
           )}
         </div>
+        {canDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-950/30"
+            onClick={() => setDeleteImplantDialogOpen(true)}
+            data-testid="button-delete-catalog-implant"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -305,6 +349,17 @@ export default function CatalogImplantDetailsPage() {
                       data-testid="input-edit-marque" 
                     />
                   </div>
+                  {editTypeImplant === "PROTHESE" && (
+                    <div className="space-y-2">
+                      <Label>Nom du pilier (optionnel)</Label>
+                      <Input
+                        value={editNomPilier}
+                        onChange={(e) => setEditNomPilier(e.target.value)}
+                        placeholder="Ex: Bone Level NC, Active RP..."
+                        data-testid="input-edit-nom-pilier-top"
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Type</Label>
                     <Select value={editTypeImplant} onValueChange={(v) => setEditTypeImplant(v as "IMPLANT" | "MINI_IMPLANT" | "PROTHESE")}>
@@ -357,17 +412,6 @@ export default function CatalogImplantDetailsPage() {
                           <SelectItem value="SCELLEE">Scellée</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                  )}
-                  {editTypeImplant === "PROTHESE" && (
-                    <div className="space-y-2">
-                      <Label>Nom du pilier (optionnel)</Label>
-                      <Input
-                        value={editNomPilier}
-                        onChange={(e) => setEditNomPilier(e.target.value)}
-                        placeholder="Ex: Bone Level NC, Active RP..."
-                        data-testid="input-edit-nom-pilier"
-                      />
                     </div>
                   )}
                   {editTypeImplant === "PROTHESE" && (
@@ -427,12 +471,21 @@ export default function CatalogImplantDetailsPage() {
                 <span className="text-xs text-muted-foreground">Marque</span>
                 <p className="text-[13px] font-medium" data-testid="text-implant-marque">{implant.marque}</p>
               </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Type</span>
-                <p className="text-[13px] font-medium" data-testid="text-implant-type">
-                  {isProthese ? "Prothèse" : implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"}
-                </p>
-              </div>
+              {isProthese ? (
+                <div>
+                  <span className="text-xs text-muted-foreground">Nom du pilier</span>
+                  <p className="text-[13px] font-medium" data-testid="text-implant-type">
+                    {implant.nomPilier || "—"}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <span className="text-xs text-muted-foreground">Type</span>
+                  <p className="text-[13px] font-medium" data-testid="text-implant-type">
+                    {implant.typeImplant === "MINI_IMPLANT" ? "Mini-implant" : "Implant"}
+                  </p>
+                </div>
+              )}
               <div>
                 <span className="text-xs text-muted-foreground">Référence fabricant</span>
                 <p className="text-[13px] font-medium" data-testid="text-implant-reference">
@@ -732,6 +785,27 @@ export default function CatalogImplantDetailsPage() {
         title={isProthese ? "Historique de la prothèse" : "Historique de l'implant"}
         maxItems={5}
       />
+
+      <AlertDialog open={deleteImplantDialogOpen} onOpenChange={setDeleteImplantDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette fiche catalogue ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. La fiche {isProthese ? "prothèse" : "implant"} sera définitivement supprimée du catalogue.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              onClick={() => deleteCatalogImplantMutation.mutate()}
+              data-testid="button-confirm-delete-catalog"
+            >
+              {deleteCatalogImplantMutation.isPending ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
